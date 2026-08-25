@@ -92,7 +92,6 @@ export default function Dashboard() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">🎸 Komadi</h1>
-          <p className="text-sm text-neutral-400">Moje skladbe za igranje na kitaro</p>
         </div>
         <div className="flex gap-2">
           <button
