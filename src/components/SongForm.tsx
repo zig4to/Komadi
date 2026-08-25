@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { DIFFICULTIES, ERAS, GENRES, STATUSES } from "@/lib/constants";
+import { ERAS, GENRES } from "@/lib/constants";
 import { supabase } from "@/lib/supabaseClient";
 import type { NewSong, Song } from "@/types/song";
 
@@ -10,13 +10,7 @@ const emptyForm = {
   author: "",
   genre: GENRES[0],
   era: ERAS[0],
-  song_key: "",
-  capo: "",
-  difficulty: "",
-  status: STATUSES[0],
-  link: "",
   favorite: false,
-  notes: "",
 };
 
 export default function SongForm({
@@ -44,13 +38,7 @@ export default function SongForm({
       author: form.author.trim(),
       genre: form.genre,
       era: form.era,
-      song_key: form.song_key.trim() || null,
-      capo: form.capo === "" ? null : Number(form.capo),
-      difficulty: (form.difficulty || null) as NewSong["difficulty"],
-      status: form.status,
-      link: form.link.trim() || null,
       favorite: form.favorite,
-      notes: form.notes.trim() || null,
     };
 
     const { data, error: insertError } = await supabase
@@ -133,74 +121,6 @@ export default function SongForm({
               </option>
             ))}
           </select>
-        </Field>
-
-        <Field label="Tonaliteta">
-          <input
-            value={form.song_key}
-            onChange={(e) => setForm({ ...form, song_key: e.target.value })}
-            className={inputClass}
-            placeholder="npr. Em"
-          />
-        </Field>
-
-        <Field label="Kapo (0–11)">
-          <input
-            type="number"
-            min={0}
-            max={11}
-            value={form.capo}
-            onChange={(e) => setForm({ ...form, capo: e.target.value })}
-            className={inputClass}
-            placeholder="npr. 2"
-          />
-        </Field>
-
-        <Field label="Težavnost">
-          <select
-            value={form.difficulty}
-            onChange={(e) => setForm({ ...form, difficulty: e.target.value })}
-            className={inputClass}
-          >
-            <option value="">— brez —</option>
-            {DIFFICULTIES.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Status učenja">
-          <select
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value as typeof form.status })}
-            className={inputClass}
-          >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Povezava (akordi / video)" className="sm:col-span-2">
-          <input
-            value={form.link}
-            onChange={(e) => setForm({ ...form, link: e.target.value })}
-            className={inputClass}
-            placeholder="https://..."
-          />
-        </Field>
-
-        <Field label="Opombe" className="sm:col-span-2">
-          <textarea
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            className={inputClass}
-            rows={2}
-          />
         </Field>
       </div>
 

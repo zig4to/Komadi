@@ -1,6 +1,6 @@
 "use client";
 
-import { DIFFICULTIES, ERAS, GENRES, STATUSES } from "@/lib/constants";
+import { ERAS, GENRES } from "@/lib/constants";
 import { emptyFilters, hasActiveFilters, type FilterState } from "@/lib/filters";
 
 export default function Filters({
@@ -74,49 +74,15 @@ export default function Filters({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <label className="block space-y-1">
-          <span className="text-xs font-medium text-neutral-400">Težavnost</span>
-          <select
-            value={filters.difficulty}
-            onChange={(e) => onChange({ ...filters, difficulty: e.target.value })}
-            className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-          >
-            <option value="">Vse</option>
-            {DIFFICULTIES.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block space-y-1">
-          <span className="text-xs font-medium text-neutral-400">Status</span>
-          <select
-            value={filters.status}
-            onChange={(e) => onChange({ ...filters, status: e.target.value })}
-            className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-          >
-            <option value="">Vsi</option>
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex items-end gap-2 pb-2 text-sm text-neutral-300">
-          <input
-            type="checkbox"
-            checked={filters.favoriteOnly}
-            onChange={(e) => onChange({ ...filters, favoriteOnly: e.target.checked })}
-            className="h-4 w-4 rounded border-neutral-700 bg-neutral-800"
-          />
-          Samo priljubljene
-        </label>
-      </div>
+      <label className="flex items-center gap-2 text-sm text-neutral-300">
+        <input
+          type="checkbox"
+          checked={filters.favoriteOnly}
+          onChange={(e) => onChange({ ...filters, favoriteOnly: e.target.checked })}
+          className="h-4 w-4 rounded border-neutral-700 bg-neutral-800"
+        />
+        Samo priljubljene
+      </label>
     </div>
   );
 }

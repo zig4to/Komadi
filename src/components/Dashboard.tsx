@@ -10,17 +10,14 @@ import type { Song } from "@/types/song";
 
 export default function Dashboard() {
   const [songs, setSongs] = useState<Song[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isSupabaseConfigured);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
   const [randomPick, setRandomPick] = useState<Song | null>(null);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setLoading(false);
-      return;
-    }
+    if (!isSupabaseConfigured) return;
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase
@@ -46,8 +43,6 @@ export default function Dashboard() {
       if (q && !`${s.title} ${s.author}`.toLowerCase().includes(q)) return false;
       if (filters.genres.length && !filters.genres.includes(s.genre)) return false;
       if (filters.eras.length && !filters.eras.includes(s.era)) return false;
-      if (filters.difficulty && s.difficulty !== filters.difficulty) return false;
-      if (filters.status && s.status !== filters.status) return false;
       if (filters.favoriteOnly && !s.favorite) return false;
       return true;
     });

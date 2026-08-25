@@ -30,11 +30,5 @@ export const GENRES = [
   "Balada / akustika",
 ] as const;
 
-export const DIFFICULTIES = ["Lahko", "Srednje", "Težko"] as const;
-
-export const STATUSES = ["Za naučiti", "V učenju", "Naučeno"] as const;
-
 export type Era = (typeof ERAS)[number];
 export type Genre = (typeof GENRES)[number];
-export type Difficulty = (typeof DIFFICULTIES)[number];
-export type Status = (typeof STATUSES)[number];
