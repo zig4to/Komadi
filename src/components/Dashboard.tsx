@@ -13,6 +13,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Song | null>(null);
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
   const [randomPick, setRandomPick] = useState<Song | null>(null);
 
@@ -48,9 +49,32 @@ export default function Dashboard() {
     });
   }, [songs, filters]);
 
-  function handleAdded(song: Song) {
-    setSongs((prev) => [song, ...prev]);
+  function handleSaved(saved: Song, mode: "insert" | "update") {
+    if (mode === "insert") {
+      setSongs((prev) => [saved, ...prev]);
+    } else {
+      setSongs((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+      setRandomPick((p) => (p?.id === saved.id ? saved : p));
+    }
     setShowForm(false);
+    setEditing(null);
+  }
+
+  function handleEdit(song: Song) {
+    setShowForm(false);
+    setEditing(song);
+    setTimeout(
+      () =>
+        document
+          .getElementById("song-form")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      50,
+    );
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditing(null);
   }
 
   async function handleDelete(id: string) {
@@ -137,7 +161,10 @@ export default function Dashboard() {
             </svg>
           </button>
           <button
-            onClick={() => setShowForm((v) => !v)}
+            onClick={() => {
+              setEditing(null);
+              setShowForm((v) => !v);
+            }}
             disabled={!isSupabaseConfigured}
             aria-label="Dodaj skladbo"
             title="Dodaj skladbo"
@@ -183,7 +210,7 @@ export default function Dashboard() {
           </div>
           <SongCard
             song={randomPick}
-            onDelete={handleDelete}
+            onEdit={handleEdit}
             onToggleFavorite={handleToggleFavorite}
             highlighted
           />
@@ -196,7 +223,16 @@ export default function Dashboard() {
         </div>
       )}
 
-      {showForm && <SongForm onAdded={handleAdded} onClose={() => setShowForm(false)} />}
+      {(showForm || editing) && (
+        <div id="song-form">
+          <SongForm
+            key={editing?.id ?? "new"}
+            initial={editing}
+            onSaved={handleSaved}
+            onClose={closeForm}
+          />
+        </div>
+      )}
 
       <Filters filters={filters} onChange={setFilters} resultCount={filteredSongs.length} />
 
@@ -218,6 +254,7 @@ export default function Dashboard() {
           <SongCard
             key={song.id}
             song={song}
+            onEdit={handleEdit}
             onDelete={handleDelete}
             onToggleFavorite={handleToggleFavorite}
           />

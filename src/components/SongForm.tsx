@@ -14,13 +14,25 @@ const emptyForm = {
 };
 
 export default function SongForm({
-  onAdded,
+  initial,
+  onSaved,
   onClose,
 }: {
-  onAdded: (song: Song) => void;
+  initial?: Song | null;
+  onSaved: (song: Song, mode: "insert" | "update") => void;
   onClose: () => void;
 }) {
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(
+    initial
+      ? {
+          title: initial.title,
+          author: initial.author,
+          genre: initial.genre,
+          era: initial.era,
+          favorite: initial.favorite,
+        }
+      : emptyForm,
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,21 +53,19 @@ export default function SongForm({
       favorite: form.favorite,
     };
 
-    const { data, error: insertError } = await supabase
-      .from("songs")
-      .insert(payload)
-      .select()
-      .single();
+    const { data, error: dbError } = initial
+      ? await supabase.from("songs").update(payload).eq("id", initial.id).select().single()
+      : await supabase.from("songs").insert(payload).select().single();
 
     setSaving(false);
 
-    if (insertError || !data) {
-      setError(insertError?.message ?? "Napaka pri shranjevanju.");
+    if (dbError || !data) {
+      setError(dbError?.message ?? "Napaka pri shranjevanju.");
       return;
     }
 
-    onAdded(data as Song);
-    setForm(emptyForm);
+    onSaved(data as Song, initial ? "update" : "insert");
+    if (!initial) setForm(emptyForm);
   }
 
   return (
@@ -64,7 +74,9 @@ export default function SongForm({
       className="rounded-xl border border-neutral-800 bg-neutral-900 p-5 space-y-4"
     >
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Dodaj skladbo</h2>
+        <h2 className="text-lg font-semibold">
+          {initial ? "Uredi skladbo" : "Dodaj skladbo"}
+        </h2>
         <button
           type="button"
           onClick={onClose}
@@ -149,7 +161,7 @@ export default function SongForm({
           disabled={saving}
           className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
         >
-          {saving ? "Shranjujem…" : "Shrani skladbo"}
+          {saving ? "Shranjujem…" : initial ? "Shrani spremembe" : "Shrani skladbo"}
         </button>
       </div>
     </form>
