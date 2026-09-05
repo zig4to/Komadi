@@ -114,16 +114,45 @@ export default function Dashboard() {
           <button
             onClick={pickRandom}
             disabled={!isSupabaseConfigured}
-            className="rounded-lg border border-neutral-700 px-3 py-2 text-sm font-medium hover:border-emerald-500 hover:text-emerald-400 disabled:opacity-40 disabled:hover:border-neutral-700 disabled:hover:text-neutral-100"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 px-3 py-2 text-sm font-medium hover:border-emerald-500 hover:text-emerald-400 disabled:opacity-40 disabled:hover:border-neutral-700 disabled:hover:text-neutral-100"
           >
-            🎲 Naključna
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4 shrink-0"
+            >
+              <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+              <path d="M16 8h.01" />
+              <path d="M8 8h.01" />
+              <path d="M8 16h.01" />
+              <path d="M16 16h.01" />
+              <path d="M12 12h.01" />
+            </svg>
+            Naključna
           </button>
           <button
             onClick={() => setShowForm((v) => !v)}
             disabled={!isSupabaseConfigured}
-            className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600"
           >
-            + Dodaj skladbo
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4 shrink-0"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Dodaj skladbo
           </button>
         </div>
       </header>
