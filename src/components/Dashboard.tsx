@@ -114,7 +114,9 @@ export default function Dashboard() {
           <button
             onClick={pickRandom}
             disabled={!isSupabaseConfigured}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 px-3 py-2 text-sm font-medium hover:border-emerald-500 hover:text-emerald-400 disabled:opacity-40 disabled:hover:border-neutral-700 disabled:hover:text-neutral-100"
+            aria-label="Naključna skladba"
+            title="Naključna skladba"
+            className="inline-flex items-center justify-center rounded-lg border border-neutral-700 p-2 hover:border-emerald-500 hover:text-emerald-400 disabled:opacity-40 disabled:hover:border-neutral-700 disabled:hover:text-neutral-100"
           >
             <svg
               aria-hidden="true"
@@ -124,7 +126,7 @@ export default function Dashboard() {
               strokeWidth={1.8}
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="h-4 w-4 shrink-0"
+              className="h-[18px] w-[18px] shrink-0"
             >
               <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
               <path d="M16 8h.01" />
@@ -133,12 +135,13 @@ export default function Dashboard() {
               <path d="M16 16h.01" />
               <path d="M12 12h.01" />
             </svg>
-            Naključna
           </button>
           <button
             onClick={() => setShowForm((v) => !v)}
             disabled={!isSupabaseConfigured}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600"
+            aria-label="Dodaj skladbo"
+            title="Dodaj skladbo"
+            className="inline-flex items-center justify-center rounded-lg bg-emerald-600 p-2 text-white hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600"
           >
             <svg
               aria-hidden="true"
@@ -148,11 +151,10 @@ export default function Dashboard() {
               strokeWidth={1.8}
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="h-4 w-4 shrink-0"
+              className="h-[18px] w-[18px] shrink-0"
             >
               <path d="M12 5v14M5 12h14" />
             </svg>
-            Dodaj skladbo
           </button>
         </div>
       </header>
