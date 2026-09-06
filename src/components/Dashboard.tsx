@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Filters from "@/components/Filters";
+import SettingsMenu from "@/components/SettingsMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
 import { emptyFilters, type FilterState } from "@/lib/filters";
@@ -124,7 +125,7 @@ export default function Dashboard() {
               strokeWidth={1.8}
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="h-6 w-6 shrink-0 text-emerald-400"
+              className="h-6 w-6 shrink-0 text-emerald-600 dark:text-emerald-400"
             >
               <path d="m11.9 12.1 4.514-4.514" />
               <path d="M20.1 2.3a1 1 0 0 0-1.4 0l-1.114 1.114A2 2 0 0 0 17 4.828v1.344a2 2 0 0 1-.586 1.414A2 2 0 0 1 17.828 7h1.344a2 2 0 0 0 1.414-.586L21.7 5.3a1 1 0 0 0 0-1.4z" />
@@ -134,13 +135,13 @@ export default function Dashboard() {
             Komadi
           </h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <button
             onClick={pickRandom}
             disabled={!isSupabaseConfigured}
             aria-label="Naključna skladba"
             title="Naključna skladba"
-            className="inline-flex items-center justify-center rounded-lg border border-neutral-700 p-2 hover:border-emerald-500 hover:text-emerald-400 disabled:opacity-40 disabled:hover:border-neutral-700 disabled:hover:text-neutral-100"
+            className="inline-flex items-center justify-center rounded-lg border border-neutral-300 p-2 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-40 dark:border-neutral-700 dark:hover:text-emerald-400"
           >
             <svg
               aria-hidden="true"
@@ -183,27 +184,30 @@ export default function Dashboard() {
               <path d="M12 5v14M5 12h14" />
             </svg>
           </button>
+          <div className="ml-1.5">
+            <SettingsMenu />
+          </div>
         </div>
       </header>
 
       {!isSupabaseConfigured && (
-        <div className="rounded-xl border border-amber-700 bg-amber-950/40 p-4 text-sm text-amber-300">
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
           Supabase še ni nastavljen. Kopiraj{" "}
-          <code className="rounded bg-neutral-800 px-1">.env.local.example</code> v{" "}
-          <code className="rounded bg-neutral-800 px-1">.env.local</code>, vnesi URL in anon
+          <code className="rounded bg-neutral-200 px-1 dark:bg-neutral-800">.env.local.example</code> v{" "}
+          <code className="rounded bg-neutral-200 px-1 dark:bg-neutral-800">.env.local</code>, vnesi URL in anon
           ključ svojega Supabase projekta ter poženi{" "}
-          <code className="rounded bg-neutral-800 px-1">supabase/schema.sql</code> v SQL
-          Editorju, nato ponovno zaženi <code className="rounded bg-neutral-800 px-1">npm run dev</code>.
+          <code className="rounded bg-neutral-200 px-1 dark:bg-neutral-800">supabase/schema.sql</code> v SQL
+          Editorju, nato ponovno zaženi <code className="rounded bg-neutral-200 px-1 dark:bg-neutral-800">npm run dev</code>.
         </div>
       )}
 
       {randomPick && (
-        <div className="rounded-xl border border-emerald-500 bg-emerald-500/10 p-4">
+        <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-medium text-emerald-400">🎲 Naključno izbrana skladba</p>
+            <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">🎲 Naključno izbrana skladba</p>
             <button
               onClick={() => setRandomPick(null)}
-              className="text-xs text-neutral-400 hover:text-neutral-200"
+              className="text-xs text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
             >
               Zapri ✕
             </button>
@@ -216,7 +220,7 @@ export default function Dashboard() {
           />
           <button
             onClick={pickRandom}
-            className="mt-3 text-sm text-neutral-300 hover:text-emerald-400"
+            className="mt-3 text-sm text-neutral-600 hover:text-emerald-600 dark:text-neutral-300 dark:hover:text-emerald-400"
           >
             ↻ Izberi drugo
           </button>
@@ -236,10 +240,10 @@ export default function Dashboard() {
 
       <Filters filters={filters} onChange={setFilters} resultCount={filteredSongs.length} />
 
-      <section className="space-y-3">
+      <section className="space-y-4">
         {loading && <p className="text-sm text-neutral-500">Nalagam skladbe…</p>}
         {loadError && (
-          <p className="rounded-lg border border-red-800 bg-red-950/50 p-3 text-sm text-red-400">
+          <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-950/50 dark:text-red-400">
             Napaka pri nalaganju: {loadError}
           </p>
         )}

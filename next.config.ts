@@ -10,6 +10,11 @@ const basePath = isGithubPages && REPO_NAME ? `/${REPO_NAME}` : "";
 
 const nextConfig: NextConfig = {
   output: "export",
+  // Skrij Next.js indikator v razvojnem načinu (okno spodaj levo).
+  devIndicators: false,
+  // Dovoli dostop do dev strežnika s telefona prek WiFi (Next blokira
+  // navzkrižne izvore dev virov). Ignorira se pri produkcijskem izvozu.
+  allowedDevOrigins: ["192.168.2.84"],
   basePath,
   assetPrefix: basePath ? `${basePath}/` : "",
   images: { unoptimized: true },

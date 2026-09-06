@@ -1,6 +1,38 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import type { Song } from "@/types/song";
+
+// Stabilen odtenek barve iz ID-ja skladbe (enak ob vsakem izrisu).
+function hueFromId(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return h % 360;
+}
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // pade na rezervni način spodaj
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
 
 export default function SongCard({
   song,
@@ -15,18 +47,53 @@ export default function SongCard({
   onToggleFavorite: (song: Song) => void;
   highlighted?: boolean;
 }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const hue = hueFromId(song.id);
+  const cardStyle: React.CSSProperties = highlighted
+    ? {
+        boxShadow:
+          "0 12px 36px -18px rgb(16 185 129 / 0.28), 0 2px 8px -6px rgb(0 0 0 / 0.32)",
+      }
+    : {
+        boxShadow: `0 12px 36px -20px hsl(${hue} 85% 55% / 0.24), 0 2px 8px -7px rgb(0 0 0 / 0.32)`,
+        borderColor: `hsl(${hue} 50% 42% / 0.55)`,
+      };
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  function handleCardClick(e: React.MouseEvent<HTMLDivElement>) {
+    // Klik na gumb (priljubljene / uredi / izbriši) ne kopira.
+    if ((e.target as HTMLElement).closest("button, a")) return;
+    copyText(song.title).then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 1600);
+    });
+  }
+
   return (
     <div
-      className={`rounded-xl border p-4 transition ${
+      onClick={handleCardClick}
+      title="Klikni za kopiranje naslova"
+      style={cardStyle}
+      className={`relative cursor-pointer rounded-xl border bg-transparent p-4 transition duration-200 hover:-translate-y-0.5 ${
         highlighted
-          ? "border-emerald-500 bg-emerald-500/5"
-          : "border-neutral-800 bg-neutral-900"
+          ? "border-emerald-500"
+          : "border-neutral-200 dark:border-neutral-800"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate font-medium text-neutral-100">{song.title}</p>
-          <p className="truncate text-sm text-neutral-400">{song.author}</p>
+          <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{song.title}</p>
+          <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{song.author}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
@@ -36,8 +103,8 @@ export default function SongCard({
             title={song.favorite ? "Odstrani iz priljubljenih" : "Dodaj med priljubljene"}
             className={
               song.favorite
-                ? "text-amber-400"
-                : "text-neutral-600 hover:text-neutral-400"
+                ? "text-amber-500 dark:text-amber-400"
+                : "text-neutral-400 hover:text-neutral-600 dark:text-neutral-600 dark:hover:text-neutral-400"
             }
           >
             <svg
@@ -58,7 +125,7 @@ export default function SongCard({
             onClick={() => onEdit(song)}
             aria-label="Uredi skladbo"
             title="Uredi skladbo"
-            className="text-neutral-600 hover:text-emerald-400"
+            className="text-neutral-400 hover:text-emerald-600 dark:text-neutral-600 dark:hover:text-emerald-400"
           >
             <svg
               viewBox="0 0 24 24"
@@ -80,7 +147,7 @@ export default function SongCard({
               onClick={() => onDelete(song.id)}
               aria-label="Izbriši skladbo"
               title="Izbriši skladbo"
-              className="text-neutral-600 hover:text-red-400"
+              className="text-neutral-400 hover:text-red-600 dark:text-neutral-600 dark:hover:text-red-400"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -102,13 +169,19 @@ export default function SongCard({
         <Badge>{song.genre}</Badge>
         <Badge>{song.era}</Badge>
       </div>
+
+      {copied && (
+        <span className="pointer-events-none absolute bottom-2 right-3 rounded bg-white/90 px-1.5 py-0.5 text-xs font-medium text-emerald-600 ring-1 ring-neutral-200 dark:bg-neutral-950/80 dark:text-emerald-400 dark:ring-0">
+          kopirano :)
+        </span>
+      )}
     </div>
   );
 }
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-full border border-neutral-700 px-2 py-0.5 text-neutral-400">
+    <span className="rounded-full border border-neutral-300 px-2 py-0.5 text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
       {children}
     </span>
   );
