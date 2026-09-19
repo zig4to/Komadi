@@ -1,9 +1,12 @@
 // Supabase Edge Function: za podano skladbo z Anthropic API (Claude) prek
-// spletnega iskanja poišče 5 glasbeno podobnih skladb.
+// spletnega iskanja poišče podobne skladbe.
 //
 // Ne potrebuje novega secreta — uporablja isti ANTHROPIC_API_KEY kot
 // guess-era. Deploy:
 //   supabase functions deploy similar-songs
+const RESULT_COUNT = 7;
+const SAME_AUTHOR_COUNT = 3;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -91,18 +94,23 @@ Deno.serve(async (req) => {
   const system =
     "Si glasbeni strokovnjak s spletnim dostopom (orodje web_search). Tvoja NALOGA: " +
     "za IZVORNO skladbo, ki jo uporabnik navede v svojem sporočilu, poišči na spletu " +
-    "in vedno vrni natanko 5 GLASBENO PODOBNIH skladb (podoben žanr, slog, obdobje ali " +
-    "razpoloženje), ne nujno istega izvajalca.\n\n" +
+    `in vedno vrni natanko ${RESULT_COUNT} GLASBENO PODOBNIH skladb (podoben žanr, ` +
+    "slog, obdobje ali razpoloženje). Okvirno (ne strogo pravilo, samo smernica) naj " +
+    `bo približno ${SAME_AUTHOR_COUNT} predlogov istega izvajalca kot izvorna skladba, ` +
+    "ostali naj bodo drugih izvajalcev — če za izvajalca ni dovolj smiselnih (res " +
+    "podobnih) skladb, to razmerje prilagodi in raje vrni več predlogov drugih " +
+    "izvajalcev, kot da bi silil neustrezne.\n\n" +
     "Spodnji 'seznam že znanih skladb' je INFORMACIJA, ne prepoved obravnave: te " +
     "skladbe (vključno z izvorno skladbo samo) uporabnik že pozna, zato jih NE SMEŠ " +
-    "vključiti med svojih 5 PREDLOGOV — a nalogo (najti 5 novih podobnih skladb) moraš " +
-    "vseeno vedno izvesti, tudi če je izvorna skladba na tem seznamu (to je pričakovano " +
-    "in normalno, saj je izvorna skladba vedno navedena).\n\n" +
+    `vključiti med svojimi ${RESULT_COUNT} PREDLOGI — a nalogo (najti ${RESULT_COUNT} ` +
+    "novih podobnih skladb) moraš vseeno vedno izvesti, tudi če je izvorna skladba na " +
+    "tem seznamu (to je pričakovano in normalno, saj je izvorna skladba vedno " +
+    "navedena).\n\n" +
     "Seznam že znanih skladb (ne predlagaj teh nazaj):\n" +
     alreadyKnown +
     "\n\nOdgovori IZKLJUČNO z veljavnim JSON seznamom, brez uvodnega besedila, brez " +
     'razlage, brez code fence, natanko v obliki: [{"title":"...","author":"..."}, ...] ' +
-    "— natanko 5 elementov. Nikoli ne odgovori s prostim besedilom.";
+    `— natanko ${RESULT_COUNT} elementov. Nikoli ne odgovori s prostim besedilom.`;
 
   const messages: Array<{ role: "user" | "assistant"; content: unknown }> = [
     { role: "user", content: `Izvorna skladba — naslov: ${title}, izvajalec: ${author}` },
@@ -124,7 +132,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           model: "claude-haiku-4-5-20251001",
-          max_tokens: 1024,
+          max_tokens: 1536,
           system,
           messages,
           // web_search_20260209 (dinamično filtriranje) po dokumentaciji ni
@@ -168,5 +176,5 @@ Deno.serve(async (req) => {
     (s) => !excludeKeys.has(`${s.title.toLowerCase()}|${s.author.toLowerCase()}`),
   );
 
-  return json({ songs: filtered.slice(0, 5) });
+  return json({ songs: filtered.slice(0, RESULT_COUNT) });
 });
