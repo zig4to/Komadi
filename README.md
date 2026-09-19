@@ -136,6 +136,34 @@ Odpri obrazec "Dodaj skladbo", vnesi naslov in avtorja, klikni ✨ ob polju "Obd
 - **"Nepričakovan odgovor AI"** → model ni odgovoril z eno od pričakovanih vrednosti; redko se zgodi, poskusi znova (gumb ✨).
 - Spremembe v `supabase/functions/guess-era/index.ts` se ne uveljavijo same — po vsakem urejanju ponovno poženi `supabase functions deploy guess-era`.
 
+## AI predlog podobnih skladb (Supabase Edge Function)
+
+Ob vsaki skladbi lahko z gumbom 🔍 "Podobno" AI (Claude, s spletnim iskanjem) predlaga 5 podobnih skladb; ob vsakem predlogu je gumb **+**, ki odpre obrazec "Dodaj skladbo", predizpolnjen z naslovom in avtorjem. Klic gre prek Supabase Edge Function `similar-songs` ([`supabase/functions/similar-songs/index.ts`](./supabase/functions/similar-songs/index.ts)), iz istega razloga kot `guess-era`.
+
+**Ta funkcija uporablja isti `ANTHROPIC_API_KEY` secret kot `guess-era`** — če si že sledil postavitvi zgoraj, ni treba ponoviti korakov 1–5. Edini nov korak je objava druge funkcije:
+
+```powershell
+supabase functions deploy similar-songs
+```
+
+Preizkusi neposredno (enak vzorec kot pri `guess-era`, korak 7 zgoraj):
+
+```powershell
+$env:SUPABASE_ANON_KEY = "<tvoj-anon-key-iz-.env.local>"
+Invoke-RestMethod `
+  -Uri "https://<reference-id>.supabase.co/functions/v1/similar-songs" `
+  -Method Post `
+  -Headers @{ Authorization = "Bearer $env:SUPABASE_ANON_KEY" } `
+  -ContentType "application/json" `
+  -Body '{"title":"Wonderwall","author":"Oasis"}'
+```
+
+Pričakovan odgovor: `{"songs":[{"title":"...","author":"..."}, ...]}` s (do) 5 elementi. Klic traja dlje kot `guess-era`, ker vključuje spletno iskanje — tudi 10–15 sekund je normalno.
+
+⚠️ **Opomba o stroških:** vsako odpiranje panela "Podobno" in vsak klik "Še več" je dejanski klic na Haiku z do 4 spletnimi iskanji — pogostejši in dražji klic kot `guess-era`. Kartica si zapomni zadnjih 5 rezultatov, dokler ne klikneš "Še več", zato zapiranje/ponovno odpiranje panela ne ustvari novega klica.
+
+Napake in odpravljanje težav so enake kot pri `guess-era` (glej razdelek zgoraj).
+
 ## Backup podatkov
 
 Supabase free tier nima samodejnih dnevnih backupov (to je plačljiva Pro funkcija), zato je na voljo ročni skript, ki celotno tabelo `songs` izvozi v lokalno JSON datoteko:

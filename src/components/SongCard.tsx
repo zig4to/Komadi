@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useCopyFeedback } from "@/lib/useCopyFeedback";
-import type { Song } from "@/types/song";
+import { supabase } from "@/lib/supabaseClient";
+import type { SimilarSong, Song } from "@/types/song";
 
 // Stabilen odtenek barve iz ID-ja skladbe (enak ob vsakem izrisu).
 function hueFromId(id: string): number {
@@ -16,6 +18,7 @@ export default function SongCard({
   onDelete,
   onToggleFavorite,
   onCopy,
+  onAddSimilar,
   highlighted = false,
 }: {
   song: Song;
@@ -23,9 +26,45 @@ export default function SongCard({
   onDelete?: (id: string) => void;
   onToggleFavorite: (song: Song) => void;
   onCopy?: (song: Song) => void;
+  onAddSimilar?: (song: SimilarSong) => void;
   highlighted?: boolean;
 }) {
   const [copied, triggerCopy] = useCopyFeedback();
+  const [similarOpen, setSimilarOpen] = useState(false);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  const [similarError, setSimilarError] = useState<string | null>(null);
+  const [similarSongs, setSimilarSongs] = useState<SimilarSong[]>([]);
+
+  async function fetchSimilar(exclude: SimilarSong[]) {
+    setSimilarLoading(true);
+    setSimilarError(null);
+
+    const { data, error } = await supabase.functions.invoke("similar-songs", {
+      body: { title: song.title, author: song.author, exclude },
+    });
+
+    setSimilarLoading(false);
+
+    const songs = (data as { songs?: SimilarSong[] } | null)?.songs;
+    if (error || !songs) {
+      setSimilarError(
+        (data as { error?: string } | null)?.error ??
+          error?.message ??
+          "Predlogov ni bilo mogoče pridobiti.",
+      );
+      return;
+    }
+    setSimilarSongs(songs);
+  }
+
+  function handleToggleSimilar() {
+    if (similarOpen) {
+      setSimilarOpen(false);
+      return;
+    }
+    setSimilarOpen(true);
+    if (similarSongs.length === 0) fetchSimilar([]);
+  }
 
   const hue = hueFromId(song.id);
   const cardStyle: React.CSSProperties = highlighted
@@ -132,13 +171,103 @@ export default function SongCard({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-        <Badge>{song.genre}</Badge>
-        <Badge>{song.era}</Badge>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge>{song.genre}</Badge>
+          <Badge>{song.era}</Badge>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleToggleSimilar}
+          aria-label={similarOpen ? "Skrij podobne skladbe" : "Najdi podobne skladbe"}
+          title="Najdi podobne skladbe"
+          aria-expanded={similarOpen}
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 font-medium transition ${
+            similarOpen
+              ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              : "border-neutral-300 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-emerald-400"
+          }`}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-[13px] w-[13px] shrink-0"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          Podobno
+        </button>
       </div>
 
+      {similarOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-800"
+        >
+          {similarLoading && (
+            <p className="text-sm text-neutral-500">Iščem podobne skladbe…</p>
+          )}
+          {similarError && (
+            <p className="text-sm text-red-600 dark:text-red-400">{similarError}</p>
+          )}
+          {!similarLoading &&
+            !similarError &&
+            similarSongs.map((s, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between gap-2 rounded-lg border border-neutral-200 p-2 text-sm dark:border-neutral-800"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">
+                    {s.title}
+                  </p>
+                  <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">
+                    {s.author}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onAddSimilar?.(s)}
+                  aria-label={`Dodaj ${s.title} v knjižnico`}
+                  title="Dodaj v knjižnico"
+                  className="shrink-0 rounded-lg border border-neutral-300 p-1.5 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-emerald-400"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-[14px] w-[14px]"
+                  >
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          {!similarLoading && !similarError && similarSongs.length > 0 && (
+            <button
+              type="button"
+              onClick={() => fetchSimilar(similarSongs)}
+              className="w-full text-center text-sm text-emerald-600 hover:underline dark:text-emerald-400"
+            >
+              Še več
+            </button>
+          )}
+        </div>
+      )}
+
       {copied && (
-        <span className="pointer-events-none absolute bottom-2 right-3 rounded bg-white/90 px-1.5 py-0.5 text-xs font-medium text-emerald-600 ring-1 ring-neutral-200 dark:bg-neutral-950/80 dark:text-emerald-400 dark:ring-0">
+        <span className="pointer-events-none absolute bottom-2 left-3 rounded bg-white/90 px-1.5 py-0.5 text-xs font-medium text-emerald-600 ring-1 ring-neutral-200 dark:bg-neutral-950/80 dark:text-emerald-400 dark:ring-0">
           kopirano :)
         </span>
       )}

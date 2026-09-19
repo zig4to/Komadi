@@ -8,7 +8,7 @@ import SongForm from "@/components/SongForm";
 import { emptyFilters, type FilterState } from "@/lib/filters";
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useCopyFeedback } from "@/lib/useCopyFeedback";
-import type { Song } from "@/types/song";
+import type { SimilarSong, Song } from "@/types/song";
 
 export default function Dashboard() {
   const [songs, setSongs] = useState<Song[]>([]);
@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
   const [randomPick, setRandomPick] = useState<Song | null>(null);
   const [activeView, setActiveView] = useState<"list" | "newest" | "popular">("list");
+  const [prefillDraft, setPrefillDraft] = useState<{ title: string; author: string } | null>(null);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -78,11 +79,26 @@ export default function Dashboard() {
     }
     setShowForm(false);
     setEditing(null);
+    setPrefillDraft(null);
   }
 
   function handleEdit(song: Song) {
     setShowForm(false);
     setEditing(song);
+    setPrefillDraft(null);
+    setTimeout(
+      () =>
+        document
+          .getElementById("song-form")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      50,
+    );
+  }
+
+  function handleAddSimilar(song: SimilarSong) {
+    setEditing(null);
+    setShowForm(true);
+    setPrefillDraft({ title: song.title, author: song.author });
     setTimeout(
       () =>
         document
@@ -95,6 +111,7 @@ export default function Dashboard() {
   function closeForm() {
     setShowForm(false);
     setEditing(null);
+    setPrefillDraft(null);
   }
 
   async function handleDelete(id: string) {
@@ -192,6 +209,7 @@ export default function Dashboard() {
           <button
             onClick={() => {
               setEditing(null);
+              setPrefillDraft(null);
               setShowForm((v) => !v);
             }}
             disabled={!isSupabaseConfigured}
@@ -245,6 +263,7 @@ export default function Dashboard() {
             onEdit={handleEdit}
             onToggleFavorite={handleToggleFavorite}
             onCopy={handleCopy}
+            onAddSimilar={handleAddSimilar}
             highlighted
           />
           <button
@@ -259,8 +278,12 @@ export default function Dashboard() {
       {(showForm || editing) && (
         <div id="song-form">
           <SongForm
-            key={editing?.id ?? "new"}
+            key={
+              editing?.id ??
+              (prefillDraft ? `prefill:${prefillDraft.title}|${prefillDraft.author}` : "new")
+            }
             initial={editing}
+            prefill={editing ? null : prefillDraft}
             onSaved={handleSaved}
             onClose={closeForm}
           />
@@ -378,6 +401,7 @@ export default function Dashboard() {
                 onDelete={handleDelete}
                 onToggleFavorite={handleToggleFavorite}
                 onCopy={handleCopy}
+                onAddSimilar={handleAddSimilar}
               />
             ))}
           </>

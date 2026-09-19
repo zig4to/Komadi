@@ -12,3 +12,8 @@ export interface Song {
 }
 
 export type NewSong = Omit<Song, "id" | "created_at" | "copy_count">;
+
+export interface SimilarSong {
+  title: string;
+  author: string;
+}

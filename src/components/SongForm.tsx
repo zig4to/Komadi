@@ -15,10 +15,12 @@ const emptyForm = {
 
 export default function SongForm({
   initial,
+  prefill,
   onSaved,
   onClose,
 }: {
   initial?: Song | null;
+  prefill?: { title: string; author: string } | null;
   onSaved: (song: Song, mode: "insert" | "update") => void;
   onClose: () => void;
 }) {
@@ -31,7 +33,9 @@ export default function SongForm({
           era: initial.era,
           favorite: initial.favorite,
         }
-      : emptyForm,
+      : prefill
+        ? { ...emptyForm, title: prefill.title, author: prefill.author }
+        : emptyForm,
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
