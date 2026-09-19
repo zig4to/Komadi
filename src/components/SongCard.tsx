@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCopyFeedback } from "@/lib/useCopyFeedback";
 import type { Song } from "@/types/song";
 
 // Stabilen odtenek barve iz ID-ja skladbe (enak ob vsakem izrisu).
@@ -8,30 +8,6 @@ function hueFromId(id: string): number {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   return h % 360;
-}
-
-async function copyText(text: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    // pade na rezervni način spodaj
-  }
-  try {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.position = "fixed";
-    ta.style.opacity = "0";
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand("copy");
-    document.body.removeChild(ta);
-    return ok;
-  } catch {
-    return false;
-  }
 }
 
 export default function SongCard({
@@ -49,8 +25,7 @@ export default function SongCard({
   onCopy?: (song: Song) => void;
   highlighted?: boolean;
 }) {
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [copied, triggerCopy] = useCopyFeedback();
 
   const hue = hueFromId(song.id);
   const cardStyle: React.CSSProperties = highlighted
@@ -63,22 +38,11 @@ export default function SongCard({
         borderColor: `hsl(${hue} 50% 42% / 0.55)`,
       };
 
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
-
   function handleCardClick(e: React.MouseEvent<HTMLDivElement>) {
     // Klik na gumb (priljubljene / uredi / izbriši) ne kopira.
     if ((e.target as HTMLElement).closest("button, a")) return;
-    copyText(song.title).then((ok) => {
-      if (!ok) return;
-      setCopied(true);
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => setCopied(false), 1600);
-      onCopy?.(song);
+    triggerCopy(song.title).then((ok) => {
+      if (ok) onCopy?.(song);
     });
   }
 
