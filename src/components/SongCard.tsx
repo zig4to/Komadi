@@ -39,12 +39,14 @@ export default function SongCard({
   onEdit,
   onDelete,
   onToggleFavorite,
+  onCopy,
   highlighted = false,
 }: {
   song: Song;
   onEdit: (song: Song) => void;
   onDelete?: (id: string) => void;
   onToggleFavorite: (song: Song) => void;
+  onCopy?: (song: Song) => void;
   highlighted?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
@@ -76,6 +78,7 @@ export default function SongCard({
       setCopied(true);
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => setCopied(false), 1600);
+      onCopy?.(song);
     });
   }
 

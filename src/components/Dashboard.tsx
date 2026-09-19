@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [editing, setEditing] = useState<Song | null>(null);
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
   const [randomPick, setRandomPick] = useState<Song | null>(null);
+  const [activeView, setActiveView] = useState<"list" | "newest" | "popular">("list");
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -49,6 +50,23 @@ export default function Dashboard() {
       return true;
     });
   }, [songs, filters]);
+
+  const newestFirst = useMemo(
+    () =>
+      [...songs].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      ),
+    [songs],
+  );
+
+  const mostPopular = useMemo(
+    () =>
+      [...songs].sort((a, b) => {
+        if (b.copy_count !== a.copy_count) return b.copy_count - a.copy_count;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }),
+    [songs],
+  );
 
   function handleSaved(saved: Song, mode: "insert" | "update") {
     if (mode === "insert") {
@@ -100,6 +118,15 @@ export default function Dashboard() {
     if (error) {
       setSongs((s) => s.map((x) => (x.id === song.id ? song : x)));
     }
+  }
+
+  async function handleCopy(song: Song) {
+    const nextCount = (song.copy_count ?? 0) + 1;
+    setSongs((s) => s.map((x) => (x.id === song.id ? { ...x, copy_count: nextCount } : x)));
+    // Najbolje-trud: če stolpec copy_count še ne obstaja (migracija ni
+    // zagnana) ali klic spodleti, samo tiho ignoriramo — kopiranje v
+    // odložišče je uporabniku že uspelo.
+    await supabase.from("songs").update({ copy_count: nextCount }).eq("id", song.id);
   }
 
   function pickRandom() {
@@ -216,6 +243,7 @@ export default function Dashboard() {
             song={randomPick}
             onEdit={handleEdit}
             onToggleFavorite={handleToggleFavorite}
+            onCopy={handleCopy}
             highlighted
           />
           <button
@@ -240,6 +268,62 @@ export default function Dashboard() {
 
       <Filters filters={filters} onChange={setFilters} resultCount={filteredSongs.length} />
 
+      <div className="mt-3! flex gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveView((v) => (v === "newest" ? "list" : "newest"))}
+          disabled={!isSupabaseConfigured}
+          aria-pressed={activeView === "newest"}
+          className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition disabled:opacity-40 ${
+            activeView === "newest"
+              ? "bg-emerald-600 text-white"
+              : "bg-neutral-100 text-neutral-800 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          }`}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4 shrink-0"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3.5 2" />
+          </svg>
+          Novo
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveView((v) => (v === "popular" ? "list" : "popular"))}
+          disabled={!isSupabaseConfigured}
+          aria-pressed={activeView === "popular"}
+          className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition disabled:opacity-40 ${
+            activeView === "popular"
+              ? "bg-orange-600 text-white"
+              : "bg-neutral-100 text-neutral-800 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          }`}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`h-4 w-4 shrink-0 ${
+              activeView === "popular" ? "text-white" : "text-orange-500"
+            }`}
+          >
+            <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+          </svg>
+          Popularno
+        </button>
+      </div>
+
       <section className="space-y-4">
         {loading && <p className="text-sm text-neutral-500">Nalagam skladbe…</p>}
         {loadError && (
@@ -247,23 +331,102 @@ export default function Dashboard() {
             Napaka pri nalaganju: {loadError}
           </p>
         )}
-        {!loading && !loadError && filteredSongs.length === 0 && (
-          <p className="text-sm text-neutral-500">
-            {songs.length === 0
-              ? "Baza je še prazna — dodaj prvo skladbo."
-              : "Nobena skladba ne ustreza izbranim filtrom."}
-          </p>
+
+        {!loading && !loadError && activeView === "newest" && (
+          newestFirst.length === 0 ? (
+            <p className="text-sm text-neutral-500">Baza je še prazna — dodaj prvo skladbo.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {newestFirst.map((song) => (
+                <CompactCard key={song.id} song={song} />
+              ))}
+            </div>
+          )
         )}
-        {filteredSongs.map((song) => (
-          <SongCard
-            key={song.id}
-            song={song}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onToggleFavorite={handleToggleFavorite}
-          />
-        ))}
+
+        {!loading && !loadError && activeView === "popular" && (
+          mostPopular.length === 0 ? (
+            <p className="text-sm text-neutral-500">Baza je še prazna — dodaj prvo skladbo.</p>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">Top 5</p>
+              {mostPopular.slice(0, 5).map((song, i) => (
+                <CompactRow key={song.id} song={song} rank={i + 1} highlighted />
+              ))}
+              {mostPopular.slice(5).map((song, i) => (
+                <CompactRow key={song.id} song={song} rank={i + 6} />
+              ))}
+            </div>
+          )
+        )}
+
+        {!loading && !loadError && activeView === "list" && (
+          <>
+            {filteredSongs.length === 0 && (
+              <p className="text-sm text-neutral-500">
+                {songs.length === 0
+                  ? "Baza je še prazna — dodaj prvo skladbo."
+                  : "Nobena skladba ne ustreza izbranim filtrom."}
+              </p>
+            )}
+            {filteredSongs.map((song) => (
+              <SongCard
+                key={song.id}
+                song={song}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onToggleFavorite={handleToggleFavorite}
+                onCopy={handleCopy}
+              />
+            ))}
+          </>
+        )}
       </section>
+    </div>
+  );
+}
+
+function CompactCard({ song }: { song: Song }) {
+  return (
+    <div
+      title={song.title}
+      className="min-w-0 rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900"
+    >
+      <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{song.title}</p>
+      <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{song.author}</p>
+    </div>
+  );
+}
+
+function CompactRow({
+  song,
+  rank,
+  highlighted = false,
+}: {
+  song: Song;
+  rank: number;
+  highlighted?: boolean;
+}) {
+  return (
+    <div
+      title={song.title}
+      className={`flex min-w-0 items-center gap-3 rounded-xl border p-3 ${
+        highlighted
+          ? "border-orange-400 bg-orange-500/10 dark:border-orange-600"
+          : "border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+      }`}
+    >
+      <span
+        className={`w-5 shrink-0 text-right text-sm font-semibold ${
+          highlighted ? "text-orange-600 dark:text-orange-400" : "text-neutral-400 dark:text-neutral-600"
+        }`}
+      >
+        {rank}
+      </span>
+      <div className="min-w-0">
+        <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{song.title}</p>
+        <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{song.author}</p>
+      </div>
     </div>
   );
 }

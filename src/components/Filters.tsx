@@ -66,7 +66,7 @@ export default function Filters({
       onClick={() => {
         if (!open) setOpen(true);
       }}
-      className={`rounded-xl border border-neutral-200 bg-white p-5 space-y-4 dark:border-neutral-800 dark:bg-neutral-900 ${
+      className={`rounded-xl border border-neutral-200 bg-white px-5 py-3 space-y-4 dark:border-neutral-800 dark:bg-neutral-900 ${
         open ? "" : "cursor-pointer"
       }`}
     >

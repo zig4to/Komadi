@@ -7,7 +7,8 @@ export interface Song {
   genre: Genre;
   era: Era;
   favorite: boolean;
+  copy_count: number;
   created_at: string;
 }
 
-export type NewSong = Omit<Song, "id" | "created_at">;
+export type NewSong = Omit<Song, "id" | "created_at" | "copy_count">;
