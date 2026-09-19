@@ -37,6 +37,14 @@ yarn-error.log*
 # vercel
 .vercel
 
+# supabase CLI
+supabase/.temp
+
+# lokalni backupi podatkov
+/backups
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+certificates

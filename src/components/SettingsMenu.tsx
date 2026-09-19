@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { runBackup, shareBackup } from "@/lib/backup";
 import { useTheme, type Theme } from "@/lib/useTheme";
 
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
@@ -14,6 +15,69 @@ export default function SettingsMenu() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const { theme, setTheme } = useTheme();
+
+  const [backupBusy, setBackupBusy] = useState<"save" | "share" | null>(null);
+  const [backupMessage, setBackupMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const backupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (backupTimer.current) clearTimeout(backupTimer.current);
+  }, []);
+
+  function todayStr(): string {
+    return new Date().toLocaleDateString("sl-SI");
+  }
+
+  async function handleSaveBackup() {
+    if (backupTimer.current) clearTimeout(backupTimer.current);
+    setBackupBusy("save");
+    setBackupMessage(null);
+
+    try {
+      await runBackup();
+      setBackupMessage({ type: "success", text: `Uspešno shranjeno · ${todayStr()}` });
+      backupTimer.current = setTimeout(() => setBackupMessage(null), 5000);
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        setBackupMessage({
+          type: "error",
+          text: err instanceof Error ? err.message : "Backup ni uspel.",
+        });
+      }
+    } finally {
+      setBackupBusy(null);
+    }
+  }
+
+  async function handleShareBackup() {
+    if (backupTimer.current) clearTimeout(backupTimer.current);
+    setBackupBusy("share");
+    setBackupMessage(null);
+
+    try {
+      const result = await shareBackup();
+      setBackupMessage({
+        type: "success",
+        text:
+          result.method === "share"
+            ? `Uspešno deljeno · ${todayStr()}`
+            : `Deljenje ni podprto, datoteka prenesena · ${todayStr()}`,
+      });
+      backupTimer.current = setTimeout(() => setBackupMessage(null), 5000);
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        setBackupMessage({
+          type: "error",
+          text: err instanceof Error ? err.message : "Deljenje ni uspelo.",
+        });
+      }
+    } finally {
+      setBackupBusy(null);
+    }
+  }
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -121,6 +185,69 @@ export default function SettingsMenu() {
                   </button>
                 ))}
               </div>
+
+              <p className="mb-1.5 mt-3 text-xs font-medium text-neutral-500">Backup</p>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleSaveBackup}
+                  disabled={backupBusy !== null}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs font-medium text-neutral-700 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:text-emerald-400"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`h-[15px] w-[15px] shrink-0 ${backupBusy === "save" ? "animate-pulse" : ""}`}
+                  >
+                    <path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+                    <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" />
+                    <path d="M7 3v4a1 1 0 0 0 1 1h7" />
+                  </svg>
+                  {backupBusy === "save" ? "Shranjujem…" : "Prenesi"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShareBackup}
+                  disabled={backupBusy !== null}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs font-medium text-neutral-700 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:text-emerald-400"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`h-[15px] w-[15px] shrink-0 ${backupBusy === "share" ? "animate-pulse" : ""}`}
+                  >
+                    <circle cx="18" cy="5" r="3" />
+                    <circle cx="6" cy="12" r="3" />
+                    <circle cx="18" cy="19" r="3" />
+                    <path d="m8.59 13.51 6.83 3.98" />
+                    <path d="m15.41 6.51-6.82 3.98" />
+                  </svg>
+                  {backupBusy === "share" ? "Delim…" : "Deli"}
+                </button>
+              </div>
+              {backupMessage && (
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className={`mt-1.5 text-center text-xs ${
+                    backupMessage.type === "error"
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-emerald-600 dark:text-emerald-400"
+                  }`}
+                >
+                  {backupMessage.text}
+                </p>
+              )}
             </div>
           )}
         </div>

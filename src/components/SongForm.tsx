@@ -35,6 +35,35 @@ export default function SongForm({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [guessing, setGuessing] = useState(false);
+  const [guessError, setGuessError] = useState<string | null>(null);
+
+  async function handleGuessEra() {
+    if (!form.title.trim() || !form.author.trim()) {
+      setGuessError("Za AI predlog najprej vnesi naslov in avtorja.");
+      return;
+    }
+    setGuessing(true);
+    setGuessError(null);
+
+    const { data, error: fnError } = await supabase.functions.invoke("guess-era", {
+      body: { title: form.title.trim(), author: form.author.trim() },
+    });
+
+    setGuessing(false);
+
+    const era = (data as { era?: string } | null)?.era;
+    if (fnError || !era) {
+      setGuessError(
+        (data as { error?: string } | null)?.error ??
+          fnError?.message ??
+          "AI predloga ni bilo mogoče pridobiti.",
+      );
+      return;
+    }
+
+    setForm((f) => ({ ...f, era: era as typeof f.era }));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -122,19 +151,48 @@ export default function SongForm({
         </Field>
 
         <Field label="Obdobje">
-          <select
-            value={form.era}
-            onChange={(e) => setForm({ ...form, era: e.target.value as typeof form.era })}
-            className={inputClass}
-          >
-            {ERAS.map((era) => (
-              <option key={era} value={era}>
-                {era}
-              </option>
-            ))}
-          </select>
+          <div className="flex gap-2">
+            <select
+              value={form.era}
+              onChange={(e) => setForm({ ...form, era: e.target.value as typeof form.era })}
+              className={inputClass}
+            >
+              {ERAS.map((era) => (
+                <option key={era} value={era}>
+                  {era}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleGuessEra}
+              disabled={guessing}
+              aria-label="Predlagaj obdobje z AI"
+              title="Predlagaj obdobje z AI"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg border border-neutral-300 px-2.5 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-emerald-400"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`h-[18px] w-[18px] shrink-0 ${guessing ? "animate-pulse" : ""}`}
+              >
+                <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+                <path d="M20 3v4" />
+                <path d="M22 5h-4" />
+                <path d="M4 17v2" />
+                <path d="M5 18H3" />
+              </svg>
+            </button>
+          </div>
         </Field>
       </div>
+
+      {guessError && <p className="text-sm text-amber-600 dark:text-amber-400">{guessError}</p>}
 
       <label className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
         <input
