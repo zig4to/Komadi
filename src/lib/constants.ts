@@ -23,6 +23,7 @@ export const GENRES = [
   "Country",
   "Reggae",
   "Balada / akustika",
+  "Dalmatinske",
 ] as const;
 
 export type Era = (typeof ERAS)[number];
