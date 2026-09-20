@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { ERAS, GENRES } from "@/lib/constants";
 import { emptyFilters, hasActiveFilters, type FilterState } from "@/lib/filters";
 
@@ -58,6 +58,7 @@ export function FiltersToggle({
     <>
       <button
         type="button"
+        data-filters-toggle
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition ${
@@ -84,6 +85,7 @@ export function FiltersToggle({
       {open && hasActiveFilters(filters) && (
         <button
           type="button"
+          data-filters-toggle
           onClick={() => onChange(emptyFilters)}
           className="shrink-0 whitespace-nowrap text-xs text-neutral-500 hover:text-blue-600 dark:text-neutral-400 dark:hover:text-blue-400"
         >
@@ -104,7 +106,7 @@ export default function Filters({
   onChange: (f: FilterState) => void;
   moodOptions: string[];
 }) {
-  const [open] = usePersistentBool("komadi:filters:open", false);
+  const [open, setOpen] = usePersistentBool("komadi:filters:open", false);
 
   function toggleValue(key: "genres" | "eras" | "moods", value: string) {
     const current = filters[key];
@@ -114,10 +116,27 @@ export default function Filters({
     onChange({ ...filters, [key]: next });
   }
 
+  // Klik kamorkoli izven gumba Filtri ali tega panela zapre filtre.
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: PointerEvent) {
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-filters-toggle]") || target.closest("[data-filters-panel]")) {
+        return;
+      }
+      setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open, setOpen]);
+
   if (!open) return null;
 
   return (
-    <div className="mt-3! space-y-4 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
+    <div
+      data-filters-panel
+      className="mt-3! space-y-4 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900"
+    >
       <input
             value={filters.search}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}

@@ -248,6 +248,21 @@ export default function Dashboard() {
     setPartialOpen(false);
   }
 
+  // Klik kamorkoli izven gumbov Novo/Popularno ali njunega prikaznega
+  // območja zapre pogled nazaj na navaden seznam.
+  useEffect(() => {
+    if (activeView === "list") return;
+    function onPointerDown(e: PointerEvent) {
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-view-toggle]") || target.closest("[data-view-section]")) {
+        return;
+      }
+      setActiveView("list");
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [activeView]);
+
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 space-y-6">
       <header className="flex items-center justify-between">
@@ -484,6 +499,7 @@ export default function Dashboard() {
       <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
         <button
           type="button"
+          data-view-toggle
           onClick={() => setActiveView((v) => (v === "newest" ? "list" : "newest"))}
           disabled={!isSupabaseConfigured}
           aria-pressed={activeView === "newest"}
@@ -512,6 +528,7 @@ export default function Dashboard() {
         </button>
         <button
           type="button"
+          data-view-toggle
           onClick={() => setActiveView((v) => (v === "popular" ? "list" : "popular"))}
           disabled={!isSupabaseConfigured}
           aria-pressed={activeView === "popular"}
@@ -563,7 +580,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <section className="mt-3! space-y-4">
+      <section data-view-section className="mt-3! space-y-4">
         {loading && <p className="text-sm text-neutral-500">Nalagam skladbe…</p>}
         {loadError && (
           <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-950/50 dark:text-red-400">
@@ -664,10 +681,12 @@ function CompactRow({
     <div
       onClick={() => triggerCopy(song.title).then((ok) => ok && onCopy?.(song))}
       title="Klikni za kopiranje naslova"
-      className={`relative flex min-w-0 cursor-pointer items-center gap-3 rounded-xl border p-3 transition hover:-translate-y-0.5 ${
+      className={`relative flex min-w-0 cursor-pointer items-center gap-3 border p-3 transition hover:-translate-y-0.5 ${
         highlighted
-          ? "border-orange-400 bg-orange-500/10 dark:border-orange-600"
-          : "border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+          ? // Oblika trzalice (guitar pick): oster kot = konica, preostali
+            // trije zaobljeni = telo trzalice.
+            "rounded-tl-sm rounded-tr-3xl rounded-br-3xl rounded-bl-3xl border-orange-400 bg-orange-500/10 dark:border-orange-600"
+          : "rounded-xl border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
       }`}
     >
       <span
