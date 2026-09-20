@@ -146,7 +146,11 @@ export default function SettingsMenu({ onImported }: { onImported?: (songs: Song
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         title="Meni"
-        className="inline-flex items-center justify-center rounded-lg border border-neutral-300 p-2 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:hover:text-emerald-400"
+        className={`inline-flex items-center justify-center rounded-full border border-current/40 p-2.5 transition ${
+          menuOpen
+            ? "bg-[linear-gradient(115deg,#475569_15%,#94a3b8_100%)] text-white"
+            : "bg-[linear-gradient(115deg,rgba(100,116,139,0.14)_15%,rgba(100,116,139,0.03)_95%)] text-slate-600 hover:bg-[linear-gradient(115deg,rgba(100,116,139,0.24)_15%,rgba(100,116,139,0.06)_95%)] dark:text-slate-400 dark:hover:bg-[linear-gradient(115deg,rgba(100,116,139,0.32)_15%,rgba(100,116,139,0.1)_95%)]"
+        }`}
       >
         <svg
           aria-hidden="true"

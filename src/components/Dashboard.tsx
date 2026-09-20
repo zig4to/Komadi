@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Filters from "@/components/Filters";
+import Filters, { FiltersToggle } from "@/components/Filters";
 import SettingsMenu from "@/components/SettingsMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
@@ -141,6 +141,11 @@ export default function Dashboard() {
     setAuthorFilter(author);
   }
 
+  function handleFiltersChange(f: FilterState) {
+    setAuthorFilter(null);
+    setFilters(f);
+  }
+
   function handleAddSimilar(song: SimilarSong) {
     setEditing(null);
     setShowForm(true);
@@ -247,7 +252,7 @@ export default function Dashboard() {
     <div className="mx-auto w-full max-w-3xl px-4 py-8 space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold">
+          <h1 className="flex items-center gap-2">
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
@@ -263,7 +268,9 @@ export default function Dashboard() {
               <path d="m6 16 2 2" />
               <path d="M8.23 9.85A3 3 0 0 1 11 8a5 5 0 0 1 5 5 3 3 0 0 1-1.85 2.77l-.92.38A2 2 0 0 0 12 18a4 4 0 0 1-4 4 6 6 0 0 1-6-6 4 4 0 0 1 4-4 2 2 0 0 0 1.85-1.23z" />
             </svg>
-            Komadi
+            <span className="bg-[linear-gradient(115deg,#059669_15%,#34d399_100%)] bg-clip-text text-2xl font-extrabold tracking-tight text-transparent">
+              Komadi
+            </span>
           </h1>
         </div>
         <div className="flex items-center gap-2">
@@ -272,7 +279,7 @@ export default function Dashboard() {
             disabled={!isSupabaseConfigured}
             aria-label="Naključna skladba"
             title="Naključna skladba"
-            className="inline-flex items-center justify-center rounded-lg border border-neutral-300 p-2 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-40 dark:border-neutral-700 dark:hover:text-emerald-400"
+            className="inline-flex items-center justify-center rounded-full border border-current/40 bg-[linear-gradient(115deg,rgba(124,58,237,0.14)_15%,rgba(124,58,237,0.03)_95%)] p-2.5 text-violet-600 transition hover:bg-[linear-gradient(115deg,rgba(124,58,237,0.24)_15%,rgba(124,58,237,0.06)_95%)] disabled:opacity-40 dark:text-violet-400 dark:hover:bg-[linear-gradient(115deg,rgba(124,58,237,0.32)_15%,rgba(124,58,237,0.1)_95%)]"
           >
             <svg
               aria-hidden="true"
@@ -297,7 +304,7 @@ export default function Dashboard() {
             disabled={!isSupabaseConfigured}
             aria-label="Delno naključna skladba"
             title="Delno naključna skladba"
-            className="inline-flex items-center justify-center rounded-lg border border-neutral-300 p-2 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-40 dark:border-neutral-700 dark:hover:text-emerald-400"
+            className="inline-flex items-center justify-center rounded-full border border-current/40 bg-[linear-gradient(115deg,rgba(8,145,178,0.14)_15%,rgba(8,145,178,0.03)_95%)] p-2.5 text-cyan-700 transition hover:bg-[linear-gradient(115deg,rgba(8,145,178,0.24)_15%,rgba(8,145,178,0.06)_95%)] disabled:opacity-40 dark:text-cyan-400 dark:hover:bg-[linear-gradient(115deg,rgba(8,145,178,0.32)_15%,rgba(8,145,178,0.1)_95%)]"
           >
             <svg
               aria-hidden="true"
@@ -325,7 +332,7 @@ export default function Dashboard() {
             disabled={!isSupabaseConfigured}
             aria-label="Dodaj skladbo"
             title="Dodaj skladbo"
-            className="inline-flex items-center justify-center rounded-lg bg-emerald-600 p-2 text-white hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600"
+            className="inline-flex items-center justify-center rounded-full bg-[linear-gradient(115deg,#059669_15%,#34d399_100%)] p-2.5 text-white transition hover:brightness-110 disabled:opacity-40"
           >
             <svg
               aria-hidden="true"
@@ -474,23 +481,13 @@ export default function Dashboard() {
         </div>
       )}
 
-      <Filters
-        filters={filters}
-        onChange={(f) => {
-          setAuthorFilter(null);
-          setFilters(f);
-        }}
-        resultCount={filteredSongs.length}
-        moodOptions={usedMoods}
-      />
-
-      <div className="mt-3! flex gap-2">
+      <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveView((v) => (v === "newest" ? "list" : "newest"))}
           disabled={!isSupabaseConfigured}
           aria-pressed={activeView === "newest"}
-          className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition disabled:opacity-40 ${
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition disabled:opacity-40 ${
             activeView === "newest"
               ? "bg-[linear-gradient(115deg,#059669_15%,#34d399_100%)] text-white"
               : "bg-[linear-gradient(115deg,rgba(16,185,129,0.14)_15%,rgba(16,185,129,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.24)_15%,rgba(16,185,129,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.32)_15%,rgba(16,185,129,0.1)_95%)]"
@@ -504,7 +501,9 @@ export default function Dashboard() {
             strokeWidth={2}
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-4 w-4 shrink-0"
+            className={`h-4 w-4 shrink-0 ${
+              activeView === "newest" ? "text-white" : "text-emerald-600 dark:text-emerald-400"
+            }`}
           >
             <circle cx="12" cy="12" r="9" />
             <path d="M12 7v5l3.5 2" />
@@ -516,7 +515,7 @@ export default function Dashboard() {
           onClick={() => setActiveView((v) => (v === "popular" ? "list" : "popular"))}
           disabled={!isSupabaseConfigured}
           aria-pressed={activeView === "popular"}
-          className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition disabled:opacity-40 ${
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition disabled:opacity-40 ${
             activeView === "popular"
               ? "bg-[linear-gradient(115deg,#ea580c_15%,#fb923c_100%)] text-white"
               : "bg-[linear-gradient(115deg,rgba(249,115,22,0.14)_15%,rgba(249,115,22,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(249,115,22,0.24)_15%,rgba(249,115,22,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(249,115,22,0.32)_15%,rgba(249,115,22,0.1)_95%)]"
@@ -538,7 +537,10 @@ export default function Dashboard() {
           </svg>
           Popularno
         </button>
+        <FiltersToggle filters={filters} onChange={handleFiltersChange} />
       </div>
+
+      <Filters filters={filters} onChange={handleFiltersChange} moodOptions={usedMoods} />
 
       {authorFilter && (
         <div className="mt-3! flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm dark:border-neutral-800 dark:bg-neutral-900">

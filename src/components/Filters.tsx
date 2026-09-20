@@ -42,18 +42,69 @@ function usePersistentBool(key: string, fallback: boolean) {
   return [value, setValue] as const;
 }
 
+// Ločen gumb (pill, ista vrsta kot Novo/Popularno) — stanje odprto/zaprto
+// si deli s spodnjim Filters (panel) prek istega localStorage ključa +
+// dogodka (usePersistentBool), zato ju ni treba ročno sinhronizirati.
+export function FiltersToggle({
+  filters,
+  onChange,
+}: {
+  filters: FilterState;
+  onChange: (f: FilterState) => void;
+}) {
+  const [open, setOpen] = usePersistentBool("komadi:filters:open", false);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition ${
+          open
+            ? "bg-[linear-gradient(115deg,#2563eb_15%,#60a5fa_100%)] text-white"
+            : "bg-[linear-gradient(115deg,rgba(37,99,235,0.14)_15%,rgba(37,99,235,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(37,99,235,0.24)_15%,rgba(37,99,235,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(37,99,235,0.32)_15%,rgba(37,99,235,0.1)_95%)]"
+        }`}
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`h-4 w-4 shrink-0 ${open ? "text-white" : "text-blue-600 dark:text-blue-400"}`}
+        >
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+        </svg>
+        Filtri
+      </button>
+
+      {open && hasActiveFilters(filters) && (
+        <button
+          type="button"
+          onClick={() => onChange(emptyFilters)}
+          className="shrink-0 whitespace-nowrap text-xs text-neutral-500 hover:text-blue-600 dark:text-neutral-400 dark:hover:text-blue-400"
+        >
+          Počisti filtre
+        </button>
+      )}
+    </>
+  );
+}
+
+// Razširjen panel s filtri — prikazan samo, ko je FiltersToggle zgoraj odprt.
 export default function Filters({
   filters,
   onChange,
-  resultCount,
   moodOptions,
 }: {
   filters: FilterState;
   onChange: (f: FilterState) => void;
-  resultCount: number;
   moodOptions: string[];
 }) {
-  const [open, setOpen] = usePersistentBool("komadi:filters:open", false);
+  const [open] = usePersistentBool("komadi:filters:open", false);
 
   function toggleValue(key: "genres" | "eras" | "moods", value: string) {
     const current = filters[key];
@@ -63,46 +114,11 @@ export default function Filters({
     onChange({ ...filters, [key]: next });
   }
 
-  return (
-    <div
-      onClick={() => {
-        if (!open) setOpen(true);
-      }}
-      className={`rounded-xl border border-neutral-200 bg-white px-5 py-3 space-y-4 dark:border-neutral-800 dark:bg-neutral-900 ${
-        open ? "" : "cursor-pointer"
-      }`}
-    >
-      <div
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-neutral-700 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-100"
-      >
-        <span>
-          Filtri{"  "}
-          <span className="ml-2 font-normal text-neutral-500">
-            ({resultCount} {resultCount === 1 ? "skladba" : "skladb"})
-          </span>
-        </span>
-        <span className="flex shrink-0 items-center gap-3">
-          {open && hasActiveFilters(filters) && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange(emptyFilters);
-              }}
-              className="text-xs font-normal text-neutral-500 hover:text-emerald-600 dark:text-neutral-400 dark:hover:text-emerald-400"
-            >
-              Počisti filtre
-            </button>
-          )}
-          <Chevron open={open} className="h-4 w-4" />
-        </span>
-      </div>
+  if (!open) return null;
 
-      {open && (
-        <>
-          <input
+  return (
+    <div className="mt-3! space-y-4 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
+      <input
             value={filters.search}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
             placeholder="Išči po naslovu ali avtorju…"
@@ -179,8 +195,6 @@ export default function Filters({
               Samo priljubljene
             </label>
           </Section>
-        </>
-      )}
     </div>
   );
 }
