@@ -19,6 +19,7 @@ export default function SongCard({
   onToggleFavorite,
   onCopy,
   onAddSimilar,
+  onFilterAuthor,
   highlighted = false,
 }: {
   song: Song;
@@ -27,6 +28,7 @@ export default function SongCard({
   onToggleFavorite: (song: Song) => void;
   onCopy?: (song: Song) => void;
   onAddSimilar?: (song: SimilarSong) => void;
+  onFilterAuthor?: (author: string) => void;
   highlighted?: boolean;
 }) {
   const [copied, triggerCopy] = useCopyFeedback();
@@ -99,7 +101,14 @@ export default function SongCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{song.title}</p>
-          <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{song.author}</p>
+          <button
+            type="button"
+            onClick={() => onFilterAuthor?.(song.author)}
+            title={`Prikaži vse skladbe izvajalca ${song.author}`}
+            className="block max-w-full truncate text-left text-sm text-neutral-500 hover:text-emerald-600 hover:underline dark:text-neutral-400 dark:hover:text-emerald-400"
+          >
+            {song.author}
+          </button>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button

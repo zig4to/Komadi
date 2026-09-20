@@ -5,7 +5,7 @@ import Filters from "@/components/Filters";
 import SettingsMenu from "@/components/SettingsMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
-import { DEFAULT_MOODS } from "@/lib/constants";
+import { DEFAULT_MOODS, ERAS, GENRES } from "@/lib/constants";
 import { emptyFilters, type FilterState } from "@/lib/filters";
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useCopyFeedback } from "@/lib/useCopyFeedback";
@@ -21,6 +21,13 @@ export default function Dashboard() {
   const [randomPick, setRandomPick] = useState<Song | null>(null);
   const [activeView, setActiveView] = useState<"list" | "newest" | "popular">("list");
   const [prefillDraft, setPrefillDraft] = useState<{ title: string; author: string } | null>(null);
+  const [authorFilter, setAuthorFilter] = useState<string | null>(null);
+
+  type PartialDimension = "genre" | "author" | "era" | "mood";
+  const [partialOpen, setPartialOpen] = useState(false);
+  const [partialDimension, setPartialDimension] = useState<PartialDimension | null>(null);
+  const [partialValue, setPartialValue] = useState("");
+  const [partialError, setPartialError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -70,6 +77,22 @@ export default function Dashboard() {
     return Array.from(set).sort((a, b) => a.localeCompare(b, "sl"));
   }, [songs]);
 
+  // Za "Delno naključen" ponudimo v spustnih seznamih samo vrednosti, ki
+  // jih dejansko ima vsaj ena skladba (da izbira ne vodi v prazen rezultat).
+  const usedGenres = useMemo(() => GENRES.filter((g) => songs.some((s) => s.genre === g)), [songs]);
+  const usedEras = useMemo(() => ERAS.filter((e) => songs.some((s) => s.era === e)), [songs]);
+  const usedAuthors = useMemo(
+    () => Array.from(new Set(songs.map((s) => s.author))).sort((a, b) => a.localeCompare(b, "sl")),
+    [songs],
+  );
+
+  const PARTIAL_LABELS: Record<PartialDimension, string> = {
+    genre: "Žanr",
+    author: "Avtor",
+    era: "Obdobje",
+    mood: "Razpoloženje",
+  };
+
   const newestFirst = useMemo(
     () =>
       [...songs].sort(
@@ -110,6 +133,12 @@ export default function Dashboard() {
           ?.scrollIntoView({ behavior: "smooth", block: "center" }),
       50,
     );
+  }
+
+  function handleFilterByAuthor(author: string) {
+    setActiveView("list");
+    setFilters({ ...emptyFilters, search: author });
+    setAuthorFilter(author);
   }
 
   function handleAddSimilar(song: SimilarSong) {
@@ -174,6 +203,46 @@ export default function Dashboard() {
     setRandomPick(choice);
   }
 
+  function handlePartialStart() {
+    const dims: PartialDimension[] = ["genre", "author", "era", "mood"];
+    const dim = dims[Math.floor(Math.random() * dims.length)];
+    setPartialDimension(dim);
+    setPartialValue("");
+    setPartialError(null);
+    setPartialOpen(true);
+  }
+
+  function handlePartialConfirm() {
+    if (!partialDimension) return;
+    const value = partialValue.trim();
+    if (!value) {
+      setPartialError("Vnesi vrednost.");
+      return;
+    }
+
+    const pool = songs.filter((s) => {
+      switch (partialDimension) {
+        case "genre":
+          return s.genre === value;
+        case "era":
+          return s.era === value;
+        case "mood":
+          return s.mood === value;
+        case "author":
+          return s.author.toLowerCase() === value.toLowerCase();
+      }
+    });
+
+    if (!pool.length) {
+      setPartialError(`Nobena skladba ne ustreza: ${PARTIAL_LABELS[partialDimension]} = "${value}".`);
+      return;
+    }
+
+    const choice = pool[Math.floor(Math.random() * pool.length)];
+    setRandomPick(choice);
+    setPartialOpen(false);
+  }
+
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 space-y-6">
       <header className="flex items-center justify-between">
@@ -224,6 +293,30 @@ export default function Dashboard() {
             </svg>
           </button>
           <button
+            onClick={handlePartialStart}
+            disabled={!isSupabaseConfigured}
+            aria-label="Delno naključna skladba"
+            title="Delno naključna skladba"
+            className="inline-flex items-center justify-center rounded-lg border border-neutral-300 p-2 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-40 dark:border-neutral-700 dark:hover:text-emerald-400"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-[18px] w-[18px] shrink-0"
+            >
+              <path d="m18 14 4 4-4 4" />
+              <path d="m18 2 4 4-4 4" />
+              <path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" />
+              <path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" />
+              <path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" />
+            </svg>
+          </button>
+          <button
             onClick={() => {
               setEditing(null);
               setPrefillDraft(null);
@@ -264,6 +357,76 @@ export default function Dashboard() {
         </div>
       )}
 
+      {partialOpen && partialDimension && (
+        <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+              🔀 Delno naključno — izbrano merilo: {PARTIAL_LABELS[partialDimension]}
+            </p>
+            <button
+              onClick={() => setPartialOpen(false)}
+              className="text-xs text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+            >
+              Zapri ✕
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {partialDimension === "author" ? (
+              <>
+                <input
+                  list="komadi-authors-list"
+                  value={partialValue}
+                  onChange={(e) => {
+                    setPartialValue(e.target.value);
+                    setPartialError(null);
+                  }}
+                  placeholder="npr. Oasis"
+                  className="flex-1 rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 focus:border-emerald-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                />
+                <datalist id="komadi-authors-list">
+                  {usedAuthors.map((a) => (
+                    <option key={a} value={a} />
+                  ))}
+                </datalist>
+              </>
+            ) : (
+              <select
+                value={partialValue}
+                onChange={(e) => {
+                  setPartialValue(e.target.value);
+                  setPartialError(null);
+                }}
+                className="flex-1 rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 focus:border-emerald-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+              >
+                <option value="">— izberi —</option>
+                {(partialDimension === "genre"
+                  ? usedGenres
+                  : partialDimension === "era"
+                    ? usedEras
+                    : usedMoods
+                ).map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              type="button"
+              onClick={handlePartialConfirm}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+            >
+              Izberi naključno skladbo
+            </button>
+          </div>
+
+          {partialError && (
+            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{partialError}</p>
+          )}
+        </div>
+      )}
+
       {randomPick && (
         <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
           <div className="mb-2 flex items-center justify-between">
@@ -281,6 +444,7 @@ export default function Dashboard() {
             onToggleFavorite={handleToggleFavorite}
             onCopy={handleCopy}
             onAddSimilar={handleAddSimilar}
+            onFilterAuthor={handleFilterByAuthor}
             highlighted
           />
           <button
@@ -310,7 +474,10 @@ export default function Dashboard() {
 
       <Filters
         filters={filters}
-        onChange={setFilters}
+        onChange={(f) => {
+          setAuthorFilter(null);
+          setFilters(f);
+        }}
         resultCount={filteredSongs.length}
         moodOptions={usedMoods}
       />
@@ -371,7 +538,28 @@ export default function Dashboard() {
         </button>
       </div>
 
-      <section className="space-y-4">
+      {authorFilter && (
+        <div className="mt-3! flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <span className="text-neutral-700 dark:text-neutral-300">
+            Skladbe izvajalca{" "}
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+              {authorFilter}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setAuthorFilter(null);
+              setFilters(emptyFilters);
+            }}
+            className="text-xs text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+          >
+            Počisti ✕
+          </button>
+        </div>
+      )}
+
+      <section className="mt-3! space-y-4">
         {loading && <p className="text-sm text-neutral-500">Nalagam skladbe…</p>}
         {loadError && (
           <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-950/50 dark:text-red-400">
@@ -425,6 +613,7 @@ export default function Dashboard() {
                 onToggleFavorite={handleToggleFavorite}
                 onCopy={handleCopy}
                 onAddSimilar={handleAddSimilar}
+                onFilterAuthor={handleFilterByAuthor}
               />
             ))}
           </>
