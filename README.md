@@ -174,6 +174,40 @@ npm run backup
 
 Datoteka pristane v `backups/songs-<datum-čas>.json` (mapa je izključena iz gita — vsebuje tvoje podatke, ne kode). Poženi po večjih spremembah v repertoarju ali pred kakšnim eksperimentiranjem z bazo.
 
+## Uvoz skladb
+
+V **Nastavitve → Uvoz skladb** lahko z gumbom "Izberi .txt datoteko" naenkrat uvoziš več skladb iz navadne besedilne datoteke. Format:
+
+```
+Avtor: Oasis
+
+Wonderwall
+Žanr: Rock
+Obdobje: 1990s
+Razpoloženje: Nostalgična
+Priljubljena: da
+
+Champagne Supernova
+Žanr: Rock
+Obdobje: 1990s
+
+Avtor: Queen
+
+Bohemian Rhapsody
+Žanr: Rock
+Obdobje: 1970s
+Priljubljena: da
+```
+
+Pravila:
+- Vrstica `Avtor: Ime` velja za vse skladbe pod njo, dokler se ne pojavi naslednja `Avtor:` vrstica.
+- Vsaka navadna vrstica (ki ni `Avtor:` ali eden od spodnjih parametrov) je naslov nove skladbe.
+- Pod naslovom lahko dodaš neobvezne vrstice `Žanr:`, `Obdobje:`, `Razpoloženje:`, `Priljubljena:` (da/ne) — karkoli izpustiš, dobi privzeto vrednost (prvi žanr/obdobje s seznama, brez razpoloženja, ni priljubljena).
+- Prazne vrstice se ignorirajo — uporabljaj jih poljubno za preglednost.
+- Žanr in obdobje morata ustrezati enemu izmed obstoječih (glej `src/lib/constants.ts`), sicer dobiš opozorilo in privzeto vrednost; razpoloženje je prosto besedilo.
+
+Po izbiri datoteke se prikaže povzetek (koliko skladb, morebitna opozorila) — šele s klikom na "Uvozi" se skladbe dejansko zapišejo v bazo.
+
 ## Varnostna opomba
 
 Aplikacija nima prijave — `anon` ključ omogoča branje in pisanje vsem, ki poznajo URL aplikacije. Za osebno/lokalno rabo je to v redu. Če jo objaviš javno (npr. na Vercelu), razmisli o:

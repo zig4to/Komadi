@@ -341,7 +341,9 @@ export default function Dashboard() {
             </svg>
           </button>
           <div className="ml-1.5">
-            <SettingsMenu />
+            <SettingsMenu
+              onImported={(imported) => setSongs((prev) => [...imported, ...prev])}
+            />
           </div>
         </div>
       </header>

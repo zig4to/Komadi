@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { runBackup, shareBackup } from "@/lib/backup";
+import { parseImportJson, parseImportText, type ParsedImport } from "@/lib/importSongs";
+import { supabase } from "@/lib/supabaseClient";
 import { useTheme, type Theme } from "@/lib/useTheme";
+import type { Song } from "@/types/song";
 
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: "system", label: "Sistemska" },
@@ -10,7 +13,7 @@ const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: "dark", label: "Temna" },
 ];
 
-export default function SettingsMenu() {
+export default function SettingsMenu({ onImported }: { onImported?: (songs: Song[]) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -22,6 +25,14 @@ export default function SettingsMenu() {
     text: string;
   } | null>(null);
   const backupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [importPending, setImportPending] = useState<ParsedImport | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importMessage, setImportMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => {
     if (backupTimer.current) clearTimeout(backupTimer.current);
@@ -77,6 +88,37 @@ export default function SettingsMenu() {
     } finally {
       setBackupBusy(null);
     }
+  }
+
+  async function handleImportFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setImportMessage(null);
+    const text = await file.text();
+    const parsed = file.name.toLowerCase().endsWith(".json")
+      ? parseImportJson(text)
+      : parseImportText(text);
+    setImportPending(parsed);
+  }
+
+  async function handleConfirmImport() {
+    if (!importPending || importPending.songs.length === 0) return;
+    setImportBusy(true);
+
+    const { data, error } = await supabase.from("songs").insert(importPending.songs).select();
+
+    setImportBusy(false);
+
+    if (error || !data) {
+      setImportMessage({ type: "error", text: error?.message ?? "Uvoz ni uspel." });
+      return;
+    }
+
+    onImported?.(data as Song[]);
+    setImportMessage({ type: "success", text: `Uvoženih ${data.length} skladb · ${todayStr()}` });
+    setImportPending(null);
   }
 
   useEffect(() => {
@@ -246,6 +288,85 @@ export default function SettingsMenu() {
                   }`}
                 >
                   {backupMessage.text}
+                </p>
+              )}
+
+              <p className="mb-1.5 mt-3 text-xs font-medium text-neutral-500">Uvoz skladb</p>
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".txt,.json,text/plain,application/json"
+                onChange={handleImportFileChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => importFileRef.current?.click()}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs font-medium text-neutral-700 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:text-neutral-200 dark:hover:text-emerald-400"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-[15px] w-[15px] shrink-0"
+                >
+                  <path d="M12 3v12" />
+                  <path d="m17 8-5-5-5 5" />
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                </svg>
+                Izberi .txt ali .json datoteko
+              </button>
+
+              {importPending && (
+                <div className="mt-2 space-y-1.5 rounded-lg border border-neutral-200 p-2 text-xs dark:border-neutral-800">
+                  <p className="font-medium text-neutral-700 dark:text-neutral-200">
+                    {importPending.songs.length === 0
+                      ? "Ni najdenih skladb za uvoz."
+                      : `Pripravljenih ${importPending.songs.length} skladb za uvoz.`}
+                  </p>
+                  {importPending.warnings.length > 0 && (
+                    <ul className="max-h-24 space-y-0.5 overflow-y-auto text-amber-600 dark:text-amber-400">
+                      {importPending.warnings.map((w, i) => (
+                        <li key={i}>⚠ {w}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="flex gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleConfirmImport}
+                      disabled={importBusy || importPending.songs.length === 0}
+                      className="flex-1 rounded-lg bg-emerald-600 px-2 py-1.5 font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                    >
+                      {importBusy ? "Uvažam…" : "Uvozi"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImportPending(null)}
+                      disabled={importBusy}
+                      className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-neutral-600 hover:border-neutral-400 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+                    >
+                      Prekliči
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {importMessage && (
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className={`mt-1.5 text-center text-xs ${
+                    importMessage.type === "error"
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-emerald-600 dark:text-emerald-400"
+                  }`}
+                >
+                  {importMessage.text}
                 </p>
               )}
             </div>
