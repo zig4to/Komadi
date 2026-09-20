@@ -46,14 +46,16 @@ export default function Filters({
   filters,
   onChange,
   resultCount,
+  moodOptions,
 }: {
   filters: FilterState;
   onChange: (f: FilterState) => void;
   resultCount: number;
+  moodOptions: string[];
 }) {
   const [open, setOpen] = usePersistentBool("komadi:filters:open", false);
 
-  function toggleValue(key: "genres" | "eras", value: string) {
+  function toggleValue(key: "genres" | "eras" | "moods", value: string) {
     const current = filters[key];
     const next = current.includes(value)
       ? current.filter((v) => v !== value)
@@ -140,6 +142,25 @@ export default function Filters({
               ))}
             </div>
           </Section>
+
+          {moodOptions.length > 0 && (
+            <Section
+              title="Razpoloženje"
+              count={filters.moods.length}
+              storageKey="komadi:filters:mood"
+            >
+              <div className="flex flex-wrap gap-2">
+                {moodOptions.map((mood) => (
+                  <Chip
+                    key={mood}
+                    active={filters.moods.includes(mood)}
+                    onClick={() => toggleValue("moods", mood)}
+                    label={mood}
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
 
           <Section
             title="Več možnosti"

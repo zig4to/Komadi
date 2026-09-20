@@ -7,6 +7,7 @@ export interface Song {
   genre: Genre;
   era: Era;
   favorite: boolean;
+  mood: string | null;
   copy_count: number;
   created_at: string;
 }

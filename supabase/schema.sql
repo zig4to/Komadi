@@ -9,6 +9,7 @@ create table if not exists public.songs (
   genre text not null,
   era text not null,
   favorite boolean not null default false,
+  mood text,
   copy_count integer not null default 0,
   created_at timestamptz not null default now()
 );
@@ -16,6 +17,7 @@ create table if not exists public.songs (
 create index if not exists songs_genre_idx on public.songs (genre);
 create index if not exists songs_era_idx on public.songs (era);
 create index if not exists songs_favorite_idx on public.songs (favorite);
+create index if not exists songs_mood_idx on public.songs (mood);
 create index if not exists songs_copy_count_idx on public.songs (copy_count desc);
 
 -- Row Level Security: aplikacija nima prijave (osebni projekt), zato

@@ -27,3 +27,18 @@ export const GENRES = [
 
 export type Era = (typeof ERAS)[number];
 export type Genre = (typeof GENRES)[number];
+
+// Razpoloženje je neobvezno in uporabniško razširljivo (ni fiksen nabor kot
+// žanr/obdobje) — to je samo začetni predlagan seznam za obrazec; nova,
+// ročno vnesena razpoloženja se shranijo kot navadno besedilo in se nato
+// pojavijo v seznamih za izbiro/filtriranje.
+export const DEFAULT_MOODS = [
+  "Vesela",
+  "Žalostna",
+  "Energična",
+  "Romantična",
+  "Umirjena",
+  "Nostalgična",
+  "Uporniška",
+  "Sanjava",
+] as const;

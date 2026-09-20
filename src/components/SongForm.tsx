@@ -11,16 +11,19 @@ const emptyForm = {
   genre: GENRES[0],
   era: ERAS[0],
   favorite: false,
+  mood: null as string | null,
 };
 
 export default function SongForm({
   initial,
   prefill,
+  knownMoods,
   onSaved,
   onClose,
 }: {
   initial?: Song | null;
   prefill?: { title: string; author: string } | null;
+  knownMoods: string[];
   onSaved: (song: Song, mode: "insert" | "update") => void;
   onClose: () => void;
 }) {
@@ -32,6 +35,7 @@ export default function SongForm({
           genre: initial.genre,
           era: initial.era,
           favorite: initial.favorite,
+          mood: initial.mood,
         }
       : prefill
         ? { ...emptyForm, title: prefill.title, author: prefill.author }
@@ -41,6 +45,7 @@ export default function SongForm({
   const [error, setError] = useState<string | null>(null);
   const [guessing, setGuessing] = useState(false);
   const [guessError, setGuessError] = useState<string | null>(null);
+  const [addingMood, setAddingMood] = useState(false);
 
   async function handleGuessEra() {
     if (!form.title.trim() || !form.author.trim()) {
@@ -84,6 +89,7 @@ export default function SongForm({
       genre: form.genre,
       era: form.era,
       favorite: form.favorite,
+      mood: form.mood?.trim() || null,
     };
 
     const { data, error: dbError } = initial
@@ -98,7 +104,10 @@ export default function SongForm({
     }
 
     onSaved(data as Song, initial ? "update" : "insert");
-    if (!initial) setForm(emptyForm);
+    if (!initial) {
+      setForm(emptyForm);
+      setAddingMood(false);
+    }
   }
 
   return (
@@ -193,6 +202,51 @@ export default function SongForm({
               </svg>
             </button>
           </div>
+        </Field>
+
+        <Field label="Razpoloženje" className="sm:col-span-2">
+          {addingMood ? (
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                value={form.mood ?? ""}
+                onChange={(e) => setForm({ ...form, mood: e.target.value })}
+                placeholder="npr. Taborniška"
+                className={inputClass}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingMood(false);
+                  setForm({ ...form, mood: null });
+                }}
+                className="shrink-0 rounded-lg border border-neutral-300 px-3 text-sm text-neutral-600 hover:border-neutral-400 dark:border-neutral-700 dark:text-neutral-300"
+              >
+                Prekliči
+              </button>
+            </div>
+          ) : (
+            <select
+              value={form.mood ?? ""}
+              onChange={(e) => {
+                if (e.target.value === "__new__") {
+                  setForm({ ...form, mood: null });
+                  setAddingMood(true);
+                  return;
+                }
+                setForm({ ...form, mood: e.target.value || null });
+              }}
+              className={inputClass}
+            >
+              <option value="">Brez</option>
+              {knownMoods.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+              <option value="__new__">+ Dodaj novo razpoloženje…</option>
+            </select>
+          )}
         </Field>
       </div>
 

@@ -5,6 +5,7 @@ import Filters from "@/components/Filters";
 import SettingsMenu from "@/components/SettingsMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
+import { DEFAULT_MOODS } from "@/lib/constants";
 import { emptyFilters, type FilterState } from "@/lib/filters";
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useCopyFeedback } from "@/lib/useCopyFeedback";
@@ -48,10 +49,26 @@ export default function Dashboard() {
       if (q && !`${s.title} ${s.author}`.toLowerCase().includes(q)) return false;
       if (filters.genres.length && !filters.genres.includes(s.genre)) return false;
       if (filters.eras.length && !filters.eras.includes(s.era)) return false;
+      if (filters.moods.length && (!s.mood || !filters.moods.includes(s.mood))) return false;
       if (filters.favoriteOnly && !s.favorite) return false;
       return true;
     });
   }, [songs, filters]);
+
+  // Razpoloženja niso fiksen nabor: obrazcu ponudimo privzete predloge +
+  // vsa že uporabljena (uporabniško dodana), filtru pa samo tista, ki jih
+  // trenutno resnično ima kaka skladba (da ni praznih/neuporabnih čipov).
+  const knownMoods = useMemo(() => {
+    const extras = new Set<string>();
+    for (const s of songs) if (s.mood && !(DEFAULT_MOODS as readonly string[]).includes(s.mood)) extras.add(s.mood);
+    return [...DEFAULT_MOODS, ...Array.from(extras).sort((a, b) => a.localeCompare(b, "sl"))];
+  }, [songs]);
+
+  const usedMoods = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of songs) if (s.mood) set.add(s.mood);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "sl"));
+  }, [songs]);
 
   const newestFirst = useMemo(
     () =>
@@ -284,13 +301,19 @@ export default function Dashboard() {
             }
             initial={editing}
             prefill={editing ? null : prefillDraft}
+            knownMoods={knownMoods}
             onSaved={handleSaved}
             onClose={closeForm}
           />
         </div>
       )}
 
-      <Filters filters={filters} onChange={setFilters} resultCount={filteredSongs.length} />
+      <Filters
+        filters={filters}
+        onChange={setFilters}
+        resultCount={filteredSongs.length}
+        moodOptions={usedMoods}
+      />
 
       <div className="mt-3! flex gap-2">
         <button

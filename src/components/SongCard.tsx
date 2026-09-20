@@ -175,6 +175,7 @@ export default function SongCard({
         <div className="flex flex-wrap items-center gap-2">
           <Badge>{song.genre}</Badge>
           <Badge>{song.era}</Badge>
+          {song.mood && <Badge>{song.mood}</Badge>}
         </div>
 
         <button
