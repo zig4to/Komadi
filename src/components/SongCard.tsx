@@ -181,7 +181,7 @@ export default function SongCard({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto">
           <Badge>{song.genre}</Badge>
           <Badge>{song.era}</Badge>
           {song.mood && <Badge>{song.mood}</Badge>}
@@ -193,7 +193,7 @@ export default function SongCard({
           aria-label={similarOpen ? "Skrij podobne skladbe" : "Najdi podobne skladbe"}
           title="Najdi podobne skladbe"
           aria-expanded={similarOpen}
-          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 font-medium transition ${
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none transition ${
             similarOpen
               ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
               : "border-neutral-300 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-emerald-400"
@@ -207,7 +207,7 @@ export default function SongCard({
             strokeWidth={1.8}
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-[13px] w-[13px] shrink-0"
+            className="h-[11px] w-[11px] shrink-0"
           >
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.3-4.3" />
@@ -287,7 +287,7 @@ export default function SongCard({
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-full border border-neutral-300 px-2 py-0.5 text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
+    <span className="shrink-0 rounded-full border border-neutral-300 px-1.5 py-0.5 text-[10px] leading-none text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
       {children}
     </span>
   );
