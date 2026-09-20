@@ -492,8 +492,8 @@ export default function Dashboard() {
           aria-pressed={activeView === "newest"}
           className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition disabled:opacity-40 ${
             activeView === "newest"
-              ? "bg-emerald-600 text-white"
-              : "bg-neutral-100 text-neutral-800 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+              ? "bg-[linear-gradient(115deg,#059669_15%,#34d399_100%)] text-white"
+              : "bg-[linear-gradient(115deg,rgba(16,185,129,0.14)_15%,rgba(16,185,129,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.24)_15%,rgba(16,185,129,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.32)_15%,rgba(16,185,129,0.1)_95%)]"
           }`}
         >
           <svg
@@ -518,8 +518,8 @@ export default function Dashboard() {
           aria-pressed={activeView === "popular"}
           className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition disabled:opacity-40 ${
             activeView === "popular"
-              ? "bg-orange-600 text-white"
-              : "bg-neutral-100 text-neutral-800 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+              ? "bg-[linear-gradient(115deg,#ea580c_15%,#fb923c_100%)] text-white"
+              : "bg-[linear-gradient(115deg,rgba(249,115,22,0.14)_15%,rgba(249,115,22,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(249,115,22,0.24)_15%,rgba(249,115,22,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(249,115,22,0.32)_15%,rgba(249,115,22,0.1)_95%)]"
           }`}
         >
           <svg

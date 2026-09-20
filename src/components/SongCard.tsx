@@ -68,16 +68,17 @@ export default function SongCard({
     if (similarSongs.length === 0) fetchSimilar([]);
   }
 
-  const hue = hueFromId(song.id);
-  const cardStyle: React.CSSProperties = highlighted
-    ? {
-        boxShadow:
-          "0 12px 36px -18px rgb(16 185 129 / 0.28), 0 2px 8px -6px rgb(0 0 0 / 0.32)",
-      }
-    : {
-        boxShadow: `0 12px 36px -20px hsl(${hue} 85% 55% / 0.24), 0 2px 8px -7px rgb(0 0 0 / 0.32)`,
-        borderColor: `hsl(${hue} 50% 42% / 0.55)`,
-      };
+  // Emerald ~152° za izpostavljeno (naključno izbrano) kartico, sicer
+  // stabilen odtenek iz ID-ja skladbe — isti odtenek uporabimo tudi za
+  // obrobo/senco (spodaj) in za delni gradient ozadja (glej className).
+  const hue = highlighted ? 152 : hueFromId(song.id);
+  const cardStyle = {
+    boxShadow: highlighted
+      ? "0 12px 36px -18px rgb(16 185 129 / 0.28), 0 2px 8px -6px rgb(0 0 0 / 0.32)"
+      : `0 12px 36px -20px hsl(${hue} 85% 55% / 0.24), 0 2px 8px -7px rgb(0 0 0 / 0.32)`,
+    borderColor: highlighted ? undefined : `hsl(${hue} 50% 42% / 0.55)`,
+    "--hue": hue,
+  } as React.CSSProperties;
 
   function handleCardClick(e: React.MouseEvent<HTMLDivElement>) {
     // Klik na gumb (priljubljene / uredi / izbriši) ne kopira.
@@ -92,7 +93,7 @@ export default function SongCard({
       onClick={handleCardClick}
       title="Klikni za kopiranje naslova"
       style={cardStyle}
-      className={`relative cursor-pointer rounded-xl border bg-transparent p-4 transition duration-200 hover:-translate-y-0.5 ${
+      className={`relative cursor-pointer rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.10),transparent_60%)] p-4 transition duration-200 hover:-translate-y-0.5 dark:bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.20),transparent_60%)] ${
         highlighted
           ? "border-emerald-500"
           : "border-neutral-200 dark:border-neutral-800"
