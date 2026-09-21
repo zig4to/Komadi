@@ -965,7 +965,7 @@ export default function Dashboard() {
                       : "Nobena skladba ne ustreza izbranim filtrom."}
                   </p>
                 )}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {displaySongs.map((song) => (
                     <div key={song.id}>
                       <SongCard
