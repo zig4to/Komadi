@@ -107,7 +107,7 @@ export default function SongCard({
       onClick={handleCardClick}
       title="Klikni za kopiranje naslova"
       style={cardStyle}
-      className={`relative isolate cursor-pointer overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.10),transparent_60%)] p-4 transition duration-200 hover:-translate-y-0.5 dark:bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.20),transparent_60%)] ${
+      className={`relative isolate cursor-pointer overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.10),transparent_60%)] p-4 transition duration-200 hover:-translate-y-0.5 dark:bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.20),transparent_60%)] lg:min-h-[138px] ${
         highlighted
           ? "border-emerald-500"
           : "border-neutral-200 dark:border-neutral-800"
