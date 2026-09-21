@@ -10,6 +10,7 @@ export interface Song {
   mood: string | null;
   origin: string | null;
   image_url: string | null;
+  chords_url: string | null;
   copy_count: number;
   created_at: string;
 }

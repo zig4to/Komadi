@@ -81,3 +81,26 @@ create policy "Public update author images" on public.author_images
 
 create policy "Public delete author images" on public.author_images
   for delete using (true);
+
+-- Ročno dodan link do akordov/tabulature po skladbi (glej
+-- supabase/migrations/0008_add_chords_url.sql) — prikazan kot gumb
+-- "Akordi" na kartici, kadar je nastavljen.
+alter table public.songs
+  add column if not exists chords_url text;
+
+-- Storage bucket za PDF akorde (glej supabase/migrations/0009_add_song_chords_bucket.sql).
+insert into storage.buckets (id, name, public)
+values ('song-chords', 'song-chords', true)
+on conflict (id) do nothing;
+
+create policy "Public read song chords" on storage.objects
+  for select using (bucket_id = 'song-chords');
+
+create policy "Public insert song chords" on storage.objects
+  for insert with check (bucket_id = 'song-chords');
+
+create policy "Public update song chords" on storage.objects
+  for update using (bucket_id = 'song-chords');
+
+create policy "Public delete song chords" on storage.objects
+  for delete using (bucket_id = 'song-chords');

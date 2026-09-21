@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
+import PdfViewer from "@/components/PdfViewer";
 import { useCopyFeedback } from "@/lib/useCopyFeedback";
 import { supabase } from "@/lib/supabaseClient";
 import type { SimilarSong, Song } from "@/types/song";
@@ -42,6 +44,12 @@ export default function SongCard({
   const [similarLoading, setSimilarLoading] = useState(false);
   const [similarError, setSimilarError] = useState<string | null>(null);
   const [similarSongs, setSimilarSongs] = useState<SimilarSong[]>([]);
+  const [pdfOpen, setPdfOpen] = useState(false);
+
+  // Akordi so lahko zunanja povezava (npr. Ultimate Guitar — odpre se v
+  // novem zavihku) ali naložen PDF (odpre se v celozaslonskem pregledu
+  // znotraj aplikacije).
+  const isChordsPdf = song.chords_url?.toLowerCase().split("?")[0].endsWith(".pdf") ?? false;
 
   async function fetchSimilar(exclude: SimilarSong[]) {
     setSimilarLoading(true);
@@ -179,40 +187,95 @@ export default function SongCard({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto">
+        <div className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto [&>*:nth-child(n+4)]:hidden sm:[&>*:nth-child(n+4)]:inline">
           <Badge>{song.genre}</Badge>
           <Badge>{song.era}</Badge>
           {song.mood && <Badge>{song.mood}</Badge>}
           {song.origin && <Badge>{song.origin}</Badge>}
         </div>
 
-        <button
-          type="button"
-          onClick={handleToggleSimilar}
-          aria-label={similarOpen ? "Skrij podobne skladbe" : "Najdi podobne skladbe"}
-          title="Najdi podobne skladbe"
-          aria-expanded={similarOpen}
-          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium leading-none backdrop-blur-sm transition ${
-            similarOpen
-              ? "border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-              : "border-neutral-300 bg-white/70 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-emerald-400"
-          }`}
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.8}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-[11px] w-[11px] shrink-0"
+        <div className="flex shrink-0 items-center gap-1.5">
+          {song.chords_url && (isChordsPdf ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPdfOpen(true);
+              }}
+              title="Odpri akorde"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-[11px] w-[11px] shrink-0"
+              >
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+              Akordi
+            </button>
+          ) : (
+            <a
+              href={song.chords_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title="Odpri akorde"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-[11px] w-[11px] shrink-0"
+              >
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+              Akordi
+            </a>
+          ))}
+
+          <button
+            type="button"
+            onClick={handleToggleSimilar}
+            aria-label={similarOpen ? "Skrij podobne skladbe" : "Najdi podobne skladbe"}
+            title="Najdi podobne skladbe"
+            aria-expanded={similarOpen}
+            className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium leading-none backdrop-blur-sm transition ${
+              similarOpen
+                ? "border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                : "border-neutral-300 bg-white/70 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-emerald-400"
+            }`}
           >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-          Podobno
-        </button>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-[11px] w-[11px] shrink-0"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            Podobno
+          </button>
+        </div>
       </div>
 
       {similarOpen && (
@@ -280,6 +343,46 @@ export default function SongCard({
           kopirano :)
         </span>
       )}
+
+      {pdfOpen &&
+        song.chords_url &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex flex-col bg-black/90"
+          >
+            <div className="flex shrink-0 items-center justify-between bg-neutral-900 px-4 py-2.5">
+              <span className="truncate text-sm font-medium text-white">
+                {song.title} — akordi
+              </span>
+              <button
+                type="button"
+                onClick={() => setPdfOpen(false)}
+                aria-label="Zapri"
+                title="Zapri"
+                className="shrink-0 p-1 text-neutral-300 hover:text-white"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                >
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 bg-neutral-800">
+              <PdfViewer url={song.chords_url} />
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

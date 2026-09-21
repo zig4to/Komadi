@@ -15,6 +15,7 @@ const emptyForm = {
   mood: null as string | null,
   origin: null as string | null,
   image_url: null as string | null,
+  chords_url: null as string | null,
 };
 
 export default function SongForm({
@@ -47,6 +48,7 @@ export default function SongForm({
           mood: initial.mood,
           origin: initial.origin,
           image_url: initial.image_url,
+          chords_url: initial.chords_url,
         }
       : prefill
         ? { ...emptyForm, title: prefill.title, author: prefill.author }
@@ -61,6 +63,9 @@ export default function SongForm({
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingChords, setUploadingChords] = useState(false);
+  const [chordsError, setChordsError] = useState<string | null>(null);
+  const chordsFileInputRef = useRef<HTMLInputElement>(null);
 
   const authorImage = authorImages[form.author.trim()] ?? null;
 
@@ -91,6 +96,27 @@ export default function SongForm({
     const author = form.author.trim();
     if (!author) return;
     await onSetAuthorImage(author, null);
+  }
+
+  async function handleChordsFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingChords(true);
+    setChordsError(null);
+    try {
+      const path = `${crypto.randomUUID()}.pdf`;
+      const { error: uploadError } = await supabase.storage
+        .from("song-chords")
+        .upload(path, file, { contentType: "application/pdf" });
+      if (uploadError) throw uploadError;
+      const { data } = supabase.storage.from("song-chords").getPublicUrl(path);
+      setForm((f) => ({ ...f, chords_url: data.publicUrl }));
+    } catch (err) {
+      setChordsError(err instanceof Error ? err.message : "Nalaganje akordov ni uspelo.");
+    } finally {
+      setUploadingChords(false);
+    }
   }
 
   async function handleGuessEra() {
@@ -138,6 +164,7 @@ export default function SongForm({
       mood: form.mood?.trim() || null,
       origin: form.origin?.trim() || null,
       image_url: form.image_url,
+      chords_url: form.chords_url,
     };
 
     const { data, error: dbError } = initial
@@ -341,6 +368,55 @@ export default function SongForm({
               <option value="__new__">+ Dodaj nov izvor…</option>
             </select>
           )}
+        </Field>
+
+        <Field label="Akordi (PDF)" className="sm:col-span-2">
+          <div className="flex items-center gap-2">
+            {form.chords_url && (
+              <span className="min-w-0 flex-1 truncate text-sm text-neutral-600 dark:text-neutral-400">
+                📄 Akordi so naloženi
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => chordsFileInputRef.current?.click()}
+              disabled={uploadingChords}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:text-emerald-400"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`h-[18px] w-[18px] shrink-0 ${uploadingChords ? "animate-pulse" : ""}`}
+              >
+                <rect width="18" height="18" x="3" y="3" rx="2" />
+                <circle cx="9" cy="9" r="2" />
+                <path d="m21 15-3.1-3.1a2 2 0 0 0-2.814.014L6 21" />
+              </svg>
+              {form.chords_url ? "Zamenjaj" : "Naloži PDF"}
+            </button>
+            {form.chords_url && (
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, chords_url: null })}
+                className="shrink-0 text-sm text-red-600 hover:underline dark:text-red-400"
+              >
+                Odstrani
+              </button>
+            )}
+            <input
+              ref={chordsFileInputRef}
+              type="file"
+              accept="application/pdf"
+              onChange={handleChordsFileSelect}
+              className="hidden"
+            />
+          </div>
+          {chordsError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{chordsError}</p>}
         </Field>
       </div>
 
