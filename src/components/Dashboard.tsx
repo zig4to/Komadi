@@ -634,9 +634,9 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="space-y-2.5">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
+      <div className="space-y-2.5 lg:flex lg:flex-wrap lg:items-center lg:gap-2 lg:space-y-0">
+        <div className="flex items-center gap-2 lg:contents">
+          <div className="relative flex-1 lg:max-w-xs lg:flex-none">
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
@@ -682,7 +682,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
+        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto lg:contents">
           <button
             type="button"
             onClick={pickRandom}
@@ -734,7 +734,7 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
+        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto lg:contents">
           <button
             type="button"
             data-view-toggle
