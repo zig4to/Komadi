@@ -113,7 +113,7 @@ export default function FeaturedArtists({
   }
 
   return (
-    <div className="pb-1">
+    <div className="pb-1.5">
       <h2 className="mb-2 text-base font-semibold text-neutral-800 dark:text-neutral-100">
         Predstavljeno
       </h2>
