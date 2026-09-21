@@ -372,6 +372,7 @@ export default function HomeHighlights({
         items={genres}
         colorOrder={GENRE_COLOR_ORDER}
         onSelect={onSelectGenre}
+        labelClassName="text-lg lg:text-2xl"
         cardSizeClassName="h-28 w-36 lg:h-32 lg:w-40"
         icons={GENRE_ICONS}
       />
