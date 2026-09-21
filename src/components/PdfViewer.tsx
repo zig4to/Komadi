@@ -35,7 +35,10 @@ export default function PdfViewer({ url }: { url: string }) {
           const page = await pdf.getPage(pageNum);
           if (cancelled) return;
 
-          const outputScale = window.devicePixelRatio || 1;
+          // Vsaj 3x tudi na navadnih (DPR 1) zaslonih, da je besedilo ostreje
+          // izrisano kot pri golem devicePixelRatio — brez vpliva na velikost
+          // shranjene PDF datoteke, ker se izris zgodi šele tu v brskalniku.
+          const outputScale = Math.max(window.devicePixelRatio || 1, 3);
           const baseViewport = page.getViewport({ scale: 1 });
           const targetWidth = container.clientWidth || 800;
           const scale = targetWidth / baseViewport.width;
