@@ -101,14 +101,16 @@ export default function Filters({
   filters,
   onChange,
   moodOptions,
+  originOptions,
 }: {
   filters: FilterState;
   onChange: (f: FilterState) => void;
   moodOptions: string[];
+  originOptions: string[];
 }) {
   const [open, setOpen] = usePersistentBool("komadi:filters:open", false);
 
-  function toggleValue(key: "genres" | "eras" | "moods", value: string) {
+  function toggleValue(key: "genres" | "eras" | "moods" | "origins", value: string) {
     const current = filters[key];
     const next = current.includes(value)
       ? current.filter((v) => v !== value)
@@ -137,12 +139,23 @@ export default function Filters({
       data-filters-panel
       className="mt-3! space-y-4 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900"
     >
-      <input
-            value={filters.search}
-            onChange={(e) => onChange({ ...filters, search: e.target.value })}
-            placeholder="Išči po naslovu ali avtorju…"
-            className="w-full rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 focus:border-emerald-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-          />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <input
+          value={filters.search}
+          onChange={(e) => onChange({ ...filters, search: e.target.value })}
+          placeholder="Išči po naslovu ali avtorju…"
+          className="w-full rounded-full border border-neutral-300 bg-neutral-50 px-4 py-2 text-sm text-neutral-900 focus:border-emerald-500 focus:outline-none sm:w-1/2 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+        />
+        {hasActiveFilters(filters) && (
+          <button
+            type="button"
+            onClick={() => onChange(emptyFilters)}
+            className="shrink-0 self-start text-xs text-neutral-500 hover:text-blue-600 sm:self-auto dark:text-neutral-400 dark:hover:text-blue-400"
+          >
+            Počisti filtre
+          </button>
+        )}
+      </div>
 
           <Section
             title="Žanr"
@@ -191,6 +204,25 @@ export default function Filters({
                     active={filters.moods.includes(mood)}
                     onClick={() => toggleValue("moods", mood)}
                     label={mood}
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {originOptions.length > 0 && (
+            <Section
+              title="Izvor"
+              count={filters.origins.length}
+              storageKey="komadi:filters:origin"
+            >
+              <div className="flex flex-wrap gap-2">
+                {originOptions.map((origin) => (
+                  <Chip
+                    key={origin}
+                    active={filters.origins.includes(origin)}
+                    onClick={() => toggleValue("origins", origin)}
+                    label={origin}
                   />
                 ))}
               </div>

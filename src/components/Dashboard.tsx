@@ -5,7 +5,7 @@ import Filters, { FiltersToggle } from "@/components/Filters";
 import SettingsMenu from "@/components/SettingsMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
-import { DEFAULT_MOODS, ERAS, GENRES } from "@/lib/constants";
+import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
 import { emptyFilters, type FilterState } from "@/lib/filters";
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useCopyFeedback } from "@/lib/useCopyFeedback";
@@ -57,6 +57,7 @@ export default function Dashboard() {
       if (filters.genres.length && !filters.genres.includes(s.genre)) return false;
       if (filters.eras.length && !filters.eras.includes(s.era)) return false;
       if (filters.moods.length && (!s.mood || !filters.moods.includes(s.mood))) return false;
+      if (filters.origins.length && (!s.origin || !filters.origins.includes(s.origin))) return false;
       if (filters.favoriteOnly && !s.favorite) return false;
       return true;
     });
@@ -74,6 +75,21 @@ export default function Dashboard() {
   const usedMoods = useMemo(() => {
     const set = new Set<string>();
     for (const s of songs) if (s.mood) set.add(s.mood);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "sl"));
+  }, [songs]);
+
+  // Izvor: enak vzorec kot razpoloženje — obrazcu privzeti predlogi + vsi že
+  // uporabljeni, filtru samo tisti, ki jih trenutno resnično ima kaka skladba.
+  const knownOrigins = useMemo(() => {
+    const extras = new Set<string>();
+    for (const s of songs)
+      if (s.origin && !(DEFAULT_ORIGINS as readonly string[]).includes(s.origin)) extras.add(s.origin);
+    return [...DEFAULT_ORIGINS, ...Array.from(extras).sort((a, b) => a.localeCompare(b, "sl"))];
+  }, [songs]);
+
+  const usedOrigins = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of songs) if (s.origin) set.add(s.origin);
     return Array.from(set).sort((a, b) => a.localeCompare(b, "sl"));
   }, [songs]);
 
@@ -163,6 +179,24 @@ export default function Dashboard() {
     setShowForm(false);
     setEditing(null);
     setPrefillDraft(null);
+  }
+
+  // Obrazec za urejanje se izriše takoj pod kartico skladbe, ki jo urejamo
+  // (ne na vrhu strani), da uporabnika ne "vrže" nazaj na vrh ob kliku.
+  function renderEditForm(song: Song) {
+    if (editing?.id !== song.id) return null;
+    return (
+      <div id="song-form" className="mt-3!">
+        <SongForm
+          key={editing.id}
+          initial={editing}
+          knownMoods={knownMoods}
+          knownOrigins={knownOrigins}
+          onSaved={handleSaved}
+          onClose={closeForm}
+        />
+      </div>
+    );
   }
 
   async function handleDelete(id: string) {
@@ -471,6 +505,7 @@ export default function Dashboard() {
             onFilterAuthor={handleFilterByAuthor}
             highlighted
           />
+          {renderEditForm(randomPick)}
           <button
             onClick={pickRandom}
             className="mt-3 text-sm text-neutral-600 hover:text-emerald-600 dark:text-neutral-300 dark:hover:text-emerald-400"
@@ -480,16 +515,14 @@ export default function Dashboard() {
         </div>
       )}
 
-      {(showForm || editing) && (
+      {showForm && (
         <div id="song-form">
           <SongForm
-            key={
-              editing?.id ??
-              (prefillDraft ? `prefill:${prefillDraft.title}|${prefillDraft.author}` : "new")
-            }
-            initial={editing}
-            prefill={editing ? null : prefillDraft}
+            key={prefillDraft ? `prefill:${prefillDraft.title}|${prefillDraft.author}` : "new"}
+            initial={null}
+            prefill={prefillDraft}
             knownMoods={knownMoods}
+            knownOrigins={knownOrigins}
             onSaved={handleSaved}
             onClose={closeForm}
           />
@@ -557,7 +590,12 @@ export default function Dashboard() {
         <FiltersToggle filters={filters} onChange={handleFiltersChange} />
       </div>
 
-      <Filters filters={filters} onChange={handleFiltersChange} moodOptions={usedMoods} />
+      <Filters
+        filters={filters}
+        onChange={handleFiltersChange}
+        moodOptions={usedMoods}
+        originOptions={usedOrigins}
+      />
 
       {authorFilter && (
         <div className="mt-3! flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm dark:border-neutral-800 dark:bg-neutral-900">
@@ -626,16 +664,18 @@ export default function Dashboard() {
               </p>
             )}
             {filteredSongs.map((song) => (
-              <SongCard
-                key={song.id}
-                song={song}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onToggleFavorite={handleToggleFavorite}
-                onCopy={handleCopy}
-                onAddSimilar={handleAddSimilar}
-                onFilterAuthor={handleFilterByAuthor}
-              />
+              <div key={song.id}>
+                <SongCard
+                  song={song}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onToggleFavorite={handleToggleFavorite}
+                  onCopy={handleCopy}
+                  onAddSimilar={handleAddSimilar}
+                  onFilterAuthor={handleFilterByAuthor}
+                />
+                {randomPick?.id !== song.id && renderEditForm(song)}
+              </div>
             ))}
           </>
         )}

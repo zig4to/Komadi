@@ -12,18 +12,21 @@ const emptyForm = {
   era: ERAS[0],
   favorite: false,
   mood: null as string | null,
+  origin: null as string | null,
 };
 
 export default function SongForm({
   initial,
   prefill,
   knownMoods,
+  knownOrigins,
   onSaved,
   onClose,
 }: {
   initial?: Song | null;
   prefill?: { title: string; author: string } | null;
   knownMoods: string[];
+  knownOrigins: string[];
   onSaved: (song: Song, mode: "insert" | "update") => void;
   onClose: () => void;
 }) {
@@ -36,6 +39,7 @@ export default function SongForm({
           era: initial.era,
           favorite: initial.favorite,
           mood: initial.mood,
+          origin: initial.origin,
         }
       : prefill
         ? { ...emptyForm, title: prefill.title, author: prefill.author }
@@ -46,6 +50,7 @@ export default function SongForm({
   const [guessing, setGuessing] = useState(false);
   const [guessError, setGuessError] = useState<string | null>(null);
   const [addingMood, setAddingMood] = useState(false);
+  const [addingOrigin, setAddingOrigin] = useState(false);
 
   async function handleGuessEra() {
     if (!form.title.trim() || !form.author.trim()) {
@@ -90,6 +95,7 @@ export default function SongForm({
       era: form.era,
       favorite: form.favorite,
       mood: form.mood?.trim() || null,
+      origin: form.origin?.trim() || null,
     };
 
     const { data, error: dbError } = initial
@@ -107,6 +113,7 @@ export default function SongForm({
     if (!initial) {
       setForm(emptyForm);
       setAddingMood(false);
+      setAddingOrigin(false);
     }
   }
 
@@ -245,6 +252,51 @@ export default function SongForm({
                 </option>
               ))}
               <option value="__new__">+ Dodaj novo razpoloženje…</option>
+            </select>
+          )}
+        </Field>
+
+        <Field label="Izvor" className="sm:col-span-2">
+          {addingOrigin ? (
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                value={form.origin ?? ""}
+                onChange={(e) => setForm({ ...form, origin: e.target.value })}
+                placeholder="npr. Balkanska"
+                className={inputClass}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingOrigin(false);
+                  setForm({ ...form, origin: null });
+                }}
+                className="shrink-0 rounded-lg border border-neutral-300 px-3 text-sm text-neutral-600 hover:border-neutral-400 dark:border-neutral-700 dark:text-neutral-300"
+              >
+                Prekliči
+              </button>
+            </div>
+          ) : (
+            <select
+              value={form.origin ?? ""}
+              onChange={(e) => {
+                if (e.target.value === "__new__") {
+                  setForm({ ...form, origin: null });
+                  setAddingOrigin(true);
+                  return;
+                }
+                setForm({ ...form, origin: e.target.value || null });
+              }}
+              className={inputClass}
+            >
+              <option value="">Brez</option>
+              {knownOrigins.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+              <option value="__new__">+ Dodaj nov izvor…</option>
             </select>
           )}
         </Field>

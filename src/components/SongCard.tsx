@@ -186,6 +186,7 @@ export default function SongCard({
           <Badge>{song.genre}</Badge>
           <Badge>{song.era}</Badge>
           {song.mood && <Badge>{song.mood}</Badge>}
+          {song.origin && <Badge>{song.origin}</Badge>}
         </div>
 
         <button

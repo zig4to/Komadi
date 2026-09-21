@@ -8,6 +8,7 @@ export interface Song {
   era: Era;
   favorite: boolean;
   mood: string | null;
+  origin: string | null;
   copy_count: number;
   created_at: string;
 }

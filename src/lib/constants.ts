@@ -43,3 +43,9 @@ export const DEFAULT_MOODS = [
   "Uporniška",
   "Sanjava",
 ] as const;
+
+// Izvor je enako neobvezen in uporabniško razširljiv kot razpoloženje — to
+// je samo začetni predlagan seznam za obrazec/filter; nov, ročno vnesen
+// izvor se shrani kot navadno besedilo in se nato pojavi v seznamih za
+// izbiro/filtriranje.
+export const DEFAULT_ORIGINS = ["Slovenska", "Tuja", "Yugo", "Španska"] as const;
