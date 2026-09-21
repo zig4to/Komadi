@@ -29,6 +29,20 @@ export const GENRES = [
 export type Era = (typeof ERAS)[number];
 export type Genre = (typeof GENRES)[number];
 
+// Slika za kartico obdobja na domači strani (public/images/eras/README.md
+// opisuje pričakovana imena datotek). Manjkajoča slika ni napaka — kartica
+// brez slike se izriše enako kot prej (samo barvni gradient).
+export const ERA_IMAGES: Record<Era, string> = {
+  "Pred 1960": "/images/eras/60s.jpg",
+  "1960s": "/images/eras/1960s.jpg",
+  "1970s": "/images/eras/70s.jpg",
+  "1980s": "/images/eras/80s.jpg",
+  "1990s": "/images/eras/90s.jpg",
+  "2000s": "/images/eras/2000s.jpg",
+  "2010s": "/images/eras/2010s.jpg",
+  "2020s": "/images/eras/2020s.jpg",
+};
+
 // Razpoloženje je neobvezno in uporabniško razširljivo (ni fiksen nabor kot
 // žanr/obdobje) — to je samo začetni predlagan seznam za obrazec; nova,
 // ročno vnesena razpoloženja se shranijo kot navadno besedilo in se nato

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Filters, { FiltersToggle } from "@/components/Filters";
 import FeaturedArtists from "@/components/FeaturedArtists";
-import HomeHighlights from "@/components/HomeHighlights";
+import HomeHighlights, { formatEraLabel } from "@/components/HomeHighlights";
 import SettingsMenu from "@/components/SettingsMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
@@ -21,6 +21,7 @@ export default function Dashboard() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Song | null>(null);
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
+  const [songsVisible, setSongsVisible] = useState(true);
   const [randomPick, setRandomPick] = useState<Song | null>(null);
   const [activeView, setActiveView] = useState<"list" | "newest" | "popular">("list");
   const [prefillDraft, setPrefillDraft] = useState<{ title: string; author: string } | null>(null);
@@ -138,7 +139,19 @@ export default function Dashboard() {
 
   // "Predstavljeno": vsak dan naključno (a ves dan stabilno) izbere dva
   // avtorja z vsaj tremi skladbami in za vsakega tri njegove skladbe.
-  const featuredArtists = useMemo(() => pickDailyFeatured(songs, 2, 3), [songs]);
+  const featuredArtists = useMemo(() => pickDailyFeatured(songs, 4, 3), [songs]);
+
+  // Naslov nad seznamom skladb: če je bilo izbrano natanko eno obdobje ali
+  // en žanr (npr. s klikom na featured kartico), pove iz katerega.
+  const songsHeading = useMemo(() => {
+    if (filters.eras.length === 1 && filters.genres.length === 0) {
+      return `Vsi komadi iz "${formatEraLabel(filters.eras[0])}"`;
+    }
+    if (filters.genres.length === 1 && filters.eras.length === 0) {
+      return `Vsi komadi iz "${filters.genres[0]}"`;
+    }
+    return "Vsi Komadi";
+  }, [filters.eras, filters.genres]);
 
   const PARTIAL_LABELS: Record<PartialDimension, string> = {
     genre: "Žanr",
@@ -352,7 +365,7 @@ export default function Dashboard() {
   }, [activeView]);
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 space-y-6">
+    <div className="mx-auto w-full max-w-3xl px-4 py-8 space-y-6 lg:max-w-6xl">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="flex items-center gap-2">
@@ -377,55 +390,6 @@ export default function Dashboard() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={pickRandom}
-            disabled={!isSupabaseConfigured}
-            aria-label="Naključna skladba"
-            title="Naključna skladba"
-            className="inline-flex items-center justify-center rounded-full border border-current/40 bg-[linear-gradient(115deg,rgba(124,58,237,0.14)_15%,rgba(124,58,237,0.03)_95%)] p-2.5 text-violet-600 transition hover:bg-[linear-gradient(115deg,rgba(124,58,237,0.24)_15%,rgba(124,58,237,0.06)_95%)] disabled:opacity-40 dark:text-violet-400 dark:hover:bg-[linear-gradient(115deg,rgba(124,58,237,0.32)_15%,rgba(124,58,237,0.1)_95%)]"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-[18px] w-[18px] shrink-0"
-            >
-              <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-              <path d="M16 8h.01" />
-              <path d="M8 8h.01" />
-              <path d="M8 16h.01" />
-              <path d="M16 16h.01" />
-              <path d="M12 12h.01" />
-            </svg>
-          </button>
-          <button
-            onClick={handlePartialStart}
-            disabled={!isSupabaseConfigured}
-            aria-label="Delno naključna skladba"
-            title="Delno naključna skladba"
-            className="inline-flex items-center justify-center rounded-full border border-current/40 bg-[linear-gradient(115deg,rgba(8,145,178,0.14)_15%,rgba(8,145,178,0.03)_95%)] p-2.5 text-cyan-700 transition hover:bg-[linear-gradient(115deg,rgba(8,145,178,0.24)_15%,rgba(8,145,178,0.06)_95%)] disabled:opacity-40 dark:text-cyan-400 dark:hover:bg-[linear-gradient(115deg,rgba(8,145,178,0.32)_15%,rgba(8,145,178,0.1)_95%)]"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-[18px] w-[18px] shrink-0"
-            >
-              <path d="m18 14 4 4-4 4" />
-              <path d="m18 2 4 4-4 4" />
-              <path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" />
-              <path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" />
-              <path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" />
-            </svg>
-          </button>
           <button
             onClick={() => {
               setEditing(null);
@@ -583,7 +547,59 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
+      <div className="mb-1.5! flex flex-nowrap items-center gap-2 overflow-x-auto">
+        <button
+          type="button"
+          onClick={pickRandom}
+          disabled={!isSupabaseConfigured}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[linear-gradient(115deg,rgba(124,58,237,0.14)_15%,rgba(124,58,237,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(124,58,237,0.24)_15%,rgba(124,58,237,0.06)_95%)] disabled:opacity-40 dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(124,58,237,0.32)_15%,rgba(124,58,237,0.1)_95%)]"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400"
+          >
+            <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+            <path d="M16 8h.01" />
+            <path d="M8 8h.01" />
+            <path d="M8 16h.01" />
+            <path d="M16 16h.01" />
+            <path d="M12 12h.01" />
+          </svg>
+          Naključno
+        </button>
+        <button
+          type="button"
+          onClick={handlePartialStart}
+          disabled={!isSupabaseConfigured}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[linear-gradient(115deg,rgba(8,145,178,0.14)_15%,rgba(8,145,178,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(8,145,178,0.24)_15%,rgba(8,145,178,0.06)_95%)] disabled:opacity-40 dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(8,145,178,0.32)_15%,rgba(8,145,178,0.1)_95%)]"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4 shrink-0 text-cyan-700 dark:text-cyan-400"
+          >
+            <path d="m18 14 4 4-4 4" />
+            <path d="m18 2 4 4-4 4" />
+            <path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" />
+            <path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" />
+            <path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" />
+          </svg>
+          Delno naključno
+        </button>
+      </div>
+
+      <div className="mt-0! flex flex-nowrap items-center gap-2 overflow-x-auto">
         <button
           type="button"
           data-view-toggle
@@ -652,7 +668,7 @@ export default function Dashboard() {
       />
 
       {isSupabaseConfigured && !loading && !loadError && activeView === "list" && !hasActiveFilters(filters) && (
-        <div className="mt-3! space-y-5">
+        <div className="mt-3! space-y-0">
           <HomeHighlights
             eras={eraHighlights}
             genres={genreHighlights}
@@ -723,27 +739,86 @@ export default function Dashboard() {
 
         {!loading && !loadError && activeView === "list" && (
           <>
-            {displaySongs.length === 0 && (
-              <p className="text-sm text-neutral-500">
-                {songs.length === 0
-                  ? "Baza je še prazna — dodaj prvo skladbo."
-                  : "Nobena skladba ne ustreza izbranim filtrom."}
-              </p>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-base font-semibold text-neutral-800 dark:text-neutral-100">
+                {songsHeading}
+              </h2>
+              {filters.eras.length > 0 || filters.genres.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthorFilter(null);
+                    setSortAlpha(false);
+                    setFilters(emptyFilters);
+                  }}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4 shrink-0"
+                  >
+                    <path d="m12 19-7-7 7-7" />
+                    <path d="M19 12H5" />
+                  </svg>
+                  Nazaj
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSongsVisible((v) => !v)}
+                  aria-expanded={songsVisible}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`h-4 w-4 shrink-0 transition-transform ${songsVisible ? "" : "-rotate-90"}`}
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                  {songsVisible ? "Skrij komade" : "Prikaži vse komade"}
+                </button>
+              )}
+            </div>
+
+            {songsVisible && (
+              <>
+                {displaySongs.length === 0 && (
+                  <p className="text-sm text-neutral-500">
+                    {songs.length === 0
+                      ? "Baza je še prazna — dodaj prvo skladbo."
+                      : "Nobena skladba ne ustreza izbranim filtrom."}
+                  </p>
+                )}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {displaySongs.map((song) => (
+                    <div key={song.id}>
+                      <SongCard
+                        song={song}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        onToggleFavorite={handleToggleFavorite}
+                        onCopy={handleCopy}
+                        onAddSimilar={handleAddSimilar}
+                        onFilterAuthor={handleFilterByAuthor}
+                      />
+                      {randomPick?.id !== song.id && renderEditForm(song)}
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
-            {displaySongs.map((song) => (
-              <div key={song.id}>
-                <SongCard
-                  song={song}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onToggleFavorite={handleToggleFavorite}
-                  onCopy={handleCopy}
-                  onAddSimilar={handleAddSimilar}
-                  onFilterAuthor={handleFilterByAuthor}
-                />
-                {randomPick?.id !== song.id && renderEditForm(song)}
-              </div>
-            ))}
           </>
         )}
       </section>

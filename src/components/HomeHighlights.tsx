@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { JSX } from "react";
+import { ERA_IMAGES } from "@/lib/constants";
 
 // Ena preprosta, polnobarvna (solid) ikona na žanr — črne barve, prikazana
 // pod ločilno črto na kartici. Ključi se morajo ujemati z GENRES v
@@ -138,7 +139,7 @@ const GENRE_COLOR_ORDER = [5, 2, 7, 0, 4, 1, 6, 3];
 // "1960s" -> "60's", "2000s" -> "2000's", "Pred 1960" -> "Pred 60's" —
 // apostrof pred "s" povsod (kot na referenčni sliki); 19XXs se dodatno
 // skrajša na zadnji dve števki.
-function formatEraLabel(era: string): string {
+export function formatEraLabel(era: string): string {
   if (era === "Pred 1960") return "60's";
   const m = era.match(/^(\d+)s$/);
   if (!m) return era;
@@ -168,6 +169,7 @@ function HighlightRow({
   formatLabel = (label) => label,
   labelClassName = "text-lg",
   icons,
+  images,
 }: {
   title: string;
   items: HighlightItem[];
@@ -176,12 +178,32 @@ function HighlightRow({
   formatLabel?: (label: string) => string;
   labelClassName?: string;
   icons?: Record<string, JSX.Element>;
+  images?: Record<string, string>;
 }) {
   // "Povleci za drsenje" z miško (na dotik že deluje naravno prek
   // overflow-x-auto). `moved` loči vlečenje od navadnega klika, da klik na
   // kartico po vlečenju ne sproži izbire. (Hook mora biti pred zgodnjim
   // "return null", da vrstni red klicanja hookov ostane enak.)
   const drag = useRef({ down: false, startX: 0, startScroll: 0, moved: false });
+
+  // Slika se uporabi le, če se je dejansko uspešno naložila — dokler
+  // manjka (uporabnik je še ni naložil v public/images/eras/), kartica
+  // ostane enaka kot brez slik (isti hook mora teči pred zgodnjim return).
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!images) return;
+    let cancelled = false;
+    for (const url of new Set(Object.values(images))) {
+      const img = new Image();
+      img.onload = () => {
+        if (!cancelled) setLoadedImages((prev) => (prev.has(url) ? prev : new Set(prev).add(url)));
+      };
+      img.src = url;
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [images]);
 
   if (items.length === 0) return null;
 
@@ -237,24 +259,46 @@ function HighlightRow({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [&::-webkit-scrollbar]:hidden cursor-grab select-none active:cursor-grabbing"
+        className="-mx-4 flex gap-3 overflow-x-auto px-4 pt-1 pb-6 [&::-webkit-scrollbar]:hidden cursor-grab select-none active:cursor-grabbing"
         style={{ scrollbarWidth: "none" }}
       >
         {items.map((item, i) => {
           const accent = ACCENTS[colorOrder[i % colorOrder.length]];
           const icon = icons?.[item.label];
+          const imageUrl = images?.[item.label];
+          const image = imageUrl && loadedImages.has(imageUrl) ? imageUrl : undefined;
           return (
             <button
               key={item.label}
               type="button"
               onClick={(e) => handleCardClick(e, item.label)}
               style={{
-                backgroundImage: `radial-gradient(120% 90% at 0% 0%, ${accent}3d 0%, transparent 60%)`,
+                backgroundImage: image
+                  ? undefined
+                  : `radial-gradient(120% 90% at 0% 0%, ${accent}3d 0%, transparent 60%)`,
                 borderColor: `${accent}4d`,
                 boxShadow: `0 10px 24px -10px ${accent}73, 0 2px 8px -4px rgb(0 0 0 / 0.15)`,
               }}
-              className="group relative flex h-28 w-36 shrink-0 flex-col justify-between overflow-hidden rounded-2xl border bg-white p-3.5 text-left text-neutral-900 transition active:scale-[0.97] dark:bg-[#111114] dark:text-white"
+              className={`group relative flex h-28 w-36 shrink-0 flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition active:scale-[0.97] ${
+                image
+                  ? "bg-neutral-800 text-white"
+                  : "bg-white text-neutral-900 dark:bg-[#111114] dark:text-white"
+              }`}
             >
+              {image && (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 opacity-80"
+                  style={{ backgroundImage: `url(${image})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                />
+              )}
+              {image && (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0"
+                  style={{ backgroundImage: "linear-gradient(0deg, rgba(0,0,0,0.6), rgba(0,0,0,0.15))" }}
+                />
+              )}
               {icon && (
                 <span
                   aria-hidden="true"
@@ -268,7 +312,11 @@ function HighlightRow({
                 <p className={`${labelClassName} leading-tight font-bold`}>{formatLabel(item.label)}</p>
                 <div className="mt-1.5 h-px w-8 rounded-full" style={{ backgroundColor: accent }} />
               </div>
-              <p className="relative text-xs font-medium text-neutral-500 dark:text-white/50">
+              <p
+                className={`relative text-xs font-medium ${
+                  image ? "text-white/85" : "text-neutral-500 dark:text-white/50"
+                }`}
+              >
                 {skladbeLabel(item.count)}
               </p>
             </button>
@@ -293,14 +341,15 @@ export default function HomeHighlights({
   if (eras.length === 0 && genres.length === 0) return null;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-0">
       <HighlightRow
         title="Obdobja"
         items={eras}
         colorOrder={ERA_COLOR_ORDER}
         onSelect={onSelectEra}
         formatLabel={formatEraLabel}
-        labelClassName="text-3xl"
+        labelClassName="text-4xl"
+        images={ERA_IMAGES}
       />
       <HighlightRow
         title="Žanri"
