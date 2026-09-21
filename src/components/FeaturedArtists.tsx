@@ -71,7 +71,7 @@ function AuthorCard({
         type="button"
         onClick={() => onFilterAuthor(group.author)}
         style={{ color: accent }}
-        className="mb-2 block text-left text-lg leading-tight font-bold hover:underline"
+        className="mb-2 block text-left text-lg leading-tight font-bold hover:underline lg:text-xl"
       >
         {group.author}
       </button>
