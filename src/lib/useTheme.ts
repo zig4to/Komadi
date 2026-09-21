@@ -18,9 +18,9 @@ function applyTheme(theme: Theme) {
 function readTheme(): Theme {
   try {
     const v = localStorage.getItem(KEY);
-    return v === "light" || v === "dark" || v === "system" ? v : "light";
+    return v === "light" || v === "dark" || v === "system" ? v : "dark";
   } catch {
-    return "light";
+    return "dark";
   }
 }
 
@@ -37,7 +37,7 @@ export function useTheme() {
   const theme = useSyncExternalStore(
     subscribe,
     readTheme,
-    () => "light" as Theme,
+    () => "dark" as Theme,
   );
 
   // Poskrbi, da se razred .dark ujema z izbiro tudi ob spremembi sistemske

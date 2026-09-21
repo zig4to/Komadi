@@ -120,7 +120,7 @@ const GENRE_ICONS: Record<string, JSX.Element> = {
 // kartico za žarenje v vogalu, rob in senco. Barve ponovno uporabljajo
 // obstoječe accent barve aplikacije (emerald/violet/cyan/orange/rose/blue/
 // amber/fuchsia), le da tu nastopajo kot žarek, ne kot poln gradient.
-const ACCENTS: string[] = [
+export const ACCENTS: string[] = [
   "#10b981", // emerald
   "#8b5cf6", // violet
   "#22d3ee", // cyan
@@ -277,9 +277,9 @@ export function HighlightRow({
               style={{
                 backgroundImage: image
                   ? undefined
-                  : `radial-gradient(120% 90% at 0% 0%, ${accent}3d 0%, transparent 60%)`,
-                borderColor: `${accent}4d`,
-                boxShadow: `0 10px 24px -10px ${accent}73, 0 2px 8px -4px rgb(0 0 0 / 0.15)`,
+                  : `radial-gradient(120% 90% at 0% 0%, ${accent}26 0%, transparent 60%)`,
+                borderColor: `${accent}38`,
+                boxShadow: `0 10px 24px -10px ${accent}40, 0 2px 8px -4px rgb(0 0 0 / 0.15)`,
               }}
               className={`group relative flex h-28 w-36 shrink-0 flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition active:scale-[0.97] ${
                 image

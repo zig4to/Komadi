@@ -1,13 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Abel, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import RegisterServiceWorker from "@/components/RegisterServiceWorker";
 import ThemeProvider from "@/components/ThemeProvider";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const abel = Abel({
+  variable: "--font-abel",
   subsets: ["latin"],
+  weight: "400",
 });
 
 const geistMono = Geist_Mono({
@@ -40,14 +41,14 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    // Privzeto svetlo; ThemeProvider po prvem izrisu preklopi na shranjeno
-    // izbiro (temna / sistemska), če je uporabnik to izbral.
+    // Privzeto temno; ThemeProvider po prvem izrisu preklopi na shranjeno
+    // izbiro (svetla / sistemska), če je uporabnik to izbral.
     <html
       lang="sl"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${abel.variable} ${geistMono.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+      <body className="min-h-full flex flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100">
         <ThemeProvider />
         {children}
         <RegisterServiceWorker />

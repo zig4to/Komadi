@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Filters, { FiltersToggle } from "@/components/Filters";
 import FeaturedArtists from "@/components/FeaturedArtists";
-import HomeHighlights, { formatEraLabel, HighlightRow } from "@/components/HomeHighlights";
+import HomeHighlights, { ACCENTS, formatEraLabel, HighlightRow } from "@/components/HomeHighlights";
 import SettingsMenu from "@/components/SettingsMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
@@ -13,6 +13,42 @@ import { emptyFilters, hasActiveFilters, type FilterState } from "@/lib/filters"
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useCopyFeedback } from "@/lib/useCopyFeedback";
 import type { SimilarSong, Song } from "@/types/song";
+
+interface RecentGroup {
+  label: string;
+  songs: Song[];
+}
+
+// Za zavihek "Novo": razdeli skladbe po dani lastnosti (avtor/obdobje/
+// razpoloženje), obdrži samo skupine z vsaj eno skladbo, jih razvrsti po
+// datumu najbolj nedavno dodane skladbe v skupini (najnovejše najprej) in
+// za vsako obdrži le njenih `songsPerGroup` najnovejših skladb.
+function groupByRecent(
+  songs: Song[],
+  keyOf: (song: Song) => string | null,
+  maxGroups: number,
+  songsPerGroup: number,
+): RecentGroup[] {
+  const byKey = new Map<string, Song[]>();
+  for (const song of songs) {
+    const key = keyOf(song);
+    if (!key) continue;
+    const list = byKey.get(key);
+    if (list) list.push(song);
+    else byKey.set(key, [song]);
+  }
+
+  return Array.from(byKey.entries())
+    .map(([label, list]) => {
+      const sorted = [...list].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+      return { label, latest: new Date(sorted[0].created_at).getTime(), songs: sorted.slice(0, songsPerGroup) };
+    })
+    .sort((a, b) => b.latest - a.latest)
+    .slice(0, maxGroups)
+    .map(({ label, songs }) => ({ label, songs }));
+}
 
 export default function Dashboard() {
   const [songs, setSongs] = useState<Song[]>([]);
@@ -215,6 +251,15 @@ export default function Dashboard() {
     [songs],
   );
 
+  // Zavihek "Novo": nad neskončnim seznamom najprej 10 nedavno dodanih,
+  // spodaj pa še skupine "Novo po ..." (avtor/obdobje/razpoloženje) — vsaka
+  // skupina prikaže do 4 najnovejše skladbe, skupine same so razvrščene po
+  // tem, katera ima najbolj nedavno dodano skladbo.
+  const recentTop = useMemo(() => newestFirst.slice(0, 10), [newestFirst]);
+  const newByAuthor = useMemo(() => groupByRecent(songs, (s) => s.author, 4, 4), [songs]);
+  const newByEra = useMemo(() => groupByRecent(songs, (s) => s.era, 4, 4), [songs]);
+  const newByMood = useMemo(() => groupByRecent(songs, (s) => s.mood, 4, 4), [songs]);
+
   const mostPopular = useMemo(
     () =>
       [...songs].sort((a, b) => {
@@ -327,18 +372,6 @@ export default function Dashboard() {
     if (randomPick?.id === id) setRandomPick(null);
   }
 
-  async function handleToggleFavorite(song: Song) {
-    const next = { ...song, favorite: !song.favorite };
-    setSongs((s) => s.map((x) => (x.id === song.id ? next : x)));
-    const { error } = await supabase
-      .from("songs")
-      .update({ favorite: next.favorite })
-      .eq("id", song.id);
-    if (error) {
-      setSongs((s) => s.map((x) => (x.id === song.id ? song : x)));
-    }
-  }
-
   async function handleCopy(song: Song) {
     const nextCount = (song.copy_count ?? 0) + 1;
     setSongs((s) => s.map((x) => (x.id === song.id ? { ...x, copy_count: nextCount } : x)));
@@ -433,7 +466,10 @@ export default function Dashboard() {
               <path d="m6 16 2 2" />
               <path d="M8.23 9.85A3 3 0 0 1 11 8a5 5 0 0 1 5 5 3 3 0 0 1-1.85 2.77l-.92.38A2 2 0 0 0 12 18a4 4 0 0 1-4 4 6 6 0 0 1-6-6 4 4 0 0 1 4-4 2 2 0 0 0 1.85-1.23z" />
             </svg>
-            <span className="bg-[linear-gradient(115deg,#059669_15%,#34d399_100%)] bg-clip-text text-2xl font-extrabold tracking-tight text-transparent">
+            <span
+              className="text-2xl font-extrabold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]"
+              style={{ WebkitTextStroke: "0.4px currentColor" }}
+            >
               Komadi
             </span>
           </h1>
@@ -567,7 +603,6 @@ export default function Dashboard() {
             song={randomPick}
             authorImage={authorImages[randomPick.author] ?? null}
             onEdit={handleEdit}
-            onToggleFavorite={handleToggleFavorite}
             onCopy={handleCopy}
             onAddSimilar={handleAddSimilar}
             onFilterAuthor={handleFilterByAuthor}
@@ -599,164 +634,166 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="mb-1.5! flex items-center gap-2">
-        <div className="relative flex-1">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-rose-600 dark:text-rose-400"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-          <input
-            value={filters.search}
-            onChange={(e) => handleFiltersChange({ ...filters, search: e.target.value })}
-            disabled={!isSupabaseConfigured}
-            placeholder="Išči po naslovu ali avtorju…"
-            className="w-full rounded-full bg-[linear-gradient(115deg,rgba(225,29,72,0.14)_15%,rgba(225,29,72,0.03)_95%)] py-2 pl-10 pr-9 text-sm text-neutral-800 placeholder-neutral-500 transition focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.24)_15%,rgba(225,29,72,0.06)_95%)] focus:outline-none disabled:opacity-40 dark:text-neutral-200 dark:placeholder-neutral-500 dark:focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.32)_15%,rgba(225,29,72,0.1)_95%)]"
-          />
-          {filters.search && (
-            <button
-              type="button"
-              onClick={() => handleFiltersChange({ ...filters, search: "" })}
-              aria-label="Počisti iskanje"
-              title="Počisti iskanje"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300"
+      <div className="space-y-2.5">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-rose-600 dark:text-rose-400"
             >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-3.5 w-3.5"
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            <input
+              value={filters.search}
+              onChange={(e) => handleFiltersChange({ ...filters, search: e.target.value })}
+              disabled={!isSupabaseConfigured}
+              placeholder="Išči po naslovu ali avtorju…"
+              className="w-full rounded-full border border-rose-500/40 bg-[linear-gradient(115deg,rgba(225,29,72,0.14)_15%,rgba(225,29,72,0.03)_95%)] py-2 pl-10 pr-9 text-sm text-neutral-800 placeholder-neutral-500 transition focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.24)_15%,rgba(225,29,72,0.06)_95%)] focus:outline-none disabled:opacity-40 dark:border-rose-400/40 dark:text-neutral-200 dark:placeholder-neutral-500 dark:focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.32)_15%,rgba(225,29,72,0.1)_95%)]"
+            />
+            {filters.search && (
+              <button
+                type="button"
+                onClick={() => handleFiltersChange({ ...filters, search: "" })}
+                aria-label="Počisti iskanje"
+                title="Počisti iskanje"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300"
               >
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </button>
-          )}
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5"
+                >
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="mb-1.5! flex flex-nowrap items-center gap-2 overflow-x-auto">
-        <button
-          type="button"
-          onClick={pickRandom}
-          disabled={!isSupabaseConfigured}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[linear-gradient(115deg,rgba(124,58,237,0.14)_15%,rgba(124,58,237,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(124,58,237,0.24)_15%,rgba(124,58,237,0.06)_95%)] disabled:opacity-40 dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(124,58,237,0.32)_15%,rgba(124,58,237,0.1)_95%)]"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.8}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400"
+        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
+          <button
+            type="button"
+            onClick={pickRandom}
+            disabled={!isSupabaseConfigured}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-violet-500/40 bg-[linear-gradient(115deg,rgba(124,58,237,0.14)_15%,rgba(124,58,237,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(124,58,237,0.24)_15%,rgba(124,58,237,0.06)_95%)] disabled:opacity-40 dark:border-violet-400/40 dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(124,58,237,0.32)_15%,rgba(124,58,237,0.1)_95%)]"
           >
-            <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-            <path d="M16 8h.01" />
-            <path d="M8 8h.01" />
-            <path d="M8 16h.01" />
-            <path d="M16 16h.01" />
-            <path d="M12 12h.01" />
-          </svg>
-          Naključno
-        </button>
-        <button
-          type="button"
-          onClick={handlePartialStart}
-          disabled={!isSupabaseConfigured}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[linear-gradient(115deg,rgba(8,145,178,0.14)_15%,rgba(8,145,178,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(8,145,178,0.24)_15%,rgba(8,145,178,0.06)_95%)] disabled:opacity-40 dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(8,145,178,0.32)_15%,rgba(8,145,178,0.1)_95%)]"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.8}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-4 w-4 shrink-0 text-cyan-700 dark:text-cyan-400"
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400"
+            >
+              <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+              <path d="M16 8h.01" />
+              <path d="M8 8h.01" />
+              <path d="M8 16h.01" />
+              <path d="M16 16h.01" />
+              <path d="M12 12h.01" />
+            </svg>
+            Naključno
+          </button>
+          <button
+            type="button"
+            onClick={handlePartialStart}
+            disabled={!isSupabaseConfigured}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-cyan-600/40 bg-[linear-gradient(115deg,rgba(8,145,178,0.14)_15%,rgba(8,145,178,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(8,145,178,0.24)_15%,rgba(8,145,178,0.06)_95%)] disabled:opacity-40 dark:border-cyan-400/40 dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(8,145,178,0.32)_15%,rgba(8,145,178,0.1)_95%)]"
           >
-            <path d="m18 14 4 4-4 4" />
-            <path d="m18 2 4 4-4 4" />
-            <path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" />
-            <path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" />
-            <path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" />
-          </svg>
-          Delno naključno
-        </button>
-      </div>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4 shrink-0 text-cyan-700 dark:text-cyan-400"
+            >
+              <path d="m18 14 4 4-4 4" />
+              <path d="m18 2 4 4-4 4" />
+              <path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" />
+              <path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" />
+              <path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" />
+            </svg>
+            Delno naključno
+          </button>
+        </div>
 
-      <div className="mt-0! flex flex-nowrap items-center gap-2 overflow-x-auto">
-        <button
-          type="button"
-          data-view-toggle
-          onClick={() => setActiveView((v) => (v === "newest" ? "list" : "newest"))}
-          disabled={!isSupabaseConfigured}
-          aria-pressed={activeView === "newest"}
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition disabled:opacity-40 ${
-            activeView === "newest"
-              ? "bg-[linear-gradient(115deg,#059669_15%,#34d399_100%)] text-white"
-              : "bg-[linear-gradient(115deg,rgba(16,185,129,0.14)_15%,rgba(16,185,129,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.24)_15%,rgba(16,185,129,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.32)_15%,rgba(16,185,129,0.1)_95%)]"
-          }`}
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`h-4 w-4 shrink-0 ${
-              activeView === "newest" ? "text-white" : "text-emerald-600 dark:text-emerald-400"
+        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
+          <button
+            type="button"
+            data-view-toggle
+            onClick={() => setActiveView((v) => (v === "newest" ? "list" : "newest"))}
+            disabled={!isSupabaseConfigured}
+            aria-pressed={activeView === "newest"}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/50 px-4 py-2 text-sm font-medium transition disabled:opacity-40 dark:border-emerald-400/50 ${
+              activeView === "newest"
+                ? "bg-[linear-gradient(115deg,#059669_15%,#34d399_100%)] text-white"
+                : "bg-[linear-gradient(115deg,rgba(16,185,129,0.14)_15%,rgba(16,185,129,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.24)_15%,rgba(16,185,129,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.32)_15%,rgba(16,185,129,0.1)_95%)]"
             }`}
           >
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 7v5l3.5 2" />
-          </svg>
-          Novo
-        </button>
-        <button
-          type="button"
-          data-view-toggle
-          onClick={() => setActiveView((v) => (v === "popular" ? "list" : "popular"))}
-          disabled={!isSupabaseConfigured}
-          aria-pressed={activeView === "popular"}
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition disabled:opacity-40 ${
-            activeView === "popular"
-              ? "bg-[linear-gradient(115deg,#ea580c_15%,#fb923c_100%)] text-white"
-              : "bg-[linear-gradient(115deg,rgba(249,115,22,0.14)_15%,rgba(249,115,22,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(249,115,22,0.24)_15%,rgba(249,115,22,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(249,115,22,0.32)_15%,rgba(249,115,22,0.1)_95%)]"
-          }`}
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`h-4 w-4 shrink-0 ${
-              activeView === "popular" ? "text-white" : "text-orange-500"
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`h-4 w-4 shrink-0 ${
+                activeView === "newest" ? "text-white" : "text-emerald-600 dark:text-emerald-400"
+              }`}
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3.5 2" />
+            </svg>
+            Novo
+          </button>
+          <button
+            type="button"
+            data-view-toggle
+            onClick={() => setActiveView((v) => (v === "popular" ? "list" : "popular"))}
+            disabled={!isSupabaseConfigured}
+            aria-pressed={activeView === "popular"}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-orange-500/50 px-4 py-2 text-sm font-medium transition disabled:opacity-40 dark:border-orange-400/50 ${
+              activeView === "popular"
+                ? "bg-[linear-gradient(115deg,#ea580c_15%,#fb923c_100%)] text-white"
+                : "bg-[linear-gradient(115deg,rgba(249,115,22,0.14)_15%,rgba(249,115,22,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(249,115,22,0.24)_15%,rgba(249,115,22,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(249,115,22,0.32)_15%,rgba(249,115,22,0.1)_95%)]"
             }`}
           >
-            <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
-          </svg>
-          Popularno
-        </button>
-        <FiltersToggle filters={filters} onChange={handleFiltersChange} />
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`h-4 w-4 shrink-0 ${
+                activeView === "popular" ? "text-white" : "text-orange-500"
+              }`}
+            >
+              <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+            </svg>
+            Popularno
+          </button>
+          <FiltersToggle filters={filters} onChange={handleFiltersChange} />
+        </div>
       </div>
 
       <Filters
@@ -807,10 +844,43 @@ export default function Dashboard() {
           newestFirst.length === 0 ? (
             <p className="text-sm text-neutral-500">Baza je še prazna — dodaj prvo skladbo.</p>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {newestFirst.map((song) => (
-                <CompactCard key={song.id} song={song} onCopy={handleCopy} />
-              ))}
+            <div className="space-y-6">
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  Nedavno dodano
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {recentTop.map((song) => (
+                    <CompactCard key={song.id} song={song} onCopy={handleCopy} />
+                  ))}
+                </div>
+              </div>
+
+              {newByAuthor.length > 0 && (
+                <RecentGroupSection
+                  title="Novo po avtorjih"
+                  groups={newByAuthor}
+                  onCopy={handleCopy}
+                  accentOffset={0}
+                />
+              )}
+              {newByEra.length > 0 && (
+                <RecentGroupSection
+                  title="Novo po obdobju"
+                  groups={newByEra}
+                  onCopy={handleCopy}
+                  formatLabel={formatEraLabel}
+                  accentOffset={3}
+                />
+              )}
+              {newByMood.length > 0 && (
+                <RecentGroupSection
+                  title="Novo po razpoloženju"
+                  groups={newByMood}
+                  onCopy={handleCopy}
+                  accentOffset={5}
+                />
+              )}
             </div>
           )
         )}
@@ -903,7 +973,6 @@ export default function Dashboard() {
                         authorImage={authorImages[song.author] ?? null}
                         onEdit={handleEdit}
                         onDelete={handleDelete}
-                        onToggleFavorite={handleToggleFavorite}
                         onCopy={handleCopy}
                         onAddSimilar={handleAddSimilar}
                         onFilterAuthor={handleFilterByAuthor}
@@ -933,7 +1002,7 @@ function CompactCard({ song, onCopy }: { song: Song; onCopy?: (song: Song) => vo
       <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{song.title}</p>
       <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{song.author}</p>
       {copied && (
-        <span className="pointer-events-none absolute bottom-1.5 right-2 rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-medium text-emerald-600 ring-1 ring-neutral-200 dark:bg-neutral-950/80 dark:text-emerald-400 dark:ring-0">
+        <span className="pointer-events-none absolute bottom-1.5 right-2 rounded bg-white/90 px-1.5 py-0.5 text-[12px] font-medium text-emerald-600 ring-1 ring-neutral-200 dark:bg-neutral-950/80 dark:text-emerald-400 dark:ring-0">
           kopirano :)
         </span>
       )}
@@ -978,10 +1047,72 @@ function CompactRow({
         <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{song.author}</p>
       </div>
       {copied && (
-        <span className="pointer-events-none absolute bottom-1.5 right-2 rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-medium text-emerald-600 ring-1 ring-neutral-200 dark:bg-neutral-950/80 dark:text-emerald-400 dark:ring-0">
+        <span className="pointer-events-none absolute bottom-1.5 right-2 rounded bg-white/90 px-1.5 py-0.5 text-[12px] font-medium text-emerald-600 ring-1 ring-neutral-200 dark:bg-neutral-950/80 dark:text-emerald-400 dark:ring-0">
           kopirano :)
         </span>
       )}
     </div>
+  );
+}
+
+function RecentGroupSection({
+  title,
+  groups,
+  onCopy,
+  formatLabel = (label) => label,
+  accentOffset = 0,
+}: {
+  title: string;
+  groups: RecentGroup[];
+  onCopy: (song: Song) => void;
+  formatLabel?: (label: string) => string;
+  accentOffset?: number;
+}) {
+  const titleAccent = ACCENTS[accentOffset % ACCENTS.length];
+  return (
+    <div>
+      <h3 className="mb-2 text-sm font-semibold" style={{ color: titleAccent }}>
+        {title}
+      </h3>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {groups.map((group, i) => {
+          const accent = ACCENTS[(accentOffset + i) % ACCENTS.length];
+          return (
+            <div
+              key={group.label}
+              style={{ borderLeftColor: accent, borderLeftWidth: 3 }}
+              className="rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900"
+            >
+              <p className="mb-1.5 truncate text-sm font-semibold" style={{ color: accent }}>
+                {formatLabel(group.label)}
+              </p>
+              <div className="space-y-0.5">
+                {group.songs.map((song) => (
+                  <RecentGroupSongRow key={song.id} song={song} onCopy={onCopy} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function RecentGroupSongRow({ song, onCopy }: { song: Song; onCopy: (song: Song) => void }) {
+  const [copied, triggerCopy] = useCopyFeedback();
+
+  return (
+    <button
+      type="button"
+      onClick={() => triggerCopy(song.title).then((ok) => ok && onCopy(song))}
+      title="Klikni za kopiranje naslova"
+      className="flex w-full flex-col items-start rounded-lg px-1.5 py-1 text-left transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
+    >
+      <span className="w-full truncate text-sm text-neutral-800 dark:text-neutral-200">{song.title}</span>
+      <span className="w-full truncate text-xs text-neutral-500 dark:text-neutral-400">
+        {copied ? "kopirano :)" : song.author}
+      </span>
+    </button>
   );
 }

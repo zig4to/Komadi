@@ -7,11 +7,9 @@ import type { SimilarSong, Song } from "@/types/song";
 
 // Diagonalna "zagozda" s sliko na desni strani kartice — enak pristop kot
 // eventCard/eventCardImage v projektu masCajt (styles.js): clip-path izreže
-// nagnjen štirikotnik (širši zgoraj, ožji spodaj), mask-image nato zmehča
-// rezan rob v gradient namesto ostre črte, opacity pa sliko "potopi" v barvo
-// kartice namesto da bi bila prilepljena na vrhu.
-const IMAGE_CLIP_PATH = "polygon(30% 0, 100% 0, 100% 100%, 10% 100%)";
-const IMAGE_EDGE_MASK = "linear-gradient(106deg, transparent 20%, #000 34%)";
+// nagnjen štirikotnik (širši zgoraj, ožji spodaj), opacity pa sliko "potopi"
+// v barvo kartice namesto da bi bila prilepljena na vrhu.
+const IMAGE_CLIP_PATH = "polygon(20% 0, 100% 0, 100% 100%, 10% 100%)";
 
 // Stabilen odtenek barve iz ID-ja skladbe (enak ob vsakem izrisu).
 function hueFromId(id: string): number {
@@ -25,7 +23,6 @@ export default function SongCard({
   authorImage = null,
   onEdit,
   onDelete,
-  onToggleFavorite,
   onCopy,
   onAddSimilar,
   onFilterAuthor,
@@ -35,7 +32,6 @@ export default function SongCard({
   authorImage?: string | null;
   onEdit: (song: Song) => void;
   onDelete?: (id: string) => void;
-  onToggleFavorite: (song: Song) => void;
   onCopy?: (song: Song) => void;
   onAddSimilar?: (song: SimilarSong) => void;
   onFilterAuthor?: (author: string) => void;
@@ -84,14 +80,14 @@ export default function SongCard({
   const hue = highlighted ? 152 : hueFromId(song.id);
   const cardStyle = {
     boxShadow: highlighted
-      ? "0 12px 36px -18px rgb(16 185 129 / 0.28), 0 2px 8px -6px rgb(0 0 0 / 0.32)"
-      : `0 12px 36px -20px hsl(${hue} 85% 55% / 0.24), 0 2px 8px -7px rgb(0 0 0 / 0.32)`,
-    borderColor: highlighted ? undefined : `hsl(${hue} 50% 42% / 0.55)`,
+      ? "0 12px 36px -18px rgb(16 185 129 / 0.16), 0 2px 8px -6px rgb(0 0 0 / 0.32)"
+      : `0 12px 36px -20px hsl(${hue} 85% 55% / 0.13), 0 2px 8px -7px rgb(0 0 0 / 0.32)`,
+    borderColor: highlighted ? undefined : `hsl(${hue} 50% 42% / 0.4)`,
     "--hue": hue,
   } as React.CSSProperties;
 
   function handleCardClick(e: React.MouseEvent<HTMLDivElement>) {
-    // Klik na gumb (priljubljene / uredi / izbriši) ne kopira.
+    // Klik na gumb (uredi / izbriši) ne kopira.
     if ((e.target as HTMLElement).closest("button, a")) return;
     triggerCopy(song.title).then((ok) => {
       if (ok) onCopy?.(song);
@@ -119,9 +115,7 @@ export default function SongCard({
           className="pointer-events-none absolute inset-y-0 -right-8 h-full w-[63%] object-cover object-right"
           style={{
             clipPath: IMAGE_CLIP_PATH,
-            opacity: 0.8,
-            WebkitMaskImage: IMAGE_EDGE_MASK,
-            maskImage: IMAGE_EDGE_MASK,
+            opacity: 0.6,
             zIndex: -1,
           }}
         />
@@ -138,37 +132,13 @@ export default function SongCard({
             {song.author}
           </button>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onToggleFavorite(song)}
-            aria-label={song.favorite ? "Odstrani iz priljubljenih" : "Dodaj med priljubljene"}
-            title={song.favorite ? "Odstrani iz priljubljenih" : "Dodaj med priljubljene"}
-            className={`rounded-full bg-white/70 p-1.5 backdrop-blur-sm dark:bg-neutral-900/70 ${
-              song.favorite
-                ? "text-amber-500 dark:text-amber-400"
-                : "text-neutral-400 hover:text-neutral-600 dark:text-neutral-600 dark:hover:text-neutral-400"
-            }`}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill={song.favorite ? "currentColor" : "none"}
-              stroke="currentColor"
-              strokeWidth={1.8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-[18px] w-[18px]"
-            >
-              <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />
-            </svg>
-          </button>
-
+        <div className="flex shrink-0 items-center gap-0.5">
           <button
             type="button"
             onClick={() => onEdit(song)}
             aria-label="Uredi skladbo"
             title="Uredi skladbo"
-            className="rounded-full bg-white/70 p-1.5 text-neutral-400 backdrop-blur-sm hover:text-emerald-600 dark:bg-neutral-900/70 dark:text-neutral-600 dark:hover:text-emerald-400"
+            className="p-1.5 text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300"
           >
             <svg
               viewBox="0 0 24 24"
@@ -190,7 +160,7 @@ export default function SongCard({
               onClick={() => onDelete(song.id)}
               aria-label="Izbriši skladbo"
               title="Izbriši skladbo"
-              className="rounded-full bg-white/70 p-1.5 text-neutral-400 backdrop-blur-sm hover:text-red-600 dark:bg-neutral-900/70 dark:text-neutral-600 dark:hover:text-red-400"
+              className="p-1.5 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -222,7 +192,7 @@ export default function SongCard({
           aria-label={similarOpen ? "Skrij podobne skladbe" : "Najdi podobne skladbe"}
           title="Najdi podobne skladbe"
           aria-expanded={similarOpen}
-          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none backdrop-blur-sm transition ${
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium leading-none backdrop-blur-sm transition ${
             similarOpen
               ? "border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
               : "border-neutral-300 bg-white/70 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-emerald-400"
@@ -316,7 +286,7 @@ export default function SongCard({
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="shrink-0 rounded-full border border-neutral-300 px-1.5 py-0.5 text-[10px] leading-none text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
+    <span className="shrink-0 rounded-full border border-neutral-300 px-1.5 py-0.5 text-[11px] leading-none text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
       {children}
     </span>
   );

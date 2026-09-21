@@ -31,7 +31,7 @@ function SongRow({
     >
       <span
         style={{ backgroundColor: `${accent}26`, color: accent }}
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[12px] font-bold"
       >
         {index}
       </span>
@@ -61,9 +61,9 @@ function AuthorCard({
   return (
     <div
       style={{
-        backgroundImage: `radial-gradient(120% 90% at 0% 0%, ${accent}3d 0%, transparent 60%)`,
-        borderColor: `${accent}4d`,
-        boxShadow: `0 10px 24px -10px ${accent}73, 0 2px 8px -4px rgb(0 0 0 / 0.15)`,
+        backgroundImage: `radial-gradient(120% 90% at 0% 0%, ${accent}26 0%, transparent 60%)`,
+        borderColor: `${accent}38`,
+        boxShadow: `0 10px 24px -10px ${accent}40, 0 2px 8px -4px rgb(0 0 0 / 0.15)`,
       }}
       className={`rounded-2xl border bg-white p-3.5 dark:bg-[#111114] ${className}`}
     >
