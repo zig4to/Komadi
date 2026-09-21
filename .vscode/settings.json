@@ -1,0 +1,25 @@
+{
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/out/**": true,
+    "**/certificates/**": true,
+    "**/backups/**": true,
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/supabase/.temp/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.next": true,
+    "**/out": true,
+    "**/certificates": true,
+    "**/backups": true,
+    "**/supabase/.temp": true,
+    "package-lock.json": true
+  },
+  "files.exclude": {
+    "**/.next": true,
+    "**/out": true
+  }
+}

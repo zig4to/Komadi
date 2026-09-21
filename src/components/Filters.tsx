@@ -139,23 +139,17 @@ export default function Filters({
       data-filters-panel
       className="mt-3! space-y-4 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900"
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <input
-          value={filters.search}
-          onChange={(e) => onChange({ ...filters, search: e.target.value })}
-          placeholder="Išči po naslovu ali avtorju…"
-          className="w-full rounded-full border border-neutral-300 bg-neutral-50 px-4 py-2 text-sm text-neutral-900 focus:border-emerald-500 focus:outline-none sm:w-1/2 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
-        />
-        {hasActiveFilters(filters) && (
+      {hasActiveFilters(filters) && (
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={() => onChange(emptyFilters)}
-            className="shrink-0 self-start text-xs text-neutral-500 hover:text-blue-600 sm:self-auto dark:text-neutral-400 dark:hover:text-blue-400"
+            className="shrink-0 text-xs text-neutral-500 hover:text-blue-600 dark:text-neutral-400 dark:hover:text-blue-400"
           >
             Počisti filtre
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
           <Section
             title="Žanr"

@@ -59,3 +59,25 @@ create policy "Public update song images" on storage.objects
 
 create policy "Public delete song images" on storage.objects
   for delete using (bucket_id = 'song-images');
+
+-- Slika kartice po avtorju (glej supabase/migrations/0007_add_author_images.sql):
+-- ena slika na avtorja, prikazana pri vseh njegovih skladbah.
+create table if not exists public.author_images (
+  author text primary key,
+  image_url text not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.author_images enable row level security;
+
+create policy "Public read author images" on public.author_images
+  for select using (true);
+
+create policy "Public insert author images" on public.author_images
+  for insert with check (true);
+
+create policy "Public update author images" on public.author_images
+  for update using (true);
+
+create policy "Public delete author images" on public.author_images
+  for delete using (true);

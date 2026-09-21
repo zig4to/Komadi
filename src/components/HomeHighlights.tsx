@@ -161,10 +161,12 @@ export interface HighlightItem {
   count: number;
 }
 
-function HighlightRow({
+const DEFAULT_COLOR_ORDER = ACCENTS.map((_, i) => i);
+
+export function HighlightRow({
   title,
   items,
-  colorOrder,
+  colorOrder = DEFAULT_COLOR_ORDER,
   onSelect,
   formatLabel = (label) => label,
   labelClassName = "text-lg",
@@ -173,7 +175,7 @@ function HighlightRow({
 }: {
   title: string;
   items: HighlightItem[];
-  colorOrder: number[];
+  colorOrder?: number[];
   onSelect: (label: string) => void;
   formatLabel?: (label: string) => string;
   labelClassName?: string;

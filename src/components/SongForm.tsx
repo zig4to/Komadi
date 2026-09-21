@@ -22,6 +22,8 @@ export default function SongForm({
   prefill,
   knownMoods,
   knownOrigins,
+  authorImages,
+  onSetAuthorImage,
   onSaved,
   onClose,
 }: {
@@ -29,6 +31,8 @@ export default function SongForm({
   prefill?: { title: string; author: string } | null;
   knownMoods: string[];
   knownOrigins: string[];
+  authorImages: Record<string, string>;
+  onSetAuthorImage: (author: string, imageUrl: string | null) => void | Promise<void>;
   onSaved: (song: Song, mode: "insert" | "update") => void;
   onClose: () => void;
 }) {
@@ -58,10 +62,13 @@ export default function SongForm({
   const [imageError, setImageError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  const authorImage = authorImages[form.author.trim()] ?? null;
+
+  async function handleImageFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file) return;
+    const author = form.author.trim();
+    if (!file || !author) return;
     setUploadingImage(true);
     setImageError(null);
     try {
@@ -72,12 +79,18 @@ export default function SongForm({
         .upload(path, blob, { contentType: "image/jpeg" });
       if (uploadError) throw uploadError;
       const { data } = supabase.storage.from("song-images").getPublicUrl(path);
-      setForm((f) => ({ ...f, image_url: data.publicUrl }));
+      await onSetAuthorImage(author, data.publicUrl);
     } catch (err) {
       setImageError(err instanceof Error ? err.message : "Nalaganje slike ni uspelo.");
     } finally {
       setUploadingImage(false);
     }
+  }
+
+  async function handleRemoveAuthorImage() {
+    const author = form.author.trim();
+    if (!author) return;
+    await onSetAuthorImage(author, null);
   }
 
   async function handleGuessEra() {
@@ -345,15 +358,15 @@ export default function SongForm({
         </label>
 
         <div className="flex items-center gap-2">
-          {form.image_url && (
+          {authorImage && (
             <div className="group relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-neutral-300 dark:border-neutral-700">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={form.image_url} alt="" className="h-full w-full object-cover" />
+              <img src={authorImage} alt="" className="h-full w-full object-cover" />
               <button
                 type="button"
-                onClick={() => setForm({ ...form, image_url: null })}
-                aria-label="Odstrani sliko"
-                title="Odstrani sliko"
+                onClick={handleRemoveAuthorImage}
+                aria-label="Odstrani sliko avtorja"
+                title="Odstrani sliko avtorja"
                 className="absolute inset-0 flex items-center justify-center bg-black/55 text-white opacity-0 transition group-hover:opacity-100"
               >
                 <svg
@@ -374,9 +387,9 @@ export default function SongForm({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingImage}
-            aria-label="Naloži sliko kartice"
-            title="Naloži sliko kartice"
+            disabled={uploadingImage || !form.author.trim()}
+            aria-label="Naloži sliko avtorja"
+            title="Naloži sliko avtorja"
             className="inline-flex shrink-0 items-center justify-center rounded-lg border border-neutral-300 p-2 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-emerald-400"
           >
             <svg
@@ -398,7 +411,7 @@ export default function SongForm({
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            onChange={handleImageSelect}
+            onChange={handleImageFileSelect}
             className="hidden"
           />
         </div>

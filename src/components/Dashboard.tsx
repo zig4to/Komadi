@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Filters, { FiltersToggle } from "@/components/Filters";
 import FeaturedArtists from "@/components/FeaturedArtists";
-import HomeHighlights, { formatEraLabel } from "@/components/HomeHighlights";
+import HomeHighlights, { formatEraLabel, HighlightRow } from "@/components/HomeHighlights";
 import SettingsMenu from "@/components/SettingsMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
@@ -16,6 +16,7 @@ import type { SimilarSong, Song } from "@/types/song";
 
 export default function Dashboard() {
   const [songs, setSongs] = useState<Song[]>([]);
+  const [authorImages, setAuthorImages] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -57,6 +58,42 @@ export default function Dashboard() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.from("author_images").select("author, image_url");
+      if (cancelled || error || !data) return;
+      setAuthorImages(Object.fromEntries(data.map((r) => [r.author, r.image_url])));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleSetAuthorImage(author: string, imageUrl: string | null) {
+    const prev = authorImages;
+    if (imageUrl) {
+      setAuthorImages((m) => ({ ...m, [author]: imageUrl }));
+      const { error } = await supabase.from("author_images").upsert({ author, image_url: imageUrl });
+      if (error) {
+        setAuthorImages(prev);
+        alert("Napaka pri shranjevanju slike: " + error.message);
+      }
+    } else {
+      setAuthorImages((m) => {
+        const next = { ...m };
+        delete next[author];
+        return next;
+      });
+      const { error } = await supabase.from("author_images").delete().eq("author", author);
+      if (error) {
+        setAuthorImages(prev);
+        alert("Napaka pri brisanju slike: " + error.message);
+      }
+    }
+  }
 
   const filteredSongs = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
@@ -140,6 +177,16 @@ export default function Dashboard() {
   // "Predstavljeno": vsak dan naključno (a ves dan stabilno) izbere dva
   // avtorja z vsaj tremi skladbami in za vsakega tri njegove skladbe.
   const featuredArtists = useMemo(() => pickDailyFeatured(songs, 4, 3), [songs]);
+
+  // "Avtorji": vsi avtorji (največ skladb najprej), z avtorjevo sliko, če je
+  // nastavljena (glej author_images / SongForm "Slika avtorja").
+  const authorHighlights = useMemo(
+    () =>
+      usedAuthors
+        .map((author) => ({ label: author, count: songs.filter((s) => s.author === author).length }))
+        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "sl")),
+    [usedAuthors, songs],
+  );
 
   // Naslov nad seznamom skladb: če je bilo izbrano natanko eno obdobje ali
   // en žanr (npr. s klikom na featured kartico), pove iz katerega.
@@ -259,6 +306,8 @@ export default function Dashboard() {
           initial={editing}
           knownMoods={knownMoods}
           knownOrigins={knownOrigins}
+          authorImages={authorImages}
+          onSetAuthorImage={handleSetAuthorImage}
           onSaved={handleSaved}
           onClose={closeForm}
         />
@@ -516,6 +565,7 @@ export default function Dashboard() {
           </div>
           <SongCard
             song={randomPick}
+            authorImage={authorImages[randomPick.author] ?? null}
             onEdit={handleEdit}
             onToggleFavorite={handleToggleFavorite}
             onCopy={handleCopy}
@@ -541,11 +591,60 @@ export default function Dashboard() {
             prefill={prefillDraft}
             knownMoods={knownMoods}
             knownOrigins={knownOrigins}
+            authorImages={authorImages}
+            onSetAuthorImage={handleSetAuthorImage}
             onSaved={handleSaved}
             onClose={closeForm}
           />
         </div>
       )}
+
+      <div className="mb-1.5! flex items-center gap-2">
+        <div className="relative flex-1">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-rose-600 dark:text-rose-400"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          <input
+            value={filters.search}
+            onChange={(e) => handleFiltersChange({ ...filters, search: e.target.value })}
+            disabled={!isSupabaseConfigured}
+            placeholder="Išči po naslovu ali avtorju…"
+            className="w-full rounded-full bg-[linear-gradient(115deg,rgba(225,29,72,0.14)_15%,rgba(225,29,72,0.03)_95%)] py-2 pl-10 pr-9 text-sm text-neutral-800 placeholder-neutral-500 transition focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.24)_15%,rgba(225,29,72,0.06)_95%)] focus:outline-none disabled:opacity-40 dark:text-neutral-200 dark:placeholder-neutral-500 dark:focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.32)_15%,rgba(225,29,72,0.1)_95%)]"
+          />
+          {filters.search && (
+            <button
+              type="button"
+              onClick={() => handleFiltersChange({ ...filters, search: "" })}
+              aria-label="Počisti iskanje"
+              title="Počisti iskanje"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-3.5 w-3.5"
+              >
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="mb-1.5! flex flex-nowrap items-center gap-2 overflow-x-auto">
         <button
@@ -676,28 +775,23 @@ export default function Dashboard() {
             onSelectGenre={handleHighlightGenre}
           />
           <FeaturedArtists items={featuredArtists} onCopy={handleCopy} onFilterAuthor={handleFilterByAuthor} />
+          <HighlightRow
+            title="Avtorji"
+            items={authorHighlights}
+            onSelect={handleFilterByAuthor}
+            images={authorImages}
+          />
         </div>
       )}
 
       {authorFilter && (
-        <div className="mt-3! flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="mt-3! rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm dark:border-neutral-800 dark:bg-neutral-900">
           <span className="text-neutral-700 dark:text-neutral-300">
-            Skladbe izvajalca{" "}
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-              {authorFilter}
+            Skladbe izvajalca:{" "}
+            <span className="text-base font-semibold text-emerald-600 dark:text-emerald-400">
+              &quot;{authorFilter}&quot;
             </span>
           </span>
-          <button
-            type="button"
-            onClick={() => {
-              setAuthorFilter(null);
-              setSortAlpha(false);
-              setFilters(emptyFilters);
-            }}
-            className="text-xs text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
-          >
-            Počisti ✕
-          </button>
         </div>
       )}
 
@@ -743,7 +837,7 @@ export default function Dashboard() {
               <h2 className="text-base font-semibold text-neutral-800 dark:text-neutral-100">
                 {songsHeading}
               </h2>
-              {filters.eras.length > 0 || filters.genres.length > 0 ? (
+              {filters.eras.length > 0 || filters.genres.length > 0 || authorFilter ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -806,6 +900,7 @@ export default function Dashboard() {
                     <div key={song.id}>
                       <SongCard
                         song={song}
+                        authorImage={authorImages[song.author] ?? null}
                         onEdit={handleEdit}
                         onDelete={handleDelete}
                         onToggleFavorite={handleToggleFavorite}
