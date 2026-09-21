@@ -120,10 +120,9 @@ export default function SongCard({
           aria-hidden="true"
           loading="lazy"
           decoding="async"
-          className="pointer-events-none absolute inset-y-0 -right-8 h-full w-[63%] object-cover object-right"
+          className="pointer-events-none absolute inset-y-0 -right-8 h-full w-[63%] object-cover object-right opacity-60 lg:opacity-50"
           style={{
             clipPath: IMAGE_CLIP_PATH,
-            opacity: 0.6,
             zIndex: -1,
           }}
         />
