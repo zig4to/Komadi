@@ -172,6 +172,7 @@ export function HighlightRow({
   labelClassName = "text-lg",
   cardSizeClassName = "h-28 w-36",
   gapClassName = "gap-3",
+  labelStroke = false,
   icons,
   images,
 }: {
@@ -183,6 +184,7 @@ export function HighlightRow({
   labelClassName?: string;
   cardSizeClassName?: string;
   gapClassName?: string;
+  labelStroke?: boolean;
   icons?: Record<string, JSX.Element>;
   images?: Record<string, string>;
 }) {
@@ -315,7 +317,12 @@ export function HighlightRow({
                 </span>
               )}
               <div className="relative">
-                <p className={`${labelClassName} leading-tight font-bold`}>{formatLabel(item.label)}</p>
+                <p
+                  className={`${labelClassName} leading-tight font-bold`}
+                  style={labelStroke ? { WebkitTextStroke: `1px ${accent}38` } : undefined}
+                >
+                  {formatLabel(item.label)}
+                </p>
                 <div className="mt-1.5 h-px w-8 rounded-full" style={{ backgroundColor: accent }} />
               </div>
               <p
@@ -357,6 +364,7 @@ export default function HomeHighlights({
         labelClassName="text-4xl lg:text-5xl"
         cardSizeClassName="h-28 w-36 lg:h-36 lg:w-48"
         gapClassName="gap-3 lg:gap-4"
+        labelStroke
         images={ERA_IMAGES}
       />
       <HighlightRow
