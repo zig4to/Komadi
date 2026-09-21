@@ -52,7 +52,7 @@ const GENRE_ICONS: Record<string, JSX.Element> = {
   ),
   Pop: (
     <svg viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a1 1 0 1 0-2 0 3 3 0 0 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V19H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.1A5 5 0 0 0 17 12z" />
+      <path d="M12 13a3 3 0 0 0 3-3V4a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a1 1 0 1 0-2 0 3 3 0 0 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V17H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.1A5 5 0 0 0 17 10z" />
     </svg>
   ),
   "Pop rock": (
@@ -78,8 +78,8 @@ const GENRE_ICONS: Record<string, JSX.Element> = {
   ),
   Country: (
     <svg viewBox="0 0 24 24" fill="currentColor">
-      <ellipse cx="12" cy="17" rx="10" ry="2.6" />
-      <path d="M8 16c-.6-3 .5-8 4-8s4.6 5 4 8H8z" />
+      <ellipse cx="12" cy="13" rx="10" ry="2.6" />
+      <path d="M8 12c-.6-3 .5-8 4-8s4.6 5 4 8H8z" />
     </svg>
   ),
   Reggae: (
@@ -115,18 +115,19 @@ const GENRE_ICONS: Record<string, JSX.Element> = {
   ),
 };
 
-// Barvna paleta za kartice ponovno uporablja obstoječe barve gumbov v
-// aplikaciji (emerald/violet/cyan/orange/blue/amber/rose/fuchsia), da so
-// kartice usklajene s preostalim vizualnim slogom.
-const PALETTE: [string, string][] = [
-  ["#059669", "#34d399"], // emerald
-  ["#7c3aed", "#a78bfa"], // violet
-  ["#0891b2", "#22d3ee"], // cyan
-  ["#ea580c", "#fb923c"], // orange
-  ["#e11d48", "#fb7185"], // rose
-  ["#2563eb", "#60a5fa"], // blue
-  ["#d97706", "#fbbf24"], // amber
-  ["#a21caf", "#e879f9"], // fuchsia
+// "Dark neon" slog: skoraj črna kartica + en poudarjen (neonski) odtenek na
+// kartico za žarenje v vogalu, rob in senco. Barve ponovno uporabljajo
+// obstoječe accent barve aplikacije (emerald/violet/cyan/orange/rose/blue/
+// amber/fuchsia), le da tu nastopajo kot žarek, ne kot poln gradient.
+const ACCENTS: string[] = [
+  "#10b981", // emerald
+  "#8b5cf6", // violet
+  "#22d3ee", // cyan
+  "#fb923c", // orange
+  "#fb7185", // rose
+  "#60a5fa", // blue
+  "#fbbf24", // amber
+  "#e879f9", // fuchsia
 ];
 
 // Ločen (premešan) vrstni red indeksov v paleto za vsako vrstico, da se
@@ -240,25 +241,36 @@ function HighlightRow({
         style={{ scrollbarWidth: "none" }}
       >
         {items.map((item, i) => {
-          const [from, to] = PALETTE[colorOrder[i % colorOrder.length]];
+          const accent = ACCENTS[colorOrder[i % colorOrder.length]];
+          const icon = icons?.[item.label];
           return (
             <button
               key={item.label}
               type="button"
               onClick={(e) => handleCardClick(e, item.label)}
-              style={{ background: `linear-gradient(115deg, ${from} 10%, ${to} 100%)` }}
-              className="flex h-28 w-36 shrink-0 flex-col justify-between rounded-xl p-3.5 text-left text-white shadow-sm transition active:scale-[0.97]"
+              style={{
+                backgroundImage: `radial-gradient(120% 90% at 0% 0%, ${accent}3d 0%, transparent 60%)`,
+                borderColor: `${accent}4d`,
+                boxShadow: `0 10px 24px -10px ${accent}73, 0 2px 8px -4px rgb(0 0 0 / 0.15)`,
+              }}
+              className="group relative flex h-28 w-36 shrink-0 flex-col justify-between overflow-hidden rounded-2xl border bg-white p-3.5 text-left text-neutral-900 transition active:scale-[0.97] dark:bg-[#111114] dark:text-white"
             >
-              <div>
+              {icon && (
+                <span
+                  aria-hidden="true"
+                  style={{ color: accent }}
+                  className="pointer-events-none absolute -right-4 -bottom-4 h-20 w-20 rotate-[-12deg] opacity-[0.22] transition-transform duration-300 group-active:rotate-[-6deg]"
+                >
+                  {icon}
+                </span>
+              )}
+              <div className="relative">
                 <p className={`${labelClassName} leading-tight font-bold`}>{formatLabel(item.label)}</p>
-                <div className="mt-1.5 h-px w-full bg-white/30" />
+                <div className="mt-1.5 h-px w-8 rounded-full" style={{ backgroundColor: accent }} />
               </div>
-              <div className="flex items-end justify-between gap-2">
-                <p className="text-xs font-medium text-white/85">{skladbeLabel(item.count)}</p>
-                {icons?.[item.label] && (
-                  <span className="h-7 w-7 shrink-0 text-black/80">{icons[item.label]}</span>
-                )}
-              </div>
+              <p className="relative text-xs font-medium text-neutral-500 dark:text-white/50">
+                {skladbeLabel(item.count)}
+              </p>
             </button>
           );
         })}

@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Filters, { FiltersToggle } from "@/components/Filters";
+import FeaturedArtists from "@/components/FeaturedArtists";
 import HomeHighlights from "@/components/HomeHighlights";
 import SettingsMenu from "@/components/SettingsMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
 import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
+import { pickDailyFeatured } from "@/lib/dailyRandom";
 import { emptyFilters, hasActiveFilters, type FilterState } from "@/lib/filters";
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useCopyFeedback } from "@/lib/useCopyFeedback";
@@ -133,6 +135,10 @@ export default function Dashboard() {
         .sort((a, b) => b.count - a.count),
     [songs, usedGenres],
   );
+
+  // "Predstavljeno": vsak dan naključno (a ves dan stabilno) izbere dva
+  // avtorja z vsaj tremi skladbami in za vsakega tri njegove skladbe.
+  const featuredArtists = useMemo(() => pickDailyFeatured(songs, 2, 3), [songs]);
 
   const PARTIAL_LABELS: Record<PartialDimension, string> = {
     genre: "Žanr",
@@ -646,13 +652,14 @@ export default function Dashboard() {
       />
 
       {isSupabaseConfigured && !loading && !loadError && activeView === "list" && !hasActiveFilters(filters) && (
-        <div className="mt-3!">
+        <div className="mt-3! space-y-5">
           <HomeHighlights
             eras={eraHighlights}
             genres={genreHighlights}
             onSelectEra={handleHighlightEra}
             onSelectGenre={handleHighlightGenre}
           />
+          <FeaturedArtists items={featuredArtists} onCopy={handleCopy} onFilterAuthor={handleFilterByAuthor} />
         </div>
       )}
 

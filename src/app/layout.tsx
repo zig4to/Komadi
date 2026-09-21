@@ -40,12 +40,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    // Privzeto temno (aplikacija je bila od nekdaj temna); ThemeProvider po
-    // prvem izrisu preklopi na shranjeno izbiro (svetla / sistemska).
+    // Privzeto svetlo; ThemeProvider po prvem izrisu preklopi na shranjeno
+    // izbiro (temna / sistemska), če je uporabnik to izbral.
     <html
       lang="sl"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
         <ThemeProvider />
