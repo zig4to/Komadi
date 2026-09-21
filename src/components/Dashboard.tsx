@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Filters, { FiltersToggle } from "@/components/Filters";
+import HomeHighlights from "@/components/HomeHighlights";
 import SettingsMenu from "@/components/SettingsMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
 import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
-import { emptyFilters, type FilterState } from "@/lib/filters";
+import { emptyFilters, hasActiveFilters, type FilterState } from "@/lib/filters";
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useCopyFeedback } from "@/lib/useCopyFeedback";
 import type { SimilarSong, Song } from "@/types/song";
@@ -22,6 +23,10 @@ export default function Dashboard() {
   const [activeView, setActiveView] = useState<"list" | "newest" | "popular">("list");
   const [prefillDraft, setPrefillDraft] = useState<{ title: string; author: string } | null>(null);
   const [authorFilter, setAuthorFilter] = useState<string | null>(null);
+  // Ko uporabnik izbere obdobje/žanr prek featured kartic na domači strani,
+  // se prikazane skladbe razvrstijo po naslovu A-Z (ročno urejanje filtrov
+  // ohrani privzeto razvrstitev po datumu dodajanja).
+  const [sortAlpha, setSortAlpha] = useState(false);
 
   type PartialDimension = "genre" | "author" | "era" | "mood";
   const [partialOpen, setPartialOpen] = useState(false);
@@ -63,6 +68,14 @@ export default function Dashboard() {
     });
   }, [songs, filters]);
 
+  const displaySongs = useMemo(
+    () =>
+      sortAlpha
+        ? [...filteredSongs].sort((a, b) => a.title.localeCompare(b.title, "sl"))
+        : filteredSongs,
+    [filteredSongs, sortAlpha],
+  );
+
   // Razpoloženja niso fiksen nabor: obrazcu ponudimo privzete predloge +
   // vsa že uporabljena (uporabniško dodana), filtru pa samo tista, ki jih
   // trenutno resnično ima kaka skladba (da ni praznih/neuporabnih čipov).
@@ -100,6 +113,25 @@ export default function Dashboard() {
   const usedAuthors = useMemo(
     () => Array.from(new Set(songs.map((s) => s.author))).sort((a, b) => a.localeCompare(b, "sl")),
     [songs],
+  );
+
+  // Featured sekcije na domači strani: obdobja kronološko (kot v ERAS),
+  // žanri po priljubljenosti (največ skladb najprej) — samo tisti, ki jih
+  // dejansko ima vsaj ena skladba.
+  const eraHighlights = useMemo(
+    () =>
+      ERAS.filter((e) => usedEras.includes(e)).map((era) => ({
+        label: era,
+        count: songs.filter((s) => s.era === era).length,
+      })),
+    [songs, usedEras],
+  );
+  const genreHighlights = useMemo(
+    () =>
+      usedGenres
+        .map((genre) => ({ label: genre, count: songs.filter((s) => s.genre === genre).length }))
+        .sort((a, b) => b.count - a.count),
+    [songs, usedGenres],
   );
 
   const PARTIAL_LABELS: Record<PartialDimension, string> = {
@@ -155,11 +187,27 @@ export default function Dashboard() {
     setActiveView("list");
     setFilters({ ...emptyFilters, search: author });
     setAuthorFilter(author);
+    setSortAlpha(false);
   }
 
   function handleFiltersChange(f: FilterState) {
     setAuthorFilter(null);
+    setSortAlpha(false);
     setFilters(f);
+  }
+
+  function handleHighlightEra(era: string) {
+    setActiveView("list");
+    setAuthorFilter(null);
+    setSortAlpha(true);
+    setFilters({ ...emptyFilters, eras: [era] });
+  }
+
+  function handleHighlightGenre(genre: string) {
+    setActiveView("list");
+    setAuthorFilter(null);
+    setSortAlpha(true);
+    setFilters({ ...emptyFilters, genres: [genre] });
   }
 
   function handleAddSimilar(song: SimilarSong) {
@@ -597,6 +645,17 @@ export default function Dashboard() {
         originOptions={usedOrigins}
       />
 
+      {isSupabaseConfigured && !loading && !loadError && activeView === "list" && !hasActiveFilters(filters) && (
+        <div className="mt-3!">
+          <HomeHighlights
+            eras={eraHighlights}
+            genres={genreHighlights}
+            onSelectEra={handleHighlightEra}
+            onSelectGenre={handleHighlightGenre}
+          />
+        </div>
+      )}
+
       {authorFilter && (
         <div className="mt-3! flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm dark:border-neutral-800 dark:bg-neutral-900">
           <span className="text-neutral-700 dark:text-neutral-300">
@@ -609,6 +668,7 @@ export default function Dashboard() {
             type="button"
             onClick={() => {
               setAuthorFilter(null);
+              setSortAlpha(false);
               setFilters(emptyFilters);
             }}
             className="text-xs text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
@@ -656,14 +716,14 @@ export default function Dashboard() {
 
         {!loading && !loadError && activeView === "list" && (
           <>
-            {filteredSongs.length === 0 && (
+            {displaySongs.length === 0 && (
               <p className="text-sm text-neutral-500">
                 {songs.length === 0
                   ? "Baza je še prazna — dodaj prvo skladbo."
                   : "Nobena skladba ne ustreza izbranim filtrom."}
               </p>
             )}
-            {filteredSongs.map((song) => (
+            {displaySongs.map((song) => (
               <div key={song.id}>
                 <SongCard
                   song={song}
