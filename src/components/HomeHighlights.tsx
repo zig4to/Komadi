@@ -171,6 +171,7 @@ export function HighlightRow({
   formatLabel = (label) => label,
   labelClassName = "text-lg",
   cardSizeClassName = "h-28 w-36",
+  gapClassName = "gap-3",
   icons,
   images,
 }: {
@@ -181,6 +182,7 @@ export function HighlightRow({
   formatLabel?: (label: string) => string;
   labelClassName?: string;
   cardSizeClassName?: string;
+  gapClassName?: string;
   icons?: Record<string, JSX.Element>;
   images?: Record<string, string>;
 }) {
@@ -263,7 +265,7 @@ export function HighlightRow({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        className="-mx-4 flex gap-3 overflow-x-auto px-4 pt-1 pb-6 [&::-webkit-scrollbar]:hidden cursor-grab select-none active:cursor-grabbing"
+        className={`-mx-4 flex ${gapClassName} overflow-x-auto px-4 pt-1 pb-6 [&::-webkit-scrollbar]:hidden cursor-grab select-none active:cursor-grabbing`}
         style={{ scrollbarWidth: "none" }}
       >
         {items.map((item, i) => {
@@ -354,6 +356,7 @@ export default function HomeHighlights({
         formatLabel={formatEraLabel}
         labelClassName="text-4xl"
         cardSizeClassName="h-28 w-36 lg:h-36 lg:w-48"
+        gapClassName="gap-4"
         images={ERA_IMAGES}
       />
       <HighlightRow
