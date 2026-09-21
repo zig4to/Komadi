@@ -170,6 +170,7 @@ export function HighlightRow({
   onSelect,
   formatLabel = (label) => label,
   labelClassName = "text-lg",
+  cardSizeClassName = "h-28 w-36",
   icons,
   images,
 }: {
@@ -179,6 +180,7 @@ export function HighlightRow({
   onSelect: (label: string) => void;
   formatLabel?: (label: string) => string;
   labelClassName?: string;
+  cardSizeClassName?: string;
   icons?: Record<string, JSX.Element>;
   images?: Record<string, string>;
 }) {
@@ -281,7 +283,7 @@ export function HighlightRow({
                 borderColor: `${accent}38`,
                 boxShadow: `0 10px 24px -10px ${accent}40, 0 2px 8px -4px rgb(0 0 0 / 0.15)`,
               }}
-              className={`group relative flex h-28 w-36 shrink-0 flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition active:scale-[0.97] ${
+              className={`group relative flex ${cardSizeClassName} shrink-0 flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition active:scale-[0.97] ${
                 image
                   ? "bg-neutral-800 text-white"
                   : "bg-white text-neutral-900 dark:bg-[#111114] dark:text-white"
@@ -351,6 +353,7 @@ export default function HomeHighlights({
         onSelect={onSelectEra}
         formatLabel={formatEraLabel}
         labelClassName="text-4xl"
+        cardSizeClassName="h-28 w-36 lg:h-36 lg:w-48"
         images={ERA_IMAGES}
       />
       <HighlightRow
@@ -358,6 +361,7 @@ export default function HomeHighlights({
         items={genres}
         colorOrder={GENRE_COLOR_ORDER}
         onSelect={onSelectGenre}
+        cardSizeClassName="h-28 w-36 lg:h-32 lg:w-40"
         icons={GENRE_ICONS}
       />
     </div>
