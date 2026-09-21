@@ -107,7 +107,7 @@ export default function SongCard({
       onClick={handleCardClick}
       title="Klikni za kopiranje naslova"
       style={cardStyle}
-      className={`relative isolate cursor-pointer overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.10),transparent_60%)] p-4 transition duration-200 hover:-translate-y-0.5 dark:bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.20),transparent_60%)] lg:min-h-[138px] ${
+      className={`relative isolate cursor-pointer overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.10),transparent_60%)] p-4 transition duration-200 hover:-translate-y-0.5 dark:bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.20),transparent_60%)] lg:min-h-[154px] ${
         highlighted
           ? "border-emerald-500"
           : "border-neutral-200 dark:border-neutral-800"
@@ -185,7 +185,7 @@ export default function SongCard({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs lg:flex-col lg:items-start lg:justify-normal">
         <div className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto [&>*:nth-child(n+4)]:hidden sm:[&>*:nth-child(n+4)]:inline">
           <Badge>{song.genre}</Badge>
           <Badge>{song.era}</Badge>
@@ -202,7 +202,7 @@ export default function SongCard({
                 setPdfOpen(true);
               }}
               title="Odpri akorde"
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400 lg:gap-1.5 lg:border-2 lg:border-amber-500/70 lg:px-2.5 lg:py-1 lg:text-[13px] dark:lg:border-amber-400/70"
             >
               <svg
                 aria-hidden="true"
@@ -212,7 +212,7 @@ export default function SongCard({
                 strokeWidth={1.8}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="h-[11px] w-[11px] shrink-0"
+                className="h-[11px] w-[11px] shrink-0 lg:h-[13px] lg:w-[13px]"
               >
                 <path d="M9 18V5l12-2v13" />
                 <circle cx="6" cy="18" r="3" />
@@ -227,7 +227,7 @@ export default function SongCard({
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               title="Odpri akorde"
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400 lg:gap-1.5 lg:border-2 lg:border-amber-500/70 lg:px-2.5 lg:py-1 lg:text-[13px] dark:lg:border-amber-400/70"
             >
               <svg
                 aria-hidden="true"
@@ -237,7 +237,7 @@ export default function SongCard({
                 strokeWidth={1.8}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="h-[11px] w-[11px] shrink-0"
+                className="h-[11px] w-[11px] shrink-0 lg:h-[13px] lg:w-[13px]"
               >
                 <path d="M9 18V5l12-2v13" />
                 <circle cx="6" cy="18" r="3" />
@@ -253,10 +253,10 @@ export default function SongCard({
             aria-label={similarOpen ? "Skrij podobne skladbe" : "Najdi podobne skladbe"}
             title="Najdi podobne skladbe"
             aria-expanded={similarOpen}
-            className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium leading-none backdrop-blur-sm transition ${
+            className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium leading-none backdrop-blur-sm transition lg:gap-1.5 lg:border-2 lg:px-2.5 lg:py-1 lg:text-[13px] ${
               similarOpen
                 ? "border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                : "border-neutral-300 bg-white/70 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-emerald-400"
+                : "border-neutral-300 bg-white/70 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-emerald-400 lg:border-neutral-400 dark:lg:border-neutral-500"
             }`}
           >
             <svg
@@ -267,7 +267,7 @@ export default function SongCard({
               strokeWidth={1.8}
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="h-[11px] w-[11px] shrink-0"
+              className="h-[11px] w-[11px] shrink-0 lg:h-[13px] lg:w-[13px]"
             >
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.3-4.3" />
@@ -388,7 +388,7 @@ export default function SongCard({
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="shrink-0 rounded-full border border-neutral-300 px-1.5 py-0.5 text-[11px] leading-none text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
+    <span className="shrink-0 rounded-full border border-neutral-300 px-1.5 py-0.5 text-[11px] leading-none text-neutral-500 dark:border-neutral-700 dark:text-neutral-400 lg:border-neutral-400 dark:lg:border-neutral-500">
       {children}
     </span>
   );
