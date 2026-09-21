@@ -32,15 +32,20 @@ export type Genre = (typeof GENRES)[number];
 // Slika za kartico obdobja na domači strani (public/images/eras/README.md
 // opisuje pričakovana imena datotek). Manjkajoča slika ni napaka — kartica
 // brez slike se izriše enako kot prej (samo barvni gradient).
+//
+// Pot mora vključevati basePath ("/Komadi" na GitHub Pages) — brez tega se
+// slike v produkciji ne naložijo (404), čeprav v `npm run dev` delujejo, ker
+// tam basePath ni nastavljen.
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 export const ERA_IMAGES: Record<Era, string> = {
-  "Pred 1960": "/images/eras/60s.jpg",
-  "1960s": "/images/eras/1960s.jpg",
-  "1970s": "/images/eras/70s.jpg",
-  "1980s": "/images/eras/80s.jpg",
-  "1990s": "/images/eras/90s.jpg",
-  "2000s": "/images/eras/2000s.jpg",
-  "2010s": "/images/eras/2010s.jpg",
-  "2020s": "/images/eras/2020s.jpg",
+  "Pred 1960": `${BASE_PATH}/images/eras/60s.jpg`,
+  "1960s": `${BASE_PATH}/images/eras/1960s.jpg`,
+  "1970s": `${BASE_PATH}/images/eras/70s.jpg`,
+  "1980s": `${BASE_PATH}/images/eras/80s.jpg`,
+  "1990s": `${BASE_PATH}/images/eras/90s.jpg`,
+  "2000s": `${BASE_PATH}/images/eras/2000s.jpg`,
+  "2010s": `${BASE_PATH}/images/eras/2010s.jpg`,
+  "2020s": `${BASE_PATH}/images/eras/2020s.jpg`,
 };
 
 // Razpoloženje je neobvezno in uporabniško razširljivo (ni fiksen nabor kot
