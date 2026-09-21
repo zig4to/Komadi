@@ -484,7 +484,7 @@ export default function Dashboard() {
             disabled={!isSupabaseConfigured}
             aria-label="Dodaj skladbo"
             title="Dodaj skladbo"
-            className="inline-flex items-center justify-center rounded-full bg-[linear-gradient(115deg,#059669_15%,#34d399_100%)] p-2.5 text-white transition hover:brightness-110 disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-1.5 rounded-full border border-emerald-500/50 bg-transparent p-2.5 text-emerald-600 transition hover:bg-emerald-500/10 disabled:opacity-40 lg:px-4 lg:py-2 dark:border-emerald-400/50 dark:text-emerald-400"
           >
             <svg
               aria-hidden="true"
@@ -498,6 +498,7 @@ export default function Dashboard() {
             >
               <path d="M12 5v14M5 12h14" />
             </svg>
+            <span className="hidden text-sm font-medium lg:inline">Dodaj nov komad</span>
           </button>
           <div className="ml-1.5">
             <SettingsMenu
