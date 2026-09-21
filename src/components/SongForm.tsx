@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { compressImage } from "@/lib/compressImage";
 import { ERAS, GENRES } from "@/lib/constants";
 import { supabase } from "@/lib/supabaseClient";
 import type { NewSong, Song } from "@/types/song";
@@ -13,6 +14,7 @@ const emptyForm = {
   favorite: false,
   mood: null as string | null,
   origin: null as string | null,
+  image_url: null as string | null,
 };
 
 export default function SongForm({
@@ -40,6 +42,7 @@ export default function SongForm({
           favorite: initial.favorite,
           mood: initial.mood,
           origin: initial.origin,
+          image_url: initial.image_url,
         }
       : prefill
         ? { ...emptyForm, title: prefill.title, author: prefill.author }
@@ -51,6 +54,31 @@ export default function SongForm({
   const [guessError, setGuessError] = useState<string | null>(null);
   const [addingMood, setAddingMood] = useState(false);
   const [addingOrigin, setAddingOrigin] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingImage(true);
+    setImageError(null);
+    try {
+      const blob = await compressImage(file);
+      const path = `${crypto.randomUUID()}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from("song-images")
+        .upload(path, blob, { contentType: "image/jpeg" });
+      if (uploadError) throw uploadError;
+      const { data } = supabase.storage.from("song-images").getPublicUrl(path);
+      setForm((f) => ({ ...f, image_url: data.publicUrl }));
+    } catch (err) {
+      setImageError(err instanceof Error ? err.message : "Nalaganje slike ni uspelo.");
+    } finally {
+      setUploadingImage(false);
+    }
+  }
 
   async function handleGuessEra() {
     if (!form.title.trim() || !form.author.trim()) {
@@ -96,6 +124,7 @@ export default function SongForm({
       favorite: form.favorite,
       mood: form.mood?.trim() || null,
       origin: form.origin?.trim() || null,
+      image_url: form.image_url,
     };
 
     const { data, error: dbError } = initial
@@ -304,15 +333,78 @@ export default function SongForm({
 
       {guessError && <p className="text-sm text-amber-600 dark:text-amber-400">{guessError}</p>}
 
-      <label className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-        <input
-          type="checkbox"
-          checked={form.favorite}
-          onChange={(e) => setForm({ ...form, favorite: e.target.checked })}
-          className="h-4 w-4 rounded border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-800"
-        />
-        Priljubljena
-      </label>
+      <div className="flex items-center justify-between gap-3">
+        <label className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+          <input
+            type="checkbox"
+            checked={form.favorite}
+            onChange={(e) => setForm({ ...form, favorite: e.target.checked })}
+            className="h-4 w-4 rounded border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-800"
+          />
+          Priljubljena
+        </label>
+
+        <div className="flex items-center gap-2">
+          {form.image_url && (
+            <div className="group relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-neutral-300 dark:border-neutral-700">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={form.image_url} alt="" className="h-full w-full object-cover" />
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, image_url: null })}
+                aria-label="Odstrani sliko"
+                title="Odstrani sliko"
+                className="absolute inset-0 flex items-center justify-center bg-black/55 text-white opacity-0 transition group-hover:opacity-100"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                >
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingImage}
+            aria-label="Naloži sliko kartice"
+            title="Naloži sliko kartice"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-neutral-300 p-2 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-emerald-400"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`h-[18px] w-[18px] shrink-0 ${uploadingImage ? "animate-pulse" : ""}`}
+            >
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <circle cx="9" cy="9" r="2" />
+              <path d="m21 15-3.1-3.1a2 2 0 0 0-2.814.014L6 21" />
+            </svg>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+        </div>
+      </div>
+
+      {imageError && <p className="text-sm text-red-600 dark:text-red-400">{imageError}</p>}
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 

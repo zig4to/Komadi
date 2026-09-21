@@ -5,6 +5,11 @@ import { useCopyFeedback } from "@/lib/useCopyFeedback";
 import { supabase } from "@/lib/supabaseClient";
 import type { SimilarSong, Song } from "@/types/song";
 
+// Diagonalna maska za sliko ozadja kartice: leva tretjina brez slike, desni
+// dve tretjini slika, prehod med njima mehko (blur videz) prek gradienta.
+const IMAGE_MASK =
+  "linear-gradient(112deg, transparent 0%, transparent 46%, black 64%, black 100%)";
+
 // Stabilen odtenek barve iz ID-ja skladbe (enak ob vsakem izrisu).
 function hueFromId(id: string): number {
   let h = 0;
@@ -93,12 +98,33 @@ export default function SongCard({
       onClick={handleCardClick}
       title="Klikni za kopiranje naslova"
       style={cardStyle}
-      className={`relative cursor-pointer rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.10),transparent_60%)] p-4 transition duration-200 hover:-translate-y-0.5 dark:bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.20),transparent_60%)] ${
+      className={`relative cursor-pointer overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.10),transparent_60%)] p-4 transition duration-200 hover:-translate-y-0.5 dark:bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.20),transparent_60%)] ${
         highlighted
           ? "border-emerald-500"
           : "border-neutral-200 dark:border-neutral-800"
       }`}
     >
+      {song.image_url && (
+        <span
+          aria-hidden="true"
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `url(${song.image_url})`,
+            backgroundSize: "cover",
+            backgroundPosition: "right center",
+            WebkitMaskImage: IMAGE_MASK,
+            maskImage: IMAGE_MASK,
+          }}
+        />
+      )}
+      {song.image_url && (
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 bg-white/55 dark:bg-neutral-950/60"
+          style={{ WebkitMaskImage: IMAGE_MASK, maskImage: IMAGE_MASK }}
+        />
+      )}
+      <div className="relative">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{song.title}</p>
@@ -277,6 +303,7 @@ export default function SongCard({
           )}
         </div>
       )}
+      </div>
 
       {copied && (
         <span className="pointer-events-none absolute bottom-2 left-3 rounded bg-white/90 px-1.5 py-0.5 text-xs font-medium text-emerald-600 ring-1 ring-neutral-200 dark:bg-neutral-950/80 dark:text-emerald-400 dark:ring-0">

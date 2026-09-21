@@ -66,6 +66,7 @@ export function parseImportText(text: string): ParsedImport {
         era: current.era,
         mood: current.mood,
         origin: current.origin,
+        image_url: null,
         favorite: current.favorite,
       });
     }
@@ -209,7 +210,7 @@ export function parseImportJson(text: string): ParsedImport {
     if (typeof o.favorite === "boolean") favorite = o.favorite;
     else if (typeof o.favorite === "string") favorite = TRUE_VALUES.has(normalizeKey(o.favorite));
 
-    songs.push({ title, author, genre, era, mood, origin, favorite });
+    songs.push({ title, author, genre, era, mood, origin, image_url: null, favorite });
   });
 
   return { songs, warnings };

@@ -11,6 +11,7 @@ create table if not exists public.songs (
   favorite boolean not null default false,
   mood text,
   origin text,
+  image_url text,
   copy_count integer not null default 0,
   created_at timestamptz not null default now()
 );
@@ -40,3 +41,21 @@ create policy "Public update" on public.songs
 
 create policy "Public delete" on public.songs
   for delete using (true);
+
+-- Storage bucket za slike skladb (glej supabase/migrations/0006_add_song_image.sql
+-- za razlago). Enak "brez prijave" varnostni model kot tabela songs.
+insert into storage.buckets (id, name, public)
+values ('song-images', 'song-images', true)
+on conflict (id) do nothing;
+
+create policy "Public read song images" on storage.objects
+  for select using (bucket_id = 'song-images');
+
+create policy "Public insert song images" on storage.objects
+  for insert with check (bucket_id = 'song-images');
+
+create policy "Public update song images" on storage.objects
+  for update using (bucket_id = 'song-images');
+
+create policy "Public delete song images" on storage.objects
+  for delete using (bucket_id = 'song-images');
