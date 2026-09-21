@@ -267,7 +267,7 @@ export function HighlightRow({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        className={`-mx-4 flex ${gapClassName} overflow-x-auto px-4 pt-1 pb-6 lg:pb-3 [&::-webkit-scrollbar]:hidden cursor-grab select-none active:cursor-grabbing`}
+        className={`-mx-4 flex ${gapClassName} overflow-x-auto px-4 pt-1 pb-1 [&::-webkit-scrollbar]:hidden cursor-grab select-none active:cursor-grabbing`}
         style={{ scrollbarWidth: "none" }}
       >
         {items.map((item, i) => {
