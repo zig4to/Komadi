@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Komadi — moje skladbe za kitaro",
+  title: "Bitne Tabs — moje skladbe za kitaro",
   description: "Osebna zbirka priljubljenih skladb za igranje na kitaro.",
   manifest: "manifest.json",
   icons: {
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Komadi",
+    title: "Bitne Tabs",
   },
 };
 

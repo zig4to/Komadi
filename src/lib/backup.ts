@@ -129,7 +129,7 @@ export async function shareBackup(): Promise<BackupResult> {
   const file = new File([json], shareFileName, { type: "text/plain" });
 
   if (typeof navigator !== "undefined" && navigator.canShare?.({ files: [file] })) {
-    await navigator.share({ files: [file], title: "Komadi – backup skladb" });
+    await navigator.share({ files: [file], title: "Bitne Tabs – backup skladb" });
     return { count: songs.length, method: "share" };
   }
 
