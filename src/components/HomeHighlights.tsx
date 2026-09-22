@@ -361,7 +361,7 @@ export default function HomeHighlights({
         colorOrder={ERA_COLOR_ORDER}
         onSelect={onSelectEra}
         formatLabel={formatEraLabel}
-        labelClassName="text-4xl lg:text-5xl"
+        labelClassName="text-4xl lg:text-6xl"
         cardSizeClassName="h-28 w-36 lg:h-36 lg:w-48"
         gapClassName="gap-3 lg:gap-4"
         labelStroke
