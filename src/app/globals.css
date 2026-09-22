@@ -4,14 +4,14 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --font-sans: var(--font-abel);
+  --font-sans: var(--font-montserrat);
   --font-mono: var(--font-geist-mono);
 }
 
 html {
-  /* Rahlo povečana osnovna velikost pisave — vse rem-enote (Tailwind
-     text-sm/base/lg ipd.) se sorazmerno povečajo v celotni aplikaciji. */
-  font-size: 17px;
+  /* Pomanjšana osnovna velikost pisave — vse rem-enote (Tailwind
+     text-sm/base/lg ipd.) se sorazmerno pomanjšajo v celotni aplikaciji. */
+  font-size: 15px;
 }
 
 body {

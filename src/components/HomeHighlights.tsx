@@ -175,6 +175,7 @@ export function HighlightRow({
   labelStroke = false,
   icons,
   images,
+  accentForLabel,
 }: {
   title: string;
   items: HighlightItem[];
@@ -187,6 +188,10 @@ export function HighlightRow({
   labelStroke?: boolean;
   icons?: Record<string, JSX.Element>;
   images?: Record<string, string>;
+  // Barva po identiteti nalepke (npr. avtorju) namesto po njenem položaju v
+  // vrstici — tako ima ista nalepka vedno isto barvo, ujemajoč se z barvo
+  // uporabljeno drugod v aplikaciji (glej src/lib/authorColor.ts).
+  accentForLabel?: (label: string) => string;
 }) {
   // "Povleci za drsenje" z miško (na dotik že deluje naravno prek
   // overflow-x-auto). `moved` loči vlečenje od navadnega klika, da klik na
@@ -271,7 +276,7 @@ export function HighlightRow({
         style={{ scrollbarWidth: "none" }}
       >
         {items.map((item, i) => {
-          const accent = ACCENTS[colorOrder[i % colorOrder.length]];
+          const accent = accentForLabel ? accentForLabel(item.label) : ACCENTS[colorOrder[i % colorOrder.length]];
           const icon = icons?.[item.label];
           const imageUrl = images?.[item.label];
           const image = imageUrl && loadedImages.has(imageUrl) ? imageUrl : undefined;

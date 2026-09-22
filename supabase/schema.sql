@@ -88,6 +88,12 @@ create policy "Public delete author images" on public.author_images
 alter table public.songs
   add column if not exists chords_url text;
 
+-- Izvorna povezava (npr. Ultimate Guitar), iz katere je bil naložen zgornji
+-- chords_url PDF (glej supabase/migrations/0010_add_chords_source_url.sql) —
+-- prikazana kot ločen gumb "UG Tabs" poleg "PDF akordi".
+alter table public.songs
+  add column if not exists chords_source_url text;
+
 -- Storage bucket za PDF akorde (glej supabase/migrations/0009_add_song_chords_bucket.sql).
 insert into storage.buckets (id, name, public)
 values ('song-chords', 'song-chords', true)

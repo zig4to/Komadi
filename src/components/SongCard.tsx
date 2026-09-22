@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import PdfViewer from "@/components/PdfViewer";
+import { authorAccentHsl } from "@/lib/authorColor";
+import { compressImage } from "@/lib/compressImage";
 import { useCopyFeedback } from "@/lib/useCopyFeedback";
 import { supabase } from "@/lib/supabaseClient";
 import type { SimilarSong, Song } from "@/types/song";
@@ -13,13 +15,6 @@ import type { SimilarSong, Song } from "@/types/song";
 // v barvo kartice namesto da bi bila prilepljena na vrhu.
 const IMAGE_CLIP_PATH = "polygon(20% 0, 100% 0, 100% 100%, 10% 100%)";
 
-// Stabilen odtenek barve iz ID-ja skladbe (enak ob vsakem izrisu).
-function hueFromId(id: string): number {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return h % 360;
-}
-
 export default function SongCard({
   song,
   authorImage = null,
@@ -28,6 +23,7 @@ export default function SongCard({
   onCopy,
   onAddSimilar,
   onFilterAuthor,
+  onSetAuthorImage,
   highlighted = false,
 }: {
   song: Song;
@@ -37,6 +33,7 @@ export default function SongCard({
   onCopy?: (song: Song) => void;
   onAddSimilar?: (song: SimilarSong) => void;
   onFilterAuthor?: (author: string) => void;
+  onSetAuthorImage?: (author: string, imageUrl: string | null) => void | Promise<void>;
   highlighted?: boolean;
 }) {
   const [copied, triggerCopy] = useCopyFeedback();
@@ -45,6 +42,33 @@ export default function SongCard({
   const [similarError, setSimilarError] = useState<string | null>(null);
   const [similarSongs, setSimilarSongs] = useState<SimilarSong[]>([]);
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // Bližnjica do "Slika avtorja" naravnost s kartice — enak upload kot v
+  // SongForm.tsx (isti "song-images" bucket, ista kompresija), da ni treba
+  // odpirati celega obrazca samo za zamenjavo slike.
+  async function handleImageFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !onSetAuthorImage) return;
+    setUploadingImage(true);
+    try {
+      const blob = await compressImage(file);
+      const path = `${crypto.randomUUID()}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from("song-images")
+        .upload(path, blob, { contentType: "image/jpeg" });
+      if (uploadError) throw uploadError;
+      const { data } = supabase.storage.from("song-images").getPublicUrl(path);
+      await onSetAuthorImage(song.author, data.publicUrl);
+    } catch {
+      // Napaka se enako obravnava kot v SongForm.tsx — tam se lahko slika
+      // po potrebi znova naloži, tu ni prostora za prikaz sporočila.
+    } finally {
+      setUploadingImage(false);
+    }
+  }
 
   // Akordi so lahko zunanja povezava (npr. Ultimate Guitar — odpre se v
   // novem zavihku) ali naložen PDF (odpre se v celozaslonskem pregledu
@@ -83,15 +107,21 @@ export default function SongCard({
   }
 
   // Emerald ~152° za izpostavljeno (naključno izbrano) kartico, sicer
-  // stabilen odtenek iz ID-ja skladbe — isti odtenek uporabimo tudi za
-  // obrobo/senco (spodaj) in za delni gradient ozadja (glej className).
-  const hue = highlighted ? 152 : hueFromId(song.id);
+  // stabilna barva (h/s/l) iz imena avtorja — tako imajo vse skladbe istega
+  // avtorja enako barvno shemo (isto barvo uporabimo tudi za obrobo/senco
+  // spodaj in za delni gradient ozadja, glej className). Obroba je manj
+  // nasičena/temnejša od osnovne barve, da ne "kriči" enako glasno.
+  const { h, s, l } = highlighted ? { h: 152, s: 70, l: 42 } : authorAccentHsl(song.author);
+  const borderS = Math.max(s - 35, 0);
+  const borderL = Math.max(l - 13, 12);
   const cardStyle = {
     boxShadow: highlighted
       ? "0 12px 36px -18px rgb(16 185 129 / 0.16), 0 2px 8px -6px rgb(0 0 0 / 0.32)"
-      : `0 12px 36px -20px hsl(${hue} 85% 55% / 0.13), 0 2px 8px -7px rgb(0 0 0 / 0.32)`,
-    borderColor: highlighted ? undefined : `hsl(${hue} 50% 42% / 0.4)`,
-    "--hue": hue,
+      : `0 12px 36px -20px hsl(${h} ${s}% ${l}% / 0.13), 0 2px 8px -7px rgb(0 0 0 / 0.32)`,
+    borderColor: highlighted ? undefined : `hsl(${h} ${borderS}% ${borderL}% / 0.4)`,
+    "--hue": h,
+    "--s": `${s}%`,
+    "--l": `${l}%`,
   } as React.CSSProperties;
 
   function handleCardClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -107,7 +137,7 @@ export default function SongCard({
       onClick={handleCardClick}
       title="Klikni za kopiranje naslova"
       style={cardStyle}
-      className={`relative isolate cursor-pointer overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.10),transparent_60%)] p-4 transition duration-200 hover:-translate-y-0.5 dark:bg-[linear-gradient(135deg,hsl(var(--hue)_85%_55%/0.20),transparent_60%)] lg:min-h-[154px] ${
+      className={`relative isolate cursor-pointer overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] p-4 transition duration-200 hover:-translate-y-0.5 dark:bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.20),transparent_60%)] lg:min-h-[154px] ${
         highlighted
           ? "border-emerald-500"
           : "border-neutral-200 dark:border-neutral-800"
@@ -128,7 +158,7 @@ export default function SongCard({
         />
       )}
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{song.title}</p>
           <button
             type="button"
@@ -138,29 +168,157 @@ export default function SongCard({
           >
             {song.author}
           </button>
-        </div>
-        <div className="flex shrink-0 items-center gap-0.5">
-          <button
-            type="button"
-            onClick={() => onEdit(song)}
-            aria-label="Uredi skladbo"
-            title="Uredi skladbo"
-            className="p-1.5 text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-[18px] w-[18px]"
-            >
-              <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
-            </svg>
-          </button>
 
+          {song.chords_source_url && (
+            <a
+              href={song.chords_source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title="Odpri na Ultimate Guitar"
+              className="mt-1.5 inline-flex w-fit shrink-0 items-center gap-1 rounded-full border border-orange-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-orange-500 hover:text-orange-600 dark:border-orange-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-orange-400 lg:gap-1.5 lg:border-2 lg:border-orange-500/70 lg:px-2.5 lg:py-1 lg:text-[13px] dark:lg:border-orange-400/70"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-[11px] w-[11px] shrink-0 lg:h-[13px] lg:w-[13px]"
+              >
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <path d="M15 3h6v6" />
+                <path d="M10 14 21 3" />
+              </svg>
+              UG Tabs
+            </a>
+          )}
+
+          <div className="mt-1.5 flex w-full min-w-0 flex-wrap items-center gap-1.5 text-xs">
+            {song.chords_url && isChordsPdf && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPdfOpen(true);
+                }}
+                title="Odpri PDF akorde"
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400 lg:gap-1.5 lg:border-2 lg:border-amber-500/70 lg:px-2.5 lg:py-1 lg:text-[13px] dark:lg:border-amber-400/70"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-[11px] w-[11px] shrink-0 lg:h-[13px] lg:w-[13px]"
+                >
+                  <path d="M9 18V5l12-2v13" />
+                  <circle cx="6" cy="18" r="3" />
+                  <circle cx="18" cy="16" r="3" />
+                </svg>
+                PDF akordi
+              </button>
+            )}
+
+            {song.chords_url && !isChordsPdf && !song.chords_source_url && (
+              <a
+                href={song.chords_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title="Odpri akorde"
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400 lg:gap-1.5 lg:border-2 lg:border-amber-500/70 lg:px-2.5 lg:py-1 lg:text-[13px] dark:lg:border-amber-400/70"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-[11px] w-[11px] shrink-0 lg:h-[13px] lg:w-[13px]"
+                >
+                  <path d="M9 18V5l12-2v13" />
+                  <circle cx="6" cy="18" r="3" />
+                  <circle cx="18" cy="16" r="3" />
+                </svg>
+                Akordi
+              </a>
+            )}
+
+            <button
+              type="button"
+              onClick={handleToggleSimilar}
+              aria-label={similarOpen ? "Skrij podobne skladbe" : "Najdi podobne skladbe"}
+              title="Najdi podobne skladbe"
+              aria-expanded={similarOpen}
+              className={`inline-flex shrink-0 items-center justify-center rounded-full border p-1 backdrop-blur-sm transition lg:border-2 lg:p-1.5 ${
+                similarOpen
+                  ? "border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                  : "border-neutral-300 bg-white/70 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-emerald-400 lg:border-neutral-400 dark:lg:border-neutral-500"
+              }`}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-[11px] w-[11px] shrink-0 lg:h-[13px] lg:w-[13px]"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </button>
+
+            {onSetAuthorImage && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    imageInputRef.current?.click();
+                  }}
+                  disabled={uploadingImage}
+                  aria-label="Naloži sliko avtorja"
+                  title="Naloži sliko avtorja"
+                  className="ml-auto flex shrink-0 items-center justify-center p-1.5 text-violet-500 hover:text-violet-600 disabled:opacity-50 dark:text-violet-400 dark:hover:text-violet-300"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-[18px] w-[18px] shrink-0"
+                  >
+                    <rect x="3" y="4" width="18" height="16" rx="2" />
+                    <circle cx="8.5" cy="9.5" r="1.5" />
+                    <path d="m4 17 4.5-4.5a1.5 1.5 0 0 1 2.12 0L14 16l2-2a1.5 1.5 0 0 1 2.12 0L20 16" />
+                  </svg>
+                </button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageFileSelect}
+                />
+              </>
+            )}
+          </div>
+        </div>
+        <div className="-mr-1.5 flex shrink-0 flex-col items-center gap-1.5">
           {onDelete && (
             <button
               type="button"
@@ -182,99 +340,35 @@ export default function SongCard({
               </svg>
             </button>
           )}
-        </div>
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs lg:flex-col lg:items-start lg:justify-normal">
-        <div className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto [&>*:nth-child(n+4)]:hidden sm:[&>*:nth-child(n+4)]:inline">
-          <Badge>{song.genre}</Badge>
-          <Badge>{song.era}</Badge>
-          {song.mood && <Badge>{song.mood}</Badge>}
-          {song.origin && <Badge>{song.origin}</Badge>}
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1.5">
-          {song.chords_url && (isChordsPdf ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setPdfOpen(true);
-              }}
-              title="Odpri akorde"
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400 lg:gap-1.5 lg:border-2 lg:border-amber-500/70 lg:px-2.5 lg:py-1 lg:text-[13px] dark:lg:border-amber-400/70"
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-[11px] w-[11px] shrink-0 lg:h-[13px] lg:w-[13px]"
-              >
-                <path d="M9 18V5l12-2v13" />
-                <circle cx="6" cy="18" r="3" />
-                <circle cx="18" cy="16" r="3" />
-              </svg>
-              Akordi
-            </button>
-          ) : (
-            <a
-              href={song.chords_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              title="Odpri akorde"
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400 lg:gap-1.5 lg:border-2 lg:border-amber-500/70 lg:px-2.5 lg:py-1 lg:text-[13px] dark:lg:border-amber-400/70"
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-[11px] w-[11px] shrink-0 lg:h-[13px] lg:w-[13px]"
-              >
-                <path d="M9 18V5l12-2v13" />
-                <circle cx="6" cy="18" r="3" />
-                <circle cx="18" cy="16" r="3" />
-              </svg>
-              Akordi
-            </a>
-          ))}
 
           <button
             type="button"
-            onClick={handleToggleSimilar}
-            aria-label={similarOpen ? "Skrij podobne skladbe" : "Najdi podobne skladbe"}
-            title="Najdi podobne skladbe"
-            aria-expanded={similarOpen}
-            className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] font-medium leading-none backdrop-blur-sm transition lg:gap-1.5 lg:border-2 lg:px-2.5 lg:py-1 lg:text-[13px] ${
-              similarOpen
-                ? "border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                : "border-neutral-300 bg-white/70 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-emerald-400 lg:border-neutral-400 dark:lg:border-neutral-500"
-            }`}
+            onClick={() => onEdit(song)}
+            aria-label="Uredi skladbo"
+            title="Uredi skladbo"
+            className="p-1.5 text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300"
           >
             <svg
-              aria-hidden="true"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth={1.8}
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="h-[11px] w-[11px] shrink-0 lg:h-[13px] lg:w-[13px]"
+              className="h-[18px] w-[18px]"
             >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
+              <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
             </svg>
-            Podobno
           </button>
         </div>
+      </div>
+
+      <div className="mt-3 hidden min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto text-xs [&>*:nth-child(n+4)]:hidden sm:[&>*:nth-child(n+4)]:inline lg:flex">
+        <Badge>{song.genre}</Badge>
+        <Badge>{song.era}</Badge>
+        {song.mood && <Badge>{song.mood}</Badge>}
+        {song.origin && <Badge>{song.origin}</Badge>}
       </div>
 
       {similarOpen && (

@@ -1,14 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Abel, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Montserrat } from "next/font/google";
 import Script from "next/script";
 import RegisterServiceWorker from "@/components/RegisterServiceWorker";
 import ThemeProvider from "@/components/ThemeProvider";
 import "./globals.css";
 
-const abel = Abel({
-  variable: "--font-abel",
+const montserrat = Montserrat({
+  variable: "--font-montserrat",
   subsets: ["latin"],
-  weight: "400",
 });
 
 const geistMono = Geist_Mono({
@@ -46,7 +45,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="sl"
       suppressHydrationWarning
-      className={`${abel.variable} ${geistMono.variable} dark h-full antialiased`}
+      className={`${montserrat.variable} ${geistMono.variable} dark h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100">
         <ThemeProvider />

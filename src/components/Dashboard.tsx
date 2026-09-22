@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Filters, { FiltersToggle } from "@/components/Filters";
 import FeaturedArtists from "@/components/FeaturedArtists";
 import HomeHighlights, { ACCENTS, formatEraLabel, HighlightRow } from "@/components/HomeHighlights";
 import SettingsMenu from "@/components/SettingsMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
+import { authorAccentHex } from "@/lib/authorColor";
 import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
 import { pickDailyFeatured } from "@/lib/dailyRandom";
 import { emptyFilters, hasActiveFilters, type FilterState } from "@/lib/filters";
@@ -69,6 +70,10 @@ export default function Dashboard() {
   const [activeView, setActiveView] = useState<"list" | "newest" | "popular">("list");
   const [prefillDraft, setPrefillDraft] = useState<{ title: string; author: string } | null>(null);
   const [authorFilter, setAuthorFilter] = useState<string | null>(null);
+  // Položaj skrolanja na domači strani tik pred klikom na avtorja/obdobje/
+  // žanr (Obdobja, Žanri, Predstavljeno, Avtorji) — gumb "Nazaj" se vrne na
+  // to mesto, namesto da bi po vrnitvi ostal na vrhu strani.
+  const homeScrollY = useRef(0);
   // Ko uporabnik izbere obdobje/žanr prek featured kartic na domači strani,
   // se prikazane skladbe razvrstijo po naslovu A-Z (ročno urejanje filtrov
   // ohrani privzeto razvrstitev po datumu dodajanja).
@@ -301,6 +306,7 @@ export default function Dashboard() {
   }
 
   function handleFilterByAuthor(author: string) {
+    homeScrollY.current = window.scrollY;
     setActiveView("list");
     setFilters({ ...emptyFilters, search: author });
     setAuthorFilter(author);
@@ -314,6 +320,7 @@ export default function Dashboard() {
   }
 
   function handleHighlightEra(era: string) {
+    homeScrollY.current = window.scrollY;
     setActiveView("list");
     setAuthorFilter(null);
     setSortAlpha(true);
@@ -321,10 +328,18 @@ export default function Dashboard() {
   }
 
   function handleHighlightGenre(genre: string) {
+    homeScrollY.current = window.scrollY;
     setActiveView("list");
     setAuthorFilter(null);
     setSortAlpha(true);
     setFilters({ ...emptyFilters, genres: [genre] });
+  }
+
+  function handleBackFromFilter() {
+    setAuthorFilter(null);
+    setSortAlpha(false);
+    setFilters(emptyFilters);
+    setTimeout(() => window.scrollTo({ top: homeScrollY.current }), 50);
   }
 
   function handleAddSimilar(song: SimilarSong) {
@@ -613,6 +628,7 @@ export default function Dashboard() {
             onCopy={handleCopy}
             onAddSimilar={handleAddSimilar}
             onFilterAuthor={handleFilterByAuthor}
+            onSetAuthorImage={handleSetAuthorImage}
             highlighted
           />
           {renderEditForm(randomPick)}
@@ -824,6 +840,7 @@ export default function Dashboard() {
             items={authorHighlights}
             onSelect={handleFilterByAuthor}
             images={authorImages}
+            accentForLabel={authorAccentHex}
           />
         </div>
       )}
@@ -917,11 +934,7 @@ export default function Dashboard() {
               {filters.eras.length > 0 || filters.genres.length > 0 || authorFilter ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    setAuthorFilter(null);
-                    setSortAlpha(false);
-                    setFilters(emptyFilters);
-                  }}
+                  onClick={handleBackFromFilter}
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
                 >
                   <svg
@@ -963,7 +976,7 @@ export default function Dashboard() {
               )}
             </div>
 
-            {songsVisible && (
+            {(songsVisible || hasActiveFilters(filters)) && (
               <>
                 {displaySongs.length === 0 && (
                   <p className="text-sm text-neutral-500">
@@ -983,6 +996,7 @@ export default function Dashboard() {
                         onCopy={handleCopy}
                         onAddSimilar={handleAddSimilar}
                         onFilterAuthor={handleFilterByAuthor}
+                        onSetAuthorImage={handleSetAuthorImage}
                       />
                       {randomPick?.id !== song.id && renderEditForm(song)}
                     </div>

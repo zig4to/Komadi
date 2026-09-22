@@ -1,13 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { authorAccentHex } from "@/lib/authorColor";
 import { useCopyFeedback } from "@/lib/useCopyFeedback";
 import type { FeaturedGroup } from "@/lib/dailyRandom";
 import type { Song } from "@/types/song";
-
-// Štiri barve iz iste "dark neon" palete kot HomeHighlights, da je slog
-// domače strani enoten — ena na predstavljenega avtorja.
-const ACCENTS = ["#10b981", "#60a5fa", "#fb7185", "#8b5cf6"];
 
 function SongRow({
   song,
@@ -97,19 +94,11 @@ export default function FeaturedArtists({
 
   if (items.length === 0) return null;
 
-  // Telefon: po dva avtorja na "stran" (druga kartica eno vrstico nižje),
-  // vsaka kartica čez celo širino — swipe levo pokaže naslednji par.
-  const pages: { group: FeaturedGroup; accentIndex: number }[][] = [];
-  items.forEach((group, i) => {
-    const pageIndex = Math.floor(i / 2);
-    (pages[pageIndex] ??= []).push({ group, accentIndex: i });
-  });
-
   function handleScroll(e: React.UIEvent<HTMLDivElement>) {
     const el = e.currentTarget;
     const maxScroll = el.scrollWidth - el.clientWidth;
     const fraction = maxScroll > 0 ? el.scrollLeft / maxScroll : 0;
-    setActiveDot(Math.round(fraction * (pages.length - 1)));
+    setActiveDot(Math.round(fraction * (items.length - 1)));
   }
 
   return (
@@ -120,47 +109,44 @@ export default function FeaturedArtists({
 
       {/* Namizje: vsi avtorji v eni vrstici. */}
       <div className="hidden gap-3 lg:grid lg:grid-cols-4">
-        {items.map((group, i) => (
+        {items.map((group) => (
           <AuthorCard
             key={group.author}
             group={group}
-            accent={ACCENTS[i % ACCENTS.length]}
+            accent={authorAccentHex(group.author)}
             onCopy={onCopy}
             onFilterAuthor={onFilterAuthor}
           />
         ))}
       </div>
 
-      {/* Telefon/tablica: po dva avtorja (druga vrstica) na drsno "stran",
-          vsaka kartica čez celo širino. */}
+      {/* Telefon/tablica: en avtor na "stran", vsaka kartica čez celo
+          širino — swipe levo pokaže naslednjega avtorja, eno kartico naenkrat. */}
       <div className="lg:hidden">
         <div
           onScroll={handleScroll}
           className="-mx-4 flex snap-x snap-mandatory overflow-x-auto px-4 scroll-pl-4 [&::-webkit-scrollbar]:hidden"
           style={{ scrollbarWidth: "none" }}
         >
-          {pages.map((page, pageIndex) => (
+          {items.map((group, i) => (
             <div
-              key={pageIndex}
-              className="flex w-full shrink-0 snap-start flex-col gap-3 pb-1"
-              style={{ paddingRight: pageIndex < pages.length - 1 ? "0.75rem" : 0 }}
+              key={group.author}
+              className="w-full shrink-0 snap-start pb-1"
+              style={{ paddingRight: i < items.length - 1 ? "0.75rem" : 0 }}
             >
-              {page.map(({ group, accentIndex }) => (
-                <AuthorCard
-                  key={group.author}
-                  group={group}
-                  accent={ACCENTS[accentIndex % ACCENTS.length]}
-                  onCopy={onCopy}
-                  onFilterAuthor={onFilterAuthor}
-                />
-              ))}
+              <AuthorCard
+                group={group}
+                accent={authorAccentHex(group.author)}
+                onCopy={onCopy}
+                onFilterAuthor={onFilterAuthor}
+              />
             </div>
           ))}
         </div>
 
-        {pages.length > 1 && (
+        {items.length > 1 && (
           <div className="mt-2 flex justify-center gap-1.5">
-            {pages.map((_, i) => (
+            {items.map((_, i) => (
               <span
                 key={i}
                 className={`h-1.5 rounded-full transition-all ${

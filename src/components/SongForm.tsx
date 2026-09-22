@@ -16,6 +16,7 @@ const emptyForm = {
   origin: null as string | null,
   image_url: null as string | null,
   chords_url: null as string | null,
+  chords_source_url: null as string | null,
 };
 
 export default function SongForm({
@@ -49,6 +50,7 @@ export default function SongForm({
           origin: initial.origin,
           image_url: initial.image_url,
           chords_url: initial.chords_url,
+          chords_source_url: initial.chords_source_url,
         }
       : prefill
         ? { ...emptyForm, title: prefill.title, author: prefill.author }
@@ -165,6 +167,7 @@ export default function SongForm({
       origin: form.origin?.trim() || null,
       image_url: form.image_url,
       chords_url: form.chords_url,
+      chords_source_url: form.chords_source_url?.trim() || null,
     };
 
     const { data, error: dbError } = initial
@@ -417,6 +420,16 @@ export default function SongForm({
             />
           </div>
           {chordsError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{chordsError}</p>}
+        </Field>
+
+        <Field label="UG Tabs (povezava)" className="sm:col-span-2">
+          <input
+            type="url"
+            value={form.chords_source_url ?? ""}
+            onChange={(e) => setForm({ ...form, chords_source_url: e.target.value || null })}
+            placeholder="https://tabs.ultimate-guitar.com/tab/..."
+            className={inputClass}
+          />
         </Field>
       </div>
 
