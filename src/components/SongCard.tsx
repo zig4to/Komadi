@@ -196,7 +196,7 @@ export default function SongCard({
             </a>
           )}
 
-          <div className="mt-1.5 flex w-full min-w-0 flex-wrap items-center gap-1.5 text-xs">
+          <div className="mt-0.5 flex w-full min-w-0 flex-wrap items-center gap-1.5 text-xs">
             {song.chords_url && isChordsPdf && (
               <button
                 type="button"
@@ -278,47 +278,9 @@ export default function SongCard({
                 <path d="m21 21-4.3-4.3" />
               </svg>
             </button>
-
-            {onSetAuthorImage && (
-              <>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    imageInputRef.current?.click();
-                  }}
-                  disabled={uploadingImage}
-                  aria-label="Naloži sliko avtorja"
-                  title="Naloži sliko avtorja"
-                  className="ml-auto flex shrink-0 items-center justify-center p-1.5 text-violet-500 hover:text-violet-600 disabled:opacity-50 dark:text-violet-400 dark:hover:text-violet-300"
-                >
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.8}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-[18px] w-[18px] shrink-0"
-                  >
-                    <rect x="3" y="4" width="18" height="16" rx="2" />
-                    <circle cx="8.5" cy="9.5" r="1.5" />
-                    <path d="m4 17 4.5-4.5a1.5 1.5 0 0 1 2.12 0L14 16l2-2a1.5 1.5 0 0 1 2.12 0L20 16" />
-                  </svg>
-                </button>
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageFileSelect}
-                />
-              </>
-            )}
           </div>
         </div>
-        <div className="-mr-1.5 flex shrink-0 flex-col items-center gap-1.5">
+        <div className="-mr-1.5 flex shrink-0 flex-col items-center gap-0">
           {onDelete && (
             <button
               type="button"
@@ -361,6 +323,44 @@ export default function SongCard({
               <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
             </svg>
           </button>
+
+          {onSetAuthorImage && (
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  imageInputRef.current?.click();
+                }}
+                disabled={uploadingImage}
+                aria-label="Naloži sliko avtorja"
+                title="Naloži sliko avtorja"
+                className="p-1.5 text-violet-500 hover:text-violet-600 disabled:opacity-50 dark:text-violet-400 dark:hover:text-violet-300"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-[18px] w-[18px] shrink-0"
+                >
+                  <rect x="3" y="4" width="18" height="16" rx="2" />
+                  <circle cx="8.5" cy="9.5" r="1.5" />
+                  <path d="m4 17 4.5-4.5a1.5 1.5 0 0 1 2.12 0L14 16l2-2a1.5 1.5 0 0 1 2.12 0L20 16" />
+                </svg>
+              </button>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageFileSelect}
+              />
+            </>
+          )}
         </div>
       </div>
 
