@@ -59,6 +59,12 @@ export default function Dashboard() {
   const [editing, setEditing] = useState<Song | null>(null);
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
   const [songsVisible, setSongsVisible] = useState(true);
+  // Na namizju (lg) je seznam vseh skladb privzeto skrit — na mobilnem
+  // ostane viden (podatek o širini zaslona ni na voljo pred hidracijo, zato
+  // to preveri šele po prvem izrisu).
+  useEffect(() => {
+    if (window.matchMedia("(min-width: 1024px)").matches) setSongsVisible(false);
+  }, []);
   const [randomPick, setRandomPick] = useState<Song | null>(null);
   const [activeView, setActiveView] = useState<"list" | "newest" | "popular">("list");
   const [prefillDraft, setPrefillDraft] = useState<{ title: string; author: string } | null>(null);
