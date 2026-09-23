@@ -112,7 +112,7 @@ export default function Dashboard() {
   // to mesto, namesto da bi po vrnitvi ostal na vrhu strani.
   const homeScrollY = useRef(0);
 
-  type PartialDimension = "genre" | "author" | "era" | "mood";
+  type PartialDimension = "genre" | "author" | "era" | "mood" | "origin";
   const [partialOpen, setPartialOpen] = useState(false);
   const [partialDimension, setPartialDimension] = useState<PartialDimension | null>(null);
   const [partialValue, setPartialValue] = useState("");
@@ -122,6 +122,9 @@ export default function Dashboard() {
   // vedenje kot začetni klik na "Delno naključno"), namesto da izbere
   // popolnoma naključno skladbo iz cele baze kot pri navadnem "Naključno".
   const [randomPickFromPartial, setRandomPickFromPartial] = useState(false);
+  // Seznam 5 naključnih skladb, prikazan pod trenutno naključno izbrano
+  // kartico po kliku na gumb "5 ↻".
+  const [randomFive, setRandomFive] = useState<Song[] | null>(null);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -470,6 +473,7 @@ export default function Dashboard() {
     author: "Avtor",
     era: "Obdobje",
     mood: "Razpoloženje",
+    origin: "Izvor",
   };
 
   const newestFirst = useMemo(
@@ -765,6 +769,7 @@ export default function Dashboard() {
   function pickRandom() {
     const pool = filteredSongs.length ? filteredSongs : songs;
     setRandomPickFromPartial(false);
+    setRandomFive(null);
     if (!pool.length) {
       setRandomPick(null);
       return;
@@ -780,14 +785,24 @@ export default function Dashboard() {
   function handlePickAnother() {
     if (randomPickFromPartial) {
       setRandomPick(null);
+      setRandomFive(null);
       handlePartialStart();
       return;
     }
     pickRandom();
   }
 
+  // Gumb "5 ↻" ob trenutno naključno izbrani kartici: prikaže (in ob
+  // ponovnem kliku znova premeša) seznam 5 naključnih skladb iz istega
+  // nabora kot navadno "Naključno" (upošteva aktivne filtre, če obstajajo).
+  function pickRandomFive() {
+    const pool = filteredSongs.length ? filteredSongs : songs;
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    setRandomFive(shuffled.slice(0, 5));
+  }
+
   function handlePartialStart() {
-    const dims: PartialDimension[] = ["genre", "author", "era", "mood"];
+    const dims: PartialDimension[] = ["genre", "author", "era", "mood", "origin"];
     const dim = dims[Math.floor(Math.random() * dims.length)];
     setPartialDimension(dim);
     setPartialValue("");
@@ -811,8 +826,16 @@ export default function Dashboard() {
           return s.era === value;
         case "mood":
           return s.mood === value;
-        case "author":
-          return s.author.toLowerCase() === value.toLowerCase();
+        case "origin":
+          return s.origin === value;
+        case "author": {
+          // Mehko ujemanje: vsaka beseda iz vnosa se mora pojaviti nekje v
+          // imenu avtorja (ni treba vnesti celega imena/vseh besed v enakem
+          // vrstnem redu) — namesto strogega ujemanja celotnega niza.
+          const authorLower = s.author.toLowerCase();
+          const queryWords = value.toLowerCase().split(/\s+/).filter(Boolean);
+          return queryWords.every((w) => authorLower.includes(w));
+        }
       }
     });
 
@@ -1462,7 +1485,9 @@ export default function Dashboard() {
                   ? usedGenres
                   : partialDimension === "era"
                     ? usedEras
-                    : usedMoods
+                    : partialDimension === "origin"
+                      ? usedOrigins
+                      : usedMoods
                 ).map((v) => (
                   <option key={v} value={v}>
                     {v}
@@ -1490,10 +1515,15 @@ export default function Dashboard() {
           <div className="mb-4 flex items-center justify-between">
             <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">🎲 Naključno izbrana skladba</p>
             <button
-              onClick={() => setRandomPick(null)}
+              onClick={() => {
+                setRandomPick(null);
+                setRandomFive(null);
+              }}
+              aria-label="Zapri"
+              title="Zapri"
               className="text-xs text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
             >
-              Zapri ✕
+              ✕
             </button>
           </div>
           <SongCard
@@ -1507,14 +1537,47 @@ export default function Dashboard() {
             highlighted
           />
           {renderEditForm(randomPick)}
-          <div className="mt-5 flex justify-end">
+          <div className="mt-5 flex items-center justify-end gap-3">
+            <button
+              onClick={pickRandomFive}
+              aria-label="Prikaži 5 naključnih skladb"
+              title="Prikaži 5 naključnih skladb"
+              className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 px-3 py-1 text-sm text-neutral-600 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-emerald-400/40 dark:text-neutral-300 dark:hover:text-emerald-400"
+            >
+              ↻ 5
+            </button>
             <button
               onClick={handlePickAnother}
-              className="text-sm text-neutral-600 hover:text-emerald-600 dark:text-neutral-300 dark:hover:text-emerald-400"
+              className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 px-3 py-1 text-sm text-neutral-600 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-emerald-400/40 dark:text-neutral-300 dark:hover:text-emerald-400"
             >
               ↻ Izberi drugo
             </button>
           </div>
+
+          {randomFive && (
+            <div className="mt-4 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+              {randomFive.length === 0 ? (
+                <p className="text-sm text-neutral-500">Ni dovolj skladb za prikaz.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {randomFive.map((song) => (
+                    <div key={song.id}>
+                      <SongCard
+                        song={song}
+                        authorImage={authorImages[song.author] ?? null}
+                        onEdit={handleEdit}
+                        onAddSimilar={handleAddSimilar}
+                        onFilterAuthor={handleFilterByAuthor}
+                        onAddToJam={handleAddToJam}
+                        onChordsClick={handleChordsClick}
+                      />
+                      {randomPick?.id !== song.id && renderEditForm(song)}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

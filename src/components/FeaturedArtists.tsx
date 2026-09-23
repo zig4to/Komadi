@@ -28,7 +28,7 @@ function SongRow({
       <div className="min-w-0 flex-1">
         <span className="block truncate text-base lg:text-sm">{song.title}</span>
       </div>
-      <ChordsButtons song={song} onChordsClick={onChordsClick} stacked merged />
+      <ChordsButtons song={song} onChordsClick={onChordsClick} stacked merged menuAlign="right" />
     </div>
   );
 }
@@ -51,7 +51,7 @@ function AuthorCard({
       style={{
         backgroundImage: `radial-gradient(120% 90% at 0% 0%, ${accent}26 0%, transparent 60%)`,
         borderColor: `${accent}38`,
-        boxShadow: `0 10px 24px -10px ${accent}40, 0 2px 8px -4px rgb(0 0 0 / 0.15)`,
+        boxShadow: `0 8px 18px -12px ${accent}30, 0 2px 8px -4px rgb(0 0 0 / 0.15)`,
       }}
       className={`rounded-2xl border bg-white p-3.5 dark:bg-[#111114] ${className}`}
     >
@@ -93,7 +93,7 @@ export default function FeaturedArtists({
   }
 
   return (
-    <div className="pb-1.5">
+    <div className="relative z-10 pb-1.5">
       <h2 className="mb-2 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
         Predstavljeno
       </h2>
@@ -122,7 +122,7 @@ export default function FeaturedArtists({
           {items.map((group, i) => (
             <div
               key={group.author}
-              className="w-full shrink-0 snap-start pb-1"
+              className="w-full shrink-0 snap-start pb-6"
               style={{ paddingRight: i < items.length - 1 ? "0.75rem" : 0 }}
             >
               <AuthorCard
@@ -136,7 +136,7 @@ export default function FeaturedArtists({
         </div>
 
         {items.length > 1 && (
-          <div className="mt-2 flex justify-center gap-1.5">
+          <div className="-mt-4 flex justify-center gap-1.5">
             {items.map((_, i) => (
               <span
                 key={i}
