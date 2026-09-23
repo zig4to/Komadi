@@ -6,7 +6,7 @@ import { parseImportJson, parseImportText, type ParsedImport } from "@/lib/impor
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { useTheme, type Theme } from "@/lib/useTheme";
-import type { Song } from "@/types/song";
+import type { QueuedSong, Song } from "@/types/song";
 
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: "system", label: "Sistemska" },
@@ -38,9 +38,50 @@ export default function SettingsMenu({ onImported }: { onImported?: (songs: Song
   } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
+  // "Čakalna vrsta": hitro predlagane skladbe (glej gumb "Hitro" ob
+  // "Dodaj skladbo" v Dashboard.tsx in tabelo queued_songs) — naloži se ob
+  // vsakem odprtju menija, da se count/seznam ne postara med sejo.
+  const [queuedOpen, setQueuedOpen] = useState(false);
+  const [queuedSongs, setQueuedSongs] = useState<QueuedSong[]>([]);
+  const [queuedError, setQueuedError] = useState<string | null>(null);
+  const [queuedDeletingId, setQueuedDeletingId] = useState<string | null>(null);
+
+  async function handleDeleteQueued(id: string) {
+    const prev = queuedSongs;
+    setQueuedDeletingId(id);
+    setQueuedSongs((s) => s.filter((x) => x.id !== id));
+    const { error } = await supabase.from("queued_songs").delete().eq("id", id);
+    setQueuedDeletingId(null);
+    if (error) {
+      setQueuedSongs(prev);
+      setQueuedError(error.message);
+    }
+  }
+
   useEffect(() => () => {
     if (backupTimer.current) clearTimeout(backupTimer.current);
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("queued_songs")
+        .select("*")
+        .order("added_at", { ascending: true });
+      if (cancelled) return;
+      if (error) {
+        setQueuedError(error.message);
+        return;
+      }
+      setQueuedError(null);
+      setQueuedSongs(data as QueuedSong[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [menuOpen]);
 
   function todayStr(): string {
     return new Date().toLocaleDateString("sl-SI");
@@ -376,6 +417,97 @@ export default function SettingsMenu({ onImported }: { onImported?: (songs: Song
                 >
                   {importMessage.text}
                 </p>
+              )}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setQueuedOpen((v) => !v)}
+            aria-expanded={queuedOpen}
+            className="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          >
+            <span className="flex items-center gap-2">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-[18px] w-[18px] shrink-0"
+              >
+                <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
+              Čakalna vrsta
+              {queuedSongs.length > 0 && (
+                <span className="rounded-full bg-fuchsia-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                  {queuedSongs.length}
+                </span>
+              )}
+            </span>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`h-4 w-4 shrink-0 transition-transform ${queuedOpen ? "" : "-rotate-90"}`}
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+
+          {queuedOpen && (
+            <div className="mt-1 px-3 pb-2 pt-1">
+              {queuedError && (
+                <p className="text-xs text-red-600 dark:text-red-400">{queuedError}</p>
+              )}
+              {queuedSongs.length === 0 && !queuedError && (
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  Čakalna vrsta je prazna.
+                </p>
+              )}
+              {queuedSongs.length > 0 && (
+                <ul className="max-h-48 space-y-1 overflow-y-auto">
+                  {queuedSongs.map((q) => (
+                    <li
+                      key={q.id}
+                      className="flex items-center gap-2 rounded-lg border border-neutral-200 px-2 py-1.5 text-xs dark:border-neutral-800"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-neutral-800 dark:text-neutral-200">
+                          {q.title}
+                        </p>
+                        <p className="truncate text-neutral-500 dark:text-neutral-400">{q.author}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteQueued(q.id)}
+                        disabled={queuedDeletingId === q.id}
+                        aria-label="Odstrani iz čakalne vrste"
+                        title="Odstrani iz čakalne vrste"
+                        className="shrink-0 p-1 text-neutral-400 hover:text-red-600 disabled:opacity-50 dark:text-neutral-500 dark:hover:text-red-400"
+                      >
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="h-3.5 w-3.5"
+                        >
+                          <path d="M18 6 6 18M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           )}

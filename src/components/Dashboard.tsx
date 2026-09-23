@@ -60,6 +60,16 @@ export default function Dashboard() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Song | null>(null);
+  // Klik na glavni "+" najprej vpraša hitro/prek telefona (addChoiceOpen);
+  // "Hitro" odpre samo naslov+avtor in zapiše v queued_songs (glej
+  // SettingsMenu.tsx "Čakalna vrsta" za prikaz/upravljanje), "Prek telefona"
+  // odpre obstoječi celoten SongForm (showForm, brez sprememb).
+  const [addChoiceOpen, setAddChoiceOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddTitle, setQuickAddTitle] = useState("");
+  const [quickAddAuthor, setQuickAddAuthor] = useState("");
+  const [quickAddError, setQuickAddError] = useState<string | null>(null);
+  const [quickAddBusy, setQuickAddBusy] = useState(false);
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
   const [songsVisible, setSongsVisible] = useState(true);
   // Na namizju (lg) je seznam vseh skladb privzeto skrit — na mobilnem
@@ -484,6 +494,31 @@ export default function Dashboard() {
     setPrefillDraft(null);
   }
 
+  function closeQuickAdd() {
+    setQuickAddOpen(false);
+    setQuickAddTitle("");
+    setQuickAddAuthor("");
+    setQuickAddError(null);
+  }
+
+  async function handleConfirmQuickAdd() {
+    const title = quickAddTitle.trim();
+    const author = quickAddAuthor.trim();
+    if (!title || !author) {
+      setQuickAddError("Vnesi naslov in avtorja.");
+      return;
+    }
+    setQuickAddBusy(true);
+    setQuickAddError(null);
+    const { error } = await supabase.from("queued_songs").insert({ title, author });
+    setQuickAddBusy(false);
+    if (error) {
+      setQuickAddError(error.message);
+      return;
+    }
+    closeQuickAdd();
+  }
+
   async function handleAddToJam(song: Song) {
     const jamAddedAt = new Date().toISOString();
     setSongs((s) => s.map((x) => (x.id === song.id ? { ...x, jam_added_at: jamAddedAt, jam_played: false } : x)));
@@ -545,6 +580,8 @@ export default function Dashboard() {
   useBackableOpen(filters.eras.length > 0 || filters.genres.length > 0 || Boolean(authorFilter), handleBackFromFilter);
   useBackableOpen(activeView !== "list", () => setActiveView("list"));
   useBackableOpen(showForm || editing !== null, closeForm);
+  useBackableOpen(addChoiceOpen, () => setAddChoiceOpen(false));
+  useBackableOpen(quickAddOpen, closeQuickAdd);
   useBackableOpen(jamOpen, () => setJamOpen(false));
   useBackableOpen(jamPickerOpen, () => setJamPickerOpen(false));
 
@@ -724,9 +761,17 @@ export default function Dashboard() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => {
-                  setEditing(null);
-                  setPrefillDraft(null);
-                  setShowForm((v) => !v);
+                  if (quickAddOpen) {
+                    closeQuickAdd();
+                  } else if (showForm || editing) {
+                    closeForm();
+                  } else if (addChoiceOpen) {
+                    setAddChoiceOpen(false);
+                  } else {
+                    setEditing(null);
+                    setPrefillDraft(null);
+                    setAddChoiceOpen(true);
+                  }
                 }}
                 disabled={!isSupabaseConfigured}
                 aria-label="Dodaj skladbo"
@@ -1073,6 +1118,116 @@ export default function Dashboard() {
             className="mt-3 text-sm text-neutral-600 hover:text-emerald-600 dark:text-neutral-300 dark:hover:text-emerald-400"
           >
             ↻ Izberi drugo
+          </button>
+        </div>
+      )}
+
+      {addChoiceOpen && (
+        <div className="rounded-xl border border-neutral-200 bg-white p-5 space-y-4 dark:border-neutral-800 dark:bg-neutral-900">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Dodaj skladbo</h2>
+            <button
+              type="button"
+              onClick={() => setAddChoiceOpen(false)}
+              className="text-sm text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+            >
+              Zapri ✕
+            </button>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => {
+                setAddChoiceOpen(false);
+                setQuickAddOpen(true);
+              }}
+              className="flex flex-col items-start gap-1.5 rounded-xl border border-fuchsia-500/40 bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] p-4 text-left transition hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.24)_15%,rgba(192,38,211,0.06)_95%)] dark:border-fuchsia-400/40 dark:hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.32)_15%,rgba(192,38,211,0.1)_95%)]"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5 shrink-0 text-fuchsia-600 dark:text-fuchsia-400"
+              >
+                <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
+              <span className="font-medium text-neutral-900 dark:text-neutral-100">Hitro</span>
+              <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                Samo naslov in avtor — za hiter predlog v čakalno vrsto.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAddChoiceOpen(false);
+                setEditing(null);
+                setPrefillDraft(null);
+                setShowForm(true);
+              }}
+              className="flex flex-col items-start gap-1.5 rounded-xl border border-emerald-500/40 bg-[linear-gradient(115deg,rgba(16,185,129,0.14)_15%,rgba(16,185,129,0.03)_95%)] p-4 text-left transition hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.24)_15%,rgba(16,185,129,0.06)_95%)] dark:border-emerald-400/40 dark:hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.32)_15%,rgba(16,185,129,0.1)_95%)]"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
+              >
+                <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+                <path d="M12 18h.01" />
+              </svg>
+              <span className="font-medium text-neutral-900 dark:text-neutral-100">Prek telefona</span>
+              <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                Celoten obrazec z vsemi podatki (žanr, obdobje, akordi …).
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {quickAddOpen && (
+        <div
+          id="quick-add-form"
+          className="rounded-xl border border-fuchsia-500/40 bg-white p-5 space-y-3 dark:border-fuchsia-400/40 dark:bg-neutral-900"
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Hitro dodaj skladbo</h2>
+            <button
+              type="button"
+              onClick={closeQuickAdd}
+              className="text-sm text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+            >
+              Zapri ✕
+            </button>
+          </div>
+          <input
+            autoFocus
+            value={quickAddTitle}
+            onChange={(e) => setQuickAddTitle(e.target.value)}
+            placeholder="Naslov skladbe"
+            className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
+          />
+          <input
+            value={quickAddAuthor}
+            onChange={(e) => setQuickAddAuthor(e.target.value)}
+            placeholder="Avtor"
+            className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
+          />
+          {quickAddError && <p className="text-sm text-red-600 dark:text-red-400">{quickAddError}</p>}
+          <button
+            type="button"
+            onClick={handleConfirmQuickAdd}
+            disabled={quickAddBusy}
+            className="rounded-full bg-fuchsia-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-fuchsia-500 disabled:opacity-50"
+          >
+            {quickAddBusy ? "Dodajam…" : "Potrdi"}
           </button>
         </div>
       )}

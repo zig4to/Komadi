@@ -147,6 +147,28 @@ begin
   end if;
 end $$;
 
+-- "Skladbe v čakalni vrsti": hitre predloge skladb (samo naslov + avtor),
+-- ki jih kdorkoli doda prek gumba "Hitro" ob kliku na "Dodaj skladbo" — glej
+-- supabase/migrations/0014_add_queued_songs.sql. Administrator jih kasneje
+-- ročno obdela in izbriše, upravljano v SettingsMenu.tsx ("Čakalna vrsta").
+create table if not exists public.queued_songs (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  author text not null,
+  added_at timestamptz not null default now()
+);
+
+alter table public.queued_songs enable row level security;
+
+create policy "Public read queued songs" on public.queued_songs
+  for select using (true);
+
+create policy "Public insert queued songs" on public.queued_songs
+  for insert with check (true);
+
+create policy "Public delete queued songs" on public.queued_songs
+  for delete using (true);
+
 -- Storage bucket za PDF akorde (glej supabase/migrations/0009_add_song_chords_bucket.sql).
 insert into storage.buckets (id, name, public)
 values ('song-chords', 'song-chords', true)

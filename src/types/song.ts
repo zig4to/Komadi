@@ -34,3 +34,13 @@ export interface JamExtra {
   added_at: string;
   played: boolean;
 }
+
+// Hitro predlagana skladba (naslov + avtor, brez ostalih podatkov) — glej
+// gumb "Hitro" ob dodajanju nove skladbe in tabelo queued_songs. Prikazano
+// in upravljano v SettingsMenu.tsx ("Čakalna vrsta").
+export interface QueuedSong {
+  id: string;
+  title: string;
+  author: string;
+  added_at: string;
+}
