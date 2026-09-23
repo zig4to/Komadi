@@ -2,30 +2,11 @@
 
 import { useState } from "react";
 import { authorAccentHex } from "@/lib/authorColor";
-import { useCopyFeedback } from "@/lib/useCopyFeedback";
 import type { FeaturedGroup } from "@/lib/dailyRandom";
-import type { Song } from "@/types/song";
 
-function SongRow({
-  song,
-  index,
-  accent,
-  onCopy,
-}: {
-  song: Song;
-  index: number;
-  accent: string;
-  onCopy: (song: Song) => void;
-}) {
-  const [copied, triggerCopy] = useCopyFeedback();
-
+function SongRow({ song, index, accent }: { song: { title: string }; index: number; accent: string }) {
   return (
-    <button
-      type="button"
-      onClick={() => triggerCopy(song.title).then((ok) => ok && onCopy(song))}
-      title="Klikni za kopiranje naslova"
-      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm text-neutral-700 transition hover:bg-black/5 dark:text-white/85 dark:hover:bg-white/10"
-    >
+    <div className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-neutral-700 dark:text-white/85">
       <span
         style={{ backgroundColor: `${accent}26`, color: accent }}
         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[12px] font-bold"
@@ -33,25 +14,18 @@ function SongRow({
         {index}
       </span>
       <span className="min-w-0 flex-1 truncate">{song.title}</span>
-      {copied && (
-        <span className="shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-          kopirano :)
-        </span>
-      )}
-    </button>
+    </div>
   );
 }
 
 function AuthorCard({
   group,
   accent,
-  onCopy,
   onFilterAuthor,
   className = "",
 }: {
   group: FeaturedGroup;
   accent: string;
-  onCopy: (song: Song) => void;
   onFilterAuthor: (author: string) => void;
   className?: string;
 }) {
@@ -74,7 +48,7 @@ function AuthorCard({
       </button>
       <div className="space-y-0.5">
         {group.songs.map((song, songIndex) => (
-          <SongRow key={song.id} song={song} index={songIndex + 1} accent={accent} onCopy={onCopy} />
+          <SongRow key={song.id} song={song} index={songIndex + 1} accent={accent} />
         ))}
       </div>
     </div>
@@ -83,11 +57,9 @@ function AuthorCard({
 
 export default function FeaturedArtists({
   items,
-  onCopy,
   onFilterAuthor,
 }: {
   items: FeaturedGroup[];
-  onCopy: (song: Song) => void;
   onFilterAuthor: (author: string) => void;
 }) {
   const [activeDot, setActiveDot] = useState(0);
@@ -114,7 +86,6 @@ export default function FeaturedArtists({
             key={group.author}
             group={group}
             accent={authorAccentHex(group.author)}
-            onCopy={onCopy}
             onFilterAuthor={onFilterAuthor}
           />
         ))}
@@ -137,7 +108,6 @@ export default function FeaturedArtists({
               <AuthorCard
                 group={group}
                 accent={authorAccentHex(group.author)}
-                onCopy={onCopy}
                 onFilterAuthor={onFilterAuthor}
               />
             </div>

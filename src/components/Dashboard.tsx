@@ -12,7 +12,6 @@ import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
 import { pickDailyFeatured } from "@/lib/dailyRandom";
 import { emptyFilters, hasActiveFilters, type FilterState } from "@/lib/filters";
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
-import { useCopyFeedback } from "@/lib/useCopyFeedback";
 import type { SimilarSong, Song } from "@/types/song";
 
 interface RecentGroup {
@@ -393,12 +392,11 @@ export default function Dashboard() {
     if (randomPick?.id === id) setRandomPick(null);
   }
 
-  async function handleCopy(song: Song) {
+  // "Popularno" šteje klike na gumba "UG Tabs" in "PDF akordi" (glej
+  // SongCard.tsx, onChordsClick) — ne več klik na kartico.
+  async function handleChordsClick(song: Song) {
     const nextCount = (song.copy_count ?? 0) + 1;
     setSongs((s) => s.map((x) => (x.id === song.id ? { ...x, copy_count: nextCount } : x)));
-    // Najbolje-trud: če stolpec copy_count še ne obstaja (migracija ni
-    // zagnana) ali klic spodleti, samo tiho ignoriramo — kopiranje v
-    // odložišče je uporabniku že uspelo.
     await supabase.from("songs").update({ copy_count: nextCount }).eq("id", song.id);
   }
 
@@ -624,10 +622,10 @@ export default function Dashboard() {
             song={randomPick}
             authorImage={authorImages[randomPick.author] ?? null}
             onEdit={handleEdit}
-            onCopy={handleCopy}
             onAddSimilar={handleAddSimilar}
             onFilterAuthor={handleFilterByAuthor}
             onSetAuthorImage={handleSetAuthorImage}
+            onChordsClick={handleChordsClick}
             highlighted
           />
           {renderEditForm(randomPick)}
@@ -833,7 +831,7 @@ export default function Dashboard() {
             onSelectEra={handleHighlightEra}
             onSelectGenre={handleHighlightGenre}
           />
-          <FeaturedArtists items={featuredArtists} onCopy={handleCopy} onFilterAuthor={handleFilterByAuthor} />
+          <FeaturedArtists items={featuredArtists} onFilterAuthor={handleFilterByAuthor} />
           <HighlightRow
             title="Avtorji"
             items={authorHighlights}
@@ -874,7 +872,7 @@ export default function Dashboard() {
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                   {recentTop.map((song) => (
-                    <CompactCard key={song.id} song={song} onCopy={handleCopy} />
+                    <CompactCard key={song.id} song={song} />
                   ))}
                 </div>
               </div>
@@ -883,7 +881,6 @@ export default function Dashboard() {
                 <RecentGroupSection
                   title="Novo po avtorjih"
                   groups={newByAuthor}
-                  onCopy={handleCopy}
                   accentOffset={0}
                 />
               )}
@@ -891,7 +888,6 @@ export default function Dashboard() {
                 <RecentGroupSection
                   title="Novo po obdobju"
                   groups={newByEra}
-                  onCopy={handleCopy}
                   formatLabel={formatEraLabel}
                   accentOffset={3}
                 />
@@ -900,7 +896,6 @@ export default function Dashboard() {
                 <RecentGroupSection
                   title="Novo po razpoloženju"
                   groups={newByMood}
-                  onCopy={handleCopy}
                   accentOffset={5}
                 />
               )}
@@ -915,10 +910,10 @@ export default function Dashboard() {
             <div className="space-y-2">
               <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">Top 5</p>
               {mostPopular.slice(0, 5).map((song, i) => (
-                <CompactRow key={song.id} song={song} rank={i + 1} onCopy={handleCopy} highlighted />
+                <CompactRow key={song.id} song={song} rank={i + 1} highlighted />
               ))}
               {mostPopular.slice(5).map((song, i) => (
-                <CompactRow key={song.id} song={song} rank={i + 6} onCopy={handleCopy} />
+                <CompactRow key={song.id} song={song} rank={i + 6} />
               ))}
             </div>
           )
@@ -992,10 +987,10 @@ export default function Dashboard() {
                         authorImage={authorImages[song.author] ?? null}
                         onEdit={handleEdit}
                         onDelete={handleDelete}
-                        onCopy={handleCopy}
                         onAddSimilar={handleAddSimilar}
                         onFilterAuthor={handleFilterByAuthor}
                         onSetAuthorImage={handleSetAuthorImage}
+                        onChordsClick={handleChordsClick}
                       />
                       {randomPick?.id !== song.id && renderEditForm(song)}
                     </div>
@@ -1010,22 +1005,11 @@ export default function Dashboard() {
   );
 }
 
-function CompactCard({ song, onCopy }: { song: Song; onCopy?: (song: Song) => void }) {
-  const [copied, triggerCopy] = useCopyFeedback();
-
+function CompactCard({ song }: { song: Song }) {
   return (
-    <div
-      onClick={() => triggerCopy(song.title).then((ok) => ok && onCopy?.(song))}
-      title="Klikni za kopiranje naslova"
-      className="relative min-w-0 cursor-pointer rounded-xl border border-neutral-200 bg-white p-3 transition hover:-translate-y-0.5 dark:border-neutral-800 dark:bg-neutral-900"
-    >
+    <div className="min-w-0 rounded-xl border border-neutral-200 bg-white p-3 transition hover:-translate-y-0.5 dark:border-neutral-800 dark:bg-neutral-900">
       <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{song.title}</p>
       <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{song.author}</p>
-      {copied && (
-        <span className="pointer-events-none absolute bottom-1.5 right-2 rounded bg-white/90 px-1.5 py-0.5 text-[12px] font-medium text-emerald-600 ring-1 ring-neutral-200 dark:bg-neutral-950/80 dark:text-emerald-400 dark:ring-0">
-          kopirano :)
-        </span>
-      )}
     </div>
   );
 }
@@ -1033,21 +1017,15 @@ function CompactCard({ song, onCopy }: { song: Song; onCopy?: (song: Song) => vo
 function CompactRow({
   song,
   rank,
-  onCopy,
   highlighted = false,
 }: {
   song: Song;
   rank: number;
-  onCopy?: (song: Song) => void;
   highlighted?: boolean;
 }) {
-  const [copied, triggerCopy] = useCopyFeedback();
-
   return (
     <div
-      onClick={() => triggerCopy(song.title).then((ok) => ok && onCopy?.(song))}
-      title="Klikni za kopiranje naslova"
-      className={`relative flex min-w-0 cursor-pointer items-center gap-3 border p-3 transition hover:-translate-y-0.5 ${
+      className={`flex min-w-0 items-center gap-3 border p-3 transition hover:-translate-y-0.5 ${
         highlighted
           ? // Oblika trzalice (guitar pick): oster kot = konica, preostali
             // trije zaobljeni = telo trzalice.
@@ -1066,11 +1044,6 @@ function CompactRow({
         <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{song.title}</p>
         <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{song.author}</p>
       </div>
-      {copied && (
-        <span className="pointer-events-none absolute bottom-1.5 right-2 rounded bg-white/90 px-1.5 py-0.5 text-[12px] font-medium text-emerald-600 ring-1 ring-neutral-200 dark:bg-neutral-950/80 dark:text-emerald-400 dark:ring-0">
-          kopirano :)
-        </span>
-      )}
     </div>
   );
 }
@@ -1078,13 +1051,11 @@ function CompactRow({
 function RecentGroupSection({
   title,
   groups,
-  onCopy,
   formatLabel = (label) => label,
   accentOffset = 0,
 }: {
   title: string;
   groups: RecentGroup[];
-  onCopy: (song: Song) => void;
   formatLabel?: (label: string) => string;
   accentOffset?: number;
 }) {
@@ -1108,7 +1079,7 @@ function RecentGroupSection({
               </p>
               <div className="space-y-0.5">
                 {group.songs.map((song) => (
-                  <RecentGroupSongRow key={song.id} song={song} onCopy={onCopy} />
+                  <RecentGroupSongRow key={song.id} song={song} />
                 ))}
               </div>
             </div>
@@ -1119,20 +1090,11 @@ function RecentGroupSection({
   );
 }
 
-function RecentGroupSongRow({ song, onCopy }: { song: Song; onCopy: (song: Song) => void }) {
-  const [copied, triggerCopy] = useCopyFeedback();
-
+function RecentGroupSongRow({ song }: { song: Song }) {
   return (
-    <button
-      type="button"
-      onClick={() => triggerCopy(song.title).then((ok) => ok && onCopy(song))}
-      title="Klikni za kopiranje naslova"
-      className="flex w-full flex-col items-start rounded-lg px-1.5 py-1 text-left transition hover:bg-neutral-100 dark:hover:bg-neutral-800"
-    >
+    <div className="flex w-full flex-col items-start rounded-lg px-1.5 py-1 text-left">
       <span className="w-full truncate text-sm text-neutral-800 dark:text-neutral-200">{song.title}</span>
-      <span className="w-full truncate text-xs text-neutral-500 dark:text-neutral-400">
-        {copied ? "kopirano :)" : song.author}
-      </span>
-    </button>
+      <span className="w-full truncate text-xs text-neutral-500 dark:text-neutral-400">{song.author}</span>
+    </div>
   );
 }

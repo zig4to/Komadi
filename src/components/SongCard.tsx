@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import PdfViewer from "@/components/PdfViewer";
 import { authorAccentHsl } from "@/lib/authorColor";
 import { compressImage } from "@/lib/compressImage";
-import { useCopyFeedback } from "@/lib/useCopyFeedback";
 import { supabase } from "@/lib/supabaseClient";
 import type { SimilarSong, Song } from "@/types/song";
 
@@ -20,23 +19,22 @@ export default function SongCard({
   authorImage = null,
   onEdit,
   onDelete,
-  onCopy,
   onAddSimilar,
   onFilterAuthor,
   onSetAuthorImage,
+  onChordsClick,
   highlighted = false,
 }: {
   song: Song;
   authorImage?: string | null;
   onEdit: (song: Song) => void;
   onDelete?: (id: string) => void;
-  onCopy?: (song: Song) => void;
   onAddSimilar?: (song: SimilarSong) => void;
   onFilterAuthor?: (author: string) => void;
+  onChordsClick?: (song: Song) => void;
   onSetAuthorImage?: (author: string, imageUrl: string | null) => void | Promise<void>;
   highlighted?: boolean;
 }) {
-  const [copied, triggerCopy] = useCopyFeedback();
   const [similarOpen, setSimilarOpen] = useState(false);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [similarError, setSimilarError] = useState<string | null>(null);
@@ -124,20 +122,10 @@ export default function SongCard({
     "--l": `${l}%`,
   } as React.CSSProperties;
 
-  function handleCardClick(e: React.MouseEvent<HTMLDivElement>) {
-    // Klik na gumb (uredi / izbriši) ne kopira.
-    if ((e.target as HTMLElement).closest("button, a")) return;
-    triggerCopy(song.title).then((ok) => {
-      if (ok) onCopy?.(song);
-    });
-  }
-
   return (
     <div
-      onClick={handleCardClick}
-      title="Klikni za kopiranje naslova"
       style={cardStyle}
-      className={`relative isolate cursor-pointer overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] p-4 transition duration-200 hover:-translate-y-0.5 dark:bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.20),transparent_60%)] lg:min-h-[154px] ${
+      className={`relative isolate overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] p-4 transition duration-200 hover:-translate-y-0.5 dark:bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.20),transparent_60%)] lg:min-h-[154px] ${
         highlighted
           ? "border-emerald-500"
           : "border-neutral-200 dark:border-neutral-800"
@@ -174,7 +162,7 @@ export default function SongCard({
               href={song.chords_source_url}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+              onClick={() => onChordsClick?.(song)}
               title="Odpri na Ultimate Guitar"
               className="mt-1.5 inline-flex w-fit shrink-0 items-center gap-1 rounded-full border border-orange-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-orange-500 hover:text-orange-600 dark:border-orange-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-orange-400 lg:gap-1.5 lg:border-2 lg:border-orange-500/70 lg:px-2.5 lg:py-1 lg:text-[13px] dark:lg:border-orange-400/70"
             >
@@ -200,9 +188,9 @@ export default function SongCard({
             {song.chords_url && isChordsPdf && (
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
+                onClick={() => {
                   setPdfOpen(true);
+                  onChordsClick?.(song);
                 }}
                 title="Odpri PDF akorde"
                 className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400 lg:gap-1.5 lg:border-2 lg:border-amber-500/70 lg:px-2.5 lg:py-1 lg:text-[13px] dark:lg:border-amber-400/70"
@@ -429,12 +417,6 @@ export default function SongCard({
             </button>
           )}
         </div>
-      )}
-
-      {copied && (
-        <span className="pointer-events-none absolute bottom-2 left-3 rounded bg-white/90 px-1.5 py-0.5 text-xs font-medium text-emerald-600 ring-1 ring-neutral-200 dark:bg-neutral-950/80 dark:text-emerald-400 dark:ring-0">
-          kopirano :)
-        </span>
       )}
 
       {pdfOpen &&

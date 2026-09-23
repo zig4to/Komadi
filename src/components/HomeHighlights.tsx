@@ -220,14 +220,6 @@ export function HighlightRow({
 
   if (items.length === 0) return null;
 
-  // Miška na namizju ima privzeto samo navpičen skrol — pretvorimo ga v
-  // vodoraven drsenje čez kartice, ko je kazalec nad vrstico.
-  function handleWheel(e: React.WheelEvent<HTMLDivElement>) {
-    if (e.deltaY === 0) return;
-    e.currentTarget.scrollLeft += e.deltaY;
-    e.preventDefault();
-  }
-
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.pointerType !== "mouse") return;
     drag.current = { down: true, startX: e.clientX, startScroll: e.currentTarget.scrollLeft, moved: false };
@@ -267,7 +259,6 @@ export function HighlightRow({
         {title}
       </h2>
       <div
-        onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
