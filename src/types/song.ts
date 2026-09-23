@@ -24,3 +24,13 @@ export interface SimilarSong {
   title: string;
   author: string;
 }
+
+// Skladba dodana v Jam, ki je (še) ni v glavni knjižnici — glej gumb
+// "Skladbe ni" in tabelo jam_extras v Dashboard.tsx.
+export interface JamExtra {
+  id: string;
+  title: string;
+  author: string;
+  added_at: string;
+  played: boolean;
+}

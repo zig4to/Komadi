@@ -103,6 +103,30 @@ alter table public.songs
 alter table public.songs
   add column if not exists jam_played boolean not null default false;
 
+-- Skladbe dodane v Jam, ki jih (še) ni v glavni knjižnici (glej
+-- supabase/migrations/0012_add_jam_extras.sql) — gumb "Skladbe ni".
+create table if not exists public.jam_extras (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  author text not null,
+  added_at timestamptz not null default now(),
+  played boolean not null default false
+);
+
+alter table public.jam_extras enable row level security;
+
+create policy "Public read jam extras" on public.jam_extras
+  for select using (true);
+
+create policy "Public insert jam extras" on public.jam_extras
+  for insert with check (true);
+
+create policy "Public update jam extras" on public.jam_extras
+  for update using (true);
+
+create policy "Public delete jam extras" on public.jam_extras
+  for delete using (true);
+
 -- Storage bucket za PDF akorde (glej supabase/migrations/0009_add_song_chords_bucket.sql).
 insert into storage.buckets (id, name, public)
 values ('song-chords', 'song-chords', true)
