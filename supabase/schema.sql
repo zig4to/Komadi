@@ -127,6 +127,26 @@ create policy "Public update jam extras" on public.jam_extras
 create policy "Public delete jam extras" on public.jam_extras
   for delete using (true);
 
+-- Omogoči Realtime (postgres_changes) za `songs` in `jam_extras`, da se
+-- spremembe Jam čakalne vrste takoj pokažejo vsem odprtim odjemalcem brez
+-- osvežitve strani (glej supabase/migrations/0013_enable_realtime.sql).
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'songs'
+  ) then
+    alter publication supabase_realtime add table public.songs;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'jam_extras'
+  ) then
+    alter publication supabase_realtime add table public.jam_extras;
+  end if;
+end $$;
+
 -- Storage bucket za PDF akorde (glej supabase/migrations/0009_add_song_chords_bucket.sql).
 insert into storage.buckets (id, name, public)
 values ('song-chords', 'song-chords', true)

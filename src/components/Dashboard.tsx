@@ -144,6 +144,45 @@ export default function Dashboard() {
     };
   }, []);
 
+  // Realtime naročnina (glej supabase/migrations/0013_enable_realtime.sql):
+  // vsaka sprememba `songs`/`jam_extras` (tudi tista, ki jo sproži kdo drug
+  // v isti sobi med jam sessionom) se takoj zlije v lokalno stanje, brez
+  // osvežitve strani. Lastne optimistične spremembe se ob echo dogodku samo
+  // brez učinka prepišejo z isto vrednostjo.
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const channel = supabase
+      .channel("songs-and-jam-extras")
+      .on<Song>("postgres_changes", { event: "*", schema: "public", table: "songs" }, (payload) => {
+        if (payload.eventType === "INSERT") {
+          const song = payload.new;
+          setSongs((prev) => (prev.some((s) => s.id === song.id) ? prev : [song, ...prev]));
+        } else if (payload.eventType === "UPDATE") {
+          const song = payload.new;
+          setSongs((prev) => prev.map((s) => (s.id === song.id ? song : s)));
+        } else if (payload.eventType === "DELETE") {
+          const id = payload.old.id;
+          if (id) setSongs((prev) => prev.filter((s) => s.id !== id));
+        }
+      })
+      .on<JamExtra>("postgres_changes", { event: "*", schema: "public", table: "jam_extras" }, (payload) => {
+        if (payload.eventType === "INSERT") {
+          const extra = payload.new;
+          setJamExtras((prev) => (prev.some((x) => x.id === extra.id) ? prev : [...prev, extra]));
+        } else if (payload.eventType === "UPDATE") {
+          const extra = payload.new;
+          setJamExtras((prev) => prev.map((x) => (x.id === extra.id ? extra : x)));
+        } else if (payload.eventType === "DELETE") {
+          const id = payload.old.id;
+          if (id) setJamExtras((prev) => prev.filter((x) => x.id !== id));
+        }
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   async function handleSetAuthorImage(author: string, imageUrl: string | null) {
     const prev = authorImages;
     if (imageUrl) {
