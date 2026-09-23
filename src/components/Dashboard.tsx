@@ -69,6 +69,9 @@ export default function Dashboard() {
   }, []);
   const [randomPick, setRandomPick] = useState<Song | null>(null);
   const [activeView, setActiveView] = useState<"list" | "newest" | "popular">("list");
+  const [jamOpen, setJamOpen] = useState(false);
+  const [jamPickerOpen, setJamPickerOpen] = useState(false);
+  const [jamPickerQuery, setJamPickerQuery] = useState("");
   const [prefillDraft, setPrefillDraft] = useState<{ title: string; author: string } | null>(null);
   const [authorFilter, setAuthorFilter] = useState<string | null>(null);
   // Položaj skrolanja na domači strani tik pred klikom na avtorja/obdobje/
@@ -142,6 +145,23 @@ export default function Dashboard() {
       }
     }
   }
+
+  const jamSongs = useMemo(
+    () =>
+      songs
+        .filter((s) => s.jam_added_at)
+        .sort((a, b) => (a.jam_added_at ?? "").localeCompare(b.jam_added_at ?? "")),
+    [songs],
+  );
+
+  const jamPickerResults = useMemo(() => {
+    const q = jamPickerQuery.trim().toLowerCase();
+    if (!q) return [];
+    return songs
+      .filter((s) => !s.jam_added_at)
+      .filter((s) => `${s.title} ${s.author}`.toLowerCase().includes(q))
+      .slice(0, 20);
+  }, [songs, jamPickerQuery]);
 
   const filteredSongs = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
@@ -362,12 +382,33 @@ export default function Dashboard() {
     setPrefillDraft(null);
   }
 
-  // Sistemski gumb "Nazaj" (Android) naj se za te tri poglede obnaša enako
-  // kot klik na njihov obstoječi gumb za zapiranje/nazaj (glej
+  async function handleAddToJam(song: Song) {
+    const jamAddedAt = new Date().toISOString();
+    setSongs((s) => s.map((x) => (x.id === song.id ? { ...x, jam_added_at: jamAddedAt, jam_played: false } : x)));
+    setJamPickerOpen(false);
+    setJamPickerQuery("");
+    await supabase.from("songs").update({ jam_added_at: jamAddedAt, jam_played: false }).eq("id", song.id);
+  }
+
+  async function handleToggleJamPlayed(song: Song) {
+    const nextPlayed = !song.jam_played;
+    setSongs((s) => s.map((x) => (x.id === song.id ? { ...x, jam_played: nextPlayed } : x)));
+    await supabase.from("songs").update({ jam_played: nextPlayed }).eq("id", song.id);
+  }
+
+  async function handleRemoveFromJam(song: Song) {
+    setSongs((s) => s.map((x) => (x.id === song.id ? { ...x, jam_added_at: null, jam_played: false } : x)));
+    await supabase.from("songs").update({ jam_added_at: null, jam_played: false }).eq("id", song.id);
+  }
+
+  // Sistemski gumb "Nazaj" (Android) naj se za te poglede obnaša enako kot
+  // klik na njihov obstoječi gumb za zapiranje/nazaj (glej
   // src/lib/useBackableOpen.ts).
   useBackableOpen(filters.eras.length > 0 || filters.genres.length > 0 || Boolean(authorFilter), handleBackFromFilter);
   useBackableOpen(activeView !== "list", () => setActiveView("list"));
   useBackableOpen(showForm || editing !== null, closeForm);
+  useBackableOpen(jamOpen, () => setJamOpen(false));
+  useBackableOpen(jamPickerOpen, () => setJamPickerOpen(false));
 
   // Obrazec za urejanje se izriše takoj pod kartico skladbe, ki jo urejamo
   // (ne na vrhu strani), da uporabnika ne "vrže" nazaj na vrh ob kliku.
@@ -535,7 +576,144 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {!isSupabaseConfigured && (
+      {jamOpen ? (
+        <div className="mt-3! space-y-4">
+          <button
+            type="button"
+            onClick={() => setJamOpen(false)}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-fuchsia-600 dark:text-neutral-300 dark:hover:text-fuchsia-400"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4 shrink-0"
+            >
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+            Nazaj
+          </button>
+          <hr className="border-t border-neutral-200 dark:border-neutral-800" />
+
+          {jamPickerOpen ? (
+            <div className="space-y-3">
+              <input
+                autoFocus
+                value={jamPickerQuery}
+                onChange={(e) => setJamPickerQuery(e.target.value)}
+                placeholder="Išči po naslovu ali avtorju…"
+                className="w-full rounded-full border border-fuchsia-500/40 bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] px-4 py-2 text-sm text-neutral-800 placeholder-neutral-500 transition focus:outline-none dark:border-fuchsia-400/40 dark:text-neutral-200 dark:placeholder-neutral-500"
+              />
+              {jamPickerQuery.trim() && jamPickerResults.length === 0 && (
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">Ni zadetkov.</p>
+              )}
+              <div className="space-y-1.5">
+                {jamPickerResults.map((song) => (
+                  <button
+                    key={song.id}
+                    type="button"
+                    onClick={() => handleAddToJam(song)}
+                    className="block w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm hover:border-fuchsia-500 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-fuchsia-400"
+                  >
+                    <span className="font-medium text-neutral-900 dark:text-neutral-100">{song.title}</span>
+                    <span className="text-neutral-500 dark:text-neutral-400"> — {song.author}</span>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setJamPickerOpen(false);
+                  setJamPickerQuery("");
+                }}
+                className="text-sm text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+              >
+                Prekliči
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={() => setJamPickerOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-fuchsia-500/40 bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.24)_15%,rgba(192,38,211,0.06)_95%)] dark:border-fuchsia-400/40 dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.32)_15%,rgba(192,38,211,0.1)_95%)]"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4 shrink-0 text-fuchsia-600 dark:text-fuchsia-400"
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Dodaj skladbo v Jam
+              </button>
+
+              {jamSongs.length === 0 ? (
+                <p className="py-6 text-center text-sm text-neutral-500 dark:text-neutral-400">Jam je še prazen.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {jamSongs.map((song) => (
+                    <div
+                      key={song.id}
+                      className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={song.jam_played}
+                        onChange={() => handleToggleJamPlayed(song)}
+                        className="h-4 w-4 shrink-0 rounded border-neutral-300 text-fuchsia-600 focus:ring-fuchsia-500 dark:border-neutral-700 dark:bg-neutral-800"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={`truncate text-sm font-medium ${
+                            song.jam_played
+                              ? "text-neutral-400 line-through dark:text-neutral-600"
+                              : "text-neutral-900 dark:text-neutral-100"
+                          }`}
+                        >
+                          {song.title}
+                        </p>
+                        <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{song.author}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFromJam(song)}
+                        aria-label="Odstrani iz Jama"
+                        title="Odstrani iz Jama"
+                        className="shrink-0 p-1 text-neutral-400 hover:text-red-600 dark:text-neutral-500 dark:hover:text-red-400"
+                      >
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="h-4 w-4"
+                        >
+                          <path d="M18 6 6 18M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {!isSupabaseConfigured && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
           Supabase še ni nastavljen. Kopiraj{" "}
           <code className="rounded bg-neutral-200 px-1 dark:bg-neutral-800">.env.local.example</code> v{" "}
@@ -665,7 +843,7 @@ export default function Dashboard() {
 
       <div className="space-y-2.5 lg:flex lg:flex-wrap lg:items-center lg:gap-2 lg:space-y-0">
         <div className="flex items-center gap-2 lg:contents">
-          <div className="relative flex-1 lg:max-w-xs lg:flex-none">
+          <div className="relative w-1/2 lg:max-w-xs lg:flex-none">
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
@@ -709,6 +887,32 @@ export default function Dashboard() {
               </button>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setJamOpen((v) => !v)}
+            disabled={!isSupabaseConfigured}
+            aria-pressed={jamOpen}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-fuchsia-500/40 px-4 py-2 text-sm font-medium transition disabled:opacity-40 dark:border-fuchsia-400/40 ${
+              jamOpen
+                ? "bg-[linear-gradient(115deg,#a21caf_15%,#e879f9_100%)] text-white"
+                : "bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.24)_15%,rgba(192,38,211,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.32)_15%,rgba(192,38,211,0.1)_95%)]"
+            }`}
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`h-4 w-4 shrink-0 ${jamOpen ? "text-white" : "text-fuchsia-600 dark:text-fuchsia-400"}`}
+            >
+              <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+            Jam
+          </button>
         </div>
 
         <div className="flex flex-nowrap items-center gap-2 overflow-x-auto lg:contents">
@@ -1019,6 +1223,8 @@ export default function Dashboard() {
           </>
         )}
       </section>
+        </>
+      )}
     </div>
   );
 }

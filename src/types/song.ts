@@ -13,10 +13,12 @@ export interface Song {
   chords_url: string | null;
   chords_source_url: string | null;
   copy_count: number;
+  jam_added_at: string | null;
+  jam_played: boolean;
   created_at: string;
 }
 
-export type NewSong = Omit<Song, "id" | "created_at" | "copy_count">;
+export type NewSong = Omit<Song, "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played">;
 
 export interface SimilarSong {
   title: string;

@@ -94,6 +94,15 @@ alter table public.songs
 alter table public.songs
   add column if not exists chords_source_url text;
 
+-- "Jam" čakalna vrsta (glej supabase/migrations/0011_add_jam_queue.sql) —
+-- jam_added_at hkrati označuje, da je skladba trenutno v jamu, in določa
+-- vrstni red v čakalni vrsti; jam_played je kljukica "odigrano".
+alter table public.songs
+  add column if not exists jam_added_at timestamptz;
+
+alter table public.songs
+  add column if not exists jam_played boolean not null default false;
+
 -- Storage bucket za PDF akorde (glej supabase/migrations/0009_add_song_chords_bucket.sql).
 insert into storage.buckets (id, name, public)
 values ('song-chords', 'song-chords', true)
