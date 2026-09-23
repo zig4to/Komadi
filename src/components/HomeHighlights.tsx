@@ -178,6 +178,7 @@ export function HighlightRow({
   accentForLabel,
   shadowAlpha = "40",
   glowAlpha = "26",
+  imageOpacityClassName = "opacity-80",
 }: {
   title: string;
   items: HighlightItem[];
@@ -198,6 +199,9 @@ export function HighlightRow({
   // kartice (senca) in znotraj nje (gradient) — nižje = manj opazen sij.
   shadowAlpha?: string;
   glowAlpha?: string;
+  // Prosojnost slike v ozadju kartice (ko je `images` nastavljen) — ločeno
+  // od `shadowAlpha`/`glowAlpha`, ki krmilita sij okoli/pod kartico.
+  imageOpacityClassName?: string;
 }) {
   // "Povleci za drsenje" z miško (na dotik že deluje naravno prek
   // overflow-x-auto). `moved` loči vlečenje od navadnega klika, da klik na
@@ -298,7 +302,7 @@ export function HighlightRow({
               {image && (
                 <span
                   aria-hidden="true"
-                  className="absolute inset-0 opacity-80"
+                  className={`absolute inset-0 ${imageOpacityClassName}`}
                   style={{ backgroundImage: `url(${image})`, backgroundSize: "cover", backgroundPosition: "center" }}
                 />
               )}
@@ -370,6 +374,7 @@ export default function HomeHighlights({
         images={ERA_IMAGES}
         shadowAlpha="20"
         glowAlpha="14"
+        imageOpacityClassName="opacity-70 lg:opacity-80"
       />
       <div className="mt-3">
         <HighlightRow

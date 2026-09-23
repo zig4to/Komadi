@@ -108,10 +108,6 @@ export default function Dashboard() {
   // žanr (Obdobja, Žanri, Predstavljeno, Avtorji) — gumb "Nazaj" se vrne na
   // to mesto, namesto da bi po vrnitvi ostal na vrhu strani.
   const homeScrollY = useRef(0);
-  // Ko uporabnik izbere obdobje/žanr prek featured kartic na domači strani,
-  // se prikazane skladbe razvrstijo po naslovu A-Z (ročno urejanje filtrov
-  // ohrani privzeto razvrstitev po datumu dodajanja).
-  const [sortAlpha, setSortAlpha] = useState(false);
 
   type PartialDimension = "genre" | "author" | "era" | "mood";
   const [partialOpen, setPartialOpen] = useState(false);
@@ -373,11 +369,8 @@ export default function Dashboard() {
   }, [songs, filters]);
 
   const displaySongs = useMemo(
-    () =>
-      sortAlpha
-        ? [...filteredSongs].sort((a, b) => a.title.localeCompare(b.title, "sl"))
-        : filteredSongs,
-    [filteredSongs, sortAlpha],
+    () => [...filteredSongs].sort((a, b) => a.title.localeCompare(b.title, "sl")),
+    [filteredSongs],
   );
 
   // Razpoloženja niso fiksen nabor: obrazcu ponudimo privzete predloge +
@@ -527,12 +520,10 @@ export default function Dashboard() {
     setActiveView("list");
     setFilters({ ...emptyFilters, search: author });
     setAuthorFilter(author);
-    setSortAlpha(false);
   }
 
   function handleFiltersChange(f: FilterState) {
     setAuthorFilter(null);
-    setSortAlpha(false);
     setFilters(f);
   }
 
@@ -540,7 +531,6 @@ export default function Dashboard() {
     homeScrollY.current = window.scrollY;
     setActiveView("list");
     setAuthorFilter(null);
-    setSortAlpha(true);
     setFilters({ ...emptyFilters, eras: [era] });
   }
 
@@ -548,13 +538,11 @@ export default function Dashboard() {
     homeScrollY.current = window.scrollY;
     setActiveView("list");
     setAuthorFilter(null);
-    setSortAlpha(true);
     setFilters({ ...emptyFilters, genres: [genre] });
   }
 
   function handleBackFromFilter() {
     setAuthorFilter(null);
-    setSortAlpha(false);
     setFilters(emptyFilters);
     setTimeout(() => window.scrollTo({ top: homeScrollY.current }), 50);
   }
