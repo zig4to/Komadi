@@ -10,7 +10,6 @@ export const ERAS = [
 
 export const GENRES = [
   "Rock",
-  "Klasični rock",
   "Hard rock",
   "Yugo rock",
   "Punk",
@@ -21,6 +20,7 @@ export const GENRES = [
   "Blues",
   "Country",
   "Reggae",
+  "Rap",
   "Balada / akustika",
   "Dalmatinske",
 ] as const;
