@@ -83,7 +83,17 @@ Za vsako skladbo razišči (splet, če nisi prepričan — ne ugibaj):
 - **genre**: najboljše ujemanje z GENRES. Če res nič ne ustreza, vprašaj.
 - **origin**: izvajalec iz bivše Jugoslavije → "Yugo"; slovenski → "Slovenska";
   sicer "Tuja". Če ni očitno, vprašaj.
-- **mood**: `null`, razen če je uporabnik ob klicu izrecno navedel drugače.
+- **mood**: poišči na spletu (besedilo/temo/pomen skladbe — Wikipedia,
+  Songfacts, "song meaning" ipd.) in na podlagi tega presodi razpoloženje.
+  Najprej poskusi ujeti eno od obstoječih vrednosti `DEFAULT_MOODS` v
+  `src/lib/constants.ts` (Vesela, Žalostna, Energična, Romantična,
+  Umirjena, Nostalgična, Uporniška, Sanjava); če nobena resnično ne
+  ustreza, lahko zapišeš novo vrednost (prosto besedilo, ni napaka — velika
+  začetnica, slovensko), a raje uporabi obstoječo, če se le da. Pri
+  utemeljitvi izhajaj iz dejanske teme/sporočila besedila, ne le iz
+  glasbenega tempa (npr. "It's My Life" je zaradi teme uporništva/prevzema
+  nadzora nad življenjem "Uporniška", ne le "Energična"). Če je uporabnik
+  ob klicu izrecno navedel razpoloženje, uporabi to namesto raziskovanja.
 - **title**: popravi UG-jevo odstranjena ločila/apostrofe nazaj na pravilen,
   splošno znan naslov skladbe.
 
@@ -119,7 +129,8 @@ dodane v `songs` (ne tistih, izpuščenih zaradi podvojitve v koraku 3, in ne
 tistih, ki jih uporabnik v koraku 2 ni izbral).
 
 ### 10. Poročaj
-Povej: koliko skladb je bilo dodanih (z avtorjem/žanrom/obdobjem/izvorom za
-vsako in kratko utemeljitvijo, če je bila negotova), koliko jih je bilo
-izpuščenih zaradi podvojitve in katere so še vedno v čakalni vrsti (izbrane
+Povej: koliko skladb je bilo dodanih (z avtorjem/žanrom/obdobjem/izvorom/
+razpoloženjem za vsako, s kratko utemeljitvijo razpoloženja in kjerkoli
+drugje negotove izbire), koliko jih je bilo izpuščenih zaradi podvojitve in
+katere so še vedno v čakalni vrsti (izbrane
 ali ne), ali so bile dodane nove slike avtorjev. Brez git commit/push.
