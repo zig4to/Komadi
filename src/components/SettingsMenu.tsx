@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { runBackup, shareBackup } from "@/lib/backup";
 import { parseImportJson, parseImportText, type ParsedImport } from "@/lib/importSongs";
 import { supabase } from "@/lib/supabaseClient";
+import { useBackableOpen } from "@/lib/useBackableOpen";
 import { useTheme, type Theme } from "@/lib/useTheme";
 import type { Song } from "@/types/song";
 
@@ -18,6 +19,9 @@ export default function SettingsMenu({ onImported }: { onImported?: (songs: Song
   const [settingsOpen, setSettingsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const { theme, setTheme } = useTheme();
+
+  // Sistemski gumb "Nazaj" (Android) naj meni zapre enako kot klik zunaj njega ali Escape.
+  useBackableOpen(menuOpen, () => setMenuOpen(false));
 
   const [backupBusy, setBackupBusy] = useState<"save" | "share" | null>(null);
   const [backupMessage, setBackupMessage] = useState<{

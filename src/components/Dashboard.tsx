@@ -13,6 +13,7 @@ import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
 import { pickDailyFeatured } from "@/lib/dailyRandom";
 import { emptyFilters, hasActiveFilters, type FilterState } from "@/lib/filters";
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
+import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { SimilarSong, Song } from "@/types/song";
 
 interface RecentGroup {
@@ -360,6 +361,13 @@ export default function Dashboard() {
     setEditing(null);
     setPrefillDraft(null);
   }
+
+  // Sistemski gumb "Nazaj" (Android) naj se za te tri poglede obnaša enako
+  // kot klik na njihov obstoječi gumb za zapiranje/nazaj (glej
+  // src/lib/useBackableOpen.ts).
+  useBackableOpen(filters.eras.length > 0 || filters.genres.length > 0 || Boolean(authorFilter), handleBackFromFilter);
+  useBackableOpen(activeView !== "list", () => setActiveView("list"));
+  useBackableOpen(showForm || editing !== null, closeForm);
 
   // Obrazec za urejanje se izriše takoj pod kartico skladbe, ki jo urejamo
   // (ne na vrhu strani), da uporabnika ne "vrže" nazaj na vrh ob kliku.

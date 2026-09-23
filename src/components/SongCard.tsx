@@ -6,6 +6,7 @@ import PdfViewer from "@/components/PdfViewer";
 import { authorAccentHsl } from "@/lib/authorColor";
 import { compressImage } from "@/lib/compressImage";
 import { supabase } from "@/lib/supabaseClient";
+import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { SimilarSong, Song } from "@/types/song";
 
 // Diagonalna "zagozda" s sliko na desni strani kartice — enak pristop kot
@@ -42,6 +43,9 @@ export default function SongCard({
   const [pdfOpen, setPdfOpen] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // Sistemski gumb "Nazaj" (Android) naj PDF pregled zapre enako kot klik na "✕".
+  useBackableOpen(pdfOpen, () => setPdfOpen(false));
 
   // Bližnjica do "Slika avtorja" naravnost s kartice — enak upload kot v
   // SongForm.tsx (isti "song-images" bucket, ista kompresija), da ni treba

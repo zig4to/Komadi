@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { ERAS, GENRES } from "@/lib/constants";
 import { emptyFilters, hasActiveFilters, type FilterState } from "@/lib/filters";
+import { useBackableOpen } from "@/lib/useBackableOpen";
 
 // Zapomni si odprto/zaprto stanje v brskalniku (localStorage), da ostane
 // enako tudi po osvežitvi strani. useSyncExternalStore poskrbi, da se
@@ -109,6 +110,11 @@ export default function Filters({
   originOptions: string[];
 }) {
   const [open, setOpen] = usePersistentBool("komadi:filters:open", false);
+
+  // Sistemski gumb "Nazaj" (Android) naj panel zapre enako kot klik zunaj
+  // njega. Kliče se samo tu (ne tudi v FiltersToggle), da se isto odprto
+  // stanje ne potisne dvakrat v zgodovino.
+  useBackableOpen(open, () => setOpen(false));
 
   function toggleValue(key: "genres" | "eras" | "moods" | "origins", value: string) {
     const current = filters[key];
