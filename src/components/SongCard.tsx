@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import PdfViewer from "@/components/PdfViewer";
+import ChordsButtons from "@/components/ChordsButtons";
 import { authorAccentHsl } from "@/lib/authorColor";
-import { supabase } from "@/lib/supabaseClient";
-import { useBackableOpen } from "@/lib/useBackableOpen";
+// import { supabase } from "@/lib/supabaseClient"; // Podobno — začasno onemogočeno.
 import type { SimilarSong, Song } from "@/types/song";
 
 // Diagonalna "zagozda" s sliko na desni strani kartice — enak pristop kot
@@ -35,62 +34,69 @@ export default function SongCard({
   onAddToJam?: (song: Song) => void;
   highlighted?: boolean;
 }) {
-  const [similarOpen, setSimilarOpen] = useState(false);
-  const [similarLoading, setSimilarLoading] = useState(false);
-  const [similarError, setSimilarError] = useState<string | null>(null);
-  const [similarSongs, setSimilarSongs] = useState<SimilarSong[]>([]);
-  const [pdfOpen, setPdfOpen] = useState(false);
+  // Podobno (similar-songs) — začasno onemogočeno.
+  // const [similarOpen, setSimilarOpen] = useState(false);
+  // const [similarLoading, setSimilarLoading] = useState(false);
+  // const [similarError, setSimilarError] = useState<string | null>(null);
+  // const [similarSongs, setSimilarSongs] = useState<SimilarSong[]>([]);
 
-  // Sistemski gumb "Nazaj" (Android) naj PDF pregled zapre enako kot klik na "✕".
-  useBackableOpen(pdfOpen, () => setPdfOpen(false));
+  // Izbriši/Uredi/Dodaj v Jam so združeni v en meni gumb (hamburger) v
+  // zgornjem desnem kotu kartice — enak vzorec kot združen "Akordi" gumb v
+  // ChordsButtons.tsx (portal, pozicioniran prek getBoundingClientRect).
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [actionsMenuPos, setActionsMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const actionsButtonRef = useRef<HTMLButtonElement>(null);
+  const actionsMenuPanelRef = useRef<HTMLDivElement>(null);
 
-  // Kratek vizualni znak (kljukica namesto +), da uporabnik vidi, da je klik
-  // na "Dodaj v Jam" dejansko nekaj naredil — brez tega ni nobene povratne
-  // informacije, ker gumb sam po sebi nič ne odpre/zapre.
-  const [jamAdded, setJamAdded] = useState(false);
-  const jamAddedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (jamAddedTimer.current) clearTimeout(jamAddedTimer.current);
-    },
-    [],
-  );
-
-  // Akordi so lahko zunanja povezava (npr. Ultimate Guitar — odpre se v
-  // novem zavihku) ali naložen PDF (odpre se v celozaslonskem pregledu
-  // znotraj aplikacije).
-  const isChordsPdf = song.chords_url?.toLowerCase().split("?")[0].endsWith(".pdf") ?? false;
-
-  async function fetchSimilar(exclude: SimilarSong[]) {
-    setSimilarLoading(true);
-    setSimilarError(null);
-
-    const { data, error } = await supabase.functions.invoke("similar-songs", {
-      body: { title: song.title, author: song.author, exclude },
-    });
-
-    setSimilarLoading(false);
-
-    const songs = (data as { songs?: SimilarSong[] } | null)?.songs;
-    if (error || !songs) {
-      setSimilarError(
-        (data as { error?: string } | null)?.error ??
-          error?.message ??
-          "Predlogov ni bilo mogoče pridobiti.",
-      );
-      return;
+  useEffect(() => {
+    if (!actionsOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      const target = e.target as Node;
+      if (!actionsButtonRef.current?.contains(target) && !actionsMenuPanelRef.current?.contains(target)) {
+        setActionsOpen(false);
+      }
     }
-    setSimilarSongs(songs);
-  }
-
-  function handleToggleSimilar() {
-    if (similarOpen) {
-      setSimilarOpen(false);
-      return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setActionsOpen(false);
     }
-    setSimilarOpen(true);
-    if (similarSongs.length === 0) fetchSimilar([]);
-  }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [actionsOpen]);
+
+  // async function fetchSimilar(exclude: SimilarSong[]) {
+  //   setSimilarLoading(true);
+  //   setSimilarError(null);
+  //
+  //   const { data, error } = await supabase.functions.invoke("similar-songs", {
+  //     body: { title: song.title, author: song.author, exclude },
+  //   });
+  //
+  //   setSimilarLoading(false);
+  //
+  //   const songs = (data as { songs?: SimilarSong[] } | null)?.songs;
+  //   if (error || !songs) {
+  //     setSimilarError(
+  //       (data as { error?: string } | null)?.error ??
+  //         error?.message ??
+  //         "Predlogov ni bilo mogoče pridobiti.",
+  //     );
+  //     return;
+  //   }
+  //   setSimilarSongs(songs);
+  // }
+  //
+  // function handleToggleSimilar() {
+  //   if (similarOpen) {
+  //     setSimilarOpen(false);
+  //     return;
+  //   }
+  //   setSimilarOpen(true);
+  //   if (similarSongs.length === 0) fetchSimilar([]);
+  // }
 
   // Emerald ~152° za izpostavljeno (naključno izbrano) kartico, sicer
   // stabilna barva (h/s/l) iz imena avtorja — tako imajo vse skladbe istega
@@ -113,7 +119,7 @@ export default function SongCard({
   return (
     <div
       style={cardStyle}
-      className={`relative isolate overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] p-4 transition duration-200 hover:-translate-y-0.5 dark:bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.20),transparent_60%)] lg:min-h-[154px] ${
+      className={`relative isolate overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] px-4 py-3 transition duration-200 hover:-translate-y-0.5 dark:bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.20),transparent_60%)] lg:min-h-[112px] ${
         highlighted
           ? "border-emerald-500"
           : "border-neutral-200 dark:border-neutral-800"
@@ -147,89 +153,8 @@ export default function SongCard({
             {song.author}
           </button>
 
-          {song.chords_source_url && (
-            <a
-              href={song.chords_source_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => onChordsClick?.(song)}
-              title="Odpri na Ultimate Guitar"
-              className="mt-1.5 inline-flex w-fit shrink-0 items-center gap-1 rounded-full border border-orange-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-orange-500 hover:text-orange-600 dark:border-orange-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-orange-400 lg:gap-1.5 lg:px-2.5 lg:py-1 lg:text-[13px]"
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-[11px] w-[11px] shrink-0 lg:h-[13px] lg:w-[13px]"
-              >
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <path d="M15 3h6v6" />
-                <path d="M10 14 21 3" />
-              </svg>
-              UG Tabs
-            </a>
-          )}
-
+          {/* Podobno — začasno onemogočeno.
           <div className="mt-0.5 flex w-full min-w-0 flex-wrap items-center gap-1.5 text-xs">
-            {song.chords_url && isChordsPdf && (
-              <button
-                type="button"
-                onClick={() => {
-                  setPdfOpen(true);
-                  onChordsClick?.(song);
-                }}
-                title="Odpri PDF akorde"
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400 lg:gap-1.5 lg:px-2.5 lg:py-1 lg:text-[13px]"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-[11px] w-[11px] shrink-0 lg:h-[13px] lg:w-[13px]"
-                >
-                  <path d="M9 18V5l12-2v13" />
-                  <circle cx="6" cy="18" r="3" />
-                  <circle cx="18" cy="16" r="3" />
-                </svg>
-                PDF akordi
-              </button>
-            )}
-
-            {song.chords_url && !isChordsPdf && !song.chords_source_url && (
-              <a
-                href={song.chords_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                title="Odpri akorde"
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400 lg:gap-1.5 lg:px-2.5 lg:py-1 lg:text-[13px]"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-[11px] w-[11px] shrink-0 lg:h-[13px] lg:w-[13px]"
-                >
-                  <path d="M9 18V5l12-2v13" />
-                  <circle cx="6" cy="18" r="3" />
-                  <circle cx="18" cy="16" r="3" />
-                </svg>
-                Akordi
-              </a>
-            )}
-
             <button
               type="button"
               onClick={handleToggleSimilar}
@@ -257,93 +182,142 @@ export default function SongCard({
               </svg>
             </button>
           </div>
+          */}
         </div>
-        <div className="-mr-1.5 flex shrink-0 flex-col items-center gap-0">
-          {onDelete && (
-            <button
-              type="button"
-              onClick={() => onDelete(song.id)}
-              aria-label="Izbriši skladbo"
-              title="Izbriši skladbo"
-              className="p-1.5 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-[18px] w-[18px]"
-              >
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </button>
-          )}
-
+        <div className="-mr-1.5 shrink-0">
           <button
+            ref={actionsButtonRef}
             type="button"
-            onClick={() => onEdit(song)}
-            aria-label="Uredi skladbo"
-            title="Uredi skladbo"
-            className="p-1.5 text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!actionsOpen) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setActionsMenuPos({ top: rect.bottom + 4, left: rect.right - 160 });
+              }
+              setActionsOpen((v) => !v);
+            }}
+            aria-haspopup="menu"
+            aria-expanded={actionsOpen}
+            aria-label="Dejanja za skladbo"
+            title="Dejanja"
+            className="rounded-full p-1.5 text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
           >
             <svg
+              aria-hidden="true"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth={1.8}
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="h-[18px] w-[18px]"
+              className="h-5 w-5"
             >
-              <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
+              <path d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
 
-          {onAddToJam && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddToJam(song);
-                setJamAdded(true);
-                if (jamAddedTimer.current) clearTimeout(jamAddedTimer.current);
-                jamAddedTimer.current = setTimeout(() => setJamAdded(false), 1400);
-              }}
-              aria-label={jamAdded ? "Dodano v Jam" : "Dodaj v Jam"}
-              title={jamAdded ? "Dodano v Jam" : "Dodaj v Jam"}
-              className={`p-1.5 transition ${
-                jamAdded
-                  ? "text-emerald-500 dark:text-emerald-400"
-                  : "text-violet-500 hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300"
-              }`}
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-[18px] w-[18px] shrink-0"
+          {actionsOpen &&
+            actionsMenuPos &&
+            typeof document !== "undefined" &&
+            createPortal(
+              <div
+                ref={actionsMenuPanelRef}
+                role="menu"
+                style={{ top: actionsMenuPos.top, left: actionsMenuPos.left }}
+                className="fixed z-50 w-40 space-y-0.5 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
               >
-                {jamAdded ? <path d="M20 6 9 17l-5-5" /> : <path d="M12 5v14M5 12h14" />}
-              </svg>
-            </button>
-          )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActionsOpen(false);
+                    onEdit(song);
+                  }}
+                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-sky-600 hover:bg-neutral-100 dark:text-sky-400 dark:hover:bg-neutral-800"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-[13px] w-[13px] shrink-0"
+                  >
+                    <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
+                  </svg>
+                  Uredi
+                </button>
+
+                {onAddToJam && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActionsOpen(false);
+                      onAddToJam(song);
+                    }}
+                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-violet-600 hover:bg-neutral-100 dark:text-violet-400 dark:hover:bg-neutral-800"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-[13px] w-[13px] shrink-0"
+                    >
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                    Dodaj v Jam
+                  </button>
+                )}
+
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActionsOpen(false);
+                      onDelete(song.id);
+                    }}
+                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-red-600 hover:bg-neutral-100 dark:text-red-400 dark:hover:bg-neutral-800"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-[13px] w-[13px] shrink-0"
+                    >
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                    Izbriši
+                  </button>
+                )}
+              </div>,
+              document.body,
+            )}
         </div>
       </div>
 
-      <div className="mt-3 hidden min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto text-xs [&>*:nth-child(n+4)]:hidden sm:[&>*:nth-child(n+4)]:inline lg:flex">
+      <div className="mt-2 hidden min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto text-xs [&>*:nth-child(n+4)]:hidden sm:[&>*:nth-child(n+4)]:inline lg:flex">
         <Badge>{song.genre}</Badge>
         <Badge>{song.era}</Badge>
         {song.mood && <Badge>{song.mood}</Badge>}
         {song.origin && <Badge>{song.origin}</Badge>}
       </div>
 
+      <div className="mt-1 flex w-full min-w-0 flex-wrap items-center gap-1.5 text-xs">
+        <ChordsButtons song={song} onChordsClick={onChordsClick} merged />
+      </div>
+
+      {/* Podobno — začasno onemogočeno.
       {similarOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
@@ -403,46 +377,8 @@ export default function SongCard({
           )}
         </div>
       )}
+      */}
 
-      {pdfOpen &&
-        song.chords_url &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="fixed inset-0 z-50 flex flex-col bg-black/90"
-          >
-            <div className="flex shrink-0 items-center justify-between bg-neutral-900 px-4 py-2.5">
-              <span className="truncate text-sm font-medium text-white">
-                {song.title} — akordi
-              </span>
-              <button
-                type="button"
-                onClick={() => setPdfOpen(false)}
-                aria-label="Zapri"
-                title="Zapri"
-                className="shrink-0 p-1 text-neutral-300 hover:text-white"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-5 w-5"
-                >
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 bg-neutral-800">
-              <PdfViewer url={song.chords_url} />
-            </div>
-          </div>,
-          document.body,
-        )}
     </div>
   );
 }
