@@ -28,7 +28,7 @@ function SongRow({
       <div className="min-w-0 flex-1">
         <span className="block truncate text-base lg:text-sm">{song.title}</span>
       </div>
-      <ChordsButtons song={song} onChordsClick={onChordsClick} stacked />
+      <ChordsButtons song={song} onChordsClick={onChordsClick} stacked merged />
     </div>
   );
 }
