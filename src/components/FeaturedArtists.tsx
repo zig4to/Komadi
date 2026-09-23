@@ -18,7 +18,7 @@ function SongRow({
   onChordsClick?: (song: Song) => void;
 }) {
   return (
-    <div className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-neutral-700 dark:text-white/85">
+    <div className="flex w-full items-center gap-2.5 rounded-lg py-1.5 pr-2.5 pl-1 text-sm text-neutral-700 dark:text-white/85">
       <span
         style={{ backgroundColor: `${accent}26`, color: accent }}
         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[12px] font-bold"
