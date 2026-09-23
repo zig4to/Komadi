@@ -840,11 +840,13 @@ export default function Dashboard() {
             onSelectEra={handleHighlightEra}
             onSelectGenre={handleHighlightGenre}
           />
-          <FeaturedArtists
-            items={featuredArtists}
-            onFilterAuthor={handleFilterByAuthor}
-            onChordsClick={handleChordsClick}
-          />
+          <div className="mt-3">
+            <FeaturedArtists
+              items={featuredArtists}
+              onFilterAuthor={handleFilterByAuthor}
+              onChordsClick={handleChordsClick}
+            />
+          </div>
           <HighlightRow
             title="Avtorji"
             items={authorHighlights}
@@ -938,7 +940,7 @@ export default function Dashboard() {
         {!loading && !loadError && activeView === "list" && (
           <>
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold text-neutral-800 dark:text-neutral-100">
+              <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100">
                 {songsHeading}
               </h2>
               {filters.eras.length > 0 || filters.genres.length > 0 || authorFilter ? (

@@ -261,7 +261,7 @@ export function HighlightRow({
 
   return (
     <div>
-      <h2 className="mb-2 text-base font-semibold text-neutral-800 dark:text-neutral-100">
+      <h2 className="mb-2 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
         {title}
       </h2>
       <div
@@ -371,17 +371,19 @@ export default function HomeHighlights({
         shadowAlpha="20"
         glowAlpha="14"
       />
-      <HighlightRow
-        title="Žanri"
-        items={genres}
-        colorOrder={GENRE_COLOR_ORDER}
-        onSelect={onSelectGenre}
-        labelClassName="text-lg lg:text-2xl"
-        cardSizeClassName="h-28 w-36 lg:h-32 lg:w-40"
-        icons={GENRE_ICONS}
-        shadowAlpha="20"
-        glowAlpha="14"
-      />
+      <div className="mt-3">
+        <HighlightRow
+          title="Žanri"
+          items={genres}
+          colorOrder={GENRE_COLOR_ORDER}
+          onSelect={onSelectGenre}
+          labelClassName="text-lg lg:text-2xl"
+          cardSizeClassName="h-28 w-36 lg:h-32 lg:w-40"
+          icons={GENRE_ICONS}
+          shadowAlpha="20"
+          glowAlpha="14"
+        />
+      </div>
     </div>
   );
 }

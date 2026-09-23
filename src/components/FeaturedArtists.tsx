@@ -27,8 +27,8 @@ function SongRow({
       </span>
       <div className="min-w-0 flex-1">
         <span className="block truncate text-base lg:text-sm">{song.title}</span>
-        <ChordsButtons song={song} onChordsClick={onChordsClick} />
       </div>
+      <ChordsButtons song={song} onChordsClick={onChordsClick} stacked />
     </div>
   );
 }
@@ -94,7 +94,7 @@ export default function FeaturedArtists({
 
   return (
     <div className="pb-1.5">
-      <h2 className="mb-2 text-base font-semibold text-neutral-800 dark:text-neutral-100">
+      <h2 className="mb-2 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
         Predstavljeno
       </h2>
 
