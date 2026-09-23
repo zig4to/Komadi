@@ -112,6 +112,14 @@ markup), dekodiraj entitete, izriši v PDF s pdfkit (Windows fonts
 poti prilagodi). Naloži v `song-chords` bucket, `PATCH` nazaj `chords_url`
 za vsako skladbo.
 
+**Past (že enkrat povzročila pokvarjene PDF-je)**: UG vsebina uporablja
+`&nbsp;` VSAK drugič namesto navadnega presledka (za poravnavo akordov nad
+besedilom) — če ga tvoja `decodeHtml` funkcija ne pozna, ostane v izpisu
+dobesedno kot besedilo `&nbsp;` namesto presledka, PDF pa je poln takih
+kosov namesto pravilno poravnanih akordov. Nujno vključi `nbsp: " "` (poleg
+šumnikov in `quot`/`apos`/`lt`/`gt`/`amp`) v nabor poznanih entitet, preden
+izrišeš PDF — ne šele po tem, ko uporabnik opazi pokvarjen izpis.
+
 ### 8. Slika avtorja (samo za avtorje BREZ obstoječega vnosa iz koraka 3)
 Poišči preko Wikipedia REST API-ja:
 ```
