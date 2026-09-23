@@ -147,7 +147,9 @@ export default function SongCard({
       )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{song.title}</p>
+          <p className="truncate text-lg font-medium text-neutral-900 lg:text-base dark:text-neutral-100">
+            {song.title}
+          </p>
           <button
             type="button"
             onClick={() => onFilterAuthor?.(song.author)}
