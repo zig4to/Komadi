@@ -14,7 +14,13 @@ const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: "dark", label: "Temna" },
 ];
 
-export default function SettingsMenu({ onImported }: { onImported?: (songs: Song[]) => void }) {
+export default function SettingsMenu({
+  onImported,
+  onOpenGoal,
+}: {
+  onImported?: (songs: Song[]) => void;
+  onOpenGoal?: () => void;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -511,6 +517,31 @@ export default function SettingsMenu({ onImported }: { onImported?: (songs: Song
               )}
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              onOpenGoal?.();
+            }}
+            className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-[18px] w-[18px] shrink-0"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="6" />
+              <circle cx="12" cy="12" r="2" />
+            </svg>
+            Mojih 20 skladb
+          </button>
         </div>
       )}
     </div>

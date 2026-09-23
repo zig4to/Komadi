@@ -15,7 +15,7 @@ import { emptyFilters, hasActiveFilters, type FilterState } from "@/lib/filters"
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { usePersistentBool } from "@/lib/usePersistentBool";
-import type { JamExtra, SimilarSong, Song } from "@/types/song";
+import type { GoalExtra, JamExtra, SimilarSong, Song } from "@/types/song";
 
 interface RecentGroup {
   label: string;
@@ -90,6 +90,18 @@ export default function Dashboard() {
   const [jamQuickAddTitle, setJamQuickAddTitle] = useState("");
   const [jamQuickAddAuthor, setJamQuickAddAuthor] = useState("");
   const [jamQuickAddError, setJamQuickAddError] = useState<string | null>(null);
+  // "Mojih 20 skladb": osebni seznam za naučit do konca leta — isti vzorec
+  // kot Jam (persist odprtost, iskalni izbirnik, "Skladbe ni" hitri vnos),
+  // samo z own poljema (goal_added_at/goal_learned, goal_extras) in brez
+  // "trenutna/naslednja" oznak, ker ne gre za živo sejo.
+  const [goalOpen, setGoalOpen] = usePersistentBool("komadi:goal:open", false);
+  const [goalPickerOpen, setGoalPickerOpen] = useState(false);
+  const [goalPickerQuery, setGoalPickerQuery] = useState("");
+  const [goalExtras, setGoalExtras] = useState<GoalExtra[]>([]);
+  const [goalQuickAddOpen, setGoalQuickAddOpen] = useState(false);
+  const [goalQuickAddTitle, setGoalQuickAddTitle] = useState("");
+  const [goalQuickAddAuthor, setGoalQuickAddAuthor] = useState("");
+  const [goalQuickAddError, setGoalQuickAddError] = useState<string | null>(null);
   const [prefillDraft, setPrefillDraft] = useState<{ title: string; author: string } | null>(null);
   const [authorFilter, setAuthorFilter] = useState<string | null>(null);
   // Položaj skrolanja na domači strani tik pred klikom na avtorja/obdobje/
@@ -154,6 +166,19 @@ export default function Dashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.from("goal_extras").select("*").order("added_at", { ascending: true });
+      if (cancelled || error || !data) return;
+      setGoalExtras(data as GoalExtra[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Realtime naročnina (glej supabase/migrations/0013_enable_realtime.sql):
   // vsaka sprememba `songs`/`jam_extras` (tudi tista, ki jo sproži kdo drug
   // v isti sobi med jam sessionom) se takoj zlije v lokalno stanje, brez
@@ -162,7 +187,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     const channel = supabase
-      .channel("songs-and-jam-extras")
+      .channel("songs-and-extras")
       .on<Song>("postgres_changes", { event: "*", schema: "public", table: "songs" }, (payload) => {
         if (payload.eventType === "INSERT") {
           const song = payload.new;
@@ -185,6 +210,18 @@ export default function Dashboard() {
         } else if (payload.eventType === "DELETE") {
           const id = payload.old.id;
           if (id) setJamExtras((prev) => prev.filter((x) => x.id !== id));
+        }
+      })
+      .on<GoalExtra>("postgres_changes", { event: "*", schema: "public", table: "goal_extras" }, (payload) => {
+        if (payload.eventType === "INSERT") {
+          const extra = payload.new;
+          setGoalExtras((prev) => (prev.some((x) => x.id === extra.id) ? prev : [...prev, extra]));
+        } else if (payload.eventType === "UPDATE") {
+          const extra = payload.new;
+          setGoalExtras((prev) => prev.map((x) => (x.id === extra.id ? extra : x)));
+        } else if (payload.eventType === "DELETE") {
+          const id = payload.old.id;
+          if (id) setGoalExtras((prev) => prev.filter((x) => x.id !== id));
         }
       })
       .subscribe();
@@ -274,6 +311,53 @@ export default function Dashboard() {
       .filter((s) => `${s.title} ${s.author}`.toLowerCase().includes(q))
       .slice(0, 20);
   }, [songs, jamPickerQuery]);
+
+  const goalSongs = useMemo(
+    () =>
+      songs
+        .filter((s) => s.goal_added_at)
+        .sort((a, b) => (a.goal_added_at ?? "").localeCompare(b.goal_added_at ?? "")),
+    [songs],
+  );
+
+  // "Mojih 20 skladb" prikazuje prave skladbe (goalSongs) in začasne
+  // "Skladbe ni" vnose (goalExtras) v enem seznamu, enak vzorec kot JamItem.
+  type GoalItem = { key: string; title: string; author: string; learned: boolean } & (
+    | { kind: "song"; song: Song }
+    | { kind: "extra"; extra: GoalExtra }
+  );
+  const goalItems = useMemo<GoalItem[]>(() => {
+    const items: (GoalItem & { addedAt: string })[] = [
+      ...goalSongs.map((song) => ({
+        key: `song:${song.id}`,
+        kind: "song" as const,
+        song,
+        title: song.title,
+        author: song.author,
+        learned: song.goal_learned,
+        addedAt: song.goal_added_at ?? "",
+      })),
+      ...goalExtras.map((extra) => ({
+        key: `extra:${extra.id}`,
+        kind: "extra" as const,
+        extra,
+        title: extra.title,
+        author: extra.author,
+        learned: extra.learned,
+        addedAt: extra.added_at,
+      })),
+    ];
+    return items.sort((a, b) => a.addedAt.localeCompare(b.addedAt));
+  }, [goalSongs, goalExtras]);
+
+  const goalPickerResults = useMemo(() => {
+    const q = goalPickerQuery.trim().toLowerCase();
+    if (!q) return [];
+    return songs
+      .filter((s) => !s.goal_added_at)
+      .filter((s) => `${s.title} ${s.author}`.toLowerCase().includes(q))
+      .slice(0, 20);
+  }, [songs, goalPickerQuery]);
 
   const filteredSongs = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
@@ -574,6 +658,60 @@ export default function Dashboard() {
     await supabase.from("jam_extras").delete().eq("id", extra.id);
   }
 
+  async function handleAddToGoal(song: Song) {
+    const goalAddedAt = new Date().toISOString();
+    setSongs((s) => s.map((x) => (x.id === song.id ? { ...x, goal_added_at: goalAddedAt, goal_learned: false } : x)));
+    setGoalPickerOpen(false);
+    setGoalPickerQuery("");
+    await supabase.from("songs").update({ goal_added_at: goalAddedAt, goal_learned: false }).eq("id", song.id);
+  }
+
+  async function handleToggleGoalLearned(song: Song) {
+    const nextLearned = !song.goal_learned;
+    setSongs((s) => s.map((x) => (x.id === song.id ? { ...x, goal_learned: nextLearned } : x)));
+    await supabase.from("songs").update({ goal_learned: nextLearned }).eq("id", song.id);
+  }
+
+  async function handleRemoveFromGoal(song: Song) {
+    setSongs((s) => s.map((x) => (x.id === song.id ? { ...x, goal_added_at: null, goal_learned: false } : x)));
+    await supabase.from("songs").update({ goal_added_at: null, goal_learned: false }).eq("id", song.id);
+  }
+
+  // "Skladbe ni" na seznamu "Mojih 20" — enak vzorec kot handleAddJamExtra.
+  async function handleAddGoalExtra() {
+    const title = goalQuickAddTitle.trim();
+    const author = goalQuickAddAuthor.trim();
+    if (!title || !author) {
+      setGoalQuickAddError("Naslov in avtor sta obvezna.");
+      return;
+    }
+    const { data, error } = await supabase
+      .from("goal_extras")
+      .insert({ title, author })
+      .select()
+      .single();
+    if (error || !data) {
+      setGoalQuickAddError(error?.message ?? "Napaka pri dodajanju.");
+      return;
+    }
+    setGoalExtras((s) => [...s, data as GoalExtra]);
+    setGoalQuickAddOpen(false);
+    setGoalQuickAddTitle("");
+    setGoalQuickAddAuthor("");
+    setGoalQuickAddError(null);
+  }
+
+  async function handleToggleGoalExtraLearned(extra: GoalExtra) {
+    const nextLearned = !extra.learned;
+    setGoalExtras((s) => s.map((x) => (x.id === extra.id ? { ...x, learned: nextLearned } : x)));
+    await supabase.from("goal_extras").update({ learned: nextLearned }).eq("id", extra.id);
+  }
+
+  async function handleRemoveGoalExtra(extra: GoalExtra) {
+    setGoalExtras((s) => s.filter((x) => x.id !== extra.id));
+    await supabase.from("goal_extras").delete().eq("id", extra.id);
+  }
+
   // Sistemski gumb "Nazaj" (Android) naj se za te poglede obnaša enako kot
   // klik na njihov obstoječi gumb za zapiranje/nazaj (glej
   // src/lib/useBackableOpen.ts).
@@ -584,6 +722,8 @@ export default function Dashboard() {
   useBackableOpen(quickAddOpen, closeQuickAdd);
   useBackableOpen(jamOpen, () => setJamOpen(false));
   useBackableOpen(jamPickerOpen, () => setJamPickerOpen(false));
+  useBackableOpen(goalOpen, () => setGoalOpen(false));
+  useBackableOpen(goalPickerOpen, () => setGoalPickerOpen(false));
 
   // Obrazec za urejanje se izriše takoj pod kartico skladbe, ki jo urejamo
   // (ne na vrhu strani), da uporabnika ne "vrže" nazaj na vrh ob kliku.
@@ -732,6 +872,47 @@ export default function Dashboard() {
               Nazaj
             </button>
           </>
+        ) : goalOpen ? (
+          <>
+            <h1 className="flex items-center gap-2">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-6 w-6 shrink-0 text-amber-600 dark:text-amber-400"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <circle cx="12" cy="12" r="6" />
+                <circle cx="12" cy="12" r="2" />
+              </svg>
+              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
+                Mojih 20 skladb
+              </span>
+            </h1>
+            <button
+              type="button"
+              onClick={() => setGoalOpen(false)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-amber-600 dark:text-neutral-300 dark:hover:text-amber-400"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4 shrink-0"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              Nazaj
+            </button>
+          </>
         ) : (
           <>
             <div>
@@ -795,6 +976,10 @@ export default function Dashboard() {
               <div className="ml-1.5">
                 <SettingsMenu
                   onImported={(imported) => setSongs((prev) => [...imported, ...prev])}
+                  onOpenGoal={() => {
+                    setJamOpen(false);
+                    setGoalOpen(true);
+                  }}
                 />
               </div>
             </div>
@@ -1002,6 +1187,197 @@ export default function Dashboard() {
                         </button>
                       </div>
                     </Fragment>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : goalOpen ? (
+        <div className="mt-3! space-y-4">
+          <hr className="border-t border-neutral-200 dark:border-neutral-800" />
+
+          {goalPickerOpen ? (
+            <div className="space-y-3">
+              <input
+                autoFocus
+                value={goalPickerQuery}
+                onChange={(e) => setGoalPickerQuery(e.target.value)}
+                placeholder="Išči po naslovu ali avtorju…"
+                className="w-full rounded-full border border-amber-500/40 bg-[linear-gradient(115deg,rgba(217,119,6,0.14)_15%,rgba(217,119,6,0.03)_95%)] px-4 py-2 text-sm text-neutral-800 placeholder-neutral-500 transition focus:outline-none dark:border-amber-400/40 dark:text-neutral-200 dark:placeholder-neutral-500"
+              />
+              {goalPickerQuery.trim() && goalPickerResults.length === 0 && (
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">Ni zadetkov.</p>
+              )}
+              <div className="space-y-1.5">
+                {goalPickerResults.map((song) => (
+                  <button
+                    key={song.id}
+                    type="button"
+                    onClick={() => handleAddToGoal(song)}
+                    className="block w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm hover:border-amber-500 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-amber-400"
+                  >
+                    <span className="font-medium text-neutral-900 dark:text-neutral-100">{song.title}</span>
+                    <span className="text-neutral-500 dark:text-neutral-400"> — {song.author}</span>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setGoalPickerOpen(false);
+                  setGoalPickerQuery("");
+                }}
+                className="text-sm text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+              >
+                Prekliči
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setGoalPickerOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-[linear-gradient(115deg,rgba(217,119,6,0.14)_15%,rgba(217,119,6,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(217,119,6,0.24)_15%,rgba(217,119,6,0.06)_95%)] dark:border-amber-400/40 dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(217,119,6,0.32)_15%,rgba(217,119,6,0.1)_95%)]"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+                  >
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  Dodaj skladbo na seznam
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGoalQuickAddOpen(true);
+                    setGoalQuickAddError(null);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-600 transition hover:border-amber-500 hover:text-amber-600 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-amber-400 dark:hover:text-amber-400"
+                >
+                  Skladbe ni
+                </button>
+              </div>
+
+              {goalQuickAddOpen && (
+                <div className="space-y-2 rounded-lg border border-amber-500/40 bg-[linear-gradient(115deg,rgba(217,119,6,0.14)_15%,rgba(217,119,6,0.03)_95%)] p-3 dark:border-amber-400/40">
+                  <input
+                    autoFocus
+                    value={goalQuickAddTitle}
+                    onChange={(e) => setGoalQuickAddTitle(e.target.value)}
+                    placeholder="Naslov skladbe"
+                    className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
+                  />
+                  <input
+                    value={goalQuickAddAuthor}
+                    onChange={(e) => setGoalQuickAddAuthor(e.target.value)}
+                    placeholder="Avtor"
+                    className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
+                  />
+                  {goalQuickAddError && (
+                    <p className="text-sm text-red-600 dark:text-red-400">{goalQuickAddError}</p>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleAddGoalExtra}
+                      className="rounded-full bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-500"
+                    >
+                      Potrdi
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGoalQuickAddOpen(false);
+                        setGoalQuickAddTitle("");
+                        setGoalQuickAddAuthor("");
+                        setGoalQuickAddError(null);
+                      }}
+                      className="text-sm text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+                    >
+                      Prekliči
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {goalItems.length === 0 ? (
+                <p className="py-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                  Seznam je še prazen.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {goalItems.map((item, i) => (
+                    <div
+                      key={item.key}
+                      className="flex items-center gap-3 rounded-full border border-neutral-200 bg-white px-4 py-2 dark:border-neutral-800 dark:bg-neutral-900"
+                    >
+                      <span
+                        className={`w-6 shrink-0 text-right text-lg font-semibold ${
+                          item.learned
+                            ? "text-neutral-300 dark:text-neutral-700"
+                            : "text-neutral-400 dark:text-neutral-600"
+                        }`}
+                      >
+                        {i + 1}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={item.learned}
+                        onChange={() =>
+                          item.kind === "song"
+                            ? handleToggleGoalLearned(item.song)
+                            : handleToggleGoalExtraLearned(item.extra)
+                        }
+                        className="h-4 w-4 shrink-0 rounded border-neutral-300 text-amber-600 focus:ring-amber-500 dark:border-neutral-700 dark:bg-neutral-800"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={`truncate text-sm font-medium ${
+                            item.learned
+                              ? "text-neutral-400 line-through dark:text-neutral-600"
+                              : "text-neutral-900 dark:text-neutral-100"
+                          }`}
+                        >
+                          {item.title}
+                        </p>
+                        <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{item.author}</p>
+                      </div>
+                      {item.kind === "song" && (
+                        <ChordsButtons song={item.song} onChordsClick={handleChordsClick} stacked />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          item.kind === "song" ? handleRemoveFromGoal(item.song) : handleRemoveGoalExtra(item.extra)
+                        }
+                        aria-label="Odstrani s seznama"
+                        title="Odstrani s seznama"
+                        className="shrink-0 p-1 text-neutral-400 hover:text-red-600 dark:text-neutral-500 dark:hover:text-red-400"
+                      >
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="h-4 w-4"
+                        >
+                          <path d="M18 6 6 18M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -1297,7 +1673,10 @@ export default function Dashboard() {
 
           <button
             type="button"
-            onClick={() => setJamOpen((v) => !v)}
+            onClick={() => {
+              setJamOpen((v) => !v);
+              setGoalOpen(false);
+            }}
             disabled={!isSupabaseConfigured}
             aria-pressed={jamOpen}
             className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-fuchsia-500/40 px-4 py-2 text-sm font-medium transition disabled:opacity-40 dark:border-fuchsia-400/40 ${

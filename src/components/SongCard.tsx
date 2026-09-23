@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import PdfViewer from "@/components/PdfViewer";
 import { authorAccentHsl } from "@/lib/authorColor";
@@ -43,6 +43,18 @@ export default function SongCard({
 
   // Sistemski gumb "Nazaj" (Android) naj PDF pregled zapre enako kot klik na "✕".
   useBackableOpen(pdfOpen, () => setPdfOpen(false));
+
+  // Kratek vizualni znak (kljukica namesto +), da uporabnik vidi, da je klik
+  // na "Dodaj v Jam" dejansko nekaj naredil — brez tega ni nobene povratne
+  // informacije, ker gumb sam po sebi nič ne odpre/zapre.
+  const [jamAdded, setJamAdded] = useState(false);
+  const jamAddedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (jamAddedTimer.current) clearTimeout(jamAddedTimer.current);
+    },
+    [],
+  );
 
   // Akordi so lahko zunanja povezava (npr. Ultimate Guitar — odpre se v
   // novem zavihku) ali naložen PDF (odpre se v celozaslonskem pregledu
@@ -142,7 +154,7 @@ export default function SongCard({
               rel="noopener noreferrer"
               onClick={() => onChordsClick?.(song)}
               title="Odpri na Ultimate Guitar"
-              className="mt-1.5 inline-flex w-fit shrink-0 items-center gap-1 rounded-full border border-orange-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-orange-500 hover:text-orange-600 dark:border-orange-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-orange-400 lg:gap-1.5 lg:border-2 lg:border-orange-500/70 lg:px-2.5 lg:py-1 lg:text-[13px] dark:lg:border-orange-400/70"
+              className="mt-1.5 inline-flex w-fit shrink-0 items-center gap-1 rounded-full border border-orange-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-orange-500 hover:text-orange-600 dark:border-orange-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-orange-400 lg:gap-1.5 lg:px-2.5 lg:py-1 lg:text-[13px]"
             >
               <svg
                 aria-hidden="true"
@@ -171,7 +183,7 @@ export default function SongCard({
                   onChordsClick?.(song);
                 }}
                 title="Odpri PDF akorde"
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400 lg:gap-1.5 lg:border-2 lg:border-amber-500/70 lg:px-2.5 lg:py-1 lg:text-[13px] dark:lg:border-amber-400/70"
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400 lg:gap-1.5 lg:px-2.5 lg:py-1 lg:text-[13px]"
               >
                 <svg
                   aria-hidden="true"
@@ -198,7 +210,7 @@ export default function SongCard({
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
                 title="Odpri akorde"
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400 lg:gap-1.5 lg:border-2 lg:border-amber-500/70 lg:px-2.5 lg:py-1 lg:text-[13px] dark:lg:border-amber-400/70"
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400 lg:gap-1.5 lg:px-2.5 lg:py-1 lg:text-[13px]"
               >
                 <svg
                   aria-hidden="true"
@@ -296,10 +308,17 @@ export default function SongCard({
               onClick={(e) => {
                 e.stopPropagation();
                 onAddToJam(song);
+                setJamAdded(true);
+                if (jamAddedTimer.current) clearTimeout(jamAddedTimer.current);
+                jamAddedTimer.current = setTimeout(() => setJamAdded(false), 1400);
               }}
-              aria-label="Dodaj v Jam"
-              title="Dodaj v Jam"
-              className="p-1.5 text-violet-500 hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300"
+              aria-label={jamAdded ? "Dodano v Jam" : "Dodaj v Jam"}
+              title={jamAdded ? "Dodano v Jam" : "Dodaj v Jam"}
+              className={`p-1.5 transition ${
+                jamAdded
+                  ? "text-emerald-500 dark:text-emerald-400"
+                  : "text-violet-500 hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300"
+              }`}
             >
               <svg
                 aria-hidden="true"
@@ -311,7 +330,7 @@ export default function SongCard({
                 strokeLinejoin="round"
                 className="h-[18px] w-[18px] shrink-0"
               >
-                <path d="M12 5v14M5 12h14" />
+                {jamAdded ? <path d="M20 6 9 17l-5-5" /> : <path d="M12 5v14M5 12h14" />}
               </svg>
             </button>
           )}

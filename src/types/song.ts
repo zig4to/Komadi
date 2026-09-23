@@ -15,10 +15,15 @@ export interface Song {
   copy_count: number;
   jam_added_at: string | null;
   jam_played: boolean;
+  goal_added_at: string | null;
+  goal_learned: boolean;
   created_at: string;
 }
 
-export type NewSong = Omit<Song, "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played">;
+export type NewSong = Omit<
+  Song,
+  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned"
+>;
 
 export interface SimilarSong {
   title: string;
@@ -43,4 +48,14 @@ export interface QueuedSong {
   title: string;
   author: string;
   added_at: string;
+}
+
+// Skladba dodana na seznam "Mojih 20 skladb" (cilj učenja), ki je (še) ni v
+// glavni knjižnici — enak vzorec kot JamExtra, glej tabelo goal_extras.
+export interface GoalExtra {
+  id: string;
+  title: string;
+  author: string;
+  added_at: string;
+  learned: boolean;
 }

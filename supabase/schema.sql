@@ -169,6 +169,47 @@ create policy "Public insert queued songs" on public.queued_songs
 create policy "Public delete queued songs" on public.queued_songs
   for delete using (true);
 
+-- "Mojih 20 skladb": osebni seznam skladb za naučit do konca leta — enak
+-- vzorec kot Jam, samo ločen od njega (glej
+-- supabase/migrations/0015_add_goal_list.sql).
+alter table public.songs
+  add column if not exists goal_added_at timestamptz;
+
+alter table public.songs
+  add column if not exists goal_learned boolean not null default false;
+
+create table if not exists public.goal_extras (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  author text not null,
+  added_at timestamptz not null default now(),
+  learned boolean not null default false
+);
+
+alter table public.goal_extras enable row level security;
+
+create policy "Public read goal extras" on public.goal_extras
+  for select using (true);
+
+create policy "Public insert goal extras" on public.goal_extras
+  for insert with check (true);
+
+create policy "Public update goal extras" on public.goal_extras
+  for update using (true);
+
+create policy "Public delete goal extras" on public.goal_extras
+  for delete using (true);
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'goal_extras'
+  ) then
+    alter publication supabase_realtime add table public.goal_extras;
+  end if;
+end $$;
+
 -- Storage bucket za PDF akorde (glej supabase/migrations/0009_add_song_chords_bucket.sql).
 insert into storage.buckets (id, name, public)
 values ('song-chords', 'song-chords', true)
