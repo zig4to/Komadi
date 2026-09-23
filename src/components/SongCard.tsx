@@ -223,6 +223,7 @@ export default function SongCard({
               <div
                 ref={actionsMenuPanelRef}
                 role="menu"
+                data-view-portal
                 style={{ top: actionsMenuPos.top, left: actionsMenuPos.left }}
                 className="fixed z-50 w-40 space-y-0.5 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
               >

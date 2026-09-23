@@ -1,21 +1,15 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { ERAS, GENRES } from "@/lib/constants";
-import { emptyFilters, hasActiveFilters, type FilterState } from "@/lib/filters";
+import { emptyFilters, type FilterState } from "@/lib/filters";
 import { usePersistentBool } from "@/lib/usePersistentBool";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 
 // Ločen gumb (pill, ista vrsta kot Novo/Popularno) — stanje odprto/zaprto
 // si deli s spodnjim Filters (panel) prek istega localStorage ključa +
 // dogodka (usePersistentBool), zato ju ni treba ročno sinhronizirati.
-export function FiltersToggle({
-  filters,
-  onChange,
-}: {
-  filters: FilterState;
-  onChange: (f: FilterState) => void;
-}) {
+export function FiltersToggle() {
   const [open, setOpen] = usePersistentBool("komadi:filters:open", false);
 
   return (
@@ -45,17 +39,6 @@ export function FiltersToggle({
         </svg>
         Filtri
       </button>
-
-      {open && hasActiveFilters(filters) && (
-        <button
-          type="button"
-          data-filters-toggle
-          onClick={() => onChange(emptyFilters)}
-          className="shrink-0 whitespace-nowrap text-xs text-neutral-500 hover:text-blue-600 dark:text-neutral-400 dark:hover:text-blue-400"
-        >
-          Počisti filtre
-        </button>
-      )}
     </>
   );
 }
@@ -87,20 +70,6 @@ export default function Filters({
     onChange({ ...filters, [key]: next });
   }
 
-  // Klik kamorkoli izven gumba Filtri ali tega panela zapre filtre.
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(e: PointerEvent) {
-      const target = e.target as HTMLElement;
-      if (target.closest("[data-filters-toggle]") || target.closest("[data-filters-panel]")) {
-        return;
-      }
-      setOpen(false);
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open, setOpen]);
-
   if (!open) return null;
 
   return (
@@ -108,17 +77,18 @@ export default function Filters({
       data-filters-panel
       className="mt-3! space-y-4 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900"
     >
-      {hasActiveFilters(filters) && (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => onChange(emptyFilters)}
-            className="shrink-0 text-xs text-neutral-500 hover:text-blue-600 dark:text-neutral-400 dark:hover:text-blue-400"
-          >
-            Počisti filtre
-          </button>
-        </div>
-      )}
+      <div className="flex justify-start">
+        <button
+          type="button"
+          onClick={() => {
+            onChange(emptyFilters);
+            setOpen(false);
+          }}
+          className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 px-3 py-1 text-xs text-neutral-500 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-emerald-400/40 dark:text-neutral-400 dark:hover:text-emerald-400"
+        >
+          Počisti filtre
+        </button>
+      </div>
 
           <Section
             title="Žanr"

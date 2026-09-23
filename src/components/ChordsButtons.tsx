@@ -15,6 +15,7 @@ export default function ChordsButtons({
   onChordsClick,
   stacked = false,
   merged = false,
+  menuAlign = "left",
 }: {
   song: Song;
   onChordsClick?: (song: Song) => void;
@@ -26,10 +27,15 @@ export default function ChordsButtons({
   // kliku odpre majhen meni z obema možnostma (namesto dveh ločenih
   // gumbov drug ob drugem) — uporabljeno v FeaturedArtists.tsx.
   merged?: boolean;
+  // Stran gumba, s katero naj se poravna odprt meni — "left" (privzeto) za
+  // gumbe bližje levemu robu (SongCard, FeaturedArtists), "right" kadar je
+  // gumb tik ob desnem robu vrstice (CompactRow na "Popularno"), da se meni
+  // ne razteza čez desni rob zaslona.
+  menuAlign?: "left" | "right";
 }) {
   const [pdfOpen, setPdfOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left?: number; right?: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
   const isChordsPdf = song.chords_url?.toLowerCase().split("?")[0].endsWith(".pdf") ?? false;
@@ -65,7 +71,11 @@ export default function ChordsButtons({
             e.stopPropagation();
             if (!menuOpen) {
               const rect = e.currentTarget.getBoundingClientRect();
-              setMenuPos({ top: rect.bottom + 4, left: rect.left });
+              setMenuPos(
+                menuAlign === "right"
+                  ? { top: rect.bottom + 4, right: window.innerWidth - rect.right }
+                  : { top: rect.bottom + 4, left: rect.left },
+              );
             }
             setMenuOpen((v) => !v);
           }}
@@ -98,7 +108,8 @@ export default function ChordsButtons({
             <div
               ref={menuPanelRef}
               role="menu"
-              style={{ top: menuPos.top, left: menuPos.left }}
+              data-view-portal
+              style={{ top: menuPos.top, left: menuPos.left, right: menuPos.right }}
               className="fixed z-50 w-36 space-y-0.5 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
             >
               <a
@@ -160,7 +171,7 @@ export default function ChordsButtons({
           song.chords_url &&
           typeof document !== "undefined" &&
           createPortal(
-            <div onClick={(e) => e.stopPropagation()} className="fixed inset-0 z-50 flex flex-col bg-black/90">
+            <div data-view-portal onClick={(e) => e.stopPropagation()} className="fixed inset-0 z-50 flex flex-col bg-black/90">
               <div className="flex shrink-0 items-center justify-between bg-neutral-900 px-4 py-2.5">
                 <span className="truncate text-sm font-medium text-white">{song.title} — akordi</span>
                 <button
@@ -261,7 +272,7 @@ export default function ChordsButtons({
         song.chords_url &&
         typeof document !== "undefined" &&
         createPortal(
-          <div onClick={(e) => e.stopPropagation()} className="fixed inset-0 z-50 flex flex-col bg-black/90">
+          <div data-view-portal onClick={(e) => e.stopPropagation()} className="fixed inset-0 z-50 flex flex-col bg-black/90">
             <div className="flex shrink-0 items-center justify-between bg-neutral-900 px-4 py-2.5">
               <span className="truncate text-sm font-medium text-white">{song.title} — akordi</span>
               <button

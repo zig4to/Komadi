@@ -95,6 +95,9 @@ export default function Dashboard() {
   // samo z own poljema (goal_added_at/goal_learned, goal_extras) in brez
   // "trenutna/naslednja" oznak, ker ne gre za živo sejo.
   const [goalOpen, setGoalOpen] = usePersistentBool("komadi:goal:open", false);
+  // Isti localStorage ključ kot FiltersToggle/Filters v Filters.tsx — da lahko
+  // "Počisti filtre" (glej handleBackFromFilter) zapre tudi panel s filtri.
+  const [, setFiltersOpen] = usePersistentBool("komadi:filters:open", false);
   const [goalPickerOpen, setGoalPickerOpen] = useState(false);
   const [goalPickerQuery, setGoalPickerQuery] = useState("");
   const [goalExtras, setGoalExtras] = useState<GoalExtra[]>([]);
@@ -114,6 +117,11 @@ export default function Dashboard() {
   const [partialDimension, setPartialDimension] = useState<PartialDimension | null>(null);
   const [partialValue, setPartialValue] = useState("");
   const [partialError, setPartialError] = useState<string | null>(null);
+  // Ali trenutni randomPick prihaja iz "Delno naključno" (izbran po merilu) —
+  // v tem primeru mora "Izberi drugo" spet odpreti izbirni obrazec (isto
+  // vedenje kot začetni klik na "Delno naključno"), namesto da izbere
+  // popolnoma naključno skladbo iz cele baze kot pri navadnem "Naključno".
+  const [randomPickFromPartial, setRandomPickFromPartial] = useState(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -544,6 +552,7 @@ export default function Dashboard() {
   function handleBackFromFilter() {
     setAuthorFilter(null);
     setFilters(emptyFilters);
+    setFiltersOpen(false);
     setTimeout(() => window.scrollTo({ top: homeScrollY.current }), 50);
   }
 
@@ -703,7 +712,7 @@ export default function Dashboard() {
   // Sistemski gumb "Nazaj" (Android) naj se za te poglede obnaša enako kot
   // klik na njihov obstoječi gumb za zapiranje/nazaj (glej
   // src/lib/useBackableOpen.ts).
-  useBackableOpen(filters.eras.length > 0 || filters.genres.length > 0 || Boolean(authorFilter), handleBackFromFilter);
+  useBackableOpen(hasActiveFilters(filters) || Boolean(authorFilter), handleBackFromFilter);
   useBackableOpen(activeView !== "list", () => setActiveView("list"));
   useBackableOpen(showForm || editing !== null, closeForm);
   useBackableOpen(addChoiceOpen, () => setAddChoiceOpen(false));
@@ -755,12 +764,26 @@ export default function Dashboard() {
 
   function pickRandom() {
     const pool = filteredSongs.length ? filteredSongs : songs;
+    setRandomPickFromPartial(false);
     if (!pool.length) {
       setRandomPick(null);
       return;
     }
     const choice = pool[Math.floor(Math.random() * pool.length)];
     setRandomPick(choice);
+  }
+
+  // "Izberi drugo" na naključno izbrani kartici: za navadno "Naključno" izbere
+  // novo naključno skladbo, za "Delno naključno" pa nazaj odpre izbirni
+  // obrazec (isto kot začetni klik na "Delno naključno"), ker mora uporabnik
+  // spet ročno izbrati vrednost merila.
+  function handlePickAnother() {
+    if (randomPickFromPartial) {
+      setRandomPick(null);
+      handlePartialStart();
+      return;
+    }
+    pickRandom();
   }
 
   function handlePartialStart() {
@@ -800,6 +823,7 @@ export default function Dashboard() {
 
     const choice = pool[Math.floor(Math.random() * pool.length)];
     setRandomPick(choice);
+    setRandomPickFromPartial(true);
     setPartialOpen(false);
   }
 
@@ -809,7 +833,11 @@ export default function Dashboard() {
     if (activeView === "list") return;
     function onPointerDown(e: PointerEvent) {
       const target = e.target as HTMLElement;
-      if (target.closest("[data-view-toggle]") || target.closest("[data-view-section]")) {
+      if (
+        target.closest("[data-view-toggle]") ||
+        target.closest("[data-view-section]") ||
+        target.closest("[data-view-portal]")
+      ) {
         return;
       }
       setActiveView("list");
@@ -1389,13 +1417,15 @@ export default function Dashboard() {
         <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-              🔀 Delno naključno — izbrano merilo: {PARTIAL_LABELS[partialDimension]}
+              🔀 Delno naključno — {PARTIAL_LABELS[partialDimension]}
             </p>
             <button
               onClick={() => setPartialOpen(false)}
+              aria-label="Zapri"
+              title="Zapri"
               className="text-xs text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
             >
-              Zapri ✕
+              ✕
             </button>
           </div>
 
@@ -1457,7 +1487,7 @@ export default function Dashboard() {
 
       {randomPick && (
         <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between">
             <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">🎲 Naključno izbrana skladba</p>
             <button
               onClick={() => setRandomPick(null)}
@@ -1477,12 +1507,14 @@ export default function Dashboard() {
             highlighted
           />
           {renderEditForm(randomPick)}
-          <button
-            onClick={pickRandom}
-            className="mt-3 text-sm text-neutral-600 hover:text-emerald-600 dark:text-neutral-300 dark:hover:text-emerald-400"
-          >
-            ↻ Izberi drugo
-          </button>
+          <div className="mt-5 flex justify-end">
+            <button
+              onClick={handlePickAnother}
+              className="text-sm text-neutral-600 hover:text-emerald-600 dark:text-neutral-300 dark:hover:text-emerald-400"
+            >
+              ↻ Izberi drugo
+            </button>
+          </div>
         </div>
       )}
 
@@ -1799,7 +1831,7 @@ export default function Dashboard() {
             </svg>
             Popularno
           </button>
-          <FiltersToggle filters={filters} onChange={handleFiltersChange} />
+          <FiltersToggle />
         </div>
       </div>
 
@@ -1921,7 +1953,7 @@ export default function Dashboard() {
               <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100">
                 {songsHeading}
               </h2>
-              {filters.eras.length > 0 || filters.genres.length > 0 || authorFilter ? (
+              {hasActiveFilters(filters) || authorFilter ? (
                 <button
                   type="button"
                   onClick={handleBackFromFilter}
@@ -2008,7 +2040,7 @@ function CompactCard({ song, onChordsClick }: { song: Song; onChordsClick?: (son
     <div className="min-w-0 rounded-xl border border-neutral-200 bg-white p-3 transition hover:-translate-y-0.5 dark:border-neutral-800 dark:bg-neutral-900">
       <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{song.title}</p>
       <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{song.author}</p>
-      <ChordsButtons song={song} onChordsClick={onChordsClick} />
+      <ChordsButtons song={song} onChordsClick={onChordsClick} merged />
     </div>
   );
 }
@@ -2046,7 +2078,7 @@ function CompactRow({
         <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{song.author}</p>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
-        <ChordsButtons song={song} onChordsClick={onChordsClick} stacked merged />
+        <ChordsButtons song={song} onChordsClick={onChordsClick} stacked merged menuAlign="right" />
         <span
           title="Kolikokrat je bila kliknjena UG Tabs ali PDF akordi povezava"
           className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500"
@@ -2113,7 +2145,7 @@ function RecentGroupSongRow({
     <div className="flex w-full flex-col items-start rounded-lg px-1.5 py-1 text-left">
       <span className="w-full truncate text-sm text-neutral-800 dark:text-neutral-200">{song.title}</span>
       <span className="w-full truncate text-xs text-neutral-500 dark:text-neutral-400">{song.author}</span>
-      <ChordsButtons song={song} onChordsClick={onChordsClick} />
+      <ChordsButtons song={song} onChordsClick={onChordsClick} merged />
     </div>
   );
 }
