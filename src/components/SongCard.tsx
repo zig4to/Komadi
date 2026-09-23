@@ -1,10 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import PdfViewer from "@/components/PdfViewer";
 import { authorAccentHsl } from "@/lib/authorColor";
-import { compressImage } from "@/lib/compressImage";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { SimilarSong, Song } from "@/types/song";
@@ -22,7 +21,7 @@ export default function SongCard({
   onDelete,
   onAddSimilar,
   onFilterAuthor,
-  onSetAuthorImage,
+  onAddToJam,
   onChordsClick,
   highlighted = false,
 }: {
@@ -33,7 +32,7 @@ export default function SongCard({
   onAddSimilar?: (song: SimilarSong) => void;
   onFilterAuthor?: (author: string) => void;
   onChordsClick?: (song: Song) => void;
-  onSetAuthorImage?: (author: string, imageUrl: string | null) => void | Promise<void>;
+  onAddToJam?: (song: Song) => void;
   highlighted?: boolean;
 }) {
   const [similarOpen, setSimilarOpen] = useState(false);
@@ -41,36 +40,9 @@ export default function SongCard({
   const [similarError, setSimilarError] = useState<string | null>(null);
   const [similarSongs, setSimilarSongs] = useState<SimilarSong[]>([]);
   const [pdfOpen, setPdfOpen] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Sistemski gumb "Nazaj" (Android) naj PDF pregled zapre enako kot klik na "✕".
   useBackableOpen(pdfOpen, () => setPdfOpen(false));
-
-  // Bližnjica do "Slika avtorja" naravnost s kartice — enak upload kot v
-  // SongForm.tsx (isti "song-images" bucket, ista kompresija), da ni treba
-  // odpirati celega obrazca samo za zamenjavo slike.
-  async function handleImageFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || !onSetAuthorImage) return;
-    setUploadingImage(true);
-    try {
-      const blob = await compressImage(file);
-      const path = `${crypto.randomUUID()}.jpg`;
-      const { error: uploadError } = await supabase.storage
-        .from("song-images")
-        .upload(path, blob, { contentType: "image/jpeg" });
-      if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from("song-images").getPublicUrl(path);
-      await onSetAuthorImage(song.author, data.publicUrl);
-    } catch {
-      // Napaka se enako obravnava kot v SongForm.tsx — tam se lahko slika
-      // po potrebi znova naloži, tu ni prostora za prikaz sporočila.
-    } finally {
-      setUploadingImage(false);
-    }
-  }
 
   // Akordi so lahko zunanja povezava (npr. Ultimate Guitar — odpre se v
   // novem zavihku) ali naložen PDF (odpre se v celozaslonskem pregledu
@@ -318,42 +290,30 @@ export default function SongCard({
             </svg>
           </button>
 
-          {onSetAuthorImage && (
-            <>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  imageInputRef.current?.click();
-                }}
-                disabled={uploadingImage}
-                aria-label="Naloži sliko avtorja"
-                title="Naloži sliko avtorja"
-                className="p-1.5 text-violet-500 hover:text-violet-600 disabled:opacity-50 dark:text-violet-400 dark:hover:text-violet-300"
+          {onAddToJam && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToJam(song);
+              }}
+              aria-label="Dodaj v Jam"
+              title="Dodaj v Jam"
+              className="p-1.5 text-violet-500 hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-[18px] w-[18px] shrink-0"
               >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-[18px] w-[18px] shrink-0"
-                >
-                  <rect x="3" y="4" width="18" height="16" rx="2" />
-                  <circle cx="8.5" cy="9.5" r="1.5" />
-                  <path d="m4 17 4.5-4.5a1.5 1.5 0 0 1 2.12 0L14 16l2-2a1.5 1.5 0 0 1 2.12 0L20 16" />
-                </svg>
-              </button>
-              <input
-                ref={imageInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleImageFileSelect}
-              />
-            </>
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
           )}
         </div>
       </div>

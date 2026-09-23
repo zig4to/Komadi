@@ -661,11 +661,20 @@ export default function Dashboard() {
                 <p className="py-6 text-center text-sm text-neutral-500 dark:text-neutral-400">Jam je še prazen.</p>
               ) : (
                 <div className="space-y-1.5">
-                  {jamSongs.map((song) => (
+                  {jamSongs.map((song, i) => (
                     <div
                       key={song.id}
                       className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900"
                     >
+                      <span
+                        className={`w-5 shrink-0 text-right text-sm font-semibold ${
+                          song.jam_played
+                            ? "text-neutral-300 dark:text-neutral-700"
+                            : "text-neutral-400 dark:text-neutral-600"
+                        }`}
+                      >
+                        {i + 1}
+                      </span>
                       <input
                         type="checkbox"
                         checked={song.jam_played}
@@ -811,7 +820,7 @@ export default function Dashboard() {
             onEdit={handleEdit}
             onAddSimilar={handleAddSimilar}
             onFilterAuthor={handleFilterByAuthor}
-            onSetAuthorImage={handleSetAuthorImage}
+            onAddToJam={handleAddToJam}
             onChordsClick={handleChordsClick}
             highlighted
           />
@@ -1211,7 +1220,7 @@ export default function Dashboard() {
                         onDelete={handleDelete}
                         onAddSimilar={handleAddSimilar}
                         onFilterAuthor={handleFilterByAuthor}
-                        onSetAuthorImage={handleSetAuthorImage}
+                        onAddToJam={handleAddToJam}
                         onChordsClick={handleChordsClick}
                       />
                       {randomPick?.id !== song.id && renderEditForm(song)}
