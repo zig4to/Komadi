@@ -2026,7 +2026,7 @@ function CompactRow({
 }) {
   return (
     <div
-      className={`flex min-w-0 items-center gap-3 border p-3 transition hover:-translate-y-0.5 ${
+      className={`flex min-w-0 items-start gap-3 border p-3 transition hover:-translate-y-0.5 ${
         highlighted
           ? // Oblika trzalice (guitar pick): oster kot = konica, preostali
             // trije zaobljeni = telo trzalice.
@@ -2045,7 +2045,15 @@ function CompactRow({
         <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{song.title}</p>
         <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{song.author}</p>
       </div>
-      <ChordsButtons song={song} onChordsClick={onChordsClick} stacked />
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <ChordsButtons song={song} onChordsClick={onChordsClick} stacked merged />
+        <span
+          title="Kolikokrat je bila kliknjena UG Tabs ali PDF akordi povezava"
+          className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500"
+        >
+          {song.copy_count}×
+        </span>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,5 @@
 export const ERAS = [
   "Pred 1960",
-  "1960s",
   "1970s",
   "1980s",
   "1990s",
@@ -39,7 +38,6 @@ export type Genre = (typeof GENRES)[number];
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 export const ERA_IMAGES: Record<Era, string> = {
   "Pred 1960": `${BASE_PATH}/images/eras/60s.jpg`,
-  "1960s": `${BASE_PATH}/images/eras/1960s.jpg`,
   "1970s": `${BASE_PATH}/images/eras/70s.jpg`,
   "1980s": `${BASE_PATH}/images/eras/80s.jpg`,
   "1990s": `${BASE_PATH}/images/eras/90s.jpg`,
