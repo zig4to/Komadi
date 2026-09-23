@@ -176,6 +176,8 @@ export function HighlightRow({
   icons,
   images,
   accentForLabel,
+  shadowAlpha = "40",
+  glowAlpha = "26",
 }: {
   title: string;
   items: HighlightItem[];
@@ -192,6 +194,10 @@ export function HighlightRow({
   // vrstici — tako ima ista nalepka vedno isto barvo, ujemajoč se z barvo
   // uporabljeno drugod v aplikaciji (glej src/lib/authorColor.ts).
   accentForLabel?: (label: string) => string;
+  // Prosojnost (dvomestna hex vrednost, "00"-"ff") barvnega sija okoli
+  // kartice (senca) in znotraj nje (gradient) — nižje = manj opazen sij.
+  shadowAlpha?: string;
+  glowAlpha?: string;
 }) {
   // "Povleci za drsenje" z miško (na dotik že deluje naravno prek
   // overflow-x-auto). `moved` loči vlečenje od navadnega klika, da klik na
@@ -279,9 +285,9 @@ export function HighlightRow({
               style={{
                 backgroundImage: image
                   ? undefined
-                  : `radial-gradient(120% 90% at 0% 0%, ${accent}26 0%, transparent 60%)`,
+                  : `radial-gradient(120% 90% at 0% 0%, ${accent}${glowAlpha} 0%, transparent 60%)`,
                 borderColor: `${accent}38`,
-                boxShadow: `0 10px 24px -10px ${accent}40, 0 2px 8px -4px rgb(0 0 0 / 0.15)`,
+                boxShadow: `0 10px 24px -10px ${accent}${shadowAlpha}, 0 2px 8px -4px rgb(0 0 0 / 0.15)`,
               }}
               className={`group relative flex ${cardSizeClassName} shrink-0 flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition active:scale-[0.97] ${
                 image
@@ -362,6 +368,8 @@ export default function HomeHighlights({
         gapClassName="gap-3 lg:gap-4"
         labelStroke
         images={ERA_IMAGES}
+        shadowAlpha="20"
+        glowAlpha="14"
       />
       <HighlightRow
         title="Žanri"
@@ -371,6 +379,8 @@ export default function HomeHighlights({
         labelClassName="text-lg lg:text-2xl"
         cardSizeClassName="h-28 w-36 lg:h-32 lg:w-40"
         icons={GENRE_ICONS}
+        shadowAlpha="20"
+        glowAlpha="14"
       />
     </div>
   );

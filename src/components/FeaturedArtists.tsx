@@ -26,7 +26,7 @@ function SongRow({
         {index}
       </span>
       <div className="min-w-0 flex-1">
-        <span className="block truncate">{song.title}</span>
+        <span className="block truncate text-base lg:text-sm">{song.title}</span>
         <ChordsButtons song={song} onChordsClick={onChordsClick} />
       </div>
     </div>
