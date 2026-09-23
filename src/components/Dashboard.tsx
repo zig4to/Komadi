@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import ChordsButtons from "@/components/ChordsButtons";
 import Filters, { FiltersToggle } from "@/components/Filters";
 import FeaturedArtists from "@/components/FeaturedArtists";
 import HomeHighlights, { ACCENTS, formatEraLabel, HighlightRow } from "@/components/HomeHighlights";
@@ -831,7 +832,11 @@ export default function Dashboard() {
             onSelectEra={handleHighlightEra}
             onSelectGenre={handleHighlightGenre}
           />
-          <FeaturedArtists items={featuredArtists} onFilterAuthor={handleFilterByAuthor} />
+          <FeaturedArtists
+            items={featuredArtists}
+            onFilterAuthor={handleFilterByAuthor}
+            onChordsClick={handleChordsClick}
+          />
           <HighlightRow
             title="Avtorji"
             items={authorHighlights}
@@ -872,7 +877,7 @@ export default function Dashboard() {
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                   {recentTop.map((song) => (
-                    <CompactCard key={song.id} song={song} />
+                    <CompactCard key={song.id} song={song} onChordsClick={handleChordsClick} />
                   ))}
                 </div>
               </div>
@@ -881,6 +886,7 @@ export default function Dashboard() {
                 <RecentGroupSection
                   title="Novo po avtorjih"
                   groups={newByAuthor}
+                  onChordsClick={handleChordsClick}
                   accentOffset={0}
                 />
               )}
@@ -888,6 +894,7 @@ export default function Dashboard() {
                 <RecentGroupSection
                   title="Novo po obdobju"
                   groups={newByEra}
+                  onChordsClick={handleChordsClick}
                   formatLabel={formatEraLabel}
                   accentOffset={3}
                 />
@@ -896,6 +903,7 @@ export default function Dashboard() {
                 <RecentGroupSection
                   title="Novo po razpoloženju"
                   groups={newByMood}
+                  onChordsClick={handleChordsClick}
                   accentOffset={5}
                 />
               )}
@@ -910,10 +918,10 @@ export default function Dashboard() {
             <div className="space-y-2">
               <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">Top 5</p>
               {mostPopular.slice(0, 5).map((song, i) => (
-                <CompactRow key={song.id} song={song} rank={i + 1} highlighted />
+                <CompactRow key={song.id} song={song} rank={i + 1} onChordsClick={handleChordsClick} highlighted />
               ))}
               {mostPopular.slice(5).map((song, i) => (
-                <CompactRow key={song.id} song={song} rank={i + 6} />
+                <CompactRow key={song.id} song={song} rank={i + 6} onChordsClick={handleChordsClick} />
               ))}
             </div>
           )
@@ -1005,11 +1013,12 @@ export default function Dashboard() {
   );
 }
 
-function CompactCard({ song }: { song: Song }) {
+function CompactCard({ song, onChordsClick }: { song: Song; onChordsClick?: (song: Song) => void }) {
   return (
     <div className="min-w-0 rounded-xl border border-neutral-200 bg-white p-3 transition hover:-translate-y-0.5 dark:border-neutral-800 dark:bg-neutral-900">
       <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{song.title}</p>
       <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{song.author}</p>
+      <ChordsButtons song={song} onChordsClick={onChordsClick} />
     </div>
   );
 }
@@ -1017,10 +1026,12 @@ function CompactCard({ song }: { song: Song }) {
 function CompactRow({
   song,
   rank,
+  onChordsClick,
   highlighted = false,
 }: {
   song: Song;
   rank: number;
+  onChordsClick?: (song: Song) => void;
   highlighted?: boolean;
 }) {
   return (
@@ -1040,10 +1051,11 @@ function CompactRow({
       >
         {rank}
       </span>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{song.title}</p>
         <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{song.author}</p>
       </div>
+      <ChordsButtons song={song} onChordsClick={onChordsClick} stacked />
     </div>
   );
 }
@@ -1051,11 +1063,13 @@ function CompactRow({
 function RecentGroupSection({
   title,
   groups,
+  onChordsClick,
   formatLabel = (label) => label,
   accentOffset = 0,
 }: {
   title: string;
   groups: RecentGroup[];
+  onChordsClick?: (song: Song) => void;
   formatLabel?: (label: string) => string;
   accentOffset?: number;
 }) {
@@ -1079,7 +1093,7 @@ function RecentGroupSection({
               </p>
               <div className="space-y-0.5">
                 {group.songs.map((song) => (
-                  <RecentGroupSongRow key={song.id} song={song} />
+                  <RecentGroupSongRow key={song.id} song={song} onChordsClick={onChordsClick} />
                 ))}
               </div>
             </div>
@@ -1090,11 +1104,18 @@ function RecentGroupSection({
   );
 }
 
-function RecentGroupSongRow({ song }: { song: Song }) {
+function RecentGroupSongRow({
+  song,
+  onChordsClick,
+}: {
+  song: Song;
+  onChordsClick?: (song: Song) => void;
+}) {
   return (
     <div className="flex w-full flex-col items-start rounded-lg px-1.5 py-1 text-left">
       <span className="w-full truncate text-sm text-neutral-800 dark:text-neutral-200">{song.title}</span>
       <span className="w-full truncate text-xs text-neutral-500 dark:text-neutral-400">{song.author}</span>
+      <ChordsButtons song={song} onChordsClick={onChordsClick} />
     </div>
   );
 }

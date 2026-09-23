@@ -1,10 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import ChordsButtons from "@/components/ChordsButtons";
 import { authorAccentHex } from "@/lib/authorColor";
 import type { FeaturedGroup } from "@/lib/dailyRandom";
+import type { Song } from "@/types/song";
 
-function SongRow({ song, index, accent }: { song: { title: string }; index: number; accent: string }) {
+function SongRow({
+  song,
+  index,
+  accent,
+  onChordsClick,
+}: {
+  song: Song;
+  index: number;
+  accent: string;
+  onChordsClick?: (song: Song) => void;
+}) {
   return (
     <div className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-neutral-700 dark:text-white/85">
       <span
@@ -13,7 +25,10 @@ function SongRow({ song, index, accent }: { song: { title: string }; index: numb
       >
         {index}
       </span>
-      <span className="min-w-0 flex-1 truncate">{song.title}</span>
+      <div className="min-w-0 flex-1">
+        <span className="block truncate">{song.title}</span>
+        <ChordsButtons song={song} onChordsClick={onChordsClick} />
+      </div>
     </div>
   );
 }
@@ -22,11 +37,13 @@ function AuthorCard({
   group,
   accent,
   onFilterAuthor,
+  onChordsClick,
   className = "",
 }: {
   group: FeaturedGroup;
   accent: string;
   onFilterAuthor: (author: string) => void;
+  onChordsClick?: (song: Song) => void;
   className?: string;
 }) {
   return (
@@ -48,7 +65,7 @@ function AuthorCard({
       </button>
       <div className="space-y-0.5">
         {group.songs.map((song, songIndex) => (
-          <SongRow key={song.id} song={song} index={songIndex + 1} accent={accent} />
+          <SongRow key={song.id} song={song} index={songIndex + 1} accent={accent} onChordsClick={onChordsClick} />
         ))}
       </div>
     </div>
@@ -58,9 +75,11 @@ function AuthorCard({
 export default function FeaturedArtists({
   items,
   onFilterAuthor,
+  onChordsClick,
 }: {
   items: FeaturedGroup[];
   onFilterAuthor: (author: string) => void;
+  onChordsClick?: (song: Song) => void;
 }) {
   const [activeDot, setActiveDot] = useState(0);
 
@@ -87,6 +106,7 @@ export default function FeaturedArtists({
             group={group}
             accent={authorAccentHex(group.author)}
             onFilterAuthor={onFilterAuthor}
+            onChordsClick={onChordsClick}
           />
         ))}
       </div>
@@ -109,6 +129,7 @@ export default function FeaturedArtists({
                 group={group}
                 accent={authorAccentHex(group.author)}
                 onFilterAuthor={onFilterAuthor}
+                onChordsClick={onChordsClick}
               />
             </div>
           ))}
