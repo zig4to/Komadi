@@ -1160,7 +1160,7 @@ export default function Dashboard() {
                         </p>
                       )}
                       <div
-                        className={`flex items-center gap-3 rounded-full border bg-white px-4 py-2 dark:bg-neutral-900 ${
+                        className={`flex items-center gap-2 rounded-full border bg-white py-2 pr-4 pl-2 dark:bg-neutral-900 ${
                           item.key === firstUnplayedJamKey
                             ? "border-emerald-400 dark:border-emerald-600"
                             : "border-neutral-200 dark:border-neutral-800"
@@ -1192,7 +1192,9 @@ export default function Dashboard() {
                             className={`truncate text-sm font-medium ${
                               item.played
                                 ? "text-neutral-400 line-through dark:text-neutral-600"
-                                : "text-neutral-900 dark:text-neutral-100"
+                                : item.key === secondUnplayedJamKey
+                                  ? "text-sky-600 dark:text-sky-400"
+                                  : "text-neutral-900 dark:text-neutral-100"
                             }`}
                           >
                             {item.title}
@@ -1200,7 +1202,7 @@ export default function Dashboard() {
                           <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{item.author}</p>
                         </div>
                         {item.kind === "song" && (
-                          <ChordsButtons song={item.song} onChordsClick={handleChordsClick} stacked />
+                          <ChordsButtons song={item.song} onChordsClick={handleChordsClick} stacked merged menuAlign="right" />
                         )}
                         <button
                           type="button"
@@ -1209,7 +1211,7 @@ export default function Dashboard() {
                           }
                           aria-label="Odstrani iz Jama"
                           title="Odstrani iz Jama"
-                          className="shrink-0 p-1 text-neutral-400 hover:text-red-600 dark:text-neutral-500 dark:hover:text-red-400"
+                          className="-ml-0.5 shrink-0 p-1 text-neutral-400 hover:text-red-600 dark:text-neutral-500 dark:hover:text-red-400"
                         >
                           <svg
                             aria-hidden="true"
