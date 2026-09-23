@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import ChordsButtons from "@/components/ChordsButtons";
 import Filters, { FiltersToggle } from "@/components/Filters";
 import FeaturedArtists from "@/components/FeaturedArtists";
@@ -14,6 +14,7 @@ import { pickDailyFeatured } from "@/lib/dailyRandom";
 import { emptyFilters, hasActiveFilters, type FilterState } from "@/lib/filters";
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
+import { usePersistentBool } from "@/lib/usePersistentBool";
 import type { JamExtra, SimilarSong, Song } from "@/types/song";
 
 interface RecentGroup {
@@ -69,7 +70,9 @@ export default function Dashboard() {
   }, []);
   const [randomPick, setRandomPick] = useState<Song | null>(null);
   const [activeView, setActiveView] = useState<"list" | "newest" | "popular">("list");
-  const [jamOpen, setJamOpen] = useState(false);
+  // Obstojno stanje (localStorage), da osvežitev strani med jam sessionom ne
+  // vrže nazaj na domačo stran — glej usePersistentBool.
+  const [jamOpen, setJamOpen] = usePersistentBool("komadi:jam:open", false);
   const [jamPickerOpen, setJamPickerOpen] = useState(false);
   const [jamPickerQuery, setJamPickerQuery] = useState("");
   const [jamExtras, setJamExtras] = useState<JamExtra[]>([]);
@@ -201,6 +204,18 @@ export default function Dashboard() {
     ];
     return items.sort((a, b) => a.addedAt.localeCompare(b.addedAt));
   }, [jamSongs, jamExtras]);
+
+  // "Trenutna"/"Naslednja" oznaki v Jam čakalni vrsti sledita prvima dvema
+  // še neobkljukanima skladbama v vrstnem redu vrste — ko se prva obkljuka,
+  // se avtomatsko premakneta na naslednji še neodigrani skladbi.
+  const firstUnplayedJamKey = useMemo(
+    () => jamItems.find((item) => !item.played)?.key ?? null,
+    [jamItems],
+  );
+  const secondUnplayedJamKey = useMemo(() => {
+    const unplayed = jamItems.filter((item) => !item.played);
+    return unplayed[1]?.key ?? null;
+  }, [jamItems]);
 
   const jamPickerResults = useMemo(() => {
     const q = jamPickerQuery.trim().toLowerCase();
@@ -602,85 +617,109 @@ export default function Dashboard() {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 space-y-6 lg:max-w-6xl">
       <header className="flex items-center justify-between">
-        <div>
-          <h1 className="flex items-center gap-2">
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-6 w-6 shrink-0 text-emerald-600 dark:text-emerald-400"
+        {jamOpen ? (
+          <>
+            <h1 className="flex items-center gap-2">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-6 w-6 shrink-0 text-fuchsia-600 dark:text-fuchsia-400"
+              >
+                <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
+              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
+                Bitne Jam!
+              </span>
+            </h1>
+            <button
+              type="button"
+              onClick={() => setJamOpen(false)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-fuchsia-600 dark:text-neutral-300 dark:hover:text-fuchsia-400"
             >
-              <path d="m11.9 12.1 4.514-4.514" />
-              <path d="M20.1 2.3a1 1 0 0 0-1.4 0l-1.114 1.114A2 2 0 0 0 17 4.828v1.344a2 2 0 0 1-.586 1.414A2 2 0 0 1 17.828 7h1.344a2 2 0 0 0 1.414-.586L21.7 5.3a1 1 0 0 0 0-1.4z" />
-              <path d="m6 16 2 2" />
-              <path d="M8.23 9.85A3 3 0 0 1 11 8a5 5 0 0 1 5 5 3 3 0 0 1-1.85 2.77l-.92.38A2 2 0 0 0 12 18a4 4 0 0 1-4 4 6 6 0 0 1-6-6 4 4 0 0 1 4-4 2 2 0 0 0 1.85-1.23z" />
-            </svg>
-            <span
-              className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]"
-            >
-              Bitne Tabs
-            </span>
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              setEditing(null);
-              setPrefillDraft(null);
-              setShowForm((v) => !v);
-            }}
-            disabled={!isSupabaseConfigured}
-            aria-label="Dodaj skladbo"
-            title="Dodaj skladbo"
-            className="inline-flex items-center justify-center gap-1.5 rounded-full border border-emerald-500/50 bg-transparent p-2.5 text-emerald-600 transition hover:bg-emerald-500/10 disabled:opacity-40 lg:px-4 lg:py-2 dark:border-emerald-400/50 dark:text-emerald-400"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-[18px] w-[18px] shrink-0"
-            >
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            <span className="hidden text-sm font-medium lg:inline">Dodaj nov komad</span>
-          </button>
-          <div className="ml-1.5">
-            <SettingsMenu
-              onImported={(imported) => setSongs((prev) => [...imported, ...prev])}
-            />
-          </div>
-        </div>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4 shrink-0"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              Nazaj
+            </button>
+          </>
+        ) : (
+          <>
+            <div>
+              <h1 className="flex items-center gap-2">
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-6 w-6 shrink-0 text-emerald-600 dark:text-emerald-400"
+                >
+                  <path d="m11.9 12.1 4.514-4.514" />
+                  <path d="M20.1 2.3a1 1 0 0 0-1.4 0l-1.114 1.114A2 2 0 0 0 17 4.828v1.344a2 2 0 0 1-.586 1.414A2 2 0 0 1 17.828 7h1.344a2 2 0 0 0 1.414-.586L21.7 5.3a1 1 0 0 0 0-1.4z" />
+                  <path d="m6 16 2 2" />
+                  <path d="M8.23 9.85A3 3 0 0 1 11 8a5 5 0 0 1 5 5 3 3 0 0 1-1.85 2.77l-.92.38A2 2 0 0 0 12 18a4 4 0 0 1-4 4 6 6 0 0 1-6-6 4 4 0 0 1 4-4 2 2 0 0 0 1.85-1.23z" />
+                </svg>
+                <span
+                  className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]"
+                >
+                  Bitne Tabs
+                </span>
+              </h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setEditing(null);
+                  setPrefillDraft(null);
+                  setShowForm((v) => !v);
+                }}
+                disabled={!isSupabaseConfigured}
+                aria-label="Dodaj skladbo"
+                title="Dodaj skladbo"
+                className="inline-flex items-center justify-center gap-1.5 rounded-full border border-emerald-500/50 bg-transparent p-2.5 text-emerald-600 transition hover:bg-emerald-500/10 disabled:opacity-40 lg:px-4 lg:py-2 dark:border-emerald-400/50 dark:text-emerald-400"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-[18px] w-[18px] shrink-0"
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                <span className="hidden text-sm font-medium lg:inline">Dodaj nov komad</span>
+              </button>
+              <div className="ml-1.5">
+                <SettingsMenu
+                  onImported={(imported) => setSongs((prev) => [...imported, ...prev])}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </header>
 
       {jamOpen ? (
         <div className="mt-3! space-y-4">
-          <button
-            type="button"
-            onClick={() => setJamOpen(false)}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-fuchsia-600 dark:text-neutral-300 dark:hover:text-fuchsia-400"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-4 w-4 shrink-0"
-            >
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-            Nazaj
-          </button>
           <hr className="border-t border-neutral-200 dark:border-neutral-800" />
 
           {jamPickerOpen ? (
@@ -797,66 +836,88 @@ export default function Dashboard() {
               {jamItems.length === 0 ? (
                 <p className="py-6 text-center text-sm text-neutral-500 dark:text-neutral-400">Jam je še prazen.</p>
               ) : (
-                <div className="space-y-1.5">
+                <div className="space-y-3">
                   {jamItems.map((item, i) => (
-                    <div
-                      key={item.key}
-                      className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900"
-                    >
-                      <span
-                        className={`w-5 shrink-0 text-right text-sm font-semibold ${
-                          item.played
-                            ? "text-neutral-300 dark:text-neutral-700"
-                            : "text-neutral-400 dark:text-neutral-600"
+                    <Fragment key={item.key}>
+                      {item.key === firstUnplayedJamKey && (
+                        <p className="flex items-center gap-1.5 pl-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                          Trenutna skladba
+                        </p>
+                      )}
+                      {item.key === secondUnplayedJamKey && (
+                        <p className="flex items-center gap-1.5 pl-1 text-[11px] font-semibold uppercase tracking-wide text-sky-600 dark:text-sky-400">
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" />
+                          Naslednja skladba
+                        </p>
+                      )}
+                      <div
+                        className={`flex items-center gap-3 rounded-full border bg-white px-4 py-2 dark:bg-neutral-900 ${
+                          item.key === firstUnplayedJamKey
+                            ? "border-emerald-400 dark:border-emerald-600"
+                            : "border-neutral-200 dark:border-neutral-800"
                         }`}
                       >
-                        {i + 1}
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={item.played}
-                        onChange={() =>
-                          item.kind === "song"
-                            ? handleToggleJamPlayed(item.song)
-                            : handleToggleJamExtraPlayed(item.extra)
-                        }
-                        className="h-4 w-4 shrink-0 rounded border-neutral-300 text-fuchsia-600 focus:ring-fuchsia-500 dark:border-neutral-700 dark:bg-neutral-800"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className={`truncate text-sm font-medium ${
-                            item.played
-                              ? "text-neutral-400 line-through dark:text-neutral-600"
-                              : "text-neutral-900 dark:text-neutral-100"
+                        <span
+                          className={`w-6 shrink-0 text-right text-lg font-semibold ${
+                            item.key === secondUnplayedJamKey
+                              ? "text-sky-600 dark:text-sky-400"
+                              : item.played
+                                ? "text-neutral-300 dark:text-neutral-700"
+                                : "text-neutral-400 dark:text-neutral-600"
                           }`}
                         >
-                          {item.title}
-                        </p>
-                        <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{item.author}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          item.kind === "song" ? handleRemoveFromJam(item.song) : handleRemoveJamExtra(item.extra)
-                        }
-                        aria-label="Odstrani iz Jama"
-                        title="Odstrani iz Jama"
-                        className="shrink-0 p-1 text-neutral-400 hover:text-red-600 dark:text-neutral-500 dark:hover:text-red-400"
-                      >
-                        <svg
-                          aria-hidden="true"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={1.8}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="h-4 w-4"
+                          {i + 1}
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={item.played}
+                          onChange={() =>
+                            item.kind === "song"
+                              ? handleToggleJamPlayed(item.song)
+                              : handleToggleJamExtraPlayed(item.extra)
+                          }
+                          className="h-4 w-4 shrink-0 rounded border-neutral-300 text-fuchsia-600 focus:ring-fuchsia-500 dark:border-neutral-700 dark:bg-neutral-800"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className={`truncate text-sm font-medium ${
+                              item.played
+                                ? "text-neutral-400 line-through dark:text-neutral-600"
+                                : "text-neutral-900 dark:text-neutral-100"
+                            }`}
+                          >
+                            {item.title}
+                          </p>
+                          <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{item.author}</p>
+                        </div>
+                        {item.kind === "song" && (
+                          <ChordsButtons song={item.song} onChordsClick={handleChordsClick} stacked />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            item.kind === "song" ? handleRemoveFromJam(item.song) : handleRemoveJamExtra(item.extra)
+                          }
+                          aria-label="Odstrani iz Jama"
+                          title="Odstrani iz Jama"
+                          className="shrink-0 p-1 text-neutral-400 hover:text-red-600 dark:text-neutral-500 dark:hover:text-red-400"
                         >
-                          <path d="M18 6 6 18M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.8}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="h-4 w-4"
+                          >
+                            <path d="M18 6 6 18M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </Fragment>
                   ))}
                 </div>
               )}

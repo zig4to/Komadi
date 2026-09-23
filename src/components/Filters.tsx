@@ -1,47 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { ERAS, GENRES } from "@/lib/constants";
 import { emptyFilters, hasActiveFilters, type FilterState } from "@/lib/filters";
+import { usePersistentBool } from "@/lib/usePersistentBool";
 import { useBackableOpen } from "@/lib/useBackableOpen";
-
-// Zapomni si odprto/zaprto stanje v brskalniku (localStorage), da ostane
-// enako tudi po osvežitvi strani. useSyncExternalStore poskrbi, da se
-// strežniški in prvi odjemalčev izris ujemata (brez hydration napak).
-const STORE_EVENT = "komadi-storage";
-
-function usePersistentBool(key: string, fallback: boolean) {
-  const read = useCallback(() => {
-    try {
-      const v = window.localStorage.getItem(key);
-      return v === null ? fallback : v === "1";
-    } catch {
-      return fallback;
-    }
-  }, [key, fallback]);
-
-  const subscribe = useCallback((cb: () => void) => {
-    window.addEventListener(STORE_EVENT, cb);
-    return () => window.removeEventListener(STORE_EVENT, cb);
-  }, []);
-
-  const value = useSyncExternalStore(subscribe, read, () => fallback);
-
-  const setValue = useCallback(
-    (next: boolean | ((prev: boolean) => boolean)) => {
-      const resolved = typeof next === "function" ? next(read()) : next;
-      try {
-        window.localStorage.setItem(key, resolved ? "1" : "0");
-      } catch {
-        // pisanje ni mogoče — tiho ignoriramo
-      }
-      window.dispatchEvent(new Event(STORE_EVENT));
-    },
-    [key, read],
-  );
-
-  return [value, setValue] as const;
-}
 
 // Ločen gumb (pill, ista vrsta kot Novo/Popularno) — stanje odprto/zaprto
 // si deli s spodnjim Filters (panel) prek istega localStorage ključa +
