@@ -22,11 +22,15 @@ export default function ListenButton({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
   const spotifyUrl = `https://open.spotify.com/search/${encodeURIComponent(`${song.author} ${song.title}`)}`;
-  // Shranjen video (youtube_url, napolnjen enkratno s skripto), sicer
-  // YouTube iskanje "avtor naslov".
+  // Shranjen video (youtube_url), sicer YouTube iskanje "avtor naslov" — za
+  // tuje skladbe z dodanim "lyrics", da so na vrhu videi z besedilom (za
+  // petje zraven); slovenske/Yugo ostanejo brez, ker jih je z besedilom malo.
+  const isDomestic = song.origin === "Slovenska" || song.origin === "Yugo";
   const youtubeUrl =
     song.youtube_url ??
-    `https://www.youtube.com/results?search_query=${encodeURIComponent(`${song.author} ${song.title}`)}`;
+    `https://www.youtube.com/results?search_query=${encodeURIComponent(
+      `${song.author} ${song.title}${isDomestic ? "" : " lyrics"}`,
+    )}`;
 
   useEffect(() => {
     if (!menuOpen) return;
