@@ -40,9 +40,14 @@ export default function ChordsButtons({
   const menuPanelRef = useRef<HTMLDivElement>(null);
   const isChordsPdf = song.chords_url?.toLowerCase().split("?")[0].endsWith(".pdf") ?? false;
   const hasPdfButton = Boolean(song.chords_url && isChordsPdf);
-  // Združen meni "Akordi" se prikaže, kadar sta na voljo vsaj dva vira
-  // (UG / PDF / Zabrenkaj); z enim samim virom ostane navaden gumb.
   const sourceCount = [song.chords_source_url, hasPdfButton, song.zabrenkaj_url].filter(Boolean).length;
+  // "Spletno iskanje" ima vsaka skladba — Google iskanje "avtor naslov
+  // Akordi" (slovenske/Yugo) oz. "... Chords" (ostale). Odpre se v novem
+  // zavihku: v nameščeni PWA na Androidu je to brskalnik (Custom Tab), ki se
+  // izriše nad aplikacijo. <iframe> ni mogoč, ker Google prepoveduje vgradnjo
+  // (X-Frame-Options).
+  const searchWord = song.origin === "Slovenska" || song.origin === "Yugo" ? "Akordi" : "Chords";
+  const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(`${song.author} ${song.title} ${searchWord}`)}`;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -61,9 +66,10 @@ export default function ChordsButtons({
     };
   }, [menuOpen]);
 
-  if (sourceCount === 0) return null;
-
-  if (merged && sourceCount >= 2) {
+  // Združen meni "Akordi" se prikaže, kadar je poleg spletnega iskanja na
+  // voljo vsaj en vir (UG / PDF / Zabrenkaj); brez virov ostane samo gumb
+  // "Spletno iskanje".
+  if (merged && sourceCount >= 1) {
     return (
       <div className={stacked ? "shrink-0" : "mt-1"}>
         <button
@@ -112,7 +118,7 @@ export default function ChordsButtons({
               role="menu"
               data-view-portal
               style={{ top: menuPos.top, left: menuPos.left, right: menuPos.right }}
-              className="fixed z-50 w-36 space-y-0.5 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
+              className="fixed z-50 w-36 space-y-0.5 rounded-xl border border-amber-400 bg-white p-1.5 shadow-xl dark:border-amber-400/70 dark:bg-neutral-900"
             >
               {song.chords_source_url && (
               <a
@@ -173,15 +179,28 @@ export default function ChordsButtons({
                   strokeWidth={1.8}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="h-[13px] w-[13px] shrink-0 text-amber-500"
+                  className="h-[13px] w-[13px] shrink-0 text-red-500"
                 >
-                  <path d="M9 18V5l12-2v13" />
-                  <circle cx="6" cy="18" r="3" />
-                  <circle cx="18" cy="16" r="3" />
+                  <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                  <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                  <path d="M16 13H8" />
+                  <path d="M16 17H8" />
+                  <path d="M10 9H8" />
                 </svg>
                 PDF akordi
               </button>
               )}
+              <div className="my-0.5 border-t border-neutral-200 dark:border-neutral-800" />
+              <a
+                href={searchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+              >
+                <GlobeIcon className="h-[13px] w-[13px] shrink-0 text-sky-500" />
+                Spletno iskanje
+              </a>
             </div>,
             document.body,
           )}
@@ -289,15 +308,28 @@ export default function ChordsButtons({
             strokeWidth={1.8}
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-[11px] w-[11px] shrink-0"
+            className="h-[11px] w-[11px] shrink-0 text-red-500"
           >
-            <path d="M9 18V5l12-2v13" />
-            <circle cx="6" cy="18" r="3" />
-            <circle cx="18" cy="16" r="3" />
+            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+            <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+            <path d="M16 13H8" />
+            <path d="M16 17H8" />
+            <path d="M10 9H8" />
           </svg>
           PDF
         </button>
       )}
+
+      <a
+        href={searchUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Spletno iskanje akordov"
+        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-sky-500 hover:text-sky-600 dark:border-sky-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-sky-400"
+      >
+        <GlobeIcon className="h-[11px] w-[11px] shrink-0 text-sky-500" />
+        {sourceCount === 0 ? "Spletno iskanje" : "Splet"}
+      </a>
 
       {pdfOpen &&
         song.chords_url &&
@@ -354,6 +386,26 @@ function GuitarIcon({ className }: { className: string }) {
       <path d="M20.1 2.3a1 1 0 0 0-1.4 0l-1.114 1.114A2 2 0 0 0 17 4.828v1.344a2 2 0 0 1-.586 1.414A2 2 0 0 1 17.828 7h1.344a2 2 0 0 0 1.414-.586L21.7 5.3a1 1 0 0 0 0-1.4z" />
       <path d="m6 16 2 2" />
       <path d="M8.23 9.85A3 3 0 0 1 11 8a5 5 0 0 1 5 5 3 3 0 0 1-1.85 2.77l-.92.38A2 2 0 0 0 12 18a4 4 0 0 1-4 4 6 6 0 0 1-6-6 4 4 0 0 1 4-4 2 2 0 0 0 1.85-1.23z" />
+    </svg>
+  );
+}
+
+// Lucide "globe" — spletno iskanje akordov.
+function GlobeIcon({ className }: { className: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+      <path d="M2 12h20" />
     </svg>
   );
 }
