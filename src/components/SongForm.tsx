@@ -425,7 +425,7 @@ export default function SongForm({
           {chordsError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{chordsError}</p>}
         </Field>
 
-        <Field label="UG Tabs (povezava)" className="sm:col-span-2">
+        <Field label="Ultimate Guitar (povezava)" className="sm:col-span-2">
           <input
             type="url"
             value={form.chords_source_url ?? ""}

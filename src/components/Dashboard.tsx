@@ -2145,7 +2145,7 @@ function CompactRow({
       <div className="flex shrink-0 flex-col items-end gap-1">
         <ChordsButtons song={song} onChordsClick={onChordsClick} stacked merged menuAlign="right" />
         <span
-          title="Kolikokrat je bila kliknjena UG Tabs ali PDF akordi povezava"
+          title="Kolikokrat je bila kliknjena povezava Ultimate Guitar, PDF akordi ali Zabrenkaj"
           className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500"
         >
           {song.copy_count}×

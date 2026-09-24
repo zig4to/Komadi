@@ -135,12 +135,25 @@ export default function ChordsButtons({
                   strokeLinejoin="round"
                   className="h-[13px] w-[13px] shrink-0 text-orange-500"
                 >
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <path d="M15 3h6v6" />
-                  <path d="M10 14 21 3" />
+                  <path d="M18.1 6.9A8 8 0 1 0 20 12h-7" />
                 </svg>
-                UG Tabs
+                Ultimate Guitar
               </a>
+              )}
+              {song.zabrenkaj_url && (
+                <a
+                  href={song.zabrenkaj_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onChordsClick?.(song);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                >
+                  <GuitarIcon className="h-[13px] w-[13px] shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  Zabrenkaj.si
+                </a>
               )}
               {hasPdfButton && (
               <button
@@ -168,21 +181,6 @@ export default function ChordsButtons({
                 </svg>
                 PDF akordi
               </button>
-              )}
-              {song.zabrenkaj_url && (
-                <a
-                  href={song.zabrenkaj_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onChordsClick?.(song);
-                  }}
-                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
-                >
-                  <GuitarIcon className="h-[13px] w-[13px] shrink-0 text-emerald-600 dark:text-emerald-400" />
-                  Zabrenkaj
-                </a>
               )}
             </div>,
             document.body,
@@ -253,11 +251,23 @@ export default function ChordsButtons({
             strokeLinejoin="round"
             className="h-[11px] w-[11px] shrink-0"
           >
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-            <path d="M15 3h6v6" />
-            <path d="M10 14 21 3" />
+            <path d="M18.1 6.9A8 8 0 1 0 20 12h-7" />
           </svg>
           UG
+        </a>
+      )}
+
+      {song.zabrenkaj_url && (
+        <a
+          href={song.zabrenkaj_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => onChordsClick?.(song)}
+          title="Odpri na Zabrenkaj.si"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-emerald-500 hover:text-emerald-600 dark:border-emerald-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-emerald-400"
+        >
+          <GuitarIcon className="h-[11px] w-[11px] shrink-0 text-emerald-600 dark:text-emerald-400" />
+          Zabrenkaj.si
         </a>
       )}
 
@@ -287,20 +297,6 @@ export default function ChordsButtons({
           </svg>
           PDF
         </button>
-      )}
-
-      {song.zabrenkaj_url && (
-        <a
-          href={song.zabrenkaj_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => onChordsClick?.(song)}
-          title="Odpri na Zabrenkaj.si"
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-emerald-500 hover:text-emerald-600 dark:border-emerald-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-emerald-400"
-        >
-          <GuitarIcon className="h-[11px] w-[11px] shrink-0 text-emerald-600 dark:text-emerald-400" />
-          Zabrenkaj
-        </a>
       )}
 
       {pdfOpen &&

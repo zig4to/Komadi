@@ -1,6 +1,6 @@
 ---
 name: dodaj-iz-cakalne-vrste
-description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v aplikaciji Bitne Tabs: za izbrane skladbe poišče UG chords povezavo, doda žanr/obdobje/izvor, generira PDF akorde in doda sliko avtorja, nato jih izbriše iz čakalne vrste. Sproži se, ko uporabnik reče nekaj v stilu 'dodaj/obdelaj/uvozi/vnesi skladbe iz čakalne vrste'. Uporabnik izbere, katere skladbe s seznama naj se obdelajo zdaj (če jih je več kot ena)."
+description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v aplikaciji Bitne Tabs: za izbrane skladbe poišče UG chords povezavo in povezavo na zabrenkaj.si (če skladba tam obstaja), doda žanr/obdobje/izvor, generira PDF akorde in doda sliko avtorja, nato jih izbriše iz čakalne vrste. Sproži se, ko uporabnik reče nekaj v stilu 'dodaj/obdelaj/uvozi/vnesi skladbe iz čakalne vrste'. Uporabnik izbere, katere skladbe s seznama naj se obdelajo zdaj (če jih je več kot ena)."
 ---
 
 ## Kontekst repozitorija (ne raziskuj, samo uporabi)
@@ -15,7 +15,7 @@ description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v
   hitre predloge, dodane prek gumba "Hitro" v aplikaciji — SAMO naslov in
   avtor, brez ostalih podatkov.
 - Stolpci `songs`: id, title, author, genre, era, favorite, mood, origin,
-  image_url, chords_url, chords_source_url, copy_count, jam_added_at,
+  image_url, chords_url, chords_source_url, zabrenkaj_url, copy_count, jam_added_at,
   jam_played, goal_added_at, goal_learned, created_at.
 - `genre`/`era` sta zaprti enumeraciji: `GENRES`/`ERAS` v
   `src/lib/constants.ts`. Če noben žanr resnično ne ustreza, VPRAŠAJ
@@ -76,6 +76,33 @@ avtorjem). Med rezultati izberi tip "Chords" z NAJVEČ glasovi (`votes`
 glavno merilo, `rating` samo kot izenačevalec). Če ni nobene "Chords"
 tabulature, uporabi najboljšo alternativo in to omeni uporabniku.
 
+### 4b. Poišči skladbo na zabrenkaj.si
+Za vsako preostalo skladbo preveri, ali je na zabrenkaj.si (slovenska
+stran z akordi). Shrani se SAMO povezava (`zabrenkaj_url`) — vsebine
+strani (besedila/akordov) ne prenašaj in ne shranjuj.
+
+1. Enkrat prenesi seznam vseh skladb `https://www.zabrenkaj.si/vse-pesmi/`
+   (brskalniški User-Agent). Vsaka skladba je vrstica
+   `<div><a href="/<slug>/">Naslov</a></div>`; seznam je na eni strani,
+   brez paginacije. Dekodiraj HTML entitete v naslovih.
+2. Primerjaj naslove normalizirano: male črke, brez šumnikov/diakritike
+   (NFD + odstrani `̀-ͯ`), brez vsebine v oklepajih, vsa ločila
+   → presledek. Isti naslov ima lahko več kandidatov (različni izvajalci).
+3. Za vsakega kandidata odpri njegovo stran in preberi SAMO `<title>`,
+   ki ima obliko `Izvajalec - Naslov - Akordi za kitaro in ukulele` —
+   izvajalec je del pred prvim ` - `. Kandidat se ujema, če se
+   normaliziran izvajalec ujema z avtorjem skladbe (upoštevaj razlike v
+   zapisu, npr. `MI2` = `Mi2`, `Hamo&Tribute2Love` = `Hamo & Tribute 2
+   love` — primerjaj tudi brez presledkov). Pazi na kratka imena: `F+` se
+   po normalizaciji skrči na `f`, kar se napačno "ujema" z vsakim avtorjem,
+   ki vsebuje črko f — delno ujemanje (includes) dovoli samo, če ima
+   krajše ime vsaj 3 znake.
+4. Ujemanje → `zabrenkaj_url = https://www.zabrenkaj.si/<slug>/`. Ni
+   ujemanja → `zabrenkaj_url: null`. Če je izvajalec na zabrenkaj.si
+   drugačen, a bi lahko šlo za isto skladbo (npr. pevec vs. njegova
+   skupina, kot Zoran Predin / Lačni Franz), povezave NE vpiši samodejno —
+   vprašaj uporabnika.
+
 ### 5. Določi metapodatke
 Za vsako skladbo razišči (splet, če nisi prepričan — ne ugibaj):
 - **era**: leto izida originalne verzije → ustrezna vrednost ERAS
@@ -102,7 +129,8 @@ En skupen insert v `songs` (`Prefer: return=representation`, da dobiš
 `id`-je nazaj): `title`, `author` (iz queued_songs, po možnosti poravnano na
 obstoječi zapis avtorja v bazi, če je bil najden pri koraku 3), `genre`,
 `era`, `favorite: false`, `mood`, `origin`, `image_url: null`,
-`chords_url: null`, `chords_source_url: <UG link>`.
+`chords_url: null`, `chords_source_url: <UG link>`,
+`zabrenkaj_url: <povezava iz koraka 4b ali null>`.
 
 ### 7. Generiraj in naloži PDF
 Za vsak `chords_source_url`: prenesi UG tab stran, izlušči `js-store`,
@@ -139,6 +167,6 @@ tistih, ki jih uporabnik v koraku 2 ni izbral).
 ### 10. Poročaj
 Povej: koliko skladb je bilo dodanih (z avtorjem/žanrom/obdobjem/izvorom/
 razpoloženjem za vsako, s kratko utemeljitvijo razpoloženja in kjerkoli
-drugje negotove izbire), koliko jih je bilo izpuščenih zaradi podvojitve in
+drugje negotove izbire, ter ali je bila najdena na zabrenkaj.si), koliko jih je bilo izpuščenih zaradi podvojitve in
 katere so še vedno v čakalni vrsti (izbrane
 ali ne), ali so bile dodane nove slike avtorjev. Brez git commit/push.
