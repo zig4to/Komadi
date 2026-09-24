@@ -17,6 +17,7 @@ const emptyForm = {
   image_url: null as string | null,
   chords_url: null as string | null,
   chords_source_url: null as string | null,
+  zabrenkaj_url: null as string | null,
 };
 
 export default function SongForm({
@@ -51,6 +52,7 @@ export default function SongForm({
           image_url: initial.image_url,
           chords_url: initial.chords_url,
           chords_source_url: initial.chords_source_url,
+          zabrenkaj_url: initial.zabrenkaj_url,
         }
       : prefill
         ? { ...emptyForm, title: prefill.title, author: prefill.author }
@@ -168,6 +170,7 @@ export default function SongForm({
       image_url: form.image_url,
       chords_url: form.chords_url,
       chords_source_url: form.chords_source_url?.trim() || null,
+      zabrenkaj_url: form.zabrenkaj_url?.trim() || null,
     };
 
     const { data, error: dbError } = initial
@@ -428,6 +431,16 @@ export default function SongForm({
             value={form.chords_source_url ?? ""}
             onChange={(e) => setForm({ ...form, chords_source_url: e.target.value || null })}
             placeholder="https://tabs.ultimate-guitar.com/tab/..."
+            className={inputClass}
+          />
+        </Field>
+
+        <Field label="Zabrenkaj (povezava)" className="sm:col-span-2">
+          <input
+            type="url"
+            value={form.zabrenkaj_url ?? ""}
+            onChange={(e) => setForm({ ...form, zabrenkaj_url: e.target.value || null })}
+            placeholder="https://www.zabrenkaj.si/..."
             className={inputClass}
           />
         </Field>

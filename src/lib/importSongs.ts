@@ -69,6 +69,7 @@ export function parseImportText(text: string): ParsedImport {
         image_url: null,
         chords_url: null,
         chords_source_url: null,
+        zabrenkaj_url: null,
         favorite: current.favorite,
       });
     }
@@ -222,6 +223,7 @@ export function parseImportJson(text: string): ParsedImport {
       image_url: null,
       chords_url: null,
       chords_source_url: null,
+      zabrenkaj_url: null,
       favorite,
     });
   });

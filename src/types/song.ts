@@ -12,6 +12,7 @@ export interface Song {
   image_url: string | null;
   chords_url: string | null;
   chords_source_url: string | null;
+  zabrenkaj_url: string | null;
   copy_count: number;
   jam_added_at: string | null;
   jam_played: boolean;

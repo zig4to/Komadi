@@ -40,7 +40,9 @@ export default function ChordsButtons({
   const menuPanelRef = useRef<HTMLDivElement>(null);
   const isChordsPdf = song.chords_url?.toLowerCase().split("?")[0].endsWith(".pdf") ?? false;
   const hasPdfButton = Boolean(song.chords_url && isChordsPdf);
-  const hasBoth = Boolean(song.chords_source_url && hasPdfButton);
+  // Združen meni "Akordi" se prikaže, kadar sta na voljo vsaj dva vira
+  // (UG / PDF / Zabrenkaj); z enim samim virom ostane navaden gumb.
+  const sourceCount = [song.chords_source_url, hasPdfButton, song.zabrenkaj_url].filter(Boolean).length;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -59,9 +61,9 @@ export default function ChordsButtons({
     };
   }, [menuOpen]);
 
-  if (!song.chords_source_url && !hasPdfButton) return null;
+  if (sourceCount === 0) return null;
 
-  if (merged && hasBoth) {
+  if (merged && sourceCount >= 2) {
     return (
       <div className={stacked ? "shrink-0" : "mt-1"}>
         <button
@@ -112,8 +114,9 @@ export default function ChordsButtons({
               style={{ top: menuPos.top, left: menuPos.left, right: menuPos.right }}
               className="fixed z-50 w-36 space-y-0.5 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
             >
+              {song.chords_source_url && (
               <a
-                href={song.chords_source_url ?? undefined}
+                href={song.chords_source_url}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => {
@@ -138,6 +141,8 @@ export default function ChordsButtons({
                 </svg>
                 UG Tabs
               </a>
+              )}
+              {hasPdfButton && (
               <button
                 type="button"
                 onClick={() => {
@@ -163,6 +168,22 @@ export default function ChordsButtons({
                 </svg>
                 PDF akordi
               </button>
+              )}
+              {song.zabrenkaj_url && (
+                <a
+                  href={song.zabrenkaj_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onChordsClick?.(song);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                >
+                  <GuitarIcon className="h-[13px] w-[13px] shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  Zabrenkaj
+                </a>
+              )}
             </div>,
             document.body,
           )}
@@ -268,6 +289,20 @@ export default function ChordsButtons({
         </button>
       )}
 
+      {song.zabrenkaj_url && (
+        <a
+          href={song.zabrenkaj_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => onChordsClick?.(song)}
+          title="Odpri na Zabrenkaj.si"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-emerald-500 hover:text-emerald-600 dark:border-emerald-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-emerald-400"
+        >
+          <GuitarIcon className="h-[11px] w-[11px] shrink-0 text-emerald-600 dark:text-emerald-400" />
+          Zabrenkaj
+        </a>
+      )}
+
       {pdfOpen &&
         song.chords_url &&
         typeof document !== "undefined" &&
@@ -303,5 +338,26 @@ export default function ChordsButtons({
           document.body,
         )}
     </div>
+  );
+}
+
+// Ista ikona kitare kot levo od naslova "Bitne Tabs" v Dashboard.tsx.
+function GuitarIcon({ className }: { className: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="m11.9 12.1 4.514-4.514" />
+      <path d="M20.1 2.3a1 1 0 0 0-1.4 0l-1.114 1.114A2 2 0 0 0 17 4.828v1.344a2 2 0 0 1-.586 1.414A2 2 0 0 1 17.828 7h1.344a2 2 0 0 0 1.414-.586L21.7 5.3a1 1 0 0 0 0-1.4z" />
+      <path d="m6 16 2 2" />
+      <path d="M8.23 9.85A3 3 0 0 1 11 8a5 5 0 0 1 5 5 3 3 0 0 1-1.85 2.77l-.92.38A2 2 0 0 0 12 18a4 4 0 0 1-4 4 6 6 0 0 1-6-6 4 4 0 0 1 4-4 2 2 0 0 0 1.85-1.23z" />
+    </svg>
   );
 }
