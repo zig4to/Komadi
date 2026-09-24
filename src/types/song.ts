@@ -13,6 +13,7 @@ export interface Song {
   chords_url: string | null;
   chords_source_url: string | null;
   zabrenkaj_url: string | null;
+  youtube_url: string | null;
   copy_count: number;
   jam_added_at: string | null;
   jam_played: boolean;
@@ -23,7 +24,7 @@ export interface Song {
 
 export type NewSong = Omit<
   Song,
-  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned"
+  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url"
 >;
 
 export interface SimilarSong {

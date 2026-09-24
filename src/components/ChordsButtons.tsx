@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import ListenButton from "@/components/ListenButton";
 import PdfViewer from "@/components/PdfViewer";
 import type { Song } from "@/types/song";
 
@@ -71,7 +72,7 @@ export default function ChordsButtons({
   // "Spletno iskanje".
   if (merged && sourceCount >= 1) {
     return (
-      <div className={stacked ? "shrink-0" : "mt-1"}>
+      <div className={stacked ? "flex shrink-0 items-center gap-1" : "mt-1 flex items-center gap-1"}>
         <button
           ref={buttonRef}
           type="button"
@@ -97,17 +98,19 @@ export default function ChordsButtons({
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth={1.8}
+            strokeWidth={1.3}
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-[11px] w-[11px] shrink-0"
+            className="h-[15px] w-[15px] shrink-0"
           >
-            <path d="M9 18V5l12-2v13" />
-            <circle cx="6" cy="18" r="3" />
-            <circle cx="18" cy="16" r="3" />
+            <rect x="5" y="3" width="14" height="18" rx="1.5" />
+            <path d="M9.7 3v18M14.3 3v18M5 8.5h14M5 14h14" />
+            <circle cx="9.7" cy="11.2" r="1.3" />
+            <circle cx="14.3" cy="16.8" r="1.3" />
           </svg>
           Akordi
         </button>
+        <ListenButton song={song} menuAlign={menuAlign} />
 
         {menuOpen &&
           menuPos &&
@@ -330,6 +333,8 @@ export default function ChordsButtons({
         <GlobeIcon className="h-[11px] w-[11px] shrink-0 text-sky-500" />
         {sourceCount === 0 ? "Spletno iskanje" : "Splet"}
       </a>
+
+      {merged && <ListenButton song={song} menuAlign={menuAlign} />}
 
       {pdfOpen &&
         song.chords_url &&
