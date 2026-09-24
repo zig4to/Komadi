@@ -553,6 +553,27 @@ export default function Dashboard() {
     setFilters({ ...emptyFilters, genres: [genre] });
   }
 
+  // Klik na naslov "Bitne Tabs": "trdo" osveži aplikacijo (kot Ctrl+F5) in
+  // se vrne na domačo stran — zapre Jam/Mojih 20/Filtre (sicer bi jih
+  // usePersistentBool po osvežitvi spet odprl), izprazni predpomnilnik
+  // service workerja (sw.js je stale-while-revalidate, zato bi navadna
+  // osvežitev najprej pokazala staro verzijo) in stran ponovno naloži.
+  async function handleHardRefresh() {
+    try {
+      for (const key of ["komadi:jam:open", "komadi:goal:open", "komadi:filters:open"]) {
+        window.localStorage.setItem(key, "0");
+      }
+    } catch {}
+    try {
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    } catch {}
+    window.scrollTo(0, 0);
+    window.location.reload();
+  }
+
   function handleBackFromFilter() {
     setAuthorFilter(null);
     setFilters(emptyFilters);
@@ -955,7 +976,13 @@ export default function Dashboard() {
         ) : (
           <>
             <div>
-              <h1 className="flex items-center gap-2">
+              <h1>
+                <button
+                  type="button"
+                  onClick={handleHardRefresh}
+                  title="Osveži aplikacijo"
+                  className="flex items-center gap-2 text-left"
+                >
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 24 24"
@@ -976,6 +1003,7 @@ export default function Dashboard() {
                 >
                   Bitne Tabs
                 </span>
+                </button>
               </h1>
             </div>
             <div className="flex items-center gap-2">
