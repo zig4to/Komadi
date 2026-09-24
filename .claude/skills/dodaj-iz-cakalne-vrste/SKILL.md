@@ -15,7 +15,8 @@ description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v
   hitre predloge, dodane prek gumba "Hitro" v aplikaciji — SAMO naslov in
   avtor, brez ostalih podatkov.
 - Stolpci `songs`: id, title, author, genre, era, favorite, mood, origin,
-  image_url, chords_url, chords_source_url, zabrenkaj_url, copy_count, jam_added_at,
+  image_url, chords_url, chords_source_url, zabrenkaj_url, youtube_url,
+  copy_count, jam_added_at,
   jam_played, goal_added_at, goal_learned, created_at.
 - `genre`/`era` sta zaprti enumeraciji: `GENRES`/`ERAS` v
   `src/lib/constants.ts`. Če noben žanr resnično ne ustreza, VPRAŠAJ
@@ -103,6 +104,14 @@ strani (besedila/akordov) ne prenašaj in ne shranjuj.
    skupina, kot Zoran Predin / Lačni Franz), povezave NE vpiši samodejno —
    vprašaj uporabnika.
 
+### 4c. YouTube in Spotify — nič ne shranjuj
+Gumb za poslušanje v aplikaciji (`ListenButton.tsx`) sam odpre YouTube
+iskanje (`youtube.com/results?search_query=<avtor naslov>`) in Spotify
+iskanje (`open.spotify.com/search/<avtor naslov>`), zato deluje za vsako
+skladbo brez povezave v bazi. `youtube_url` pusti prazen (null) — videov
+NE išči (strganje YouTubovih rezultatov iskanja YouTube po ~20 zahtevah
+omeji, uporabnik pa se je odločil, da iskanje zadošča).
+
 ### 5. Določi metapodatke
 Za vsako skladbo razišči (splet, če nisi prepričan — ne ugibaj):
 - **era**: leto izida originalne verzije → ustrezna vrednost ERAS
@@ -130,7 +139,8 @@ En skupen insert v `songs` (`Prefer: return=representation`, da dobiš
 obstoječi zapis avtorja v bazi, če je bil najden pri koraku 3), `genre`,
 `era`, `favorite: false`, `mood`, `origin`, `image_url: null`,
 `chords_url: null`, `chords_source_url: <UG link>`,
-`zabrenkaj_url: <povezava iz koraka 4b ali null>`.
+`zabrenkaj_url: <povezava iz koraka 4b ali null>`,
+`youtube_url: null`.
 
 ### 7. Generiraj in naloži PDF
 Za vsak `chords_source_url`: prenesi UG tab stran, izlušči `js-store`,
@@ -167,6 +177,7 @@ tistih, ki jih uporabnik v koraku 2 ni izbral).
 ### 10. Poročaj
 Povej: koliko skladb je bilo dodanih (z avtorjem/žanrom/obdobjem/izvorom/
 razpoloženjem za vsako, s kratko utemeljitvijo razpoloženja in kjerkoli
-drugje negotove izbire, ter ali je bila najdena na zabrenkaj.si), koliko jih je bilo izpuščenih zaradi podvojitve in
+drugje negotove izbire, ter ali je bila najdena na zabrenkaj.si),
+koliko jih je bilo izpuščenih zaradi podvojitve in
 katere so še vedno v čakalni vrsti (izbrane
 ali ne), ali so bile dodane nove slike avtorjev. Brez git commit/push.
