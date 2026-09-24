@@ -6,6 +6,7 @@ import Filters, { FiltersToggle } from "@/components/Filters";
 import FeaturedArtists from "@/components/FeaturedArtists";
 import HomeHighlights, { ACCENTS, formatEraLabel, HighlightRow } from "@/components/HomeHighlights";
 import SettingsMenu from "@/components/SettingsMenu";
+import SortMenu, { SONG_SORTS } from "@/components/SortMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
 import { authorAccentHex } from "@/lib/authorColor";
@@ -15,6 +16,7 @@ import { emptyFilters, hasActiveFilters, type FilterState } from "@/lib/filters"
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { usePersistentBool } from "@/lib/usePersistentBool";
+import { usePersistentString } from "@/lib/usePersistentString";
 import type { GoalExtra, JamExtra, SimilarSong, Song } from "@/types/song";
 
 interface RecentGroup {
@@ -98,6 +100,9 @@ export default function Dashboard() {
   // Isti localStorage ključ kot FiltersToggle/Filters v Filters.tsx — da lahko
   // "Počisti filtre" (glej handleBackFromFilter) zapre tudi panel s filtri.
   const [, setFiltersOpen] = usePersistentBool("komadi:filters:open", false);
+  // Vrstni red seznama "Vsi Komadi" (gumb "Filter" desno od naslova, glej
+  // SortMenu.tsx). Zapomnjeno čez osvežitev.
+  const [songSort, setSongSort] = usePersistentString("komadi:sort", "az", SONG_SORTS);
   const [goalPickerOpen, setGoalPickerOpen] = useState(false);
   const [goalPickerQuery, setGoalPickerQuery] = useState("");
   const [goalExtras, setGoalExtras] = useState<GoalExtra[]>([]);
@@ -380,8 +385,37 @@ export default function Dashboard() {
   }, [songs, filters]);
 
   const displaySongs = useMemo(
-    () => [...filteredSongs].sort((a, b) => a.title.localeCompare(b.title, "sl")),
-    [filteredSongs],
+    () => {
+      const byTitle = (a: Song, b: Song) => a.title.localeCompare(b.title, "sl");
+      // "1960s" ni v ERAS, a obstaja v bazi (glej past "Pred 1960"/"1960s"
+      // v CLAUDE.md) — uvrsti ga takoj za "Pred 1960"; neznane na konec.
+      const eraIndex = (s: Song) => {
+        const i = ERAS.indexOf(s.era);
+        if (i >= 0) return i;
+        return (s.era as string) === "1960s" ? 0.5 : ERAS.length;
+      };
+      return [...filteredSongs].sort((a, b) => {
+        switch (songSort) {
+          case "newest":
+            return b.created_at.localeCompare(a.created_at);
+          case "oldest":
+            return a.created_at.localeCompare(b.created_at);
+          case "za":
+            return byTitle(b, a);
+          case "author":
+            return a.author.localeCompare(b.author, "sl") || byTitle(a, b);
+          case "popular":
+            return b.copy_count - a.copy_count || byTitle(a, b);
+          case "era-old":
+            return eraIndex(a) - eraIndex(b) || byTitle(a, b);
+          case "era-new":
+            return eraIndex(b) - eraIndex(a) || byTitle(a, b);
+          default:
+            return byTitle(a, b);
+        }
+      });
+    },
+    [filteredSongs, songSort],
   );
 
   // Razpoloženja niso fiksen nabor: obrazcu ponudimo privzete predloge +
@@ -2043,9 +2077,12 @@ export default function Dashboard() {
         {!loading && !loadError && activeView === "list" && (
           <>
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100">
-                {songsHeading}
-              </h2>
+              <div className="flex min-w-0 items-center gap-2">
+                <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100">
+                  {songsHeading}
+                </h2>
+                <SortMenu value={songSort} onChange={setSongSort} />
+              </div>
               {hasActiveFilters(filters) || authorFilter ? (
                 <button
                   type="button"
