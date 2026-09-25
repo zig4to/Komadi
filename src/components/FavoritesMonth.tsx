@@ -41,14 +41,14 @@ function favoritesSorted(songs: Song[]) {
     .sort((a, b) => b.favorited_at!.localeCompare(a.favorited_at!));
 }
 
-function StarIcon({ filled, className }: { filled: boolean; className: string }) {
+function StarIcon({ filled, className, strokeWidth = 1.8 }: { filled: boolean; className: string; strokeWidth?: number }) {
   return (
     <svg
       aria-hidden="true"
       viewBox="0 0 24 24"
       fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
-      strokeWidth={1.8}
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
@@ -85,7 +85,7 @@ export function FavoriteCard({
         borderColor: `${accent}38`,
         boxShadow: `0 8px 18px -14px ${accent}66`,
       }}
-      className="flex items-center gap-2.5 rounded-xl border bg-white p-2 dark:bg-[#111114]"
+      className="relative isolate flex items-center gap-2.5 overflow-hidden rounded-xl border bg-white p-2 pr-12 dark:bg-[#111114]"
     >
       <div
         style={{ backgroundColor: `${accent}33`, color: accent }}
@@ -126,14 +126,16 @@ export function FavoriteCard({
         <ChordsButtons song={song} onChordsClick={onChordsClick} merged />
       </div>
 
+      {/* Velika obrobna zvezda kot ikona v ozadju, ki jo desni rob kartice
+          odreže (overflow-hidden). Klik odstrani iz priljubljenih. */}
       <button
         type="button"
         onClick={() => onToggleFavorite(song)}
         title="Odstrani iz priljubljenih"
         aria-label="Odstrani iz priljubljenih"
-        className="shrink-0 rounded-full p-1 text-amber-500 transition hover:bg-amber-500/10 hover:text-amber-600 dark:text-amber-400"
+        className="absolute -right-5 top-1/2 -z-10 -translate-y-1/2 text-amber-500 opacity-20 transition hover:opacity-70 dark:text-amber-400"
       >
-        <StarIcon filled className="h-[18px] w-[18px]" />
+        <StarIcon filled={false} strokeWidth={1} className="h-14 w-14" />
       </button>
     </div>
   );
