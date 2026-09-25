@@ -13,6 +13,8 @@ import type { Song } from "@/types/song";
 
 // Kartic na stolpec v "swipe" pogledu na domači strani.
 const COLUMN_SIZE = 3;
+// Kartic na stran na računalniku (3 vrste × 3), polnijo se po vrstah.
+const DESKTOP_PAGE_SIZE = 9;
 const COLUMN_GAP_PX = 12; // gap-3
 
 // "2026-09" — ključ meseca v lokalnem času.
@@ -158,53 +160,130 @@ function CardGrid({ songs, authorImages, ...handlers }: { songs: Song[] } & Card
   );
 }
 
-// Priljubljene tekočega meseca kot vodoravni "swipe": stolpci po 3
-// kartice, od najstarejše (levo) do najnovejše — nova priljubljena napolni
-// zadnji stolpec desno oz. začne novega. Na telefonu se vidi del naslednjega
-// stolpca (namig za drsenje), na računalniku trije stolpci in vlečenje z miško.
-export function FavoritesThisMonth({ songs, authorImages, ...handlers }: { songs: Song[] } & CardHandlers) {
-  const key = currentMonthKey();
-  const items = favoritesSorted(songs)
-    .filter((s) => monthKey(s.favorited_at!) === key)
-    .reverse();
-  const columns: Song[][] = [];
-  for (let i = 0; i < items.length; i += COLUMN_SIZE) columns.push(items.slice(i, i + COLUMN_SIZE));
-
+// Vodoravni "swipe" skupin kartic (stolpec na telefonu, stran 3 × 3 na
+// računalniku): drsenje na dotik, vlečenje z miško, poravnava na skupino in
+// pike — pike samo, če vse skupine ne gredo na zaslon.
+function Swiper({
+  groups,
+  groupClassName,
+  className = "",
+  renderCard,
+}: {
+  groups: Song[][];
+  groupClassName: string;
+  className?: string;
+  renderCard: (song: Song) => React.ReactNode;
+}) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const [activeColumn, setActiveColumn] = useState(0);
-  // Koliko stolpcev je naenkrat vidnih (1 na telefonu, 3 na računalniku) —
-  // pike pokažemo samo, če vsi stolpci ne gredo na zaslon.
-  const [visibleColumns, setVisibleColumns] = useState(1);
-  const positions = Math.max(1, columns.length - visibleColumns + 1);
+  const [active, setActive] = useState(0);
+  const [visibleGroups, setVisibleGroups] = useState(1);
+  const positions = Math.max(1, groups.length - visibleGroups + 1);
+  // Vlečenje z miško (na dotik drsenje deluje samo po sebi); `moved` prepreči,
+  // da bi spust po vlečenju sprožil klik na gumb v kartici.
+  const drag = useRef({ down: false, startX: 0, startScroll: 0, moved: false });
 
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
     const measure = () => {
       const first = el.firstElementChild as HTMLElement | null;
-      if (first) setVisibleColumns(Math.max(1, Math.floor((el.clientWidth + COLUMN_GAP_PX) / (first.offsetWidth + COLUMN_GAP_PX))));
+      if (first && first.offsetWidth > 0)
+        setVisibleGroups(Math.max(1, Math.floor((el.clientWidth + COLUMN_GAP_PX) / (first.offsetWidth + COLUMN_GAP_PX))));
     };
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [columns.length]);
-  // Vlečenje z miško (na dotik drsenje deluje samo po sebi); `moved` prepreči,
-  // da bi spust po vlečenju sprožil klik na gumb v kartici.
-  const drag = useRef({ down: false, startX: 0, startScroll: 0, moved: false });
+  }, [groups.length]);
 
   function handleScroll() {
     const el = scrollerRef.current;
     const first = el?.firstElementChild as HTMLElement | null;
     if (!el || !first) return;
-    const step = first.offsetWidth + COLUMN_GAP_PX;
-    setActiveColumn(Math.min(positions - 1, Math.round(el.scrollLeft / step)));
+    setActive(Math.min(positions - 1, Math.round(el.scrollLeft / (first.offsetWidth + COLUMN_GAP_PX))));
   }
 
-  function scrollToColumn(i: number) {
+  function scrollToGroup(i: number) {
     const el = scrollerRef.current;
-    const col = el?.children[i] as HTMLElement | undefined;
-    if (el && col) el.scrollTo({ left: col.offsetLeft - el.offsetLeft, behavior: "smooth" });
+    const g = el?.children[i] as HTMLElement | undefined;
+    if (el && g) el.scrollTo({ left: g.offsetLeft - el.offsetLeft, behavior: "smooth" });
   }
+
+  return (
+    <div className={className}>
+      <div
+        ref={scrollerRef}
+        onScroll={handleScroll}
+        onPointerDown={(e) => {
+          if (e.pointerType !== "mouse") return;
+          drag.current = { down: true, startX: e.clientX, startScroll: e.currentTarget.scrollLeft, moved: false };
+        }}
+        onPointerMove={(e) => {
+          if (!drag.current.down) return;
+          const dx = e.clientX - drag.current.startX;
+          if (Math.abs(dx) > 3) drag.current.moved = true;
+          e.currentTarget.scrollLeft = drag.current.startScroll - dx;
+        }}
+        onPointerUp={() => {
+          if (!drag.current.down) return;
+          drag.current.down = false;
+          if (drag.current.moved) scrollToGroup(active);
+        }}
+        onPointerLeave={() => {
+          drag.current.down = false;
+        }}
+        onClickCapture={(e) => {
+          if (drag.current.moved) {
+            e.preventDefault();
+            e.stopPropagation();
+            drag.current.moved = false;
+          }
+        }}
+        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:mx-0 lg:scroll-px-0 lg:px-0"
+      >
+        {groups.map((g, i) => (
+          <div key={i} className={`shrink-0 snap-start ${groupClassName}`}>
+            {g.map(renderCard)}
+          </div>
+        ))}
+      </div>
+
+      {positions > 1 && (
+        <div className="mt-2.5 flex justify-center gap-1.5">
+          {Array.from({ length: positions }, (_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => scrollToGroup(i)}
+              aria-label={`Skupina ${i + 1}`}
+              className={`h-1.5 rounded-full transition-all ${
+                i === active ? "w-5 bg-amber-500" : "w-1.5 bg-neutral-300 hover:bg-neutral-400 dark:bg-neutral-700"
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function chunk<T>(list: T[], size: number) {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+}
+
+// Priljubljene tekočega meseca, od najstarejše do najnovejše. Telefon:
+// stolpci po 3 (swipe levo/desno, viden rob naslednjega stolpca). Računalnik:
+// strani 3 × 3, ki se polnijo po vrstah (prva vrsta, druga, tretja), nato
+// naslednja stran desno.
+export function FavoritesThisMonth({ songs, authorImages, ...handlers }: { songs: Song[] } & CardHandlers) {
+  const key = currentMonthKey();
+  const items = favoritesSorted(songs)
+    .filter((s) => monthKey(s.favorited_at!) === key)
+    .reverse();
+  const renderCard = (s: Song) => (
+    <FavoriteCard key={s.id} song={s} authorImage={authorImages[s.author] ?? null} {...handlers} />
+  );
 
   return (
     <section className="mb-5">
@@ -225,63 +304,18 @@ export function FavoritesThisMonth({ songs, authorImages, ...handlers }: { songs
         </div>
       ) : (
         <>
-          <div
-            ref={scrollerRef}
-            onScroll={handleScroll}
-            onPointerDown={(e) => {
-              if (e.pointerType !== "mouse") return;
-              drag.current = { down: true, startX: e.clientX, startScroll: e.currentTarget.scrollLeft, moved: false };
-            }}
-            onPointerMove={(e) => {
-              if (!drag.current.down) return;
-              const dx = e.clientX - drag.current.startX;
-              if (Math.abs(dx) > 3) drag.current.moved = true;
-              e.currentTarget.scrollLeft = drag.current.startScroll - dx;
-            }}
-            onPointerUp={() => {
-              if (!drag.current.down) return;
-              drag.current.down = false;
-              if (drag.current.moved) scrollToColumn(activeColumn);
-            }}
-            onPointerLeave={() => {
-              drag.current.down = false;
-            }}
-            onClickCapture={(e) => {
-              if (drag.current.moved) {
-                e.preventDefault();
-                e.stopPropagation();
-                drag.current.moved = false;
-              }
-            }}
-            className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:mx-0 lg:scroll-px-0 lg:px-0"
-          >
-            {columns.map((col, i) => (
-              <div
-                key={i}
-                className="flex w-[86%] shrink-0 snap-start flex-col gap-2 sm:w-[calc(50%-6px)] lg:w-[calc((100%-24px)/3)]"
-              >
-                {col.map((s) => (
-                  <FavoriteCard key={s.id} song={s} authorImage={authorImages[s.author] ?? null} {...handlers} />
-                ))}
-              </div>
-            ))}
-          </div>
-
-          {positions > 1 && (
-            <div className="mt-2.5 flex justify-center gap-1.5">
-              {Array.from({ length: positions }, (_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => scrollToColumn(i)}
-                  aria-label={`Stolpec ${i + 1}`}
-                  className={`h-1.5 rounded-full transition-all ${
-                    i === activeColumn ? "w-5 bg-amber-500" : "w-1.5 bg-neutral-300 hover:bg-neutral-400 dark:bg-neutral-700"
-                  }`}
-                />
-              ))}
-            </div>
-          )}
+          <Swiper
+            className="lg:hidden"
+            groups={chunk(items, COLUMN_SIZE)}
+            groupClassName="flex w-[86%] flex-col gap-2 sm:w-[calc(50%-6px)]"
+            renderCard={renderCard}
+          />
+          <Swiper
+            className="hidden lg:block"
+            groups={chunk(items, DESKTOP_PAGE_SIZE)}
+            groupClassName="grid w-full grid-cols-3 content-start gap-x-3 gap-y-2"
+            renderCard={renderCard}
+          />
         </>
       )}
     </section>
