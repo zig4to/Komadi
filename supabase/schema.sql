@@ -226,3 +226,28 @@ create policy "Public update song chords" on storage.objects
 
 create policy "Public delete song chords" on storage.objects
   for delete using (bucket_id = 'song-chords');
+
+-- "Popravi skladbe": prijave napak na skladbah (gumb "Prijavi napako" v
+-- meniju kartice), glej supabase/migrations/0018_add_song_reports.sql.
+create table if not exists public.song_reports (
+  id uuid primary key default gen_random_uuid(),
+  song_id uuid not null references public.songs (id) on delete cascade,
+  title text not null,
+  author text not null,
+  note text,
+  reported_at timestamptz not null default now()
+);
+
+alter table public.song_reports enable row level security;
+
+create policy "Public read song reports" on public.song_reports
+  for select using (true);
+
+create policy "Public insert song reports" on public.song_reports
+  for insert with check (true);
+
+create policy "Public delete song reports" on public.song_reports
+  for delete using (true);
+
+create policy "Public update song reports" on public.song_reports
+  for update using (true) with check (true);

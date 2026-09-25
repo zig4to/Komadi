@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import ChordsButtons from "@/components/ChordsButtons";
 import { authorAccentHsl } from "@/lib/authorColor";
-// import { supabase } from "@/lib/supabaseClient"; // Podobno — začasno onemogočeno.
-import type { SimilarSong, Song } from "@/types/song";
+import { supabase } from "@/lib/supabaseClient";
+import type { SimilarSong, Song, SongReport } from "@/types/song";
 
 // Diagonalna "zagozda" s sliko na desni strani kartice — enak pristop kot
 // eventCard/eventCardImage v projektu masCajt (styles.js): clip-path izreže
@@ -22,6 +22,7 @@ export default function SongCard({
   onFilterAuthor,
   onAddToJam,
   onChordsClick,
+  onReported,
   highlighted = false,
 }: {
   song: Song;
@@ -32,6 +33,7 @@ export default function SongCard({
   onFilterAuthor?: (author: string) => void;
   onChordsClick?: (song: Song) => void;
   onAddToJam?: (song: Song) => void;
+  onReported?: (report: SongReport) => void;
   highlighted?: boolean;
 }) {
   // Podobno (similar-songs) — začasno onemogočeno.
@@ -47,6 +49,41 @@ export default function SongCard({
   const [actionsMenuPos, setActionsMenuPos] = useState<{ top: number; left: number } | null>(null);
   const actionsButtonRef = useRef<HTMLButtonElement>(null);
   const actionsMenuPanelRef = useRef<HTMLDivElement>(null);
+
+  // "Prijavi napako": kratek obrazec na dnu kartice, zapiše v song_reports
+  // (seznam prijav je v SettingsMenu.tsx, "Popravi skladbe").
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportNote, setReportNote] = useState("");
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportMessage, setReportMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  async function handleSubmitReport() {
+    setReportBusy(true);
+    const note = reportNote.trim();
+    const { data, error } = await supabase
+      .from("song_reports")
+      .insert({
+        song_id: song.id,
+        title: song.title,
+        author: song.author,
+        note: note || null,
+      })
+      .select()
+      .single();
+    setReportBusy(false);
+    if (error || !data) {
+      setReportMessage({ type: "error", text: error?.message ?? "Prijava ni uspela." });
+      return;
+    }
+    setReportOpen(false);
+    setReportNote("");
+    setReportMessage({ type: "success", text: "Hvala, napaka je prijavljena." });
+    setTimeout(() => setReportMessage(null), 3000);
+    onReported?.(data as SongReport);
+  }
 
   useEffect(() => {
     if (!actionsOpen) return;
@@ -301,6 +338,30 @@ export default function SongCard({
                     Izbriši
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActionsOpen(false);
+                    setReportOpen(true);
+                  }}
+                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-[13px] w-[13px] shrink-0 text-yellow-500 dark:text-yellow-400"
+                  >
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+                    <path d="M12 9v4M12 17h.01" />
+                  </svg>
+                  Prijavi napako
+                </button>
               </div>,
               document.body,
             )}
@@ -317,6 +378,71 @@ export default function SongCard({
       <div className="mt-1 flex w-full min-w-0 flex-wrap items-center gap-1.5 text-xs">
         <ChordsButtons song={song} onChordsClick={onChordsClick} merged />
       </div>
+
+      {reportOpen && (
+        <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-200">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-[13px] w-[13px] shrink-0 text-yellow-500 dark:text-yellow-400"
+            >
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+              <path d="M12 9v4M12 17h.01" />
+            </svg>
+            Prijavi napako
+          </p>
+          <textarea
+            value={reportNote}
+            onChange={(e) => setReportNote(e.target.value)}
+            placeholder="Kaj je narobe? (neobvezno)"
+            rows={2}
+            autoFocus
+            className="w-full resize-none rounded-lg border border-neutral-300 bg-white/80 px-2 py-1.5 text-sm text-neutral-800 outline-none focus:border-yellow-500 dark:border-neutral-700 dark:bg-neutral-900/80 dark:text-neutral-100"
+          />
+          <div className="flex gap-1.5 text-xs">
+            <button
+              type="button"
+              onClick={handleSubmitReport}
+              disabled={reportBusy}
+              className="flex-1 rounded-lg bg-yellow-500 px-2 py-1.5 font-medium text-neutral-900 hover:bg-yellow-400 disabled:opacity-50"
+            >
+              {reportBusy ? "Pošiljam…" : "Pošlji"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setReportOpen(false);
+                setReportNote("");
+                setReportMessage(null);
+              }}
+              disabled={reportBusy}
+              className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-neutral-600 hover:border-neutral-400 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+            >
+              Prekliči
+            </button>
+          </div>
+        </div>
+      )}
+
+      {reportMessage && (
+        <p
+          role="status"
+          aria-live="polite"
+          className={`mt-2 text-xs ${
+            reportMessage.type === "error"
+              ? "text-red-600 dark:text-red-400"
+              : "text-emerald-600 dark:text-emerald-400"
+          }`}
+        >
+          {reportMessage.text}
+        </p>
+      )}
 
       {/* Podobno — začasno onemogočeno.
       {similarOpen && (

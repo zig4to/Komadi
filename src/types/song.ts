@@ -52,6 +52,18 @@ export interface QueuedSong {
   added_at: string;
 }
 
+// Prijava napake na skladbi (gumb "Prijavi napako" v meniju kartice) —
+// glej tabelo song_reports. Prikazano in upravljano v SettingsMenu.tsx
+// ("Popravi skladbe").
+export interface SongReport {
+  id: string;
+  song_id: string;
+  title: string;
+  author: string;
+  note: string | null;
+  reported_at: string;
+}
+
 // Skladba dodana na seznam "Mojih 20 skladb" (cilj učenja), ki je (še) ni v
 // glavni knjižnici — enak vzorec kot JamExtra, glej tabelo goal_extras.
 export interface GoalExtra {

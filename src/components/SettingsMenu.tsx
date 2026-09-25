@@ -6,7 +6,7 @@ import { parseImportJson, parseImportText, type ParsedImport } from "@/lib/impor
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { useTheme, type Theme } from "@/lib/useTheme";
-import type { QueuedSong, Song } from "@/types/song";
+import type { QueuedSong, Song, SongReport } from "@/types/song";
 
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: "system", label: "Sistemska" },
@@ -17,9 +17,28 @@ const THEME_OPTIONS: { value: Theme; label: string }[] = [
 export default function SettingsMenu({
   onImported,
   onOpenGoal,
+  queuedSongs = [],
+  queuedError = null,
+  onRemoveQueued,
+  onOpenQueue,
+  reports = [],
+  reportsError = null,
+  onRefreshLists,
+  onOpenFix,
 }: {
   onImported?: (songs: Song[]) => void;
   onOpenGoal?: () => void;
+  queuedSongs?: QueuedSong[];
+  queuedError?: string | null;
+  onRemoveQueued?: (id: string) => Promise<void>;
+  // Odpre celostransko stran "Čakalna vrsta".
+  onOpenQueue?: () => void;
+  reports?: SongReport[];
+  reportsError?: string | null;
+  // Ob odprtju menija: ponovno naloži čakalno vrsto in prijave napak.
+  onRefreshLists?: () => void;
+  // Odpre celostransko stran "Popravi skladbe"; s songId še obrazec za urejanje te skladbe.
+  onOpenFix?: (songId?: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -44,49 +63,39 @@ export default function SettingsMenu({
   } | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
-  // "Čakalna vrsta": hitro predlagane skladbe (glej gumb "Hitro" ob
-  // "Dodaj skladbo" v Dashboard.tsx in tabelo queued_songs) — naloži se ob
-  // vsakem odprtju menija, da se count/seznam ne postara med sejo.
+  // "Čakalna vrsta": hiter pregled hitro predlaganih skladb (gumb "Hitro" ob
+  // "Dodaj skladbo", tabela queued_songs) — seznam je v Dashboard.tsx, ki ima
+  // tudi celostransko stran "Čakalna vrsta".
   const [queuedOpen, setQueuedOpen] = useState(false);
-  const [queuedSongs, setQueuedSongs] = useState<QueuedSong[]>([]);
-  const [queuedError, setQueuedError] = useState<string | null>(null);
   const [queuedDeletingId, setQueuedDeletingId] = useState<string | null>(null);
 
   async function handleDeleteQueued(id: string) {
-    const prev = queuedSongs;
     setQueuedDeletingId(id);
-    setQueuedSongs((s) => s.filter((x) => x.id !== id));
-    const { error } = await supabase.from("queued_songs").delete().eq("id", id);
+    await onRemoveQueued?.(id);
     setQueuedDeletingId(null);
-    if (error) {
-      setQueuedSongs(prev);
-      setQueuedError(error.message);
-    }
   }
+
+  // "Popravi skladbe": samo hiter pregled prijav napak (brez označevanja
+  // popravljenega) — seznam je v Dashboard.tsx, "✓ Popravljeno" pa samo na
+  // celostranski strani "Popravi skladbe".
+  const [reportsOpen, setReportsOpen] = useState(false);
+  const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
+
+  // Prop funkcija se spremeni ob vsakem izrisu, zato jo hranimo v refu —
+  // sicer bi se učinek spodaj sprožil (in ponovno nalagal) ob vsakem izrisu.
+  const refreshListsRef = useRef(onRefreshLists);
+  useEffect(() => {
+    refreshListsRef.current = onRefreshLists;
+  });
 
   useEffect(() => () => {
     if (backupTimer.current) clearTimeout(backupTimer.current);
   }, []);
 
+  // Ob vsakem odprtju menija osveži čakalno vrsto in prijave, da se
+  // count/seznam ne postara med sejo.
   useEffect(() => {
-    if (!menuOpen) return;
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from("queued_songs")
-        .select("*")
-        .order("added_at", { ascending: true });
-      if (cancelled) return;
-      if (error) {
-        setQueuedError(error.message);
-        return;
-      }
-      setQueuedError(null);
-      setQueuedSongs(data as QueuedSong[]);
-    })();
-    return () => {
-      cancelled = true;
-    };
+    if (menuOpen) refreshListsRef.current?.();
   }, [menuOpen]);
 
   function todayStr(): string {
@@ -444,7 +453,11 @@ export default function SettingsMenu({
                 strokeLinejoin="round"
                 className="h-[18px] w-[18px] shrink-0"
               >
-                <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+                <path d="M21 15V6" />
+                <path d="M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+                <path d="M12 12H3" />
+                <path d="M16 6H3" />
+                <path d="M12 18H3" />
               </svg>
               Čakalna vrsta
               {queuedSongs.length > 0 && (
@@ -515,6 +528,179 @@ export default function SettingsMenu({
                   ))}
                 </ul>
               )}
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onOpenQueue?.();
+                }}
+                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-fuchsia-500/60 px-2 py-1.5 text-xs font-medium text-fuchsia-700 hover:bg-fuchsia-500/10 dark:text-fuchsia-400"
+              >
+                Odpri stran Čakalna vrsta
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5 shrink-0"
+                >
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setReportsOpen((v) => !v)}
+            aria-expanded={reportsOpen}
+            className="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          >
+            <span className="flex items-center gap-2">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-[18px] w-[18px] shrink-0"
+              >
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+              </svg>
+              Popravi skladbe
+              {reports.length > 0 && (
+                <span className="rounded-full bg-yellow-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-900">
+                  {reports.length}
+                </span>
+              )}
+            </span>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`h-4 w-4 shrink-0 transition-transform ${reportsOpen ? "" : "-rotate-90"}`}
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+
+          {reportsOpen && (
+            <div className="mt-1 px-3 pb-2 pt-1">
+              {reportsError && (
+                <p className="text-xs text-red-600 dark:text-red-400">{reportsError}</p>
+              )}
+              {reports.length === 0 && !reportsError && (
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  Ni prijavljenih napak.
+                </p>
+              )}
+              {reports.length > 0 && (
+                <ul className="max-h-48 space-y-1 overflow-y-auto">
+                  {reports.map((r) => {
+                    const expanded = expandedReportId === r.id;
+                    return (
+                    <li
+                      key={r.id}
+                      className="rounded-lg border border-neutral-200 px-2 py-1.5 text-xs dark:border-neutral-800"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setExpandedReportId(expanded ? null : r.id)}
+                        aria-expanded={expanded}
+                        className="flex w-full min-w-0 items-start gap-1 text-left"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium text-neutral-800 dark:text-neutral-200">
+                            {r.title}
+                          </p>
+                          <p className="truncate text-neutral-500 dark:text-neutral-400">{r.author}</p>
+                        </div>
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className={`mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400 transition-transform ${
+                            expanded ? "" : "-rotate-90"
+                          }`}
+                        >
+                          <path d="m6 9 6 6 6-6" />
+                        </svg>
+                      </button>
+
+                      {expanded && (
+                        <div className="mt-1.5 space-y-1.5 border-t border-neutral-200 pt-1.5 dark:border-neutral-800">
+                          <p className="whitespace-pre-wrap break-words text-neutral-700 dark:text-neutral-300">
+                            {r.note || (
+                              <span className="italic text-neutral-400 dark:text-neutral-500">
+                                Brez opisa.
+                              </span>
+                            )}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuOpen(false);
+                              onOpenFix?.(r.song_id);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium text-sky-600 hover:bg-neutral-100 dark:text-sky-400 dark:hover:bg-neutral-800"
+                          >
+                            <svg
+                              aria-hidden="true"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={1.8}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-3 w-3 shrink-0"
+                            >
+                              <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
+                            </svg>
+                            Uredi skladbo
+                          </button>
+                        </div>
+                      )}
+                    </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onOpenFix?.();
+                }}
+                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-yellow-500/60 px-2 py-1.5 text-xs font-medium text-yellow-700 hover:bg-yellow-500/10 dark:text-yellow-400"
+              >
+                Odpri stran Popravi skladbe
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5 shrink-0"
+                >
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </button>
             </div>
           )}
 
