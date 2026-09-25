@@ -9,7 +9,8 @@ import type { Song } from "@/types/song";
 // meni "Akordi") s povezavami za poslušanje skladbe. Spotify odpre iskanje
 // "avtor naslov" (na telefonu v aplikaciji Spotify), zato deluje za vse
 // skladbe brez shranjenih povezav. YouTube odpre shranjen video
-// (`youtube_url`) ali, če ga ni, YouTube iskanje.
+// (`youtube_url`) ali, če ga ni, YouTube iskanje. YouTube Music vedno odpre
+// iskanje.
 export default function ListenButton({
   song,
   menuAlign = "left",
@@ -31,6 +32,12 @@ export default function ListenButton({
     `https://www.youtube.com/results?search_query=${encodeURIComponent(
       `${song.author} ${song.title}${isDomestic ? "" : " lyrics"}`,
     )}`;
+  // YouTube Music: vedno iskanje "avtor naslov" (brez "lyrics" in brez
+  // shranjenega youtube_url — tam so za tuje skladbe lyric videi, YT Music pa
+  // besedilo prikaže sam in naj predvaja albumsko različico).
+  const youtubeMusicUrl = `https://music.youtube.com/search?q=${encodeURIComponent(
+    `${song.author} ${song.title}`,
+  )}`;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -97,7 +104,7 @@ export default function ListenButton({
             role="menu"
             data-view-portal
             style={{ top: menuPos.top, left: menuPos.left, right: menuPos.right }}
-            className="fixed z-50 w-36 space-y-0.5 rounded-xl border border-amber-400 bg-white p-1.5 shadow-xl dark:border-amber-400/70 dark:bg-neutral-900"
+            className="fixed z-50 w-36 space-y-0.5 rounded-xl border border-emerald-500 bg-white p-1.5 shadow-xl dark:border-emerald-400/70 dark:bg-neutral-900"
           >
             <a
               href={spotifyUrl}
@@ -141,9 +148,31 @@ export default function ListenButton({
                 className="h-[13px] w-[13px] shrink-0 text-red-500"
               >
                 <rect x="2" y="5" width="20" height="14" rx="4" />
-                <path d="m10 9 5 3-5 3Z" />
+                <path d="m10 9 5 3-5 3Z" className="fill-black stroke-black dark:fill-white dark:stroke-white" />
               </svg>
               YouTube
+            </a>
+            <a
+              href={youtubeMusicUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMenuOpen(false)}
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-[13px] w-[13px] shrink-0 text-red-500"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="m10 8.5 5.5 3.5-5.5 3.5Z" className="fill-black stroke-black dark:fill-white dark:stroke-white" />
+              </svg>
+              YouTube Music
             </a>
           </div>,
           document.body,
