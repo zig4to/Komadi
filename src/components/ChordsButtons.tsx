@@ -91,7 +91,7 @@ export default function ChordsButtons({
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           title="Akordi"
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-400 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/70 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-400/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400"
         >
           <svg
             aria-hidden="true"
