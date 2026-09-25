@@ -27,12 +27,13 @@ description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v
   bend/avtorjev portret za vse skladbe tega avtorja — preveri, ali za
   avtorja že obstaja vnos, preden iščeš/nalagaš novo sliko.
 - Storage bucket `song-chords` hrani PDF akorde, `song-images` slike.
-- **Znana past**: `formatEraLabel` v `src/components/HomeHighlights.tsx`
-  prikaže ERO "Pred 1960" IN "1960s" kot isto oznako "60's" na domači
-  strani. Preden dodeliš eno od teh dveh vrednosti, preveri (REST API
-  `select=id&era=eq.<vrednost>`), katera od njiju je trenutno dejansko v
-  uporabi (ima >0 skladb), in uporabi TISTO — sicer nastane podvojena
-  kartica (to se je enkrat že zgodilo pri uvozu CCR).
+- **Obdobje do vključno 60-ih = "Pred 1960"**: vse skladbe iz 60-ih in
+  starejše dobijo `era: "Pred 1960"` (na domači strani se prikaže kot
+  "60's"). Vrednosti "1960s" NIKOLI ne uporabi — ni v `ERAS`, a
+  `formatEraLabel` (`src/components/HomeHighlights.tsx`) bi jo prav tako
+  prikazal kot "60's" in na domači strani bi nastala podvojena kartica (to
+  se je že zgodilo; vse skladbe "1960s" so bile prestavljene na
+  "Pred 1960").
 - Vse to so SAMO podatkovne spremembe v Supabase — koda repozitorija se NE
   spreminja, zato na koncu NE delaj git commit/push (razen če si moral
   dejansko urediti kodo, npr. dodati vrednost v GENRES/DEFAULT_ORIGINS — v
@@ -203,7 +204,7 @@ uporabnik izrecno zahteva.
 ### 5. Določi metapodatke
 Za vsako skladbo razišči (splet, če nisi prepričan — ne ugibaj):
 - **era**: leto izida originalne verzije → ustrezna vrednost ERAS
-  (upoštevaj past "Pred 1960"/"1960s" iz konteksta zgoraj).
+  (60-a in starejše → "Pred 1960", nikoli "1960s" — glej kontekst zgoraj).
 - **genre**: najboljše ujemanje z GENRES. Če res nič ne ustreza, vprašaj.
 - **origin**: izvajalec iz bivše Jugoslavije → "Yugo"; slovenski → "Slovenska";
   sicer "Tuja". Če ni očitno, vprašaj.
