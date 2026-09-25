@@ -69,16 +69,29 @@ export function FavoriteCard({
   onToggleFavorite,
   onFilterAuthor,
   onChordsClick,
+  onAddToJam,
 }: {
   song: Song;
   authorImage: string | null;
   onToggleFavorite: (song: Song) => void;
   onFilterAuthor?: (author: string) => void;
   onChordsClick?: (song: Song) => void;
+  onAddToJam?: (song: Song) => void;
 }) {
   const accent = authorAccentHex(song.author);
   const [portraitSrc, setPortraitSrc] = useState<string | null>(null);
   const date = song.favorited_at ? new Date(song.favorited_at).toLocaleDateString("sl-SI", { day: "numeric", month: "short" }) : null;
+
+  // Kratek vizualni znak (kljukica namesto strele), da je jasno, da je klik
+  // na "Dodaj v Jam" nekaj naredil — enak vzorec kot na SongCard.tsx.
+  const [jamAdded, setJamAdded] = useState(false);
+  const jamAddedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (jamAddedTimer.current) clearTimeout(jamAddedTimer.current);
+    },
+    [],
+  );
 
   return (
     <div
@@ -125,7 +138,41 @@ export function FavoriteCard({
           </button>
           {date && <span className="shrink-0">· {date}</span>}
         </p>
-        <ChordsButtons song={song} onChordsClick={onChordsClick} merged />
+        <span className="mt-1 inline-flex items-center gap-1">
+          <ChordsButtons song={song} onChordsClick={onChordsClick} merged />
+          {onAddToJam && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToJam(song);
+                setJamAdded(true);
+                if (jamAddedTimer.current) clearTimeout(jamAddedTimer.current);
+                jamAddedTimer.current = setTimeout(() => setJamAdded(false), 1400);
+              }}
+              aria-label={jamAdded ? "Dodano v Jam" : "Dodaj v Jam"}
+              title={jamAdded ? "Dodano v Jam" : "Dodaj v Jam"}
+              className={`inline-flex shrink-0 items-center p-0.5 transition ${
+                jamAdded
+                  ? "text-emerald-500 dark:text-emerald-400"
+                  : "text-fuchsia-500 hover:text-fuchsia-600 dark:text-fuchsia-400 dark:hover:text-fuchsia-300"
+              }`}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-[15px] w-[15px] shrink-0"
+              >
+                {jamAdded ? <path d="M20 6 9 17l-5-5" /> : <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />}
+              </svg>
+            </button>
+          )}
+        </span>
       </div>
 
       {/* Velika obrobna zvezda kot ikona v ozadju, ki jo desni rob kartice
@@ -148,6 +195,7 @@ type CardHandlers = {
   onToggleFavorite: (song: Song) => void;
   onFilterAuthor?: (author: string) => void;
   onChordsClick?: (song: Song) => void;
+  onAddToJam?: (song: Song) => void;
 };
 
 function CardGrid({ songs, authorImages, ...handlers }: { songs: Song[] } & CardHandlers) {

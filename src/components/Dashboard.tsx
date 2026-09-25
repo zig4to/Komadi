@@ -2266,6 +2266,7 @@ export default function Dashboard() {
               handleFilterByAuthor(author);
             }}
             onChordsClick={handleChordsClick}
+            onAddToJam={handleAddToJam}
           />
         </div>
       ) : queueOpen ? (
@@ -3141,6 +3142,7 @@ export default function Dashboard() {
                   onToggleFavorite={handleToggleFavorite}
                   onFilterAuthor={handleFilterByAuthor}
                   onChordsClick={handleChordsClick}
+                  onAddToJam={handleAddToJam}
                 />
                 <HomeHighlights
                   eras={eraHighlights}
