@@ -174,6 +174,11 @@ export default function SongForm({
       chords_source_url: form.chords_source_url?.trim() || null,
       zabrenkaj_url: form.zabrenkaj_url?.trim() || null,
       other_chords_url: form.other_chords_url?.trim() || null,
+      // Datum ob označitvi kot priljubljena (za "Priljubljeno ta mesec"); pri
+      // že priljubljeni skladbi ostane prvotni datum, ob odznačitvi null.
+      favorited_at: form.favorite
+        ? (initial?.favorite ? initial.favorited_at : null) ?? new Date().toISOString()
+        : null,
     };
 
     const { data, error: dbError } = initial

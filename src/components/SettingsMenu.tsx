@@ -25,6 +25,8 @@ export default function SettingsMenu({
   reportsError = null,
   onRefreshLists,
   onOpenFix,
+  onOpenFavArchive,
+  favArchiveMonthCount = 0,
 }: {
   onImported?: (songs: Song[]) => void;
   onOpenGoal?: () => void;
@@ -39,6 +41,9 @@ export default function SettingsMenu({
   onRefreshLists?: () => void;
   // Odpre celostransko stran "Popravi skladbe"; s songId še obrazec za urejanje te skladbe.
   onOpenFix?: (songId?: string) => void;
+  // Odpre celostransko stran "Arhiv priljubljenih" (pretekli meseci).
+  onOpenFavArchive?: () => void;
+  favArchiveMonthCount?: number;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -703,6 +708,36 @@ export default function SettingsMenu({
               </button>
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              onOpenFavArchive?.();
+            }}
+            className="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          >
+            <span className="flex items-center gap-2">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-[18px] w-[18px] shrink-0"
+              >
+                <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />
+              </svg>
+              Arhiv priljubljenih
+            </span>
+            {favArchiveMonthCount > 0 && (
+              <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-900">
+                {favArchiveMonthCount}
+              </span>
+            )}
+          </button>
 
           <button
             type="button"

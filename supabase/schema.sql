@@ -287,3 +287,8 @@ create policy "Public update import batches" on public.import_batches
 -- supabase/migrations/0022_add_other_chords_url.sql.
 alter table public.songs
   add column if not exists other_chords_url text;
+
+-- Kdaj je bila skladba označena kot priljubljena, glej
+-- supabase/migrations/0023_add_favorited_at.sql.
+alter table public.songs
+  add column if not exists favorited_at timestamptz;

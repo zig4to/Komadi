@@ -14,6 +14,7 @@ import SortMenu, { SONG_SORTS } from "@/components/SortMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
 import { ImportHistory, ImportReports } from "@/components/ImportTabs";
+import { FavoritesArchive, FavoritesThisMonth, favoriteArchiveMonths } from "@/components/FavoritesMonth";
 import { authorAccentHex } from "@/lib/authorColor";
 import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
 import { pickDailyFeatured } from "@/lib/dailyRandom";
@@ -172,6 +173,8 @@ export default function Dashboard() {
   // reports zgoraj) — enak vzorec odprtosti kot Jam/Mojih 20 skladb.
   const [fixOpen, setFixOpen] = usePersistentBool("komadi:fix:open", false);
   const [queueOpen, setQueueOpen] = usePersistentBool("komadi:queue:open", false);
+  // "Arhiv priljubljenih": priljubljene preteklih mesecev (FavoritesMonth.tsx).
+  const [favArchiveOpen, setFavArchiveOpen] = usePersistentBool("komadi:favarchive:open", false);
   // Isti localStorage ključ kot FiltersToggle/Filters v Filters.tsx — da lahko
   // "Počisti filtre" (glej handleBackFromFilter) zapre tudi panel s filtri.
   const [, setFiltersOpen] = usePersistentBool("komadi:filters:open", false);
@@ -817,10 +820,20 @@ export default function Dashboard() {
     }
   }
 
+  function openFavArchive() {
+    setJamOpen(false);
+    setGoalOpen(false);
+    setFixOpen(false);
+    setQueueOpen(false);
+    setFavArchiveOpen(true);
+    window.scrollTo({ top: 0 });
+  }
+
   function openQueue() {
     setJamOpen(false);
     setGoalOpen(false);
     setFixOpen(false);
+    setFavArchiveOpen(false);
     setQueueOpen(true);
     refreshImportBatches();
     window.scrollTo({ top: 0 });
@@ -901,6 +914,7 @@ export default function Dashboard() {
     setJamOpen(false);
     setGoalOpen(false);
     setQueueOpen(false);
+    setFavArchiveOpen(false);
     setFixOpen(true);
     const song = songId ? songs.find((s) => s.id === songId) : undefined;
     if (song) handleEdit(song);
@@ -1013,6 +1027,25 @@ export default function Dashboard() {
     }
     if (data) setQueuedSongs((prev) => [...prev, data as QueuedSong]);
     closeQuickAdd();
+  }
+
+  // "Priljubljena" v meniju kartice (SongCard.tsx) — preklopi song.favorite
+  // takoj lokalno, nato v bazi; ob napaki vrne prejšnjo vrednost.
+  async function handleToggleFavorite(song: Song) {
+    // favorited_at določa mesec v "Priljubljeno ta mesec" / arhivu.
+    const next = { favorite: !song.favorite, favorited_at: song.favorite ? null : new Date().toISOString() };
+    const prev = { favorite: song.favorite, favorited_at: song.favorited_at };
+    const apply = (value: typeof next) => {
+      setSongs((list) => list.map((x) => (x.id === song.id ? { ...x, ...value } : x)));
+      setRandomPick((p) => (p?.id === song.id ? { ...p, ...value } : p));
+      setRandomFive((list) => list?.map((x) => (x.id === song.id ? { ...x, ...value } : x)) ?? null);
+    };
+    apply(next);
+    const { error } = await supabase.from("songs").update(next).eq("id", song.id);
+    if (error) {
+      apply(prev);
+      alert("Napaka pri shranjevanju priljubljene: " + error.message);
+    }
   }
 
   async function handleAddToJam(song: Song) {
@@ -1196,6 +1229,7 @@ export default function Dashboard() {
   useBackableOpen(goalOpen, () => setGoalOpen(false));
   useBackableOpen(fixOpen, () => setFixOpen(false));
   useBackableOpen(queueOpen, () => setQueueOpen(false));
+  useBackableOpen(favArchiveOpen, () => setFavArchiveOpen(false));
   useBackableOpen(goalPickerOpen, () => setGoalPickerOpen(false));
 
   // Obrazec za urejanje se izriše takoj pod kartico skladbe, ki jo urejamo
@@ -1437,6 +1471,45 @@ export default function Dashboard() {
               Nazaj
             </button>
           </>
+        ) : favArchiveOpen ? (
+          <>
+            <h1 className="flex items-center gap-2">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-6 w-6 shrink-0 text-amber-500 dark:text-amber-400"
+              >
+                <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />
+              </svg>
+              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
+                Arhiv priljubljenih
+              </span>
+            </h1>
+            <button
+              type="button"
+              onClick={() => setFavArchiveOpen(false)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-amber-600 dark:text-neutral-300 dark:hover:text-amber-400"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4 shrink-0"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              Nazaj
+            </button>
+          </>
         ) : queueOpen ? (
           <>
             <h1 className="flex items-center gap-2">
@@ -1595,6 +1668,7 @@ export default function Dashboard() {
                     setJamOpen(false);
                     setFixOpen(false);
                     setQueueOpen(false);
+                    setFavArchiveOpen(false);
                     setGoalOpen(true);
                   }}
                   queuedSongs={queuedSongs}
@@ -1608,6 +1682,8 @@ export default function Dashboard() {
                     refreshQueued();
                   }}
                   onOpenFix={openFix}
+                  onOpenFavArchive={openFavArchive}
+                  favArchiveMonthCount={favoriteArchiveMonths(songs).length}
                 />
               </div>
             </div>
@@ -2054,6 +2130,20 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+      ) : favArchiveOpen ? (
+        <div className="mt-3! space-y-4">
+          <hr className="border-t border-neutral-200 dark:border-neutral-800" />
+          <FavoritesArchive
+            songs={songs}
+            authorImages={authorImages}
+            onToggleFavorite={handleToggleFavorite}
+            onFilterAuthor={(author) => {
+              setFavArchiveOpen(false);
+              handleFilterByAuthor(author);
+            }}
+            onChordsClick={handleChordsClick}
+          />
+        </div>
       ) : queueOpen ? (
         <div className="mt-3! space-y-4">
           <hr className="border-t border-neutral-200 dark:border-neutral-800" />
@@ -2269,6 +2359,7 @@ export default function Dashboard() {
                       onAddToJam={handleAddToJam}
                       onChordsClick={handleChordsClick}
                       onReported={handleReported}
+                      onToggleFavorite={handleToggleFavorite}
                     />
                   </div>
                   <div className="relative space-y-2 border-t border-dashed border-yellow-500/50 px-3 pb-3 pt-2.5 text-sm dark:border-yellow-400/40">
@@ -2549,6 +2640,7 @@ export default function Dashboard() {
                 onAddToJam={handleAddToJam}
                 onChordsClick={handleChordsClick}
                 onReported={handleReported}
+                onToggleFavorite={handleToggleFavorite}
                 highlighted
               />
               {renderEditForm(randomPick)}
@@ -2588,6 +2680,7 @@ export default function Dashboard() {
                             onAddToJam={handleAddToJam}
                             onChordsClick={handleChordsClick}
                             onReported={handleReported}
+                            onToggleFavorite={handleToggleFavorite}
                           />
                           {randomPick?.id !== song.id && renderEditForm(song)}
                         </div>
@@ -2795,6 +2888,7 @@ export default function Dashboard() {
                   setGoalOpen(false);
                   setFixOpen(false);
                   setQueueOpen(false);
+                  setFavArchiveOpen(false);
                 }}
                 disabled={!isSupabaseConfigured}
                 aria-pressed={jamOpen}
@@ -2953,6 +3047,13 @@ export default function Dashboard() {
             activeView === "list" &&
             !hasActiveFilters(filters) && (
               <div className="mt-3! space-y-0">
+                <FavoritesThisMonth
+                  songs={songs}
+                  authorImages={authorImages}
+                  onToggleFavorite={handleToggleFavorite}
+                  onFilterAuthor={handleFilterByAuthor}
+                  onChordsClick={handleChordsClick}
+                />
                 <HomeHighlights
                   eras={eraHighlights}
                   genres={genreHighlights}
@@ -3157,6 +3258,7 @@ export default function Dashboard() {
                             onAddToJam={handleAddToJam}
                             onChordsClick={handleChordsClick}
                             onReported={handleReported}
+                            onToggleFavorite={handleToggleFavorite}
                           />
                           {randomPick?.id !== song.id && renderEditForm(song)}
                         </div>

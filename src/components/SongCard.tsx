@@ -24,6 +24,7 @@ export default function SongCard({
   onAddToJam,
   onChordsClick,
   onReported,
+  onToggleFavorite,
   highlighted = false,
 }: {
   song: Song;
@@ -35,6 +36,7 @@ export default function SongCard({
   onChordsClick?: (song: Song) => void;
   onAddToJam?: (song: Song) => void;
   onReported?: (report: SongReport) => void;
+  onToggleFavorite?: (song: Song) => void;
   highlighted?: boolean;
 }) {
   // Podobno (similar-songs) — začasno onemogočeno.
@@ -241,7 +243,7 @@ export default function SongCard({
               e.stopPropagation();
               if (!actionsOpen) {
                 const rect = e.currentTarget.getBoundingClientRect();
-                setActionsMenuPos({ top: rect.bottom + 4, left: rect.right - 160 });
+                setActionsMenuPos({ top: rect.bottom + 4, left: rect.right - 192 });
               }
               setActionsOpen((v) => !v);
             }}
@@ -274,7 +276,7 @@ export default function SongCard({
                 role="menu"
                 data-view-portal
                 style={{ top: actionsMenuPos.top, left: actionsMenuPos.left }}
-                className="fixed z-50 w-40 space-y-0.5 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
+                className="fixed z-50 w-48 space-y-0.5 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
               >
                 <button
                   type="button"
@@ -374,6 +376,32 @@ export default function SongCard({
                   </svg>
                   Prijavi napako
                 </button>
+
+                {onToggleFavorite && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActionsOpen(false);
+                      onToggleFavorite(song);
+                    }}
+                    aria-pressed={song.favorite}
+                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill={song.favorite ? "currentColor" : "none"}
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-[13px] w-[13px] shrink-0 text-amber-500 dark:text-amber-400"
+                    >
+                      <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />
+                    </svg>
+                    {song.favorite ? "Odstrani iz priljubljenih" : "Priljubljena"}
+                  </button>
+                )}
               </div>,
               document.body,
             )}
