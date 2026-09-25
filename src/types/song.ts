@@ -47,6 +47,16 @@ export interface SimilarSong {
 
 // Skladba dodana v Jam, ki je (še) ni v glavni knjižnici — glej gumb
 // "Skladbe ni" in tabelo jam_extras v Dashboard.tsx.
+// Ena skladba iz preteklega Jama (tabela jam_history) — song_id je null za
+// "Skladbe ni" vnose in za skladbe, ki so bile medtem izbrisane iz knjižnice.
+export interface JamHistoryEntry {
+  id: string;
+  song_id: string | null;
+  title: string;
+  author: string;
+  added_at: string;
+}
+
 export interface JamExtra {
   id: string;
   title: string;

@@ -26,6 +26,7 @@ export default function SettingsMenu({
   onRefreshLists,
   onOpenFix,
   onOpenFavArchive,
+  onOpenJamArchive,
   favArchiveMonthCount = 0,
 }: {
   onImported?: (songs: Song[]) => void;
@@ -43,6 +44,8 @@ export default function SettingsMenu({
   onOpenFix?: (songId?: string) => void;
   // Odpre celostransko stran "Arhiv priljubljenih" (pretekli meseci).
   onOpenFavArchive?: () => void;
+  // Odpre Jam s prikazanim arhivom preteklih Jamov.
+  onOpenJamArchive?: () => void;
   favArchiveMonthCount?: number;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -737,6 +740,31 @@ export default function SettingsMenu({
                 {favArchiveMonthCount}
               </span>
             )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              onOpenJamArchive?.();
+            }}
+            className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-[18px] w-[18px] shrink-0"
+            >
+              <rect width="20" height="5" x="2" y="3" rx="1" />
+              <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+              <path d="M10 12h4" />
+            </svg>
+            Arhiv Jam-a
           </button>
 
           <button

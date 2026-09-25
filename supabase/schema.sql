@@ -292,3 +292,23 @@ alter table public.songs
 -- supabase/migrations/0023_add_favorited_at.sql.
 alter table public.songs
   add column if not exists favorited_at timestamptz;
+
+-- Arhiv Jama, glej supabase/migrations/0024_add_jam_history.sql.
+create table if not exists public.jam_history (
+  id uuid primary key default gen_random_uuid(),
+  song_id uuid references public.songs (id) on delete set null,
+  title text not null,
+  author text not null,
+  added_at timestamptz not null default now()
+);
+
+alter table public.jam_history enable row level security;
+
+create policy "Public read jam history" on public.jam_history
+  for select using (true);
+
+create policy "Public insert jam history" on public.jam_history
+  for insert with check (true);
+
+create policy "Public delete jam history" on public.jam_history
+  for delete using (true);

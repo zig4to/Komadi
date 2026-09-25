@@ -13,6 +13,7 @@ import SettingsMenu from "@/components/SettingsMenu";
 import SortMenu, { SONG_SORTS } from "@/components/SortMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
+import JamArchive from "@/components/JamArchive";
 import { ImportHistory, ImportReports } from "@/components/ImportTabs";
 import { FavoritesArchive, FavoritesThisMonth, favoriteArchiveMonths } from "@/components/FavoritesMonth";
 import { authorAccentHex } from "@/lib/authorColor";
@@ -35,6 +36,7 @@ import type {
   SongReport,
   QueuedSong,
   ImportBatch,
+  JamHistoryEntry,
 } from "@/types/song";
 
 const QUEUE_TABS = ["queue", "reports", "history"] as const;
@@ -158,6 +160,11 @@ export default function Dashboard() {
   // vrže nazaj na domačo stran — glej usePersistentBool.
   const [jamOpen, setJamOpen] = usePersistentBool("komadi:jam:open", false);
   const [jamPickerOpen, setJamPickerOpen] = useState(false);
+  // Arhiv Jama (tabela jam_history): gumb "Arhiv" na sredini glave, ko je
+  // Jam odprt; pod črto nato namesto trenutnega Jama pokaže pretekle.
+  const [jamArchiveOpen, setJamArchiveOpen] = useState(false);
+  const [jamHistory, setJamHistory] = useState<JamHistoryEntry[]>([]);
+  const [jamHistoryError, setJamHistoryError] = useState<string | null>(null);
   const [jamPickerQuery, setJamPickerQuery] = useState("");
   const [jamExtras, setJamExtras] = useState<JamExtra[]>([]);
   const [jamQuickAddOpen, setJamQuickAddOpen] = useState(false);
@@ -1063,6 +1070,28 @@ export default function Dashboard() {
       .from("songs")
       .update({ jam_added_at: jamAddedAt, jam_played: false })
       .eq("id", song.id);
+    recordJamHistory({ song_id: song.id, title: song.title, author: song.author, added_at: jamAddedAt });
+  }
+
+  // Vsako dodajanje v Jam se zapiše tudi v arhiv (jam_history), ki ostane po
+  // odstranitvi iz Jama. Neuspeh zapisa ne ustavi dodajanja v Jam.
+  async function recordJamHistory(entry: Omit<JamHistoryEntry, "id">) {
+    const { data } = await supabase.from("jam_history").insert(entry).select().single();
+    if (data) setJamHistory((h) => [...h, data as JamHistoryEntry]);
+  }
+
+  async function openJamArchive() {
+    setJamArchiveOpen(true);
+    const { data, error } = await supabase
+      .from("jam_history")
+      .select("*")
+      .order("added_at", { ascending: true });
+    if (error) {
+      setJamHistoryError(error.message);
+      return;
+    }
+    setJamHistoryError(null);
+    setJamHistory(data as JamHistoryEntry[]);
   }
 
   async function handleToggleJamPlayed(song: Song) {
@@ -1107,6 +1136,7 @@ export default function Dashboard() {
       return;
     }
     setJamExtras((s) => [...s, data as JamExtra]);
+    recordJamHistory({ song_id: null, title, author, added_at: (data as JamExtra).added_at });
     setJamQuickAddOpen(false);
     setJamQuickAddTitle("");
     setJamQuickAddAuthor("");
@@ -1226,6 +1256,7 @@ export default function Dashboard() {
   useBackableOpen(quickAddOpen, closeQuickAdd);
   useBackableOpen(jamOpen, () => setJamOpen(false));
   useBackableOpen(jamPickerOpen, () => setJamPickerOpen(false));
+  useBackableOpen(jamOpen && jamArchiveOpen, () => setJamArchiveOpen(false));
   useBackableOpen(goalOpen, () => setGoalOpen(false));
   useBackableOpen(fixOpen, () => setFixOpen(false));
   useBackableOpen(queueOpen, () => setQueueOpen(false));
@@ -1390,7 +1421,7 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 space-y-6 lg:max-w-6xl">
-      <header className="flex items-center justify-between">
+      <header className="relative flex items-center justify-between">
         {jamOpen ? (
           <>
             <h1 className="flex items-center gap-2">
@@ -1412,7 +1443,37 @@ export default function Dashboard() {
             </h1>
             <button
               type="button"
-              onClick={() => setJamOpen(false)}
+              onClick={() => (jamArchiveOpen ? setJamArchiveOpen(false) : openJamArchive())}
+              aria-pressed={jamArchiveOpen}
+              title={jamArchiveOpen ? "Nazaj na trenutni Jam" : "Arhiv preteklih Jamov"}
+              className={`absolute left-1/2 hidden -translate-x-1/2 items-center gap-1.5 rounded-full border border-fuchsia-500/40 px-4 py-1.5 text-sm font-medium transition lg:inline-flex ${
+                jamArchiveOpen
+                  ? "bg-fuchsia-600 text-white"
+                  : "text-neutral-600 hover:bg-fuchsia-500/10 hover:text-fuchsia-600 dark:text-neutral-300 dark:hover:text-fuchsia-400"
+              }`}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4 shrink-0"
+              >
+                <rect width="20" height="5" x="2" y="3" rx="1" />
+                <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+                <path d="M10 12h4" />
+              </svg>
+              Arhiv
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setJamOpen(false);
+                setJamArchiveOpen(false);
+              }}
               className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-fuchsia-600 dark:text-neutral-300 dark:hover:text-fuchsia-400"
             >
               <svg
@@ -1683,6 +1744,15 @@ export default function Dashboard() {
                   }}
                   onOpenFix={openFix}
                   onOpenFavArchive={openFavArchive}
+                  onOpenJamArchive={() => {
+                    setGoalOpen(false);
+                    setFixOpen(false);
+                    setQueueOpen(false);
+                    setFavArchiveOpen(false);
+                    setJamOpen(true);
+                    openJamArchive();
+                    window.scrollTo({ top: 0 });
+                  }}
                   favArchiveMonthCount={favoriteArchiveMonths(songs).length}
                 />
               </div>
@@ -1695,6 +1765,33 @@ export default function Dashboard() {
         <div className="mt-3! space-y-4">
           <hr className="border-t border-neutral-200 dark:border-neutral-800" />
 
+          {jamArchiveOpen ? (
+            <JamArchive
+              entries={jamHistory}
+              songs={songs}
+              error={jamHistoryError}
+              renderSongCard={(song) => (
+                <>
+                  <SongCard
+                    song={song}
+                    authorImage={authorImages[song.author] ?? null}
+                    onEdit={handleEdit}
+                    onFilterAuthor={(author) => {
+                      setJamOpen(false);
+                      setJamArchiveOpen(false);
+                      handleFilterByAuthor(author);
+                    }}
+                    onAddToJam={handleAddToJam}
+                    onChordsClick={handleChordsClick}
+                    onReported={handleReported}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                  {renderEditForm(song)}
+                </>
+              )}
+            />
+          ) : (
+          <>
           {jamPickerOpen ? (
             <div className="space-y-3">
               <input
@@ -1920,6 +2017,8 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+          )}
+          </>
           )}
         </div>
       ) : goalOpen ? (
