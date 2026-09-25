@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import ChordsButtons from "@/components/ChordsButtons";
 import { authorAccentHsl } from "@/lib/authorColor";
+import { PORTRAIT_FOCUS_Y } from "@/lib/constants";
 import { supabase } from "@/lib/supabaseClient";
 import type { SimilarSong, Song, SongReport } from "@/types/song";
 
@@ -45,6 +46,12 @@ export default function SongCard({
   // Izbriši/Uredi/Dodaj v Jam so združeni v en meni gumb (hamburger) v
   // zgornjem desnem kotu kartice — enak vzorec kot združen "Akordi" gumb v
   // ChordsButtons.tsx (portal, pozicioniran prek getBoundingClientRect).
+  // Pokončna slika avtorja (portret): prikažemo zgornji del namesto sredine,
+  // sicer ozek, širok izrez kartice odreže glavo (ljudje so slikani stoje,
+  // glava je v zgornji tretjini). Hranimo src, da se ob menjavi slike ne
+  // prenese stara vrednost.
+  const [portraitSrc, setPortraitSrc] = useState<string | null>(null);
+
   const [actionsOpen, setActionsOpen] = useState(false);
   const [actionsMenuPos, setActionsMenuPos] = useState<{ top: number; left: number } | null>(null);
   const actionsButtonRef = useRef<HTMLButtonElement>(null);
@@ -169,10 +176,15 @@ export default function SongCard({
           aria-hidden="true"
           loading="lazy"
           decoding="async"
-          className="pointer-events-none absolute inset-y-0 -right-8 h-full w-[63%] object-cover object-right opacity-60 lg:opacity-20"
+          onLoad={(e) => {
+            const img = e.currentTarget;
+            if (img.naturalHeight > img.naturalWidth) setPortraitSrc(authorImage);
+          }}
+          className="pointer-events-none absolute inset-y-0 -right-8 h-full w-[63%] object-cover opacity-60 lg:opacity-20"
           style={{
             clipPath: IMAGE_CLIP_PATH,
             zIndex: -1,
+            objectPosition: portraitSrc === authorImage ? `right ${PORTRAIT_FOCUS_Y}` : "right center",
           }}
         />
       )}

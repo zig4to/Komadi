@@ -66,3 +66,9 @@ export const DEFAULT_MOODS = [
 // izvor se shrani kot navadno besedilo in se nato pojavi v seznamih za
 // izbiro/filtriranje.
 export const DEFAULT_ORIGINS = ["Slovenska", "Tuja", "Yugo", "Španska"] as const;
+
+// Pokončne (portretne) slike avtorjev se na karticah izrežejo od tega
+// navpičnega položaja namesto od sredine — ljudje so slikani stoje in glava
+// je v zgornji tretjini, sredinski izrez pa jo odreže (SongCard.tsx,
+// HomeHighlights.tsx).
+export const PORTRAIT_FOCUS_Y = "20%";

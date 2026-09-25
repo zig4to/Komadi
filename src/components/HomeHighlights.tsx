@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { JSX } from "react";
-import { ERA_IMAGES } from "@/lib/constants";
+import { ERA_IMAGES, PORTRAIT_FOCUS_Y } from "@/lib/constants";
 
 // Ena preprosta, polnobarvna (solid) ikona na žanr — črne barve, prikazana
 // pod ločilno črto na kartici. Ključi se morajo ujemati z GENRES v
@@ -213,13 +213,19 @@ export function HighlightRow({
   // manjka (uporabnik je še ni naložil v public/images/eras/), kartica
   // ostane enaka kot brez slik (isti hook mora teči pred zgodnjim return).
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
+  // Pokončne slike (npr. portret avtorja): izrez od zgornjega dela, ne od
+  // sredine, da glava ostane vidna (PORTRAIT_FOCUS_Y v constants.ts).
+  const [portraitImages, setPortraitImages] = useState<Set<string>>(new Set());
   useEffect(() => {
     if (!images) return;
     let cancelled = false;
     for (const url of new Set(Object.values(images))) {
       const img = new Image();
       img.onload = () => {
-        if (!cancelled) setLoadedImages((prev) => (prev.has(url) ? prev : new Set(prev).add(url)));
+        if (cancelled) return;
+        setLoadedImages((prev) => (prev.has(url) ? prev : new Set(prev).add(url)));
+        if (img.naturalHeight > img.naturalWidth)
+          setPortraitImages((prev) => (prev.has(url) ? prev : new Set(prev).add(url)));
       };
       img.src = url;
     }
@@ -303,7 +309,11 @@ export function HighlightRow({
                 <span
                   aria-hidden="true"
                   className={`absolute inset-0 ${imageOpacityClassName}`}
-                  style={{ backgroundImage: `url(${image})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                  style={{
+                    backgroundImage: `url(${image})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: portraitImages.has(image) ? `center ${PORTRAIT_FOCUS_Y}` : "center",
+                  }}
                 />
               )}
               {image && (
