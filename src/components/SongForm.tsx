@@ -219,16 +219,6 @@ export default function SongForm({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Naslov skladbe *">
-          <input
-            required
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className={inputClass}
-            placeholder="npr. Wonderwall"
-          />
-        </Field>
-
         <Field label="Avtor / izvajalec *">
           <input
             required
@@ -236,6 +226,16 @@ export default function SongForm({
             onChange={(e) => setForm({ ...form, author: e.target.value })}
             className={inputClass}
             placeholder="npr. Oasis"
+          />
+        </Field>
+
+        <Field label="Naslov skladbe *">
+          <input
+            required
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            className={inputClass}
+            placeholder="npr. Wonderwall"
           />
         </Field>
 

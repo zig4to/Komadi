@@ -14,6 +14,8 @@ import SortMenu, { SONG_SORTS } from "@/components/SortMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
 import JamArchive from "@/components/JamArchive";
+import VoiceQuickAdd from "@/components/VoiceQuickAdd";
+import AddChoiceIcons from "@/components/AddChoiceIcons";
 import { ImportHistory, ImportReports } from "@/components/ImportTabs";
 import { FavoritesArchive, FavoritesThisMonth, favoriteArchiveMonths } from "@/components/FavoritesMonth";
 import { authorAccentHex } from "@/lib/authorColor";
@@ -40,6 +42,7 @@ import type {
 } from "@/types/song";
 
 const QUEUE_TABS = ["queue", "reports", "history"] as const;
+const SONGS_VISIBLE_VALUES = ["unset", "1", "0"] as const;
 const QUEUE_TAB_LABELS: Record<(typeof QUEUE_TABS)[number], string> = {
   queue: "Čakalna vrsta",
   reports: "Poročila",
@@ -139,19 +142,30 @@ export default function Dashboard() {
   // odpre obstoječi celoten SongForm (showForm, brez sprememb).
   const [addChoiceOpen, setAddChoiceOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  // "Glasovno": naslov in izvajalca narekuješ, nato se odpre obrazec "Hitro".
+  const [voiceAddOpen, setVoiceAddOpen] = useState(false);
   const [quickAddTitle, setQuickAddTitle] = useState("");
   const [quickAddAuthor, setQuickAddAuthor] = useState("");
   const [quickAddError, setQuickAddError] = useState<string | null>(null);
   const [quickAddBusy, setQuickAddBusy] = useState(false);
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
-  const [songsVisible, setSongsVisible] = useState(true);
+  const [defaultSongsVisible, setDefaultSongsVisible] = useState(true);
   // Na namizju (lg) je seznam vseh skladb privzeto skrit — na mobilnem
   // ostane viden (podatek o širini zaslona ni na voljo pred hidracijo, zato
   // to preveri šele po prvem izrisu).
   useEffect(() => {
     if (window.matchMedia("(min-width: 1024px)").matches)
-      setSongsVisible(false);
+      setDefaultSongsVisible(false);
   }, []);
+  // Izbira "Prikaži"/"Skrij komade" se zapomni (localStorage) in preživi
+  // osvežitev; dokler je uporabnik ne spremeni, velja privzeto zgoraj.
+  const [storedSongsVisible, setStoredSongsVisible] = usePersistentString(
+    "komadi:songs:visible",
+    "unset",
+    SONGS_VISIBLE_VALUES,
+  );
+  const songsVisible =
+    storedSongsVisible === "unset" ? defaultSongsVisible : storedSongsVisible === "1";
   const [randomPick, setRandomPick] = useState<Song | null>(null);
   const [activeView, setActiveView] = useState<"list" | "newest" | "popular">(
     "list",
@@ -1022,18 +1036,26 @@ export default function Dashboard() {
     }
     setQuickAddBusy(true);
     setQuickAddError(null);
+    const error = await addToQueue(title, author);
+    setQuickAddBusy(false);
+    if (error) {
+      setQuickAddError(error);
+      return;
+    }
+    closeQuickAdd();
+  }
+
+  // Zapis v čakalno vrsto (queued_songs) — skupno za "Hitro" in "Glasovno".
+  // Vrne sporočilo napake ali null.
+  async function addToQueue(title: string, author: string): Promise<string | null> {
     const { data, error } = await supabase
       .from("queued_songs")
       .insert({ title, author })
       .select()
       .single();
-    setQuickAddBusy(false);
-    if (error) {
-      setQuickAddError(error.message);
-      return;
-    }
+    if (error) return error.message;
     if (data) setQueuedSongs((prev) => [...prev, data as QueuedSong]);
-    closeQuickAdd();
+    return null;
   }
 
   // "Priljubljena" v meniju kartice (SongCard.tsx) — preklopi song.favorite
@@ -1254,6 +1276,7 @@ export default function Dashboard() {
   useBackableOpen(showForm || editing !== null, closeForm);
   useBackableOpen(addChoiceOpen, () => setAddChoiceOpen(false));
   useBackableOpen(quickAddOpen, closeQuickAdd);
+  useBackableOpen(voiceAddOpen, () => setVoiceAddOpen(false));
   useBackableOpen(jamOpen, () => setJamOpen(false));
   useBackableOpen(jamPickerOpen, () => setJamPickerOpen(false));
   useBackableOpen(jamOpen && jamArchiveOpen, () => setJamArchiveOpen(false));
@@ -1687,7 +1710,9 @@ export default function Dashboard() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => {
-                  if (quickAddOpen) {
+                  if (voiceAddOpen) {
+                    setVoiceAddOpen(false);
+                  } else if (quickAddOpen) {
                     closeQuickAdd();
                   } else if (showForm || editing) {
                     closeForm();
@@ -2803,66 +2828,30 @@ export default function Dashboard() {
                   Zapri ✕
                 </button>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddChoiceOpen(false);
-                    setQuickAddOpen(true);
-                  }}
-                  className="flex flex-col items-start gap-1.5 rounded-xl border border-fuchsia-500/40 bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] p-4 text-left transition hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.24)_15%,rgba(192,38,211,0.06)_95%)] dark:border-fuchsia-400/40 dark:hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.32)_15%,rgba(192,38,211,0.1)_95%)]"
-                >
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.8}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-5 w-5 shrink-0 text-fuchsia-600 dark:text-fuchsia-400"
-                  >
-                    <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
-                  </svg>
-                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                    Hitro
-                  </span>
-                  <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                    Samo naslov in avtor — za hiter predlog v čakalno vrsto.
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddChoiceOpen(false);
-                    setEditing(null);
-                    setPrefillDraft(null);
-                    setShowForm(true);
-                  }}
-                  className="flex flex-col items-start gap-1.5 rounded-xl border border-emerald-500/40 bg-[linear-gradient(115deg,rgba(16,185,129,0.14)_15%,rgba(16,185,129,0.03)_95%)] p-4 text-left transition hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.24)_15%,rgba(16,185,129,0.06)_95%)] dark:border-emerald-400/40 dark:hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.32)_15%,rgba(16,185,129,0.1)_95%)]"
-                >
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.8}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
-                  >
-                    <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
-                    <path d="M12 18h.01" />
-                  </svg>
-                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                    Prek telefona
-                  </span>
-                  <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                    Celoten obrazec z vsemi podatki (žanr, obdobje, akordi …).
-                  </span>
-                </button>
-              </div>
+              <AddChoiceIcons
+                onVoice={() => {
+                  setAddChoiceOpen(false);
+                  setVoiceAddOpen(true);
+                }}
+                onQuick={() => {
+                  setAddChoiceOpen(false);
+                  setQuickAddOpen(true);
+                }}
+                onPhone={() => {
+                  setAddChoiceOpen(false);
+                  setEditing(null);
+                  setPrefillDraft(null);
+                  setShowForm(true);
+                }}
+              />
             </div>
+          )}
+
+          {voiceAddOpen && (
+            <VoiceQuickAdd
+              onCancel={() => setVoiceAddOpen(false)}
+              onAdd={(title, author) => addToQueue(title, author)}
+            />
           )}
 
           {quickAddOpen && (
@@ -2882,15 +2871,15 @@ export default function Dashboard() {
               </div>
               <input
                 autoFocus
-                value={quickAddTitle}
-                onChange={(e) => setQuickAddTitle(e.target.value)}
-                placeholder="Naslov skladbe"
-                className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
-              />
-              <input
                 value={quickAddAuthor}
                 onChange={(e) => setQuickAddAuthor(e.target.value)}
                 placeholder="Avtor"
+                className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
+              />
+              <input
+                value={quickAddTitle}
+                onChange={(e) => setQuickAddTitle(e.target.value)}
+                placeholder="Naslov skladbe"
                 className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
               />
               {quickAddError && (
@@ -3314,7 +3303,7 @@ export default function Dashboard() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setSongsVisible((v) => !v)}
+                      onClick={() => setStoredSongsVisible(songsVisible ? "0" : "1")}
                       aria-expanded={songsVisible}
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
                     >
@@ -3330,7 +3319,7 @@ export default function Dashboard() {
                       >
                         <path d="m6 9 6 6 6-6" />
                       </svg>
-                      {songsVisible ? "Skrij komade" : "Prikaži vse komade"}
+                      {songsVisible ? "Skrij komade" : "Prikaži"}
                     </button>
                   )}
                 </div>
