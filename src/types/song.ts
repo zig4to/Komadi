@@ -18,6 +18,9 @@ export interface Song {
   // polni ju skill dodaj-iz-cakalne-vrste; brez njiju ListenButton odpre iskanje.
   spotify_url: string | null;
   youtube_music_url: string | null;
+  // Uvoz (batch) iz čakalne vrste, v katerem je bila skladba dodana — null
+  // za ročno dodane in starejše skladbe. Glej ImportBatch spodaj.
+  import_batch_id: string | null;
   copy_count: number;
   jam_added_at: string | null;
   jam_played: boolean;
@@ -28,7 +31,7 @@ export interface Song {
 
 export type NewSong = Omit<
   Song,
-  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url"
+  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id"
 >;
 
 export interface SimilarSong {
@@ -54,6 +57,46 @@ export interface QueuedSong {
   title: string;
   author: string;
   added_at: string;
+}
+
+// En zagon skilla dodaj-iz-cakalne-vrste (tabela import_batches) s
+// strukturiranim poročilom. Skill ob koncu zapiše `report` v tej obliki;
+// vsa polja so neobvezna, da se starejša/nepopolna poročila ne sesujejo.
+export interface ImportReportAdded {
+  song_id?: string;
+  title: string;
+  author: string;
+  genre?: string;
+  era?: string;
+  origin?: string;
+  mood?: string;
+  // Kratka utemeljitev razpoloženja (tema besedila).
+  mood_reason?: string;
+  // Katere povezave so bile najdene ob uvozu.
+  links?: {
+    ug?: boolean;
+    pdf?: boolean;
+    zabrenkaj?: boolean;
+    youtube?: boolean;
+    youtube_music?: boolean;
+    spotify?: boolean;
+  };
+  // Posebnosti te skladbe (npr. ne-originalna različica, ročna izbira).
+  note?: string;
+}
+
+export interface ImportReport {
+  added?: ImportReportAdded[];
+  skipped?: { title: string; author: string; reason: string }[];
+  remaining?: { title: string; author: string }[];
+  author_images?: string[];
+  notes?: string[];
+}
+
+export interface ImportBatch {
+  id: string;
+  created_at: string;
+  report: ImportReport;
 }
 
 // Prijava napake na skladbi (gumb "Prijavi napako" v meniju kartice) —

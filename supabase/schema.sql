@@ -259,3 +259,26 @@ alter table public.songs
 
 alter table public.songs
   add column if not exists youtube_music_url text;
+
+-- Uvozi iz čakalne vrste (batchi s poročilom), glej
+-- supabase/migrations/0021_add_import_batches.sql.
+create table if not exists public.import_batches (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  report jsonb not null default '{}'::jsonb
+);
+
+alter table public.songs
+  add column if not exists import_batch_id uuid
+  references public.import_batches (id) on delete set null;
+
+alter table public.import_batches enable row level security;
+
+create policy "Public read import batches" on public.import_batches
+  for select using (true);
+
+create policy "Public insert import batches" on public.import_batches
+  for insert with check (true);
+
+create policy "Public update import batches" on public.import_batches
+  for update using (true) with check (true);

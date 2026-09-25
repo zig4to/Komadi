@@ -13,6 +13,7 @@ import SettingsMenu from "@/components/SettingsMenu";
 import SortMenu, { SONG_SORTS } from "@/components/SortMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
+import { ImportHistory, ImportReports } from "@/components/ImportTabs";
 import { authorAccentHex } from "@/lib/authorColor";
 import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
 import { pickDailyFeatured } from "@/lib/dailyRandom";
@@ -32,7 +33,15 @@ import type {
   Song,
   SongReport,
   QueuedSong,
+  ImportBatch,
 } from "@/types/song";
+
+const QUEUE_TABS = ["queue", "reports", "history"] as const;
+const QUEUE_TAB_LABELS: Record<(typeof QUEUE_TABS)[number], string> = {
+  queue: "Čakalna vrsta",
+  reports: "Poročila",
+  history: "Zgodovina dodajanja",
+};
 
 interface RecentGroup {
   label: string;
@@ -98,6 +107,11 @@ export default function Dashboard() {
   // po uspešnem shranjevanju se ta vnos odstrani iz čakalne vrste.
   const [queueAddingId, setQueueAddingId] = useState<string | null>(null);
   const [confirmRemoveQueuedId, setConfirmRemoveQueuedId] = useState<string | null>(null);
+  // Zavihki strani "Čakalna vrsta": seznam, poročila uvozov in zgodovina
+  // dodajanja (uvozi = tabela import_batches, glej ImportTabs.tsx).
+  const [queueTab, setQueueTab] = usePersistentString("komadi:queue:tab", "queue", QUEUE_TABS);
+  const [importBatches, setImportBatches] = useState<ImportBatch[]>([]);
+  const [importBatchesError, setImportBatchesError] = useState<string | null>(null);
   const reportedSongIds = useMemo(
     () => new Set(reports.map((r) => r.song_id)),
     [reports],
@@ -266,6 +280,24 @@ export default function Dashboard() {
         .order("added_at", { ascending: true });
       if (cancelled || error || !data) return;
       setQueuedSongs(data as QueuedSong[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("import_batches")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (cancelled) return;
+      // Brez migracije 0021 tabela ne obstaja — zavihka to pokažeta kot napako.
+      if (error) setImportBatchesError(error.message);
+      else if (data) setImportBatches(data as ImportBatch[]);
     })();
     return () => {
       cancelled = true;
@@ -790,7 +822,21 @@ export default function Dashboard() {
     setGoalOpen(false);
     setFixOpen(false);
     setQueueOpen(true);
+    refreshImportBatches();
     window.scrollTo({ top: 0 });
+  }
+
+  async function refreshImportBatches() {
+    const { data, error } = await supabase
+      .from("import_batches")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      setImportBatchesError(error.message);
+      return;
+    }
+    setImportBatchesError(null);
+    setImportBatches(data as ImportBatch[]);
   }
 
   // "Dodaj v knjižnico" na strani Čakalna vrsta: celoten SongForm z
@@ -2012,6 +2058,38 @@ export default function Dashboard() {
         <div className="mt-3! space-y-4">
           <hr className="border-t border-neutral-200 dark:border-neutral-800" />
 
+          <div role="tablist" className="flex gap-1 overflow-x-auto rounded-full border border-fuchsia-500/30 p-1 text-sm dark:border-fuchsia-400/30">
+            {QUEUE_TABS.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={queueTab === tab}
+                onClick={() => setQueueTab(tab)}
+                className={`flex-1 whitespace-nowrap rounded-full px-3 py-1.5 font-medium transition ${
+                  queueTab === tab
+                    ? "bg-fuchsia-600 text-white"
+                    : "text-neutral-600 hover:bg-fuchsia-500/10 dark:text-neutral-300"
+                }`}
+              >
+                {QUEUE_TAB_LABELS[tab]}
+                {tab === "queue" && queuedSongs.length > 0 && ` (${queuedSongs.length})`}
+              </button>
+            ))}
+          </div>
+
+          {queueTab === "reports" ? (
+            <ImportReports batches={importBatches} error={importBatchesError} />
+          ) : queueTab === "history" ? (
+            <ImportHistory
+              batches={importBatches}
+              songs={songs}
+              error={importBatchesError}
+              onEditSong={(s) => (editing?.id === s.id ? closeForm() : handleEdit(s))}
+              renderEditForm={renderEditForm}
+            />
+          ) : (
+          <>
           {queuedError && (
             <p className="text-sm text-red-600 dark:text-red-400">{queuedError}</p>
           )}
@@ -2131,6 +2209,8 @@ export default function Dashboard() {
                 );
               })}
             </div>
+          )}
+          </>
           )}
         </div>
       ) : fixOpen ? (

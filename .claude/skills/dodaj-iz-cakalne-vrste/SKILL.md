@@ -16,7 +16,7 @@ description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v
   avtor, brez ostalih podatkov.
 - Stolpci `songs`: id, title, author, genre, era, favorite, mood, origin,
   image_url, chords_url, chords_source_url, zabrenkaj_url, youtube_url,
-  spotify_url, youtube_music_url, copy_count, jam_added_at,
+  spotify_url, youtube_music_url, import_batch_id, copy_count, jam_added_at,
   jam_played, goal_added_at, goal_learned, created_at.
 - `genre`/`era` sta zaprti enumeraciji: `GENRES`/`ERAS` v
   `src/lib/constants.ts`. Če noben žanr resnično ne ustreza, VPRAŠAJ
@@ -83,8 +83,10 @@ stran z akordi). Shrani se SAMO povezava (`zabrenkaj_url`) — vsebine
 strani (besedila/akordov) ne prenašaj in ne shranjuj.
 
 1. Enkrat prenesi seznam vseh skladb `https://www.zabrenkaj.si/vse-pesmi/`
-   (brskalniški User-Agent). Vsaka skladba je vrstica
-   `<div><a href="/<slug>/">Naslov</a></div>`; seznam je na eni strani,
+   (brskalniški User-Agent). Vsaka skladba je
+   `<div> <a href="/<slug>/">Naslov</a> </div>` — med oznakami so prelomi
+   vrstic in tabulatorji, zato regex `<div>\s*<a href="\/([^"\/]+)\/">([^<]+)<\/a>\s*<\/div>`
+   (brez `\s*` ne najde ničesar). Seznam je na eni strani (~2800 skladb),
    brez paginacije. Dekodiraj HTML entitete v naslovih.
 2. Primerjaj naslove normalizirano: male črke, brez šumnikov/diakritike
    (NFD + odstrani `̀-ͯ`), brez vsebine v oklepajih, vsa ločila
@@ -112,6 +114,20 @@ povezavo, če obstaja, sicer odpre iskanje "avtor naslov" — zato vpiši SAMO
 zanesljivo ujemanje, sicer `null` (napačna povezava je slabša od iskanja).
 Nikoli ne ugibaj in ne sestavljaj ID-jev na pamet.
 
+**Če originala ni, vzemi najboljšo drugo različico — ne `null`.** Zahteva
+uporabnika: vsaka skladba naj ima povezavo na vseh treh platformah, kadar
+je skladba tam sploh na voljo. Vrstni red: original (tudi remaster, single
+version) → ponovni studijski posnetek istega izvajalca → uradni live
+posnetek istega izvajalca. Priredb drugih izvajalcev, karaoke ipd. ne
+jemlji. `null` samo, če skladbe istega izvajalca na platformi res ni.
+Katero ne-originalno različico si izbral, navedi v poročilu.
+
+**Past pri filtriranju**: filter, ki izloča "live"/"remix"/"acoustic"
+posnetke, NE sme veljati za besede, ki so del naslova skladbe (npr. "Live
+Is Life" — filter na "live" je izločil vse zadetke, tudi original). Filter
+uporabi samo na delu naslova ZUNAJ imena skladbe (npr. oklepaji, pripone
+za " - ").
+
 Stolpca `spotify_url`/`youtube_music_url` doda migracija
 `supabase/migrations/0020_add_spotify_youtube_music_urls.sql`. Če insert/
 PATCH vrne napako "column ... does not exist", uporabnika prosi, naj to
@@ -134,12 +150,22 @@ https://www.youtube.com/results?search_query=<avtor naslov>[ lyrics]
 - Oblika: `https://www.youtube.com/watch?v=<videoId>`.
 
 **YouTube Music (`youtube_music_url`)** — albumska različica (NE lyric
-video). Iz iste vrste strganja (iskanje `<avtor> <naslov>` brez "lyrics")
-poišči `videoRenderer`, katerega kanal je samodejno ustvarjen
-`<Izvajalec> - Topic` (ime pred " - Topic" se ujema z avtorjem) in naslov
-videa je naslov skladbe. Oblika:
-`https://music.youtube.com/watch?v=<videoId>`. Če "Topic" posnetka ni med
-rezultati, pusti `null`.
+video). NE išči "- Topic" kanalov v navadnem YouTube iskanju — pri znanih
+izvajalcih so albumske skladbe prikazane pod uradnim kanalom izvajalca, zato
+tako najdeš le redke. Uporabi interno iskanje YouTube Music s filtrom
+"Skladbe" (brez ključa):
+```
+POST https://music.youtube.com/youtubei/v1/search?prettyPrint=false
+Content-Type: application/json, Origin/Referer: https://music.youtube.com
+{"context":{"client":{"clientName":"WEB_REMIX","clientVersion":"1.20240918.01.00","hl":"en","gl":"SI"}},
+ "query":"<avtor> <naslov>","params":"EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D"}
+```
+Rekurzivno poberi `musicResponsiveListItemRenderer`: `videoId` iz
+`playlistItemData.videoId`, stolpci `flexColumns[i].musicResponsiveListItemFlexColumnRenderer.text.runs`
+(stolpec 0 = naslov, stolpec 1 = `Izvajalec • Album • trajanje`). Izberi
+prvi zadetek, kjer se izvajalec ujema z avtorjem in naslov (brez pripon kot
+"(2009 Remaster)", "(feat. …)") z naslovom skladbe. Oblika:
+`https://music.youtube.com/watch?v=<videoId>`.
 
 **Pazi na omejitev**: YouTube po ~20 hitrih zaporednih zahtevah začne
 omejevati (prazni/drugačni rezultati). Med zahtevami počakaj 2–3 s; pri več
@@ -156,7 +182,13 @@ Potrebuje `SPOTIFY_CLIENT_ID` in `SPOTIFY_CLIENT_SECRET` v `.env.local`
 3. Izberi zadetek, kjer se ime izvajalca (`artists[].name`) ujema z
    avtorjem in ime skladbe z naslovom (priponi kot " - Remastered 2011" ali
    " - 2004 Remaster" ignoriraj). Prednost ima originalni album/single pred
-   kompilacijami ("Greatest Hits", "Best of") in live verzijami.
+   kompilacijami ("Greatest Hits", "Best of") in live verzijami. Pazi na
+   izjeme: pri starejših skladbah je lahko original izšel na albumu, ki ga
+   Spotify označi kot kompilacijo (npr. "Ring of Fire" 1963 na "Ring Of
+   Fire: The Best Of Johnny Cash") — preveri datum izida, ne samo tip
+   albuma. Iskanje `track:… artist:…` včasih originala ne vrne; če ga ni,
+   poskusi še navadno iskanje `<naslov> <avtor>` (brez `track:`/`artist:`),
+   preden vzameš ne-originalno različico.
 4. Oblika: `external_urls.spotify` (`https://open.spotify.com/track/<id>`).
 
 Če `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET` v `.env.local` NI, Spotify
@@ -189,9 +221,19 @@ Za vsako skladbo razišči (splet, če nisi prepričan — ne ugibaj):
 - **title**: popravi UG-jevo odstranjena ločila/apostrofe nazaj na pravilen,
   splošno znan naslov skladbe.
 
+### 5b. Ustvari uvoz (batch)
+Vsak zagon tega skilla je EN uvoz. Tik pred vstavljanjem ustvari vrstico v
+`import_batches` (`POST /rest/v1/import_batches`, telo `{}`,
+`Prefer: return=representation`) in si zapomni njen `id`. Tabelo doda
+migracija `supabase/migrations/0021_add_import_batches.sql` — če ne obstaja
+(napaka "relation ... does not exist"), uporabnika prosi, naj jo zažene, in
+nadaljuj brez batcha (`import_batch_id` izpusti), poročilo pa samo izpiši.
+Batch ustvari tudi, če je bila vsaka skladba izpuščena — poročilo o
+izpuščenih je prav tako koristno.
+
 ### 6. Vstavi v bazo
 En skupen insert v `songs` (`Prefer: return=representation`, da dobiš
-`id`-je nazaj): `title`, `author` (iz queued_songs, po možnosti poravnano na
+`id`-je nazaj): `import_batch_id: <id iz koraka 5b>`, `title`, `author` (iz queued_songs, po možnosti poravnano na
 obstoječi zapis avtorja v bazi, če je bil najden pri koraku 3), `genre`,
 `era`, `favorite: false`, `mood`, `origin`, `image_url: null`,
 `chords_url: null`, `chords_source_url: <UG link>`,
@@ -231,7 +273,31 @@ Izbriši iz `queued_songs` SAMO tiste vrstice, ki so bile dejansko uspešno
 dodane v `songs` (ne tistih, izpuščenih zaradi podvojitve v koraku 3, in ne
 tistih, ki jih uporabnik v koraku 2 ni izbral).
 
-### 10. Poročaj
+### 10. Shrani poročilo v uvoz
+`PATCH /rest/v1/import_batches?id=eq.<id>` s poljem `report` (JSON). Prikaže
+se v aplikaciji na strani "Čakalna vrsta" → zavihek "Poročila" (skladbe
+uvoza pa v zavihku "Zgodovina dodajanja", prek `songs.import_batch_id`).
+Oblika (tip `ImportReport` v `src/types/song.ts`; besedila slovensko):
+```json
+{
+  "added": [{
+    "song_id": "<uuid>", "title": "...", "author": "...",
+    "genre": "...", "era": "...", "origin": "...", "mood": "...",
+    "mood_reason": "kratka utemeljitev po temi besedila",
+    "links": { "ug": true, "pdf": true, "zabrenkaj": false,
+               "youtube": true, "youtube_music": true, "spotify": true },
+    "note": "posebnost te skladbe (npr. ne-originalna različica) ali izpusti"
+  }],
+  "skipped": [{ "title": "...", "author": "...", "reason": "že v knjižnici / ..." }],
+  "remaining": [{ "title": "...", "author": "..." }],
+  "author_images": ["Izvajalec", "..."],
+  "notes": ["negotove odločitve, stvari za preveriti, odprta vprašanja"]
+}
+```
+`links` naj odraža DEJANSKO stanje v bazi po koncu uvoza (tudi PDF iz
+koraka 7). `remaining` = vse, kar je po koraku 9 še v `queued_songs`.
+
+### 11. Poročaj
 Povej: koliko skladb je bilo dodanih (z avtorjem/žanrom/obdobjem/izvorom/
 razpoloženjem za vsako, s kratko utemeljitvijo razpoloženja in kjerkoli
 drugje negotove izbire, ali je bila najdena na zabrenkaj.si, in katere od
