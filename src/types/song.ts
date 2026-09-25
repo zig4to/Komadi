@@ -14,6 +14,10 @@ export interface Song {
   chords_source_url: string | null;
   zabrenkaj_url: string | null;
   youtube_url: string | null;
+  // Točna povezava na Spotify skladbo / YouTube Music (albumska različica) —
+  // polni ju skill dodaj-iz-cakalne-vrste; brez njiju ListenButton odpre iskanje.
+  spotify_url: string | null;
+  youtube_music_url: string | null;
   copy_count: number;
   jam_added_at: string | null;
   jam_played: boolean;
@@ -24,7 +28,7 @@ export interface Song {
 
 export type NewSong = Omit<
   Song,
-  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url"
+  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url"
 >;
 
 export interface SimilarSong {

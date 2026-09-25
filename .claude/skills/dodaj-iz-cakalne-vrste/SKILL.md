@@ -1,6 +1,6 @@
 ---
 name: dodaj-iz-cakalne-vrste
-description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v aplikaciji Bitne Tabs: za izbrane skladbe poišče UG chords povezavo in povezavo na zabrenkaj.si (če skladba tam obstaja), doda žanr/obdobje/izvor, generira PDF akorde in doda sliko avtorja, nato jih izbriše iz čakalne vrste. Sproži se, ko uporabnik reče nekaj v stilu 'dodaj/obdelaj/uvozi/vnesi skladbe iz čakalne vrste'. Uporabnik izbere, katere skladbe s seznama naj se obdelajo zdaj (če jih je več kot ena)."
+description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v aplikaciji Bitne Tabs: za izbrane skladbe poišče UG chords povezavo, povezavo na zabrenkaj.si (če skladba tam obstaja) ter povezave YouTube, YouTube Music in Spotify, doda žanr/obdobje/izvor, generira PDF akorde in doda sliko avtorja, nato jih izbriše iz čakalne vrste. Sproži se, ko uporabnik reče nekaj v stilu 'dodaj/obdelaj/uvozi/vnesi skladbe iz čakalne vrste'. Uporabnik izbere, katere skladbe s seznama naj se obdelajo zdaj (če jih je več kot ena)."
 ---
 
 ## Kontekst repozitorija (ne raziskuj, samo uporabi)
@@ -16,7 +16,7 @@ description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v
   avtor, brez ostalih podatkov.
 - Stolpci `songs`: id, title, author, genre, era, favorite, mood, origin,
   image_url, chords_url, chords_source_url, zabrenkaj_url, youtube_url,
-  copy_count, jam_added_at,
+  spotify_url, youtube_music_url, copy_count, jam_added_at,
   jam_played, goal_added_at, goal_learned, created_at.
 - `genre`/`era` sta zaprti enumeraciji: `GENRES`/`ERAS` v
   `src/lib/constants.ts`. Če noben žanr resnično ne ustreza, VPRAŠAJ
@@ -104,13 +104,69 @@ strani (besedila/akordov) ne prenašaj in ne shranjuj.
    skupina, kot Zoran Predin / Lačni Franz), povezave NE vpiši samodejno —
    vprašaj uporabnika.
 
-### 4c. YouTube in Spotify — nič ne shranjuj
-Gumb za poslušanje v aplikaciji (`ListenButton.tsx`) sam odpre YouTube
-iskanje (`youtube.com/results?search_query=<avtor naslov>`) in Spotify
-iskanje (`open.spotify.com/search/<avtor naslov>`), zato deluje za vsako
-skladbo brez povezave v bazi. `youtube_url` pusti prazen (null) — videov
-NE išči (strganje YouTubovih rezultatov iskanja YouTube po ~20 zahtevah
-omeji, uporabnik pa se je odločil, da iskanje zadošča).
+### 4c. Povezave za poslušanje: YouTube, YouTube Music, Spotify
+Za vsako skladbo poišči in shrani VSE TRI povezave (`youtube_url`,
+`youtube_music_url`, `spotify_url`), če jih še nima (nova skladba jih nima
+nobene). Gumb za poslušanje (`ListenButton.tsx`) uporabi shranjeno
+povezavo, če obstaja, sicer odpre iskanje "avtor naslov" — zato vpiši SAMO
+zanesljivo ujemanje, sicer `null` (napačna povezava je slabša od iskanja).
+Nikoli ne ugibaj in ne sestavljaj ID-jev na pamet.
+
+Stolpca `spotify_url`/`youtube_music_url` doda migracija
+`supabase/migrations/0020_add_spotify_youtube_music_urls.sql`. Če insert/
+PATCH vrne napako "column ... does not exist", uporabnika prosi, naj to
+migracijo zažene v Supabase SQL Editorju, in te dve polji do takrat izpusti.
+
+**YouTube (`youtube_url`)** — strgaj stran z rezultati iskanja:
+```
+https://www.youtube.com/results?search_query=<avtor naslov>[ lyrics]
+```
+(brskalniški `User-Agent` + `Accept-Language`), izlušči
+`var ytInitialData = {...};</script>`, JSON.parse, rekurzivno poberi
+`videoRenderer` (`videoId`, `title.runs[0].text`, `ownerText.runs[0].text`).
+- Tuje skladbe (origin ni Slovenska/Yugo): iskanje z dodanim ` lyrics`,
+  izberi **lyric video** (naslov vsebuje "lyric") — za petje zraven.
+- Slovenske/Yugo: iskanje brez "lyrics", izberi **uradni video/audio**
+  (kanal izvajalca, VEVO, "Official").
+- Ujemanje mora vsebovati naslov skladbe IN izvajalca (v naslovu videa ali
+  kot ime kanala). Izogibaj se priredbam, live verzijam, karaoke,
+  "sped up"/"slowed" ipd.
+- Oblika: `https://www.youtube.com/watch?v=<videoId>`.
+
+**YouTube Music (`youtube_music_url`)** — albumska različica (NE lyric
+video). Iz iste vrste strganja (iskanje `<avtor> <naslov>` brez "lyrics")
+poišči `videoRenderer`, katerega kanal je samodejno ustvarjen
+`<Izvajalec> - Topic` (ime pred " - Topic" se ujema z avtorjem) in naslov
+videa je naslov skladbe. Oblika:
+`https://music.youtube.com/watch?v=<videoId>`. Če "Topic" posnetka ni med
+rezultati, pusti `null`.
+
+**Pazi na omejitev**: YouTube po ~20 hitrih zaporednih zahtevah začne
+omejevati (prazni/drugačni rezultati). Med zahtevami počakaj 2–3 s; pri več
+skladbah delaj v paketih po največ ~20 zahtev s premorom. Če odziv nima
+`ytInitialData` ali nima rezultatov, ne vpiši ničesar in poskusi kasneje.
+
+**Spotify (`spotify_url`)** — prek Spotify Web API (client credentials).
+Potrebuje `SPOTIFY_CLIENT_ID` in `SPOTIFY_CLIENT_SECRET` v `.env.local`
+(NIKOLI z `NEXT_PUBLIC_` predpono — ne smeta v bundle aplikacije):
+1. Žeton: `POST https://accounts.spotify.com/api/token` z
+   `grant_type=client_credentials` in Basic auth `id:secret`.
+2. Iskanje: `GET https://api.spotify.com/v1/search?type=track&limit=10&q=track:<naslov> artist:<avtor>`
+   (Bearer žeton).
+3. Izberi zadetek, kjer se ime izvajalca (`artists[].name`) ujema z
+   avtorjem in ime skladbe z naslovom (priponi kot " - Remastered 2011" ali
+   " - 2004 Remaster" ignoriraj). Prednost ima originalni album/single pred
+   kompilacijami ("Greatest Hits", "Best of") in live verzijami.
+4. Oblika: `external_urls.spotify` (`https://open.spotify.com/track/<id>`).
+
+Če `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET` v `.env.local` NI, Spotify
+preskoči (`spotify_url: null`) in na koncu uporabniku povej, da za točne
+Spotify povezave potrebuje Client ID/Secret (brezplačna aplikacija na
+https://developer.spotify.com/dashboard) v `.env.local`.
+
+Isti postopek lahko uporabiš tudi za skladbe, ki so že v bazi in jim
+katera od teh povezav manjka (PATCH samo manjkajoča polja) — a samo, če to
+uporabnik izrecno zahteva.
 
 ### 5. Določi metapodatke
 Za vsako skladbo razišči (splet, če nisi prepričan — ne ugibaj):
@@ -140,7 +196,8 @@ obstoječi zapis avtorja v bazi, če je bil najden pri koraku 3), `genre`,
 `era`, `favorite: false`, `mood`, `origin`, `image_url: null`,
 `chords_url: null`, `chords_source_url: <UG link>`,
 `zabrenkaj_url: <povezava iz koraka 4b ali null>`,
-`youtube_url: null`.
+`youtube_url`, `youtube_music_url`, `spotify_url`: povezave iz koraka 4c
+(ali `null`, kjer ni zanesljivega ujemanja).
 
 ### 7. Generiraj in naloži PDF
 Za vsak `chords_source_url`: prenesi UG tab stran, izlušči `js-store`,
@@ -177,7 +234,9 @@ tistih, ki jih uporabnik v koraku 2 ni izbral).
 ### 10. Poročaj
 Povej: koliko skladb je bilo dodanih (z avtorjem/žanrom/obdobjem/izvorom/
 razpoloženjem za vsako, s kratko utemeljitvijo razpoloženja in kjerkoli
-drugje negotove izbire, ter ali je bila najdena na zabrenkaj.si),
+drugje negotove izbire, ali je bila najdena na zabrenkaj.si, in katere od
+povezav YouTube/YouTube Music/Spotify so bile najdene — za manjkajoče
+na kratko zakaj),
 koliko jih je bilo izpuščenih zaradi podvojitve in
 katere so še vedno v čakalni vrsti (izbrane
 ali ne), ali so bile dodane nove slike avtorjev. Brez git commit/push.

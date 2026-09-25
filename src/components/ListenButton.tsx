@@ -22,7 +22,10 @@ export default function ListenButton({
   const [menuPos, setMenuPos] = useState<{ top: number; left?: number; right?: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
-  const spotifyUrl = `https://open.spotify.com/search/${encodeURIComponent(`${song.author} ${song.title}`)}`;
+  // Shranjena točna skladba (spotify_url), sicer Spotify iskanje "avtor naslov".
+  const spotifyUrl =
+    song.spotify_url ??
+    `https://open.spotify.com/search/${encodeURIComponent(`${song.author} ${song.title}`)}`;
   // Shranjen video (youtube_url), sicer YouTube iskanje "avtor naslov" — za
   // tuje skladbe z dodanim "lyrics", da so na vrhu videi z besedilom (za
   // petje zraven); slovenske/Yugo ostanejo brez, ker jih je z besedilom malo.
@@ -32,12 +35,12 @@ export default function ListenButton({
     `https://www.youtube.com/results?search_query=${encodeURIComponent(
       `${song.author} ${song.title}${isDomestic ? "" : " lyrics"}`,
     )}`;
-  // YouTube Music: vedno iskanje "avtor naslov" (brez "lyrics" in brez
-  // shranjenega youtube_url — tam so za tuje skladbe lyric videi, YT Music pa
-  // besedilo prikaže sam in naj predvaja albumsko različico).
-  const youtubeMusicUrl = `https://music.youtube.com/search?q=${encodeURIComponent(
-    `${song.author} ${song.title}`,
-  )}`;
+  // YouTube Music: shranjena albumska različica (youtube_music_url), sicer
+  // iskanje "avtor naslov" (brez "lyrics" in nikoli youtube_url — tam so za
+  // tuje skladbe lyric videi, YT Music pa besedilo prikaže sam).
+  const youtubeMusicUrl =
+    song.youtube_music_url ??
+    `https://music.youtube.com/search?q=${encodeURIComponent(`${song.author} ${song.title}`)}`;
 
   useEffect(() => {
     if (!menuOpen) return;

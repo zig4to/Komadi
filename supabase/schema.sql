@@ -251,3 +251,11 @@ create policy "Public delete song reports" on public.song_reports
 
 create policy "Public update song reports" on public.song_reports
   for update using (true) with check (true);
+
+-- Shranjeni povezavi za poslušanje (glej
+-- supabase/migrations/0020_add_spotify_youtube_music_urls.sql).
+alter table public.songs
+  add column if not exists spotify_url text;
+
+alter table public.songs
+  add column if not exists youtube_music_url text;
