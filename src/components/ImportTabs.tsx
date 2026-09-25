@@ -26,6 +26,7 @@ const LINK_LABELS: [keyof NonNullable<ImportReportAdded["links"]>, string][] = [
   ["ug", "UG"],
   ["pdf", "PDF"],
   ["zabrenkaj", "Zabrenkaj"],
+  ["other", "Drugo"],
   ["youtube", "YouTube"],
   ["youtube_music", "YT Music"],
   ["spotify", "Spotify"],

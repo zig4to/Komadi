@@ -16,7 +16,7 @@ description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v
   avtor, brez ostalih podatkov.
 - Stolpci `songs`: id, title, author, genre, era, favorite, mood, origin,
   image_url, chords_url, chords_source_url, zabrenkaj_url, youtube_url,
-  spotify_url, youtube_music_url, import_batch_id, copy_count, jam_added_at,
+  other_chords_url, spotify_url, youtube_music_url, import_batch_id, copy_count, jam_added_at,
   jam_played, goal_added_at, goal_learned, created_at.
 - `genre`/`era` sta zaprti enumeraciji: `GENRES`/`ERAS` v
   `src/lib/constants.ts`. Če noben žanr resnično ne ustreza, VPRAŠAJ
@@ -106,6 +106,23 @@ strani (besedila/akordov) ne prenašaj in ne shranjuj.
    drugačen, a bi lahko šlo za isto skladbo (npr. pevec vs. njegova
    skupina, kot Zoran Predin / Lačni Franz), povezave NE vpiši samodejno —
    vprašaj uporabnika.
+
+### 4d. Akordi z drugih strani (samo če ni UG IN ni zabrenkaj.si)
+Če skladba nima akordov na Ultimate Guitar (korak 4) NITI na zabrenkaj.si
+(korak 4b), ne izpusti je takoj:
+1. Če je uporabnik dal povezavo do akordov (npr. v sporočilu ob klicu),
+   jo vpiši v `other_chords_url`.
+2. Sicer za Yugo skladbe poskusi pesmarica.rs (iskanje po naslovu/izvajalcu)
+   ali drugo znano stran z akordi; vpiši SAMO potrjeno ujemanje (izvajalec in
+   naslov na strani se ujemata).
+3. Če ne najdeš ničesar, vprašaj uporabnika za povezavo; brez akordov
+   skladbo izpusti in navedi v poročilu.
+
+Shrani se SAMO povezava (kot pri zabrenkaj.si), vsebine ne prenašaj — zato
+PDF pri takih skladbah ne nastane (`chords_url` ostane `null`). Gumb v
+meniju "Akordi" dobi ime iz domene povezave (npr. "pesmarica.rs"). Stolpec
+doda migracija `supabase/migrations/0022_add_other_chords_url.sql`. V
+poročilu je to `links.other`.
 
 ### 4c. Povezave za poslušanje: YouTube, YouTube Music, Spotify
 Za vsako skladbo poišči in shrani VSE TRI povezave (`youtube_url`,
@@ -239,6 +256,7 @@ obstoječi zapis avtorja v bazi, če je bil najden pri koraku 3), `genre`,
 `era`, `favorite: false`, `mood`, `origin`, `image_url: null`,
 `chords_url: null`, `chords_source_url: <UG link>`,
 `zabrenkaj_url: <povezava iz koraka 4b ali null>`,
+`other_chords_url: <povezava iz koraka 4d ali null>`,
 `youtube_url`, `youtube_music_url`, `spotify_url`: povezave iz koraka 4c
 (ali `null`, kjer ni zanesljivega ujemanja).
 
@@ -285,7 +303,7 @@ Oblika (tip `ImportReport` v `src/types/song.ts`; besedila slovensko):
     "song_id": "<uuid>", "title": "...", "author": "...",
     "genre": "...", "era": "...", "origin": "...", "mood": "...",
     "mood_reason": "kratka utemeljitev po temi besedila",
-    "links": { "ug": true, "pdf": true, "zabrenkaj": false,
+    "links": { "ug": true, "pdf": true, "zabrenkaj": false, "other": false,
                "youtube": true, "youtube_music": true, "spotify": true },
     "note": "posebnost te skladbe (npr. ne-originalna različica) ali izpusti"
   }],

@@ -13,6 +13,9 @@ export interface Song {
   chords_url: string | null;
   chords_source_url: string | null;
   zabrenkaj_url: string | null;
+  // Akordi z druge strani (npr. pesmarica.rs), kadar jih ni na UG/zabrenkaj.si —
+  // gumb v meniju "Akordi" dobi ime iz domene povezave (ChordsButtons.tsx).
+  other_chords_url: string | null;
   youtube_url: string | null;
   // Točna povezava na Spotify skladbo / YouTube Music (albumska različica) —
   // polni ju skill dodaj-iz-cakalne-vrste; brez njiju ListenButton odpre iskanje.
@@ -77,6 +80,7 @@ export interface ImportReportAdded {
     ug?: boolean;
     pdf?: boolean;
     zabrenkaj?: boolean;
+    other?: boolean;
     youtube?: boolean;
     youtube_music?: boolean;
     spotify?: boolean;

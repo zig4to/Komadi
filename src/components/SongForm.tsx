@@ -18,6 +18,7 @@ const emptyForm = {
   chords_url: null as string | null,
   chords_source_url: null as string | null,
   zabrenkaj_url: null as string | null,
+  other_chords_url: null as string | null,
 };
 
 export default function SongForm({
@@ -53,6 +54,7 @@ export default function SongForm({
           chords_url: initial.chords_url,
           chords_source_url: initial.chords_source_url,
           zabrenkaj_url: initial.zabrenkaj_url,
+          other_chords_url: initial.other_chords_url ?? null,
         }
       : prefill
         ? { ...emptyForm, title: prefill.title, author: prefill.author }
@@ -171,6 +173,7 @@ export default function SongForm({
       chords_url: form.chords_url,
       chords_source_url: form.chords_source_url?.trim() || null,
       zabrenkaj_url: form.zabrenkaj_url?.trim() || null,
+      other_chords_url: form.other_chords_url?.trim() || null,
     };
 
     const { data, error: dbError } = initial
@@ -443,6 +446,19 @@ export default function SongForm({
             placeholder="https://www.zabrenkaj.si/..."
             className={inputClass}
           />
+        </Field>
+
+        <Field label="Drugi akordi (povezava)" className="sm:col-span-2">
+          <input
+            type="url"
+            value={form.other_chords_url ?? ""}
+            onChange={(e) => setForm({ ...form, other_chords_url: e.target.value || null })}
+            placeholder="https://… (pesmarica.rs, …)"
+            className={inputClass}
+          />
+          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+            Za akorde, ki niso na UG ali zabrenkaj.si — gumb v meniju Akordi dobi ime strani.
+          </p>
         </Field>
       </div>
 

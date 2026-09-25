@@ -282,3 +282,8 @@ create policy "Public insert import batches" on public.import_batches
 
 create policy "Public update import batches" on public.import_batches
   for update using (true) with check (true);
+
+-- Akordi z drugih strani (npr. pesmarica.rs), glej
+-- supabase/migrations/0022_add_other_chords_url.sql.
+alter table public.songs
+  add column if not exists other_chords_url text;

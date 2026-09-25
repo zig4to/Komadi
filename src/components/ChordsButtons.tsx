@@ -41,7 +41,9 @@ export default function ChordsButtons({
   const menuPanelRef = useRef<HTMLDivElement>(null);
   const isChordsPdf = song.chords_url?.toLowerCase().split("?")[0].endsWith(".pdf") ?? false;
   const hasPdfButton = Boolean(song.chords_url && isChordsPdf);
-  const sourceCount = [song.chords_source_url, hasPdfButton, song.zabrenkaj_url].filter(Boolean).length;
+  const sourceCount = [song.chords_source_url, hasPdfButton, song.zabrenkaj_url, song.other_chords_url].filter(Boolean).length;
+  // Akordi z druge strani (npr. pesmarica.rs): gumb dobi ime iz domene povezave.
+  const otherLabel = song.other_chords_url ? siteLabel(song.other_chords_url) : null;
   // "Spletno iskanje" ima vsaka skladba — Google iskanje "avtor naslov
   // Akordi" (slovenske/Yugo) oz. "... Chords" (ostale). Odpre se v novem
   // zavihku: v nameščeni PWA na Androidu je to brskalnik (Custom Tab), ki se
@@ -68,7 +70,7 @@ export default function ChordsButtons({
   }, [menuOpen]);
 
   // Združen meni "Akordi" se prikaže, kadar je poleg spletnega iskanja na
-  // voljo vsaj en vir (UG / PDF / Zabrenkaj); brez virov ostane samo gumb
+  // voljo vsaj en vir (UG / PDF / Zabrenkaj / druga stran); brez virov ostane samo gumb
   // "Spletno iskanje".
   if (merged && sourceCount >= 1) {
     return (
@@ -162,6 +164,22 @@ export default function ChordsButtons({
                 >
                   <GuitarIcon className="h-[13px] w-[13px] shrink-0 text-emerald-600 dark:text-emerald-400" />
                   Zabrenkaj.si
+                </a>
+              )}
+              {song.other_chords_url && (
+                <a
+                  href={song.other_chords_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onChordsClick?.(song);
+                  }}
+                  title={`Akordi na ${otherLabel}`}
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                >
+                  <SongbookIcon className="h-[13px] w-[13px] shrink-0 text-violet-600 dark:text-violet-400" />
+                  <span className="truncate">{otherLabel}</span>
                 </a>
               )}
               {hasPdfButton && (
@@ -293,6 +311,20 @@ export default function ChordsButtons({
         </a>
       )}
 
+      {song.other_chords_url && (
+        <a
+          href={song.other_chords_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => onChordsClick?.(song)}
+          title={`Akordi na ${otherLabel}`}
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-violet-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-violet-500 hover:text-violet-600 dark:border-violet-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-violet-400"
+        >
+          <SongbookIcon className="h-[11px] w-[11px] shrink-0 text-violet-600 dark:text-violet-400" />
+          {otherLabel}
+        </a>
+      )}
+
       {hasPdfButton && (
         <button
           type="button"
@@ -396,6 +428,35 @@ function GuitarIcon({ className }: { className: string }) {
 }
 
 // Lucide "globe" — spletno iskanje akordov.
+// Ime spletne strani iz povezave za gumb "drugi akordi": domena brez "www."
+// (https://www.pesmarica.rs/akordi/… → "pesmarica.rs").
+function siteLabel(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www./, "");
+  } catch {
+    return "Akordi";
+  }
+}
+
+// Odprta pesmarica (Lucide "book-open") — gumb za akorde z drugih strani.
+function SongbookIcon({ className }: { className: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M12 7v14" />
+      <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
+    </svg>
+  );
+}
+
 function GlobeIcon({ className }: { className: string }) {
   return (
     <svg
