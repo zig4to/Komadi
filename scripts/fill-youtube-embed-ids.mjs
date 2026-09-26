@@ -34,7 +34,20 @@ function seconds(text) {
   return text.split(":").reduce((acc, p) => acc * 60 + Number(p), 0);
 }
 
+// Začasne prekinitve ("fetch failed") ali omejitve: do 3 ponovni poskusi s čakanjem.
 async function searchYouTube(query) {
+  const waits = [5_000, 15_000, 30_000];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await searchYouTubeOnce(query);
+    } catch (e) {
+      if (attempt >= waits.length) throw new Error(`${e.message}${e.cause?.code ? ` (${e.cause.code})` : ""}`);
+      await new Promise((r) => setTimeout(r, waits[attempt]));
+    }
+  }
+}
+
+async function searchYouTubeOnce(query) {
   const res = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, {
     headers: { "User-Agent": UA, "Accept-Language": "en" },
   });
@@ -107,5 +120,6 @@ for (const [i, s] of songs.entries()) {
   } catch (e) {
     console.log(`✗ ${s.author} – ${s.title}: ${e.message}`);
   }
+  await new Promise((r) => setTimeout(r, 1_000));
 }
 console.log(`Končano: ${done}/${songs.length}${dry ? " (dry run, nič zapisano)" : ""}`);

@@ -98,6 +98,14 @@ export default function YouTubeMiniPlayer({
   // dovoli vgradnje) naloži naslednjega V ISTI predvajalnik (loadVideoById),
   // brez novega iframea; na koncu pokaže kodo napake.
   const attemptRef = useRef(0);
+  // Telefon brez dotika (gesta) ne dovoli samodejnega zagona z zvokom: po
+  // samodejnem preklopu na naslednji video ta obvisi v stanju "še ni začel".
+  // Če se v 3 s ne začne, gumb vrnemo v ▶ — naslednji dotik ga zažene.
+  const stallTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const armStallTimer = () => {
+    clearTimeout(stallTimerRef.current);
+    stallTimerRef.current = setTimeout(() => setLoading(false), 3_000);
+  };
   const [started, setStarted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorCode, setErrorCode] = useState<number | null>(null);
@@ -125,13 +133,19 @@ export default function YouTubeMiniPlayer({
         height: 200,
         playerVars: { playsinline: 1, rel: 0, modestbranding: 1, autoplay: 1, origin: window.location.origin },
         events: {
-          onReady: () => playerRef.current?.playVideo(),
+          onReady: () => {
+            playerRef.current?.playVideo();
+            armStallTimer();
+          },
           // 1 = predvaja, 2 = premor, 0 = konec
           onStateChange: (e) => {
             setPlaying(e.data === 1);
             // -1 = še ni začel, 3 = nalaga; vse ostalo (tudi 5 = pripravljen, če
             // brskalnik blokira samodejni zagon) pomeni, da gumb spet deluje.
-            if (e.data !== -1 && e.data !== 3) setLoading(false);
+            if (e.data !== -1 && e.data !== 3) {
+              clearTimeout(stallTimerRef.current);
+              setLoading(false);
+            }
             if (e.data === 1) {
               setDuration(playerRef.current?.getDuration() ?? 0);
               onPlayingRef.current?.(videoIds[attemptRef.current]);
@@ -142,7 +156,10 @@ export default function YouTubeMiniPlayer({
             console.warn(`YouTube napaka ${e.data} za video ${failedId}`);
             attemptRef.current++;
             const next = videoIds[attemptRef.current];
-            if (next) playerRef.current?.loadVideoById(next);
+            if (next) {
+              playerRef.current?.loadVideoById(next);
+              armStallTimer();
+            }
             else {
               setLoading(false);
               setErrorCode(e.data);
@@ -155,6 +172,7 @@ export default function YouTubeMiniPlayer({
 
   useEffect(() => {
     return () => {
+      clearTimeout(stallTimerRef.current);
       playerRef.current?.destroy();
       playerRef.current = null;
     };
