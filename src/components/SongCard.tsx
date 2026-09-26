@@ -6,7 +6,7 @@ import ChordsButtons from "@/components/ChordsButtons";
 import { authorAccentHsl } from "@/lib/authorColor";
 import { PORTRAIT_FOCUS_Y } from "@/lib/constants";
 import { supabase } from "@/lib/supabaseClient";
-import type { SimilarSong, Song, SongReport } from "@/types/song";
+import type { Playlist, SimilarSong, Song, SongReport } from "@/types/song";
 
 // Diagonalna "zagozda" s sliko na desni strani kartice — enak pristop kot
 // eventCard/eventCardImage v projektu masCajt (styles.js): clip-path izreže
@@ -92,6 +92,53 @@ export default function SongCard({
     setReportMessage({ type: "success", text: "Hvala, napaka je prijavljena." });
     setTimeout(() => setReportMessage(null), 3000);
     onReported?.(data as SongReport);
+  }
+
+  // "Dodaj v playlisto": majhen izbirnik na dnu kartice (enak vzorec kot
+  // "Prijavi napako") — seznam playlist se naloži ob odprtju, zapis gre v
+  // playlist_songs (glej Playlists.tsx).
+  const [playlistPickerOpen, setPlaylistPickerOpen] = useState(false);
+  const [playlistOptions, setPlaylistOptions] = useState<Playlist[] | null>(null);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
+  const [playlistBusy, setPlaylistBusy] = useState(false);
+
+  async function openPlaylistPicker() {
+    setPlaylistPickerOpen(true);
+    setPlaylistOptions(null);
+    setSelectedPlaylistId(null);
+    const { data, error } = await supabase
+      .from("playlists")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      setPlaylistPickerOpen(false);
+      setReportMessage({ type: "error", text: error.message });
+      return;
+    }
+    const list = data as Playlist[];
+    setPlaylistOptions(list);
+    if (list.length === 1) setSelectedPlaylistId(list[0].id);
+  }
+
+  async function handleAddToPlaylist() {
+    const playlist = playlistOptions?.find((p) => p.id === selectedPlaylistId);
+    if (!playlist) return;
+    setPlaylistBusy(true);
+    const { error } = await supabase
+      .from("playlist_songs")
+      .insert({ playlist_id: playlist.id, song_id: song.id });
+    setPlaylistBusy(false);
+    setPlaylistPickerOpen(false);
+    if (error) {
+      setReportMessage({
+        type: "error",
+        // 23505 = unique (playlist_id, song_id)
+        text: error.code === "23505" ? `Skladba je že na playlisti "${playlist.name}".` : error.message,
+      });
+    } else {
+      setReportMessage({ type: "success", text: `Dodano na playlisto "${playlist.name}".` });
+    }
+    setTimeout(() => setReportMessage(null), 3000);
   }
 
   useEffect(() => {
@@ -328,6 +375,35 @@ export default function SongCard({
                   </button>
                 )}
 
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActionsOpen(false);
+                    setReportOpen(false);
+                    openPlaylistPicker();
+                  }}
+                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-yellow-600 hover:bg-neutral-100 dark:text-yellow-400 dark:hover:bg-neutral-800"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-[13px] w-[13px] shrink-0"
+                  >
+                    <path d="M16 6H3" />
+                    <path d="M12 12H3" />
+                    <path d="M12 18H3" />
+                    <path d="M21 15V6" />
+                    <circle cx="18.5" cy="15.5" r="2.5" />
+                  </svg>
+                  Dodaj v playlisto
+                </button>
+
                 {onDelete && (
                   <button
                     type="button"
@@ -357,6 +433,7 @@ export default function SongCard({
                   type="button"
                   onClick={() => {
                     setActionsOpen(false);
+                    setPlaylistPickerOpen(false);
                     setReportOpen(true);
                   }}
                   className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
@@ -418,6 +495,66 @@ export default function SongCard({
       <div className="mt-1 flex w-full min-w-0 flex-wrap items-center gap-1.5 text-xs">
         <ChordsButtons song={song} onChordsClick={onChordsClick} merged />
       </div>
+
+      {playlistPickerOpen && (
+        <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+          <p className="text-xs font-medium text-neutral-700 dark:text-neutral-200">
+            Dodaj v playlisto
+          </p>
+          {playlistOptions === null ? (
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">Nalagam…</p>
+          ) : playlistOptions.length === 0 ? (
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              Še nimaš nobene playliste. Ustvari jo z gumbom »Playliste«.
+            </p>
+          ) : (
+            <div role="radiogroup" className="max-h-40 space-y-1 overflow-y-auto">
+              {playlistOptions.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selectedPlaylistId === p.id}
+                  onClick={() => setSelectedPlaylistId(p.id)}
+                  className={`flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left text-sm transition ${
+                    selectedPlaylistId === p.id
+                      ? "border-yellow-500 bg-yellow-500/15 text-neutral-900 dark:text-neutral-100"
+                      : "border-neutral-300 text-neutral-700 hover:border-yellow-500 dark:border-neutral-700 dark:text-neutral-300"
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`h-3 w-3 shrink-0 rounded-full border ${
+                      selectedPlaylistId === p.id
+                        ? "border-yellow-500 bg-yellow-500"
+                        : "border-neutral-400 dark:border-neutral-600"
+                    }`}
+                  />
+                  <span className="truncate">{p.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-1.5 text-xs">
+            <button
+              type="button"
+              onClick={handleAddToPlaylist}
+              disabled={playlistBusy || !selectedPlaylistId}
+              className="flex-1 rounded-lg bg-yellow-500 px-2 py-1.5 font-medium text-neutral-900 hover:bg-yellow-400 disabled:opacity-50"
+            >
+              {playlistBusy ? "Dodajam…" : "Potrdi"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPlaylistPickerOpen(false)}
+              disabled={playlistBusy}
+              className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-neutral-600 hover:border-neutral-400 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+            >
+              Prekliči
+            </button>
+          </div>
+        </div>
+      )}
 
       {reportOpen && (
         <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-800">

@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   // Dovoli dostop do dev strežnika s telefona prek WiFi (Next blokira
   // navzkrižne izvore dev virov). Ignorira se pri produkcijskem izvozu.
-  allowedDevOrigins: ["192.168.2.84", "192.168.1.9", "192.168.2.98", "192.168.1.11"],
+  allowedDevOrigins: ["192.168.2.84", "192.168.1.9", "192.168.2.98", "192.168.1.11", "10.29.66.105"],
   basePath,
   assetPrefix: basePath ? `${basePath}/` : "",
   images: { unoptimized: true },

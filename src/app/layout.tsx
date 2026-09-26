@@ -10,9 +10,11 @@ const montserrat = Montserrat({
   subsets: ["latin"],
 });
 
+// latin-ext: š/č/ž, sicer pridejo iz nadomestne pisave z drugačno širino in
+// v ChordsViewer.tsx zamaknejo akorde nad besedilom.
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
 });
 
 export const metadata: Metadata = {

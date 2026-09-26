@@ -13,6 +13,9 @@ export interface Song {
   chords_url: string | null;
   chords_source_url: string | null;
   zabrenkaj_url: string | null;
+  // Surov UG markup akordov ([ch]/[tab]) za vgrajen pregledovalnik
+  // (ChordsViewer.tsx) — polni scripts/fill-chords-text.mjs, ne forma/uvoz.
+  chords_text: string | null;
   // Akordi z druge strani (npr. pesmarica.rs), kadar jih ni na UG/zabrenkaj.si —
   // gumb v meniju "Akordi" dobi ime iz domene povezave (ChordsButtons.tsx).
   other_chords_url: string | null;
@@ -37,7 +40,7 @@ export interface Song {
 
 export type NewSong = Omit<
   Song,
-  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id"
+  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text"
 >;
 
 export interface SimilarSong {
@@ -54,6 +57,19 @@ export interface JamHistoryEntry {
   song_id: string | null;
   title: string;
   author: string;
+  added_at: string;
+}
+
+export interface Playlist {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface PlaylistSong {
+  id: string;
+  playlist_id: string;
+  song_id: string;
   added_at: string;
 }
 

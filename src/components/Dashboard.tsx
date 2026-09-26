@@ -14,6 +14,7 @@ import SortMenu, { SONG_SORTS } from "@/components/SortMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
 import JamArchive from "@/components/JamArchive";
+import Playlists from "@/components/Playlists";
 import VoiceQuickAdd from "@/components/VoiceQuickAdd";
 import AddChoiceIcons from "@/components/AddChoiceIcons";
 import { ImportHistory, ImportReports } from "@/components/ImportTabs";
@@ -196,6 +197,8 @@ export default function Dashboard() {
   const [queueOpen, setQueueOpen] = usePersistentBool("komadi:queue:open", false);
   // "Arhiv priljubljenih": priljubljene preteklih mesecev (FavoritesMonth.tsx).
   const [favArchiveOpen, setFavArchiveOpen] = usePersistentBool("komadi:favarchive:open", false);
+  // "Playliste": poimenovani seznami skladb (Playlists.tsx, tabeli playlists/playlist_songs).
+  const [playlistsOpen, setPlaylistsOpen] = usePersistentBool("komadi:playlists:open", false);
   // Isti localStorage ključ kot FiltersToggle/Filters v Filters.tsx — da lahko
   // "Počisti filtre" (glej handleBackFromFilter) zapre tudi panel s filtri.
   const [, setFiltersOpen] = usePersistentBool("komadi:filters:open", false);
@@ -846,7 +849,18 @@ export default function Dashboard() {
     setGoalOpen(false);
     setFixOpen(false);
     setQueueOpen(false);
+    setPlaylistsOpen(false);
     setFavArchiveOpen(true);
+    window.scrollTo({ top: 0 });
+  }
+
+  function openPlaylists() {
+    setJamOpen(false);
+    setGoalOpen(false);
+    setFixOpen(false);
+    setQueueOpen(false);
+    setFavArchiveOpen(false);
+    setPlaylistsOpen(true);
     window.scrollTo({ top: 0 });
   }
 
@@ -855,6 +869,7 @@ export default function Dashboard() {
     setGoalOpen(false);
     setFixOpen(false);
     setFavArchiveOpen(false);
+    setPlaylistsOpen(false);
     setQueueOpen(true);
     refreshImportBatches();
     window.scrollTo({ top: 0 });
@@ -936,6 +951,7 @@ export default function Dashboard() {
     setGoalOpen(false);
     setQueueOpen(false);
     setFavArchiveOpen(false);
+    setPlaylistsOpen(false);
     setFixOpen(true);
     const song = songId ? songs.find((s) => s.id === songId) : undefined;
     if (song) handleEdit(song);
@@ -1284,6 +1300,7 @@ export default function Dashboard() {
   useBackableOpen(fixOpen, () => setFixOpen(false));
   useBackableOpen(queueOpen, () => setQueueOpen(false));
   useBackableOpen(favArchiveOpen, () => setFavArchiveOpen(false));
+  useBackableOpen(playlistsOpen, () => setPlaylistsOpen(false));
   useBackableOpen(goalPickerOpen, () => setGoalPickerOpen(false));
 
   // Obrazec za urejanje se izriše takoj pod kartico skladbe, ki jo urejamo
@@ -1555,6 +1572,49 @@ export default function Dashboard() {
               Nazaj
             </button>
           </>
+        ) : playlistsOpen ? (
+          <>
+            <h1 className="flex items-center gap-2">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-6 w-6 shrink-0 text-yellow-600 dark:text-yellow-400"
+              >
+                <path d="M16 6H3" />
+                <path d="M12 12H3" />
+                <path d="M12 18H3" />
+                <path d="M21 15V6" />
+                <circle cx="18.5" cy="15.5" r="2.5" />
+              </svg>
+              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
+                Playliste
+              </span>
+            </h1>
+            <button
+              type="button"
+              onClick={() => setPlaylistsOpen(false)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-yellow-600 dark:text-neutral-300 dark:hover:text-yellow-400"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4 shrink-0"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              Nazaj
+            </button>
+          </>
         ) : favArchiveOpen ? (
           <>
             <h1 className="flex items-center gap-2">
@@ -1755,6 +1815,7 @@ export default function Dashboard() {
                     setFixOpen(false);
                     setQueueOpen(false);
                     setFavArchiveOpen(false);
+                    setPlaylistsOpen(false);
                     setGoalOpen(true);
                   }}
                   queuedSongs={queuedSongs}
@@ -1774,6 +1835,7 @@ export default function Dashboard() {
                     setFixOpen(false);
                     setQueueOpen(false);
                     setFavArchiveOpen(false);
+                    setPlaylistsOpen(false);
                     setJamOpen(true);
                     openJamArchive();
                     window.scrollTo({ top: 0 });
@@ -2253,6 +2315,31 @@ export default function Dashboard() {
               )}
             </div>
           )}
+        </div>
+      ) : playlistsOpen ? (
+        <div className="mt-3! space-y-4">
+          <hr className="border-t border-neutral-200 dark:border-neutral-800" />
+          <Playlists
+            songs={songs}
+            renderSongCard={(song) => (
+              <>
+                <SongCard
+                  song={song}
+                  authorImage={authorImages[song.author] ?? null}
+                  onEdit={handleEdit}
+                  onFilterAuthor={(author) => {
+                    setPlaylistsOpen(false);
+                    handleFilterByAuthor(author);
+                  }}
+                  onAddToJam={handleAddToJam}
+                  onChordsClick={handleChordsClick}
+                  onReported={handleReported}
+                  onToggleFavorite={handleToggleFavorite}
+                />
+                {renderEditForm(song)}
+              </>
+            )}
+          />
         </div>
       ) : favArchiveOpen ? (
         <div className="mt-3! space-y-4">
@@ -2921,7 +3008,7 @@ export default function Dashboard() {
 
           <div className="space-y-2.5 lg:flex lg:flex-wrap lg:items-center lg:gap-2 lg:space-y-0">
             <div className="flex items-center gap-2 lg:contents">
-              <div className="relative w-1/2 lg:max-w-xs lg:flex-none">
+              <div className="relative w-1/4 lg:w-1/2 lg:max-w-xs lg:flex-none">
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 24 24"
@@ -2941,9 +3028,24 @@ export default function Dashboard() {
                     handleFiltersChange({ ...filters, search: e.target.value })
                   }
                   disabled={!isSupabaseConfigured}
-                  placeholder="Išči po naslovu ali avtorju…"
-                  className="w-full rounded-full border border-rose-500/40 bg-[linear-gradient(115deg,rgba(225,29,72,0.14)_15%,rgba(225,29,72,0.03)_95%)] py-2 pl-10 pr-9 text-sm text-neutral-800 placeholder-neutral-500 transition focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.24)_15%,rgba(225,29,72,0.06)_95%)] focus:outline-none disabled:opacity-40 dark:border-rose-400/40 dark:text-neutral-200 dark:placeholder-neutral-500 dark:focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.32)_15%,rgba(225,29,72,0.1)_95%)]"
+                  aria-label="Išči po naslovu ali avtorju"
+                  className="w-full rounded-full border border-rose-500/40 bg-[linear-gradient(115deg,rgba(225,29,72,0.14)_15%,rgba(225,29,72,0.03)_95%)] py-2 pl-10 pr-9 text-sm text-neutral-800 transition focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.24)_15%,rgba(225,29,72,0.06)_95%)] focus:outline-none disabled:opacity-40 dark:border-rose-400/40 dark:text-neutral-200 dark:focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.32)_15%,rgba(225,29,72,0.1)_95%)]"
                 />
+                {/* Placeholder as an overlay so it can be shorter on phones
+                    (a native placeholder can't change text per breakpoint). */}
+                {!filters.search && (
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none absolute left-9 top-1/2 -translate-y-1/2 whitespace-nowrap text-sm text-neutral-500 lg:left-10 ${
+                      isSupabaseConfigured ? "" : "opacity-40"
+                    }`}
+                  >
+                    <span className="lg:hidden">Išči</span>
+                    <span className="hidden lg:inline">
+                      Išči po naslovu ali avtorju…
+                    </span>
+                  </span>
+                )}
                 {filters.search && (
                   <button
                     type="button"
@@ -2978,6 +3080,7 @@ export default function Dashboard() {
                   setFixOpen(false);
                   setQueueOpen(false);
                   setFavArchiveOpen(false);
+                  setPlaylistsOpen(false);
                 }}
                 disabled={!isSupabaseConfigured}
                 aria-pressed={jamOpen}
@@ -3000,6 +3103,36 @@ export default function Dashboard() {
                   <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
                 </svg>
                 Jam
+              </button>
+
+              <button
+                type="button"
+                onClick={openPlaylists}
+                disabled={!isSupabaseConfigured}
+                aria-pressed={playlistsOpen}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-yellow-500/40 px-4 py-2 text-sm font-medium transition disabled:opacity-40 dark:border-yellow-400/40 ${
+                  playlistsOpen
+                    ? "bg-[linear-gradient(115deg,#a16207_15%,#facc15_100%)] text-white"
+                    : "bg-[linear-gradient(115deg,rgba(202,138,4,0.14)_15%,rgba(202,138,4,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(202,138,4,0.24)_15%,rgba(202,138,4,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(202,138,4,0.32)_15%,rgba(202,138,4,0.1)_95%)]"
+                }`}
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`h-4 w-4 shrink-0 ${playlistsOpen ? "text-white" : "text-yellow-600 dark:text-yellow-400"}`}
+                >
+                  <path d="M16 6H3" />
+                  <path d="M12 12H3" />
+                  <path d="M12 18H3" />
+                  <path d="M21 15V6" />
+                  <circle cx="18.5" cy="15.5" r="2.5" />
+                </svg>
+                Playliste
               </button>
             </div>
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import ListenButton from "@/components/ListenButton";
+import ChordsViewer from "@/components/ChordsViewer";
 import PdfViewer from "@/components/PdfViewer";
 import type { Song } from "@/types/song";
 
@@ -35,6 +36,7 @@ export default function ChordsButtons({
   menuAlign?: "left" | "right";
 }) {
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; left?: number; right?: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -123,8 +125,35 @@ export default function ChordsButtons({
               role="menu"
               data-view-portal
               style={{ top: menuPos.top, left: menuPos.left, right: menuPos.right }}
-              className="fixed z-50 w-36 space-y-0.5 rounded-xl border border-amber-400 bg-white p-1.5 shadow-xl dark:border-amber-400/70 dark:bg-neutral-900"
+              className="fixed z-50 w-40 space-y-0.5 rounded-xl border border-amber-400 bg-white p-1.5 shadow-xl dark:border-amber-400/70 dark:bg-neutral-900"
             >
+              {song.chords_text && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setViewerOpen(true);
+                    onChordsClick?.(song);
+                  }}
+                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-[13px] w-[13px] shrink-0 text-amber-500"
+                  >
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                  </svg>
+                  Akordi v aplikaciji
+                </button>
+              )}
               {song.chords_source_url && (
               <a
                 href={song.chords_source_url}
@@ -225,6 +254,10 @@ export default function ChordsButtons({
             </div>,
             document.body,
           )}
+
+        {viewerOpen && song.chords_text && (
+          <ChordsViewer song={song} onClose={() => setViewerOpen(false)} />
+        )}
 
         {pdfOpen &&
           song.chords_url &&
