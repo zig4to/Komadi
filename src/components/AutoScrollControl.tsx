@@ -201,7 +201,7 @@ export default function AutoScrollControl({
         aria-label="Zaženi samodejno pomikanje"
         title="Zaženi samodejno pomikanje"
         style={cornerStyle}
-        className="fixed bottom-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-900/90 text-neutral-200 shadow-lg ring-1 ring-white/10 hover:bg-neutral-800 hover:text-white active:scale-95"
+        className="fixed bottom-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-900/90 border-2 border-amber-400 text-amber-400 shadow-lg hover:bg-neutral-800 hover:text-amber-300 active:scale-95"
       >
         <svg
           aria-hidden="true"
@@ -223,7 +223,7 @@ export default function AutoScrollControl({
   return (
     <div
       style={cornerStyle}
-      className="fixed bottom-4 right-4 z-10 flex items-center gap-0.5 rounded-full bg-neutral-900/90 px-1 py-1 text-neutral-200 shadow-lg ring-1 ring-white/10"
+      className="fixed bottom-4 right-4 z-10 flex items-center gap-0.5 rounded-full bg-neutral-900/90 px-1 py-1 border-2 border-amber-400 text-neutral-200 shadow-lg"
     >
       <button
         type="button"
@@ -289,12 +289,12 @@ export default function AutoScrollControl({
             strokeWidth={1.8}
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-4 w-4"
+            className="h-4 w-4 text-amber-400"
           >
             <path d="M8 5v14M16 5v14" />
           </svg>
         ) : (
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" stroke="none" className="h-4 w-4">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" stroke="none" className="h-4 w-4 text-amber-400">
             <path d="M8 5v14l11-7-11-7z" />
           </svg>
         )}
