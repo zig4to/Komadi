@@ -1,6 +1,6 @@
 ---
 name: dodaj-iz-cakalne-vrste
-description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v aplikaciji Bitne Tabs: za izbrane skladbe poišče UG chords povezavo, povezavo na zabrenkaj.si (če skladba tam obstaja) ter povezave YouTube, YouTube Music in Spotify, doda žanr/obdobje/izvor, generira PDF akorde in doda sliko avtorja, nato jih izbriše iz čakalne vrste. Sproži se, ko uporabnik reče nekaj v stilu 'dodaj/obdelaj/uvozi/vnesi skladbe iz čakalne vrste'. Uporabnik izbere, katere skladbe s seznama naj se obdelajo zdaj (če jih je več kot ena)."
+description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v aplikaciji Bitne Tabs: za izbrane skladbe poišče UG chords povezavo, povezavo na zabrenkaj.si (če skladba tam obstaja) ter povezave YouTube, YouTube Music in Spotify, doda žanr/obdobje/izvor, generira PDF akorde in "Akordi v aplikaciji" (chords_text + rezervni YouTube videi za mini predvajalnik) ter doda sliko avtorja, nato jih izbriše iz čakalne vrste. Sproži se, ko uporabnik reče nekaj v stilu 'dodaj/obdelaj/uvozi/vnesi skladbe iz čakalne vrste'. Uporabnik izbere, katere skladbe s seznama naj se obdelajo zdaj (če jih je več kot ena)."
 ---
 
 ## Kontekst repozitorija (ne raziskuj, samo uporabi)
@@ -15,8 +15,8 @@ description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v
   hitre predloge, dodane prek gumba "Hitro" v aplikaciji — SAMO naslov in
   avtor, brez ostalih podatkov.
 - Stolpci `songs`: id, title, author, genre, era, favorite, mood, origin,
-  image_url, chords_url, chords_source_url, zabrenkaj_url, youtube_url,
-  other_chords_url, spotify_url, youtube_music_url, import_batch_id, copy_count, jam_added_at,
+  image_url, chords_url, chords_source_url, zabrenkaj_url, chords_text, youtube_url,
+  other_chords_url, spotify_url, youtube_music_url, youtube_embed_ids, import_batch_id, copy_count, jam_added_at,
   jam_played, goal_added_at, goal_learned, created_at.
 - `genre`/`era` sta zaprti enumeraciji: `GENRES`/`ERAS` v
   `src/lib/constants.ts`. Če noben žanr resnično ne ustreza, VPRAŠAJ
@@ -276,6 +276,31 @@ kosov namesto pravilno poravnanih akordov. Nujno vključi `nbsp: " "` (poleg
 šumnikov in `quot`/`apos`/`lt`/`gt`/`amp`) v nabor poznanih entitet, preden
 izrišeš PDF — ne šele po tem, ko uporabnik opazi pokvarjen izpis.
 
+### 7b. "Akordi v aplikaciji" (vgrajen pregledovalnik + mini predvajalnik)
+Poleg PDF-ja dobi vsaka nova skladba z `chords_source_url` še besedilo
+akordov za vgrajen pregledovalnik (`ChordsViewer.tsx`, vrstica "Akordi v
+aplikaciji" v meniju Akordi) in rezervne YouTube videe za njegov mini
+predvajalnik. Za vsako dodano skladbo zaženi obstoječi skripti (ne piši
+svoje logike — skripti že pravilno dekodirata `&nbsp;`/šumnike in
+razvrstita videe):
+```
+node --env-file=.env.local scripts/fill-chords-text.mjs --id <song_id>
+node --env-file=.env.local scripts/fill-youtube-embed-ids.mjs --id <song_id>
+```
+- `fill-chords-text.mjs` zapiše `songs.chords_text` (surov UG markup
+  `[ch]`/`[tab]`). Skladbe brez UG povezave ga nimajo — vrstica "Akordi v
+  aplikaciji" se zanje ne prikaže, to ni napaka.
+- `fill-youtube-embed-ids.mjs` zapiše `songs.youtube_embed_ids` (do 8
+  zadetkov iskanja "avtor naslov", brez `youtube_url`/`youtube_music_url`).
+  Predvajalnik jih preizkuša po vrsti, ker založbe vgradnjo pogosto
+  blokirajo (napaka 150) — vgradljivosti tu NE preverjaj, to naredi
+  predvajalnik sam v brskalniku. YouTube po ~20 hitrih iskanjih omeji
+  dostop: pri več kot ~20 skladbah naredi pavzo (~60 s) med paketi.
+- Če skripta javi "column ... does not exist", uporabnika prosi, naj v
+  Supabase SQL Editorju zažene `supabase/migrations/0026_add_chords_text.sql`
+  oz. `0027_add_youtube_embed_ids.sql`, nato korak ponovi.
+- Rezultat (✓/✗ na skladbo) upoštevaj v poročilu (korak 10 `note`, korak 11).
+
 ### 8. Slika avtorja (samo za avtorje BREZ obstoječega vnosa iz koraka 3)
 Poišči preko Wikipedia REST API-ja:
 ```
@@ -321,7 +346,7 @@ Povej: koliko skladb je bilo dodanih (z avtorjem/žanrom/obdobjem/izvorom/
 razpoloženjem za vsako, s kratko utemeljitvijo razpoloženja in kjerkoli
 drugje negotove izbire, ali je bila najdena na zabrenkaj.si, in katere od
 povezav YouTube/YouTube Music/Spotify so bile najdene — za manjkajoče
-na kratko zakaj),
+na kratko zakaj, in ali ima "Akordi v aplikaciji" (korak 7b)),
 koliko jih je bilo izpuščenih zaradi podvojitve in
 katere so še vedno v čakalni vrsti (izbrane
 ali ne), ali so bile dodane nove slike avtorjev. Brez git commit/push.

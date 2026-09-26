@@ -29,6 +29,7 @@ const UA =
 const ENTITIES = {
   nbsp: " ", quot: '"', apos: "'", lt: "<", gt: ">", amp: "&",
   scaron: "š", Scaron: "Š", ccaron: "č", Ccaron: "Č", zcaron: "ž", Zcaron: "Ž",
+  rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“", ndash: "–", mdash: "—", hellip: "…",
 };
 function decodeHtml(s) {
   return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {

@@ -7,8 +7,12 @@ import { useEffect, useRef, useState } from "react";
 // element iz scrollRef.
 export default function AutoScrollControl({
   scrollRef,
+  speedFactor = 1,
 }: {
   scrollRef: React.RefObject<HTMLElement | null>;
+  // Množitelj hitrosti (1 = PDF). Besedilo akordov je gostejše od PDF strani,
+  // zato ChordsViewer drsi hitreje pri isti številki na kontroli.
+  speedFactor?: number;
 }) {
   // Samodejno pomikanje: "autoScrollStarted" je enosmerno stikalo (krogec ->
   // kontrolna vrstica), "isPlaying" pa dvosmerni play/pause preklop znotraj
@@ -152,7 +156,7 @@ export default function AutoScrollControl({
       // Privzeta hitrost 5 naj ustreza prejšnjemu tempu hitrosti 2 na stari
       // lestvici (2 * 24/7 ≈ 6.86 px/s), zato množitelj 48/35 (= (2*24/7)/5).
       const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
-      const nextScrollTop = preciseScrollTopRef.current + speedRef.current * (48 / 35) * deltaSeconds;
+      const nextScrollTop = preciseScrollTopRef.current + speedRef.current * (48 / 35) * speedFactor * deltaSeconds;
 
       if (nextScrollTop >= maxScrollTop) {
         preciseScrollTopRef.current = maxScrollTop;
@@ -173,7 +177,7 @@ export default function AutoScrollControl({
       rafIdRef.current = null;
       lastTimestampRef.current = null;
     };
-  }, [isPlaying, scrollRef]);
+  }, [isPlaying, scrollRef, speedFactor]);
 
   if (!autoScrollStarted) {
     return (

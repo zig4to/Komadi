@@ -19,6 +19,7 @@ const transposeKey = (id: string) => `komadi:chords:transpose:${id}`;
 const workingVideoKey = (id: string) => `komadi:chords:video:${id}`;
 const MIN_FONT = 10;
 const MAX_FONT = 28;
+const FONT_STEP = 0.5;
 
 function readNumber(key: string, fallback: number) {
   try {
@@ -209,7 +210,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
         <div className="flex items-center gap-1" role="group" aria-label="Velikost pisave">
           <button
             type="button"
-            onClick={() => setFontSize((f) => Math.max(MIN_FONT, f - 1))}
+            onClick={() => setFontSize((f) => Math.max(MIN_FONT, f - FONT_STEP))}
             disabled={fontSize <= MIN_FONT}
             aria-label="Manjša pisava"
             title="Manjša pisava"
@@ -219,7 +220,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
           </button>
           <button
             type="button"
-            onClick={() => setFontSize((f) => Math.min(MAX_FONT, f + 1))}
+            onClick={() => setFontSize((f) => Math.min(MAX_FONT, f + FONT_STEP))}
             disabled={fontSize >= MAX_FONT}
             aria-label="Večja pisava"
             title="Večja pisava"
@@ -270,7 +271,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
         </div>
       </div>
 
-      <AutoScrollControl scrollRef={scrollRef} />
+      <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} />
     </div>,
     document.body,
   );
