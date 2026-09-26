@@ -20,6 +20,8 @@ const workingVideoKey = (id: string) => `komadi:chords:video:${id}`;
 const MIN_FONT = 10;
 const MAX_FONT = 28;
 const FONT_STEP = 0.5;
+// Skrivanje/prikaz zgornjih vrstic ob samodejnem pomikanju: mehak ease-in-out.
+const BARS_TRANSITION = "550ms cubic-bezier(0.65, 0, 0.35, 1)";
 
 function readNumber(key: string, fallback: number) {
   try {
@@ -53,6 +55,8 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
     return { ...parts, capo: findCapo(parts.description) };
   }, [song.chords_text]);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
+  // Celozaslonski način med samodejnim pomikanjem (AutoScrollControl onPlayingChange).
+  const [fullscreen, setFullscreen] = useState(false);
   // Mini predvajalnik: youtube_url (za tuje pogosto lyric video), sicer YouTube Music.
   const watchUrl = youTubeVideoId(song.youtube_url) ? song.youtube_url : song.youtube_music_url;
   // Kandidati po vrsti: video, ki je pri tej skladbi že deloval (zapomnjen v
@@ -152,6 +156,19 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
 
   return createPortal(
     <div data-view-portal onClick={(e) => e.stopPropagation()} className="fixed inset-0 z-50 flex flex-col bg-neutral-950">
+      {/* Med samodejnim pomikanjem zgornji vrstici zdrsneta gor (celozaslonski
+          način), ob pavzi se vrneta. Skrito s CSS, ne odstranjeno — predvajalnik
+          mora ostati, da glasba igra naprej. */}
+      <div
+        className="grid shrink-0"
+        style={{ gridTemplateRows: fullscreen ? "0fr" : "1fr", transition: `grid-template-rows ${BARS_TRANSITION}` }}
+        aria-hidden={fullscreen}
+      >
+      <div
+        className="min-h-0 overflow-hidden"
+        // Brez transform: ta bi fixed sličico YouTube videa (znotraj vrstice) ujel v ta okvir.
+        style={{ opacity: fullscreen ? 0 : 1, transition: `opacity ${BARS_TRANSITION}` }}
+      >
       <div className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2">
         <span className="shrink-0 text-sm font-medium text-neutral-300">Akordi</span>
         {videoIds.length > 0 ? <YouTubeMiniPlayer
@@ -230,6 +247,8 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
           </button>
         </div>
       </div>
+      </div>
+      </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto px-4 pb-32 pt-4">
         <div className="font-mono leading-snug text-neutral-100" style={{ fontSize }}>
@@ -271,7 +290,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
         </div>
       </div>
 
-      <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} />
+      <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} onPlayingChange={setFullscreen} />
     </div>,
     document.body,
   );

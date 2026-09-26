@@ -8,11 +8,14 @@ import { useEffect, useRef, useState } from "react";
 export default function AutoScrollControl({
   scrollRef,
   speedFactor = 1,
+  onPlayingChange,
 }: {
   scrollRef: React.RefObject<HTMLElement | null>;
   // Množitelj hitrosti (1 = PDF). Besedilo akordov je gostejše od PDF strani,
   // zato ChordsViewer drsi hitreje pri isti številki na kontroli.
   speedFactor?: number;
+  // Ali samodejno pomikanje teče — ChordsViewer med njim skrije zgornji vrstici.
+  onPlayingChange?: (playing: boolean) => void;
 }) {
   // Samodejno pomikanje: "autoScrollStarted" je enosmerno stikalo (krogec ->
   // kontrolna vrstica), "isPlaying" pa dvosmerni play/pause preklop znotraj
@@ -37,6 +40,14 @@ export default function AutoScrollControl({
   // drsenje po dotiku) — takrat zanka nadaljuje od novega mesta.
   const userActiveRef = useRef(false);
   const lastWrittenRef = useRef<number | null>(null);
+
+  const onPlayingChangeRef = useRef(onPlayingChange);
+  useEffect(() => {
+    onPlayingChangeRef.current = onPlayingChange;
+  });
+  useEffect(() => {
+    onPlayingChangeRef.current?.(isPlaying);
+  }, [isPlaying]);
 
   useEffect(() => {
     speedRef.current = speed;
