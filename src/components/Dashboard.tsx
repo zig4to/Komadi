@@ -382,8 +382,11 @@ export default function Dashboard() {
               prev.some((s) => s.id === song.id) ? prev : [song, ...prev],
             );
           } else if (payload.eventType === "UPDATE") {
+            // Združi, ne zamenjaj: Postgres v realtime UPDATE ne pošlje velikih
+            // (TOAST) stolpcev, ki se niso spremenili — npr. chords_text ob
+            // posodobitvi copy_count — in skladba bi jih sicer izgubila.
             const song = payload.new;
-            setSongs((prev) => prev.map((s) => (s.id === song.id ? song : s)));
+            setSongs((prev) => prev.map((s) => (s.id === song.id ? { ...s, ...song } : s)));
           } else if (payload.eventType === "DELETE") {
             const id = payload.old.id;
             if (id) setSongs((prev) => prev.filter((s) => s.id !== id));

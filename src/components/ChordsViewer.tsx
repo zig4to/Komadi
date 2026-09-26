@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import AutoScrollControl from "@/components/AutoScrollControl";
+import YouTubeMiniPlayer, { youTubeVideoId } from "@/components/YouTubeMiniPlayer";
 import { findCapo, layoutChordLine, parseChords, simplifyChord, splitDescription, transposeChord, type ChordsLine } from "@/lib/chords";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { Song } from "@/types/song";
@@ -15,6 +16,7 @@ import type { Song } from "@/types/song";
 const FONT_KEY = "komadi:chords:font";
 const SIMPLIFY_KEY = "komadi:chords:simplify";
 const transposeKey = (id: string) => `komadi:chords:transpose:${id}`;
+const workingVideoKey = (id: string) => `komadi:chords:video:${id}`;
 const MIN_FONT = 10;
 const MAX_FONT = 28;
 
@@ -50,6 +52,25 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
     return { ...parts, capo: findCapo(parts.description) };
   }, [song.chords_text]);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
+  // Mini predvajalnik: youtube_url (za tuje pogosto lyric video), sicer YouTube Music.
+  const watchUrl = youTubeVideoId(song.youtube_url) ? song.youtube_url : song.youtube_music_url;
+  // Kandidati po vrsti: video, ki je pri tej skladbi že deloval (zapomnjen v
+  // brskalniku), youtube_url, YouTube Music, nato rezervni iz iskanja
+  // (youtube_embed_ids) — predvajalnik ob napaki 101/150 preizkusi naslednjega.
+  const [videoIds] = useState(() => {
+    let remembered: string | null = null;
+    try {
+      remembered = window.localStorage.getItem(workingVideoKey(song.id));
+    } catch {}
+    return [
+      ...new Set([
+        remembered,
+        youTubeVideoId(song.youtube_url),
+        youTubeVideoId(song.youtube_music_url),
+        ...(song.youtube_embed_ids ?? []),
+      ]),
+    ].filter((id): id is string => Boolean(id));
+  });
 
   useBackableOpen(true, onClose);
 
@@ -130,8 +151,17 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
 
   return createPortal(
     <div data-view-portal onClick={(e) => e.stopPropagation()} className="fixed inset-0 z-50 flex flex-col bg-neutral-950">
-      <div className="flex shrink-0 items-center justify-between gap-2 bg-neutral-900 px-4 py-2.5">
-        <span className="text-sm font-medium text-neutral-300">Akordi</span>
+      <div className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2">
+        <span className="shrink-0 text-sm font-medium text-neutral-300">Akordi</span>
+        {videoIds.length > 0 ? <YouTubeMiniPlayer
+            videoIds={videoIds}
+            watchUrl={watchUrl ?? `https://www.youtube.com/watch?v=${videoIds[0]}`}
+            onPlaying={(id) => {
+              try {
+                window.localStorage.setItem(workingVideoKey(song.id), id);
+              } catch {}
+            }}
+          /> : <span className="flex-1" />}
         <button
           type="button"
           onClick={onClose}

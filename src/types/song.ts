@@ -27,6 +27,9 @@ export interface Song {
   // polni ju skill dodaj-iz-cakalne-vrste; brez njiju ListenButton odpre iskanje.
   spotify_url: string | null;
   youtube_music_url: string | null;
+  // Rezervni YouTube videi za mini predvajalnik v pregledovalniku akordov,
+  // kadar youtube_url ne dovoli vgradnje (scripts/fill-youtube-embed-ids.mjs).
+  youtube_embed_ids: string[] | null;
   // Uvoz (batch) iz čakalne vrste, v katerem je bila skladba dodana — null
   // za ročno dodane in starejše skladbe. Glej ImportBatch spodaj.
   import_batch_id: string | null;
@@ -40,7 +43,7 @@ export interface Song {
 
 export type NewSong = Omit<
   Song,
-  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text"
+  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids"
 >;
 
 export interface SimilarSong {
