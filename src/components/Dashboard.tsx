@@ -13,6 +13,7 @@ import SettingsMenu from "@/components/SettingsMenu";
 import SortMenu, { SONG_SORTS } from "@/components/SortMenu";
 import SongCard from "@/components/SongCard";
 import SongForm from "@/components/SongForm";
+import ChordsViewer from "@/components/ChordsViewer";
 import JamArchive from "@/components/JamArchive";
 import Playlists from "@/components/Playlists";
 import VoiceQuickAdd from "@/components/VoiceQuickAdd";
@@ -31,6 +32,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { usePersistentBool } from "@/lib/usePersistentBool";
 import { usePersistentString } from "@/lib/usePersistentString";
+import { closeChordsViewer, useOpenChordsSongId } from "@/lib/openChords";
 import type {
   GoalExtra,
   JamExtra,
@@ -181,6 +183,9 @@ export default function Dashboard() {
   // razširi čez prosti prostor, gumba Jam/Playliste pa skrčita v ikoni.
   const [searchFocused, setSearchFocused] = useState(false);
   const searchWide = searchFocused || filters.search !== "";
+  // "Akordi v aplikaciji": odprta skladba je v localStorage (src/lib/openChords.ts),
+  // da po osvežitvi ostane odprta; pregledovalnik se izriše samo tu.
+  const openChordsId = useOpenChordsSongId();
   // Seznam skladb se riše po RESULTS_PAGE kartic, naslednje ob pomiku do dna
   // (LoadMoreSentinel). Brez tega je vsaka od prvih črk v iskanju (ujema se
   // skoraj vseh ~290 skladb) in brisanje zadnje črke (spet cel seznam)
@@ -3532,6 +3537,11 @@ export default function Dashboard() {
           </section>
         </>
       )}
+
+      {(() => {
+        const chordsSong = openChordsId ? songs.find((s) => s.id === openChordsId && s.chords_text) : undefined;
+        return chordsSong ? <ChordsViewer key={chordsSong.id} song={chordsSong} onClose={closeChordsViewer} /> : null;
+      })()}
     </div>
   );
 }

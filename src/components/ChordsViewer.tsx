@@ -34,8 +34,13 @@ const CHORD_COLOR_KEY = "komadi:chords:chordColor";
 const FLOATING_PLAYER_KEY = "komadi:chords:floatingPlayer";
 // Izbrana različica prijema za vsak akord ({ "Dm": 1, … }).
 const SHAPE_CHOICE_KEY = "komadi:chords:shapeChoice";
-// Zamik besedila glede na video (s), na skladbo — video ima lahko daljši uvod.
-const lrcOffsetKey = (id: string) => `komadi:chords:lrcOffset:${id}`;
+// Zamik besedila glede na video (s), za vsak posnetek posebej — drug video
+// iste skladbe ima lahko drugačen uvod. Glavni zapis je songs.lrc_offsets
+// ({ videoId: s }, vse naprave); localStorage je rezerva, dokler migracija
+// 0028 ni pognana.
+// Korak zamika (s).
+const LRC_OFFSET_STEP = 0.25;
+const lrcOffsetsKey = (id: string) => `komadi:chords:lrcOffsets:${id}`;
 const transposeKey = (id: string) => `komadi:chords:transpose:${id}`;
 const workingVideoKey = (id: string) => `komadi:chords:video:${id}`;
 const MIN_FONT = 10;
@@ -325,8 +330,35 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
   const smartAvailable = !!sync && sync.points.length > 0;
   const [smartOn, setSmartOn] = useState(false);
   const smartActive = smartAvailable && smartOn;
-  const [lrcOffset, setLrcOffset] = useState(() => readNumber(lrcOffsetKey(song.id), 0));
-  useEffect(() => writeNumber(lrcOffsetKey(song.id), lrcOffset), [song.id, lrcOffset]);
+  // Posnetek, ki trenutno igra (onPlaying) — zamik velja zanj.
+  const [playingVideo, setPlayingVideo] = useState<string | null>(null);
+  const [lrcOffsets, setLrcOffsets] = useState<Record<string, number>>(() => {
+    let local: Record<string, number> = {};
+    try {
+      local = JSON.parse(window.localStorage.getItem(lrcOffsetsKey(song.id)) ?? "{}");
+    } catch {}
+    return { ...local, ...(song.lrc_offsets ?? {}) };
+  });
+  // Računalnik: gumbi za zamik v vrstici se razprejo šele ob kliku na "Zamik".
+  const [offsetOpen, setOffsetOpen] = useState(false);
+  const lrcOffset = playingVideo ? (lrcOffsets[playingVideo] ?? 0) : 0;
+  const [lrcOffsetError, setLrcOffsetError] = useState<string | null>(null);
+  const saveOffsetTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(saveOffsetTimerRef.current), []);
+  // Vsak klik takoj velja; v bazo gre 0,7 s po zadnjem (več klikov = en zapis).
+  const changeLrcOffset = (delta: number) => {
+    if (!playingVideo) return;
+    const next = { ...lrcOffsets, [playingVideo]: Math.round((lrcOffset + delta) * 4) / 4 };
+    setLrcOffsets(next);
+    try {
+      window.localStorage.setItem(lrcOffsetsKey(song.id), JSON.stringify(next));
+    } catch {}
+    clearTimeout(saveOffsetTimerRef.current);
+    saveOffsetTimerRef.current = setTimeout(async () => {
+      const { error } = await supabase.from("songs").update({ lrc_offsets: next }).eq("id", song.id);
+      setLrcOffsetError(error ? error.message : null);
+    }, 700);
+  };
   const [activeLine, setActiveLine] = useState(-1);
   const onVideoTime = (seconds: number, duration: number) => {
     if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
@@ -582,6 +614,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
             smartOn={smartOn}
             onSmartToggle={setSmartOn}
             onPlaying={(id) => {
+              setPlayingVideo(id);
               try {
                 window.localStorage.setItem(workingVideoKey(song.id), id);
               } catch {}
@@ -655,6 +688,44 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
             A+
           </button>
         </div>
+        {/* Računalnik: zamik Smart playa v vrstici (na telefonu v ⚙ → Napredne nastavitve). */}
+        {smartAvailable && (
+          <div
+            className="hidden items-center rounded-full border border-orange-400 py-0.5 pl-2.5 pr-0.5 lg:flex"
+            role="group"
+            aria-label="Zamik besedila"
+            title={playingVideo ? "Zamik besedila za posnetek, ki igra" : "Najprej zaženi predvajanje"}
+          >
+            <button
+              type="button"
+              onClick={() => setOffsetOpen((v) => !v)}
+              aria-expanded={offsetOpen}
+              className={`mr-0.5 flex h-7 items-center text-xs ${offsetOpen ? "text-neutral-400" : "pr-2 text-neutral-200 hover:text-white"}`}
+            >
+              Zamik
+              {!offsetOpen && lrcOffset !== 0 && (
+                <span className="ml-1 tabular-nums text-amber-400">
+                  {lrcOffset > 0 ? "+" : ""}
+                  {lrcOffset.toFixed(2).replace(".", ",")}
+                </span>
+              )}
+            </button>
+            {offsetOpen && (
+              <>
+                <button type="button" onClick={() => changeLrcOffset(-LRC_OFFSET_STEP)} disabled={!playingVideo} aria-label="Besedilo 0,25 s prej" title="Besedilo 0,25 s prej" className={toneButton}>
+                  −
+                </button>
+                <span className="w-11 text-center text-xs tabular-nums text-neutral-200">
+                  {lrcOffset > 0 ? "+" : ""}
+                  {lrcOffset.toFixed(2).replace(".", ",")}
+                </span>
+                <button type="button" onClick={() => changeLrcOffset(LRC_OFFSET_STEP)} disabled={!playingVideo} aria-label="Besedilo 0,25 s pozneje" title="Besedilo 0,25 s pozneje" className={toneButton}>
+                  +
+                </button>
+              </>
+            )}
+          </div>
+        )}
         <button
           ref={themeButtonRef}
           type="button"
@@ -815,29 +886,41 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                           : `${lrc?.album || "Besedilo"}: povezanih ${sync.matched}/${sync.total} vrstic. Zaženi z gumbom Smart play levo od ▶.`}
                   </span>
                   {smartAvailable && (
-                    <div className="mt-1.5 flex items-center justify-between gap-2">
-                      <span className="text-[11px] text-neutral-300">Zamik besedila</span>
+                    <div className="mt-1.5 flex items-center justify-between gap-2 lg:hidden">
+                      <span className="text-[11px] text-neutral-300">
+                        Zamik besedila
+                        <span className="block text-[10px] leading-tight text-neutral-500">
+                          {playingVideo ? "za posnetek, ki igra" : "najprej zaženi predvajanje"}
+                        </span>
+                      </span>
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => setLrcOffset((o) => Math.round((o - 0.5) * 10) / 10)}
-                          className="rounded-full border border-orange-400 px-2 text-xs text-amber-400"
+                          onClick={() => changeLrcOffset(-LRC_OFFSET_STEP)}
+                          disabled={!playingVideo}
+                          className="rounded-full border border-orange-400 px-2 text-xs text-amber-400 disabled:opacity-40"
                         >
-                          −0,5 s
+                          −0,25 s
                         </button>
-                        <span className="w-10 text-center text-[11px] tabular-nums text-neutral-300">
+                        <span className="w-12 text-center text-[11px] tabular-nums text-neutral-300">
                           {lrcOffset > 0 ? "+" : ""}
-                          {lrcOffset.toFixed(1).replace(".", ",")}
+                          {lrcOffset.toFixed(2).replace(".", ",")}
                         </span>
                         <button
                           type="button"
-                          onClick={() => setLrcOffset((o) => Math.round((o + 0.5) * 10) / 10)}
-                          className="rounded-full border border-orange-400 px-2 text-xs text-amber-400"
+                          onClick={() => changeLrcOffset(LRC_OFFSET_STEP)}
+                          disabled={!playingVideo}
+                          className="rounded-full border border-orange-400 px-2 text-xs text-amber-400 disabled:opacity-40"
                         >
-                          +0,5 s
+                          +0,25 s
                         </button>
                       </div>
                     </div>
+                  )}
+                  {smartAvailable && lrcOffsetError && (
+                    <span className="mt-1 block text-[10px] leading-tight text-red-400">
+                      Zamik je shranjen samo v tem brskalniku ({lrcOffsetError}). Poženi migracijo 0028_add_lrc_offset.sql v Supabase.
+                    </span>
                   )}
                 </div>
               </div>
@@ -927,7 +1010,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
               data-line={i}
               className={
                 smartActive && i === activeLine
-                  ? "-mx-1 rounded-md bg-[color-mix(in_srgb,var(--cv-section)_18%,transparent)] px-1 transition-colors"
+                  ? "-mx-1 rounded-md bg-[color-mix(in_srgb,var(--cv-section)_18%,transparent)] px-1 transition-colors lg:w-fit"
                   : "transition-colors"
               }
             >

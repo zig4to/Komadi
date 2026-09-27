@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import ListenButton from "@/components/ListenButton";
-import ChordsViewer from "@/components/ChordsViewer";
 import PdfViewer from "@/components/PdfViewer";
+import { openChordsViewer } from "@/lib/openChords";
 import type { Song } from "@/types/song";
 
 // Skrajšana različica gumbov "UG Tabs"/"PDF akordi" iz SongCard.tsx (samo
@@ -36,7 +36,6 @@ export default function ChordsButtons({
   menuAlign?: "left" | "right";
 }) {
   const [pdfOpen, setPdfOpen] = useState(false);
-  const [viewerOpen, setViewerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; left?: number; right?: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -132,7 +131,7 @@ export default function ChordsButtons({
                   type="button"
                   onClick={() => {
                     setMenuOpen(false);
-                    setViewerOpen(true);
+                    openChordsViewer(song.id);
                     onChordsClick?.(song);
                   }}
                   className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
@@ -255,9 +254,6 @@ export default function ChordsButtons({
             document.body,
           )}
 
-        {viewerOpen && song.chords_text && (
-          <ChordsViewer song={song} onClose={() => setViewerOpen(false)} />
-        )}
 
         {pdfOpen &&
           song.chords_url &&

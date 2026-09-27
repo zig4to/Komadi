@@ -30,6 +30,10 @@ export interface Song {
   // Rezervni YouTube videi za mini predvajalnik v pregledovalniku akordov,
   // kadar youtube_url ne dovoli vgradnje (scripts/fill-youtube-embed-ids.mjs).
   youtube_embed_ids: string[] | null;
+  // Zamik besedila s časi za "Smart play" (s, + = besedilo pozneje), za vsak
+  // YouTube posnetek posebej ({ videoId: s }) — nastavi se v pregledovalniku
+  // akordov (0028_add_lrc_offset.sql).
+  lrc_offsets?: Record<string, number>;
   // Uvoz (batch) iz čakalne vrste, v katerem je bila skladba dodana — null
   // za ročno dodane in starejše skladbe. Glej ImportBatch spodaj.
   import_batch_id: string | null;
@@ -43,7 +47,7 @@ export interface Song {
 
 export type NewSong = Omit<
   Song,
-  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids"
+  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids" | "lrc_offsets"
 >;
 
 export interface SimilarSong {
