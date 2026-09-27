@@ -44,6 +44,8 @@ import type {
 
 const QUEUE_TABS = ["queue", "reports", "history"] as const;
 const SONGS_VISIBLE_VALUES = ["unset", "1", "0"] as const;
+// Največ toliko zadetkov iskanja/filtrov naenkrat (glej visibleResults).
+const RESULTS_PAGE = 40;
 const QUEUE_TAB_LABELS: Record<(typeof QUEUE_TABS)[number], string> = {
   queue: "Čakalna vrsta",
   reports: "Poročila",
@@ -175,6 +177,19 @@ export default function Dashboard() {
   // vrže nazaj na domačo stran — glej usePersistentBool.
   const [jamOpen, setJamOpen] = usePersistentBool("komadi:jam:open", false);
   const [jamPickerOpen, setJamPickerOpen] = useState(false);
+  // Telefon: med iskanjem (fokus ali vpisano besedilo) se iskalno polje
+  // razširi čez prosti prostor, gumba Jam/Playliste pa skrčita v ikoni.
+  const [searchFocused, setSearchFocused] = useState(false);
+  const searchWide = searchFocused || filters.search !== "";
+  // Seznam skladb se riše po RESULTS_PAGE kartic, naslednje ob pomiku do dna
+  // (LoadMoreSentinel). Brez tega je vsaka od prvih črk v iskanju (ujema se
+  // skoraj vseh ~290 skladb) in brisanje zadnje črke (spet cel seznam)
+  // izrisalo vse kartice in tipkanje/brisanje je zaostajalo. Ob vsaki
+  // spremembi filtrov spet od začetka; "← Nazaj" (handleBackFromFilter) pa
+  // nariše cel seznam, da se lahko vrne na prejšnji položaj.
+  const [resultsPage, setResultsPage] = useState({ key: "", count: RESULTS_PAGE });
+  const filtersKey = JSON.stringify(filters);
+  const visibleResults = resultsPage.key === filtersKey ? resultsPage.count : RESULTS_PAGE;
   // Arhiv Jama (tabela jam_history): gumb "Arhiv" na sredini glave, ko je
   // Jam odprt; pod črto nato namesto trenutnega Jama pokaže pretekle.
   const [jamArchiveOpen, setJamArchiveOpen] = useState(false);
@@ -1016,6 +1031,8 @@ export default function Dashboard() {
     setAuthorFilter(null);
     setFilters(emptyFilters);
     setFiltersOpen(false);
+    // Cel seznam, da je prejšnji položaj (lahko globoko v seznamu) spet dosegljiv.
+    setResultsPage({ key: JSON.stringify(emptyFilters), count: Infinity });
     setTimeout(() => window.scrollTo({ top: homeScrollY.current }), 50);
   }
 
@@ -3010,7 +3027,11 @@ export default function Dashboard() {
 
           <div className="space-y-2.5 lg:flex lg:flex-wrap lg:items-center lg:gap-2 lg:space-y-0">
             <div className="flex items-center gap-2 lg:contents">
-              <div className="relative w-1/4 lg:w-1/2 lg:max-w-xs lg:flex-none">
+              <div
+                className={`relative lg:w-1/2 lg:max-w-xs lg:flex-none ${
+                  searchWide ? "min-w-0 flex-1" : "w-1/4"
+                }`}
+              >
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 24 24"
@@ -3029,6 +3050,13 @@ export default function Dashboard() {
                   onChange={(e) =>
                     handleFiltersChange({ ...filters, search: e.target.value })
                   }
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                  // Enter na telefonski tipkovnici zapre tipkovnico (rezultati so že spodaj).
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
+                  enterKeyHint="search"
                   disabled={!isSupabaseConfigured}
                   aria-label="Išči po naslovu ali avtorju"
                   className="w-full rounded-full border border-rose-500/40 bg-[linear-gradient(115deg,rgba(225,29,72,0.14)_15%,rgba(225,29,72,0.03)_95%)] py-2 pl-10 pr-9 text-sm text-neutral-800 transition focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.24)_15%,rgba(225,29,72,0.06)_95%)] focus:outline-none disabled:opacity-40 dark:border-rose-400/40 dark:text-neutral-200 dark:focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.32)_15%,rgba(225,29,72,0.1)_95%)]"
@@ -3086,7 +3114,8 @@ export default function Dashboard() {
                 }}
                 disabled={!isSupabaseConfigured}
                 aria-pressed={jamOpen}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-fuchsia-500/40 px-4 py-2 text-sm font-medium transition disabled:opacity-40 dark:border-fuchsia-400/40 ${
+                aria-label="Jam"
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-fuchsia-500/40 py-2 ${searchWide ? "px-2.5 lg:px-4" : "px-4"} text-sm font-medium transition disabled:opacity-40 dark:border-fuchsia-400/40 ${
                   jamOpen
                     ? "bg-[linear-gradient(115deg,#a21caf_15%,#e879f9_100%)] text-white"
                     : "bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.24)_15%,rgba(192,38,211,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.32)_15%,rgba(192,38,211,0.1)_95%)]"
@@ -3104,7 +3133,7 @@ export default function Dashboard() {
                 >
                   <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
                 </svg>
-                Jam
+                <span className={searchWide ? "hidden lg:inline" : ""}>Jam</span>
               </button>
 
               <button
@@ -3112,7 +3141,8 @@ export default function Dashboard() {
                 onClick={openPlaylists}
                 disabled={!isSupabaseConfigured}
                 aria-pressed={playlistsOpen}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-yellow-500/40 px-4 py-2 text-sm font-medium transition disabled:opacity-40 dark:border-yellow-400/40 ${
+                aria-label="Playliste"
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-yellow-500/40 py-2 ${searchWide ? "px-2.5 lg:px-4" : "px-4"} text-sm font-medium transition disabled:opacity-40 dark:border-yellow-400/40 ${
                   playlistsOpen
                     ? "bg-[linear-gradient(115deg,#a16207_15%,#facc15_100%)] text-white"
                     : "bg-[linear-gradient(115deg,rgba(202,138,4,0.14)_15%,rgba(202,138,4,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(202,138,4,0.24)_15%,rgba(202,138,4,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(202,138,4,0.32)_15%,rgba(202,138,4,0.1)_95%)]"
@@ -3134,7 +3164,7 @@ export default function Dashboard() {
                   <path d="M21 15V6" />
                   <circle cx="18.5" cy="15.5" r="2.5" />
                 </svg>
-                Playliste
+                <span className={searchWide ? "hidden lg:inline" : ""}>Playliste</span>
               </button>
             </div>
 
@@ -3470,7 +3500,7 @@ export default function Dashboard() {
                       </p>
                     )}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {displaySongs.map((song) => (
+                      {displaySongs.slice(0, visibleResults).map((song) => (
                         <div key={song.id}>
                           <SongCard
                             song={song}
@@ -3488,6 +3518,13 @@ export default function Dashboard() {
                         </div>
                       ))}
                     </div>
+                    {displaySongs.length > visibleResults && (
+                      <LoadMoreSentinel
+                        // Nov opazovalec po vsaki strani: če je konec še vedno blizu zaslona, naloži naslednjo.
+                        key={visibleResults}
+                        onVisible={() => setResultsPage({ key: filtersKey, count: visibleResults + RESULTS_PAGE })}
+                      />
+                    )}
                   </>
                 )}
               </>
@@ -3496,6 +3533,38 @@ export default function Dashboard() {
         </>
       )}
     </div>
+  );
+}
+
+// Konec prikazanega dela seznama zadetkov: ko pride blizu zaslona, naloži
+// naslednjo stran (gumb za primer, da IntersectionObserver ne sproži).
+function LoadMoreSentinel({ onVisible }: { onVisible: () => void }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const onVisibleRef = useRef(onVisible);
+  useEffect(() => {
+    onVisibleRef.current = onVisible;
+  });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) onVisibleRef.current();
+      },
+      { rootMargin: "600px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={() => onVisibleRef.current()}
+      className="mx-auto mt-4 block rounded-full border border-neutral-300 px-4 py-1.5 text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+    >
+      Pokaži več
+    </button>
   );
 }
 

@@ -218,13 +218,9 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
   // Gumb celozaslonsko: skrije obe zgornji vrstici (kot med samodejnim
   // pomikanjem) in, kjer gre (Fullscreen API — ne npr. v iPhone Safariju),
   // še vrstico brskalnika/sistema. Izhod: gumb v kotu ali Nazaj.
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  // Isti koren še kot stanje — cilj portala za plavajoči predvajalnik.
+  // Koren pregledovalnika — cilj portala za plavajoči predvajalnik.
   const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
-  const setRoot = useCallback((el: HTMLDivElement | null) => {
-    rootRef.current = el;
-    setRootEl(el);
-  }, []);
+  const setRoot = useCallback((el: HTMLDivElement | null) => setRootEl(el), []);
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
     // Izhod iz celozaslonskega načina brskalnika (npr. Android Nazaj) vrne vrstici.
@@ -241,7 +237,9 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
   const enterFullscreen = () => {
     closeThemeMenu();
     setIsFullscreen(true);
-    if (document.fullscreenEnabled) rootRef.current?.requestFullscreen().catch(() => {});
+    // Cela stran, ne samo koren pregledovalnika: Android brskalniki (npr. Brave)
+    // pri delu strani ne prilagodijo vedno vidnega območja.
+    if (document.fullscreenEnabled) document.documentElement.requestFullscreen().catch(() => {});
   };
   const exitFullscreen = () => {
     setIsFullscreen(false);
@@ -496,7 +494,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
     "flex h-7 min-w-7 items-center justify-center rounded-full text-sm font-medium text-neutral-200 hover:bg-neutral-800 hover:text-white disabled:opacity-40 active:scale-95";
 
   return createPortal(
-    <div ref={setRoot} data-view-portal onClick={(e) => e.stopPropagation()} style={themeVars} className="fixed inset-0 z-50 flex flex-col bg-(--cv-bg)">
+    <div ref={setRoot} data-view-portal onClick={(e) => e.stopPropagation()} style={themeVars} className="fixed inset-0 z-50 flex flex-col bg-(--cv-bg) pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
       {/* Med samodejnim pomikanjem zgornji vrstici zdrsneta gor (celozaslonski
           način), ob pavzi se vrneta. Skrito s CSS, ne odstranjeno — predvajalnik
           mora ostati, da glasba igra naprej. */}

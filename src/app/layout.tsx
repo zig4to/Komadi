@@ -38,6 +38,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#059669",
   colorScheme: "light dark",
+  // Brez tega telefon v celozaslonskem načinu (ChordsViewer) pusti na mestu
+  // statusne vrstice/izreza kamere prazen črn pas; odmik za izrez dodajo
+  // komponente same z env(safe-area-inset-*).
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
