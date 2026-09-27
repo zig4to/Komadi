@@ -188,6 +188,36 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
   };
   useBackableOpen(editing, cancelEdit);
 
+  // Gumb celozaslonsko: skrije obe zgornji vrstici (kot med samodejnim
+  // pomikanjem) in, kjer gre (Fullscreen API — ne npr. v iPhone Safariju),
+  // še vrstico brskalnika/sistema. Izhod: gumb v kotu ali Nazaj.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    // Izhod iz celozaslonskega načina brskalnika (npr. Android Nazaj) vrne vrstici.
+    const onChange = () => {
+      if (!document.fullscreenElement) setIsFullscreen(false);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      // Ob zaprtju pregledovalnika ne ostani v celozaslonskem načinu.
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    };
+  }, []);
+  const enterFullscreen = () => {
+    closeThemeMenu();
+    setIsFullscreen(true);
+    if (document.fullscreenEnabled) rootRef.current?.requestFullscreen().catch(() => {});
+  };
+  const exitFullscreen = () => {
+    setIsFullscreen(false);
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  };
+  useBackableOpen(isFullscreen, exitFullscreen);
+  // Zgornji vrstici skrite: med samodejnim pomikanjem ali v celozaslonskem načinu.
+  const barsHidden = fullscreen || isFullscreen;
+
   const shift = (d: number) => setSemitones((s) => wrap(s + d));
   const display = (name: string) => {
     const t = transposeChord(name, semitones);
@@ -345,19 +375,19 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
     "flex h-7 min-w-7 items-center justify-center rounded-full text-sm font-medium text-neutral-200 hover:bg-neutral-800 hover:text-white disabled:opacity-40 active:scale-95";
 
   return createPortal(
-    <div data-view-portal onClick={(e) => e.stopPropagation()} style={themeVars} className="fixed inset-0 z-50 flex flex-col bg-(--cv-bg)">
+    <div ref={rootRef} data-view-portal onClick={(e) => e.stopPropagation()} style={themeVars} className="fixed inset-0 z-50 flex flex-col bg-(--cv-bg)">
       {/* Med samodejnim pomikanjem zgornji vrstici zdrsneta gor (celozaslonski
           način), ob pavzi se vrneta. Skrito s CSS, ne odstranjeno — predvajalnik
           mora ostati, da glasba igra naprej. */}
       <div
         className="grid shrink-0"
-        style={{ gridTemplateRows: fullscreen ? "0fr" : "1fr", transition: `grid-template-rows ${BARS_TRANSITION}` }}
-        aria-hidden={fullscreen}
+        style={{ gridTemplateRows: barsHidden ? "0fr" : "1fr", transition: `grid-template-rows ${BARS_TRANSITION}` }}
+        aria-hidden={barsHidden}
       >
       <div
         className="min-h-0 overflow-hidden"
         // Brez transform: ta bi fixed sličico YouTube videa (znotraj vrstice) ujel v ta okvir.
-        style={{ opacity: fullscreen ? 0 : 1, transition: `opacity ${BARS_TRANSITION}` }}
+        style={{ opacity: barsHidden ? 0 : 1, transition: `opacity ${BARS_TRANSITION}` }}
       >
       <div className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2">
         <span className="shrink-0 text-sm font-medium text-neutral-300">Akordi</span>
@@ -472,9 +502,34 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
           </svg>
           Uredi
         </button>
+        <button
+          type="button"
+          onClick={enterFullscreen}
+          aria-label="Celozaslonski način"
+          title="Celozaslonski način"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 text-neutral-200 transition hover:text-white active:scale-95"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+          </svg>
+        </button>
       </div>
       </div>
       </div>
+
+      {isFullscreen && (
+        <button
+          type="button"
+          onClick={exitFullscreen}
+          aria-label="Izhod iz celozaslonskega načina"
+          title="Izhod iz celozaslonskega načina"
+          className="fixed right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-orange-400 bg-neutral-900/70 text-amber-400 backdrop-blur active:scale-95"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+            <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" />
+          </svg>
+        </button>
+      )}
 
       {themeMenuPos && (
         <div
