@@ -84,6 +84,7 @@ export default function YouTubeMiniPlayer({
   watchUrl,
   onPlaying,
   floatingHost,
+  onTime,
 }: {
   videoIds: string[];
   watchUrl: string;
@@ -93,12 +94,17 @@ export default function YouTubeMiniPlayer({
   // pravokotniku desno (portal v ta element — koren pregledovalnika, da ga
   // pokaže tudi celozaslonski način brskalnika). null = ni prikazan.
   floatingHost?: HTMLElement | null;
+  // "Pametni predvajalnik": trenutni čas in dolžina videa (ob predvajanju
+  // vsakih 250 ms in ob preskoku z drsnikom/gumbi).
+  onTime?: (seconds: number, duration: number, playing: boolean) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
   const onPlayingRef = useRef(onPlaying);
+  const onTimeRef = useRef(onTime);
   useEffect(() => {
     onPlayingRef.current = onPlaying;
+    onTimeRef.current = onTime;
   });
   // Kandidati po vrsti (glej ChordsViewer): ob napaki (101/150 — lastnik ne
   // dovoli vgradnje) naloži naslednjega V ISTI predvajalnik (loadVideoById),
@@ -189,6 +195,10 @@ export default function YouTubeMiniPlayer({
     const id = setInterval(() => setCurrent(playerRef.current?.getCurrentTime() ?? 0), 250);
     return () => clearInterval(id);
   }, [playing]);
+
+  useEffect(() => {
+    onTimeRef.current?.(current, duration, playing);
+  }, [current, duration, playing]);
 
   if (errorCode !== null || videoIds.length === 0) {
     return (

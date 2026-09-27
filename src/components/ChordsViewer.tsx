@@ -17,6 +17,7 @@ import {
   type ChordsLine,
 } from "@/lib/chords";
 import { findChordShapes, loadChordDb, type ChordPosition } from "@/lib/chordShapes";
+import { alignLyrics, fetchLrcCandidates, lineAt, pickCandidate, type LrcCandidate } from "@/lib/syncedLyrics";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { Song } from "@/types/song";
@@ -33,6 +34,8 @@ const CHORD_COLOR_KEY = "komadi:chords:chordColor";
 const FLOATING_PLAYER_KEY = "komadi:chords:floatingPlayer";
 // Izbrana različica prijema za vsak akord ({ "Dm": 1, … }).
 const SHAPE_CHOICE_KEY = "komadi:chords:shapeChoice";
+// Zamik besedila glede na video (s), na skladbo — video ima lahko daljši uvod.
+const lrcOffsetKey = (id: string) => `komadi:chords:lrcOffset:${id}`;
 const transposeKey = (id: string) => `komadi:chords:transpose:${id}`;
 const workingVideoKey = (id: string) => `komadi:chords:video:${id}`;
 const MIN_FONT = 10;
@@ -295,6 +298,63 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
     </button>
   );
 
+  // "Pametni predvajalnik": med predvajanjem videa se pesem sama pomika na
+  // vrstico, ki se trenutno poje (in jo poudari). Besedilo s časi iz LRCLIB
+  // (src/lib/syncedLyrics.ts), prenese se enkrat na skladbo; brez njega ostane
+  // ročni autoscroll.
+  const [lrcCandidates, setLrcCandidates] = useState<LrcCandidate[] | null>(null);
+  const [lrcError, setLrcError] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchLrcCandidates(song.id, song.title, song.author)
+      .then((c) => {
+        if (!cancelled) setLrcCandidates(c);
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setLrcError(e.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [song.id, song.title, song.author]);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const lrc = useMemo(() => (lrcCandidates ? pickCandidate(lrcCandidates, videoDuration) : null), [lrcCandidates, videoDuration]);
+  const sync = useMemo(() => (lrc ? { ...alignLyrics(lrc.lines, body), total: lrc.lines.length } : null), [lrc, body]);
+  const smartActive = !!sync && sync.points.length > 0;
+  const [lrcOffset, setLrcOffset] = useState(() => readNumber(lrcOffsetKey(song.id), 0));
+  useEffect(() => writeNumber(lrcOffsetKey(song.id), lrcOffset), [song.id, lrcOffset]);
+  const [activeLine, setActiveLine] = useState(-1);
+  const onVideoTime = (seconds: number, duration: number) => {
+    if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
+    if (sync) setActiveLine(lineAt(sync.points, seconds - lrcOffset));
+  };
+  // Ročno pomikanje (dotik, kolesce) za 4 s ustavi samodejno sledenje.
+  const lastUserScrollRef = useRef(0);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !smartActive) return;
+    const mark = () => {
+      lastUserScrollRef.current = Date.now();
+    };
+    el.addEventListener("touchstart", mark, { passive: true });
+    el.addEventListener("wheel", mark, { passive: true });
+    el.addEventListener("pointerdown", mark);
+    return () => {
+      el.removeEventListener("touchstart", mark);
+      el.removeEventListener("wheel", mark);
+      el.removeEventListener("pointerdown", mark);
+    };
+  }, [smartActive]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || activeLine < 0 || Date.now() - lastUserScrollRef.current < 4000) return;
+    const line = el.querySelector<HTMLElement>(`[data-line="${activeLine}"]`);
+    if (!line) return;
+    // Trenutna vrstica ~ tretjino od vrha vidnega dela.
+    const top = el.scrollTop + line.getBoundingClientRect().top - el.getBoundingClientRect().top - el.clientHeight / 3;
+    el.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }, [activeLine]);
+
   // Shema prijema ob prehodu z miško čez akord (na telefonu ob dotiku) —
   // kot na Ultimate Guitar. Vsak akord ima več različic (odprta, barre …),
   // med njimi puščici ‹ ›; izbira se zapomni za vsak akord (vse skladbe).
@@ -513,6 +573,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
             videoIds={videoIds}
             watchUrl={watchUrl ?? `https://www.youtube.com/watch?v=${videoIds[0]}`}
             floatingHost={floatingPlayer && fullscreen ? rootEl : null}
+            onTime={onVideoTime}
             onPlaying={(id) => {
               try {
                 window.localStorage.setItem(workingVideoKey(song.id), id);
@@ -735,6 +796,43 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                     />
                   </button>
                 </div>
+                <div className="border-t border-neutral-700 pt-2">
+                  <span className="text-xs text-neutral-200">Pametni predvajalnik</span>
+                  <span className="block text-[10px] leading-tight text-neutral-500">
+                    {lrcError
+                      ? `Napaka: ${lrcError}`
+                      : !lrcCandidates
+                        ? "Iščem besedilo s časi …"
+                        : !sync
+                          ? "Za to skladbo ni besedila s časi."
+                          : `${lrc?.album || "Besedilo"}: povezanih ${sync.matched}/${sync.total} vrstic. Pritisni ▶ zgoraj.`}
+                  </span>
+                  {smartActive && (
+                    <div className="mt-1.5 flex items-center justify-between gap-2">
+                      <span className="text-[11px] text-neutral-300">Zamik besedila</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setLrcOffset((o) => Math.round((o - 0.5) * 10) / 10)}
+                          className="rounded-full border border-orange-400 px-2 text-xs text-amber-400"
+                        >
+                          −0,5 s
+                        </button>
+                        <span className="w-10 text-center text-[11px] tabular-nums text-neutral-300">
+                          {lrcOffset > 0 ? "+" : ""}
+                          {lrcOffset.toFixed(1).replace(".", ",")}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setLrcOffset((o) => Math.round((o + 0.5) * 10) / 10)}
+                          className="rounded-full border border-orange-400 px-2 text-xs text-amber-400"
+                        >
+                          +0,5 s
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -815,7 +913,20 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
               {description.map((l, i) => renderLine(l, i, false))}
             </div>
           )}
-          {body.map((l, i) => renderLine(l, i, true))}
+          {body.map((l, i) => (
+            // data-line: cilj "Pametnega predvajalnika"; trenutna vrstica poudarjena.
+            <div
+              key={i}
+              data-line={i}
+              className={
+                smartActive && i === activeLine
+                  ? "-mx-1 rounded-md bg-[color-mix(in_srgb,var(--cv-section)_18%,transparent)] px-1 transition-colors"
+                  : "transition-colors"
+              }
+            >
+              {renderLine(l, i, true)}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -860,7 +971,8 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
         </div>
       )}
 
-      {!editing && <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} onPlayingChange={setFullscreen} />}
+      {/* Med pametnim sledenjem ni ročnega autoscrolla — ne bi se smela tepsti. */}
+      {!editing && !smartActive && <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} onPlayingChange={setFullscreen} />}
     </div>,
     document.body,
   );
