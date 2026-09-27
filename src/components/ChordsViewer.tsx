@@ -320,13 +320,17 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
   const [videoDuration, setVideoDuration] = useState(0);
   const lrc = useMemo(() => (lrcCandidates ? pickCandidate(lrcCandidates, videoDuration) : null), [lrcCandidates, videoDuration]);
   const sync = useMemo(() => (lrc ? { ...alignLyrics(lrc.lines, body), total: lrc.lines.length } : null), [lrc, body]);
-  const smartActive = !!sync && sync.points.length > 0;
+  // Na voljo, če je besedilo s časi; sledi pa samo po gumbu "Smart play"
+  // (navadni ▶ samo predvaja, kot prej).
+  const smartAvailable = !!sync && sync.points.length > 0;
+  const [smartOn, setSmartOn] = useState(false);
+  const smartActive = smartAvailable && smartOn;
   const [lrcOffset, setLrcOffset] = useState(() => readNumber(lrcOffsetKey(song.id), 0));
   useEffect(() => writeNumber(lrcOffsetKey(song.id), lrcOffset), [song.id, lrcOffset]);
   const [activeLine, setActiveLine] = useState(-1);
   const onVideoTime = (seconds: number, duration: number) => {
     if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
-    if (sync) setActiveLine(lineAt(sync.points, seconds - lrcOffset));
+    setActiveLine(smartActive && sync ? lineAt(sync.points, seconds - lrcOffset) : -1);
   };
   // Ročno pomikanje (dotik, kolesce) za 4 s ustavi samodejno sledenje.
   const lastUserScrollRef = useRef(0);
@@ -574,6 +578,9 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
             watchUrl={watchUrl ?? `https://www.youtube.com/watch?v=${videoIds[0]}`}
             floatingHost={floatingPlayer && fullscreen ? rootEl : null}
             onTime={onVideoTime}
+            smartAvailable={smartAvailable}
+            smartOn={smartOn}
+            onSmartToggle={setSmartOn}
             onPlaying={(id) => {
               try {
                 window.localStorage.setItem(workingVideoKey(song.id), id);
@@ -805,9 +812,9 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                         ? "Iščem besedilo s časi …"
                         : !sync
                           ? "Za to skladbo ni besedila s časi."
-                          : `${lrc?.album || "Besedilo"}: povezanih ${sync.matched}/${sync.total} vrstic. Pritisni ▶ zgoraj.`}
+                          : `${lrc?.album || "Besedilo"}: povezanih ${sync.matched}/${sync.total} vrstic. Zaženi z gumbom Smart play levo od ▶.`}
                   </span>
-                  {smartActive && (
+                  {smartAvailable && (
                     <div className="mt-1.5 flex items-center justify-between gap-2">
                       <span className="text-[11px] text-neutral-300">Zamik besedila</span>
                       <div className="flex items-center gap-1">

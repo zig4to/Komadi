@@ -85,6 +85,9 @@ export default function YouTubeMiniPlayer({
   onPlaying,
   floatingHost,
   onTime,
+  smartAvailable = false,
+  smartOn = false,
+  onSmartToggle,
 }: {
   videoIds: string[];
   watchUrl: string;
@@ -97,6 +100,11 @@ export default function YouTubeMiniPlayer({
   // "Pametni predvajalnik": trenutni čas in dolžina videa (ob predvajanju
   // vsakih 250 ms in ob preskoku z drsnikom/gumbi).
   onTime?: (seconds: number, duration: number, playing: boolean) => void;
+  // Gumb "Smart play" levo od ▶ (samo, če ima skladba besedilo s časi):
+  // zažene predvajanje in vklopi sledenje; ponoven klik sledenje izklopi.
+  smartAvailable?: boolean;
+  smartOn?: boolean;
+  onSmartToggle?: (on: boolean) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
@@ -227,6 +235,11 @@ export default function YouTubeMiniPlayer({
     player.seekTo(t, true);
     setCurrent(t);
   };
+  // Na začetek skladbe (predvajanje se ne ustavi).
+  const restart = () => {
+    playerRef.current?.seekTo(0, true);
+    setCurrent(0);
+  };
   const playIcon = loading ? (
     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-4 w-4 animate-spin">
       <path d="M12 3a9 9 0 1 0 9 9" strokeLinecap="round" />
@@ -245,6 +258,29 @@ export default function YouTubeMiniPlayer({
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
+      {smartAvailable && (
+        <button
+          type="button"
+          onClick={() => {
+            if (smartOn) return onSmartToggle?.(false);
+            onSmartToggle?.(true);
+            if (!playing) togglePlay();
+          }}
+          disabled={loading}
+          aria-pressed={smartOn}
+          aria-label={smartOn ? "Izklopi Smart play" : "Smart play: akordi sledijo petju"}
+          title={smartOn ? "Izklopi Smart play" : "Smart play: akordi sledijo petju"}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 transition disabled:opacity-60 active:scale-95 ${
+            smartOn ? "bg-orange-400 text-neutral-900" : "text-amber-400 hover:bg-orange-400/15"
+          }`}
+        >
+          {/* Predvajaj + vrstice besedila. */}
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+            <path d="M3 5.5v7l5.5-3.5L3 5.5z" fill="currentColor" stroke="none" />
+            <path d="M12 7h9M12 12h9M3 17h18" />
+          </svg>
+        </button>
+      )}
       <button
         type="button"
         onClick={togglePlay}
@@ -254,6 +290,18 @@ export default function YouTubeMiniPlayer({
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-60 active:scale-95"
       >
         {playIcon}
+      </button>
+      <button
+        type="button"
+        onClick={restart}
+        disabled={!ready}
+        aria-label="Na začetek skladbe"
+        title="Na začetek skladbe"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-40 active:scale-95"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+          <path d="M6 5h2.5v14H6zM20 5v14L9 12l11-7z" />
+        </svg>
       </button>
 
       <input
@@ -308,10 +356,7 @@ export default function YouTubeMiniPlayer({
           >
             <button
               type="button"
-              onClick={() => {
-                playerRef.current?.seekTo(0, true);
-                setCurrent(0);
-              }}
+              onClick={restart}
               disabled={!ready}
               aria-label="Na začetek skladbe"
               title="Na začetek skladbe"

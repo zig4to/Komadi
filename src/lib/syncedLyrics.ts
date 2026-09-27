@@ -27,11 +27,17 @@ const cacheKey = (songId: string) => `komadi:chords:lrc:${songId}`;
 
 // Vse različice s časi (največ 8) — katero uporabiti, se odloči šele, ko je
 // znana dolžina YouTube videa (pickCandidate). Rezultat, tudi prazen, gre v
-// localStorage, da se LRCLIB ne kliče ob vsakem odprtju.
+// localStorage, da se LRCLIB ne kliče ob vsakem odprtju — skupaj z naslovom
+// in izvajalcem, ker po popravku zapisa (npr. "Papparazzi" → "Paparazzi")
+// stari (prazen) rezultat ne velja več.
 export async function fetchLrcCandidates(songId: string, title: string, author: string): Promise<LrcCandidate[]> {
+  const query = `${title}\n${author}`;
   try {
     const cached = window.localStorage.getItem(cacheKey(songId));
-    if (cached) return JSON.parse(cached) as LrcCandidate[];
+    if (cached) {
+      const parsed = JSON.parse(cached) as { query?: string; candidates?: LrcCandidate[] };
+      if (parsed.query === query && parsed.candidates) return parsed.candidates;
+    }
   } catch {}
   const q = new URLSearchParams({ track_name: title, artist_name: ARTIST_ALIAS[author] ?? author });
   const res = await fetch(`https://lrclib.net/api/search?${q}`);
@@ -43,7 +49,7 @@ export async function fetchLrcCandidates(songId: string, title: string, author: 
     .map((d) => ({ album: d.albumName ?? "", duration: d.duration ?? 0, lines: parseLrc(d.syncedLyrics!) }))
     .filter((c) => c.lines.length > 0);
   try {
-    window.localStorage.setItem(cacheKey(songId), JSON.stringify(candidates));
+    window.localStorage.setItem(cacheKey(songId), JSON.stringify({ query, candidates }));
   } catch {}
   return candidates;
 }
