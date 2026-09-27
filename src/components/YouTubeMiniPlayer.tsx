@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 // Mini predvajalnik v zgornji vrstici ChordsViewer.tsx (kot v UG Tabs app):
 // YouTube IFrame Player API, lastne kontrole (play/pause, drsnik po dolžini
@@ -82,11 +83,16 @@ export default function YouTubeMiniPlayer({
   videoIds,
   watchUrl,
   onPlaying,
+  floatingHost,
 }: {
   videoIds: string[];
   watchUrl: string;
   // Video, ki se je res začel predvajati — ChordsViewer si ga zapomni za naslednjič.
   onPlaying?: (videoId: string) => void;
+  // "Predvajalnik med pomikanjem": kontrole istega predvajalnika v plavajočem
+  // pravokotniku desno (portal v ta element — koren pregledovalnika, da ga
+  // pokaže tudi celozaslonski način brskalnika). null = ni prikazan.
+  floatingHost?: HTMLElement | null;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
@@ -199,33 +205,45 @@ export default function YouTubeMiniPlayer({
 
   const ready = started && !loading;
 
+  const togglePlay = () => {
+    if (!playerRef.current) start();
+    else if (playing) playerRef.current.pauseVideo();
+    else playerRef.current.playVideo();
+  };
+  const seekBy = (delta: number) => {
+    const player = playerRef.current;
+    if (!player) return;
+    const t = Math.max(0, Math.min(duration || Infinity, player.getCurrentTime() + delta));
+    player.seekTo(t, true);
+    setCurrent(t);
+  };
+  const playIcon = loading ? (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-4 w-4 animate-spin">
+      <path d="M12 3a9 9 0 1 0 9 9" strokeLinecap="round" />
+    </svg>
+  ) : playing ? (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+      <path d="M7 5h3v14H7zM14 5h3v14h-3z" />
+    </svg>
+  ) : (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+      <path d="M8 5v14l11-7-11-7z" />
+    </svg>
+  );
+  const floatButton =
+    "flex h-9 w-9 items-center justify-center rounded-full text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-40 active:scale-95";
+
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
       <button
         type="button"
-        onClick={() => {
-          if (!playerRef.current) start();
-          else if (playing) playerRef.current.pauseVideo();
-          else playerRef.current.playVideo();
-        }}
+        onClick={togglePlay}
         disabled={loading}
         aria-label={playing ? "Premor" : "Predvajaj"}
         title={playing ? "Premor" : "Predvajaj skladbo"}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-500 disabled:opacity-60 active:scale-95"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-60 active:scale-95"
       >
-        {loading ? (
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-4 w-4 animate-spin">
-            <path d="M12 3a9 9 0 1 0 9 9" strokeLinecap="round" />
-          </svg>
-        ) : playing ? (
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-            <path d="M7 5h3v14H7zM14 5h3v14h-3z" />
-          </svg>
-        ) : (
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-            <path d="M8 5v14l11-7-11-7z" />
-          </svg>
-        )}
+        {playIcon}
       </button>
 
       <input
@@ -241,7 +259,7 @@ export default function YouTubeMiniPlayer({
         }}
         disabled={!ready || duration === 0}
         aria-label="Položaj v skladbi"
-        className="h-1 min-w-0 flex-1 cursor-pointer accent-red-500 disabled:opacity-40"
+        className="h-1 min-w-0 flex-1 cursor-pointer accent-orange-400 disabled:opacity-40"
       />
       <span className="shrink-0 text-[11px] tabular-nums text-neutral-400">
         {formatTime(current)} / {formatTime(duration)}
@@ -252,7 +270,7 @@ export default function YouTubeMiniPlayer({
         onClick={() => setVideoVisible((v) => !v)}
         aria-pressed={videoVisible}
         title={videoVisible ? "Skrij video" : "Pokaži video"}
-        className={`shrink-0 rounded p-1 hover:text-white ${videoVisible ? "text-red-400" : "text-neutral-400"}`}
+        className={`shrink-0 rounded p-1 hover:text-white ${videoVisible ? "text-amber-400" : "text-neutral-400"}`}
       >
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
           <rect x="2" y="5" width="15" height="14" rx="2" />
@@ -270,6 +288,53 @@ export default function YouTubeMiniPlayer({
             : "pointer-events-none fixed -left-[9999px] top-0 opacity-0"
         }
       />
+
+      {floatingHost &&
+        createPortal(
+          <div
+            role="group"
+            aria-label="Predvajalnik"
+            className="fixed right-3 top-1/2 z-10 flex -translate-y-1/2 flex-col items-center gap-1 rounded-xl border border-orange-400 bg-neutral-900/85 p-1 shadow-lg backdrop-blur"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                playerRef.current?.seekTo(0, true);
+                setCurrent(0);
+              }}
+              disabled={!ready}
+              aria-label="Na začetek skladbe"
+              title="Na začetek skladbe"
+              className={floatButton}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+                <path d="M6 5h2.5v14H6zM20 5v14L9 12l11-7z" />
+              </svg>
+            </button>
+            <button type="button" onClick={() => seekBy(-10)} disabled={!ready} aria-label="10 s nazaj" title="10 s nazaj" className={floatButton}>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+                <path d="M11 6v12l-8.5-6L11 6zm9.5 0v12L12 12l8.5-6z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={togglePlay}
+              disabled={loading}
+              aria-label={playing ? "Premor" : "Predvajaj"}
+              title={playing ? "Premor" : "Predvajaj skladbo"}
+              className={`${floatButton} border border-orange-400`}
+            >
+              {playIcon}
+            </button>
+            <button type="button" onClick={() => seekBy(10)} disabled={!ready} aria-label="10 s naprej" title="10 s naprej" className={floatButton}>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+                <path d="M13 6v12l8.5-6L13 6zM3.5 6v12L12 12 3.5 6z" />
+              </svg>
+            </button>
+            <span className="pb-0.5 text-[10px] tabular-nums text-neutral-400">{formatTime(current)}</span>
+          </div>,
+          floatingHost,
+        )}
     </div>
   );
 }

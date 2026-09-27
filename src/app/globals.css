@@ -16,4 +16,14 @@ html {
 
 body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  /* Brez utripajočega kazalca ob kliku na navadno besedilo (npr. Chromov
+     "caret browsing", F7); v poljih za vnos ostane. */
+  caret-color: transparent;
+}
+
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  caret-color: auto;
 }

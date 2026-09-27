@@ -220,10 +220,12 @@ export default function AutoScrollControl({
     );
   }
 
+  // Na telefonu navpično (zraste navzgor iz krogca: + na vrhu, predvajaj/
+  // premor spodaj), na računalniku vodoravno v izvornem vrstnem redu.
   return (
     <div
       style={cornerStyle}
-      className="fixed bottom-4 right-4 z-10 flex items-center gap-0.5 rounded-full bg-neutral-900/90 px-1 py-1 border-2 border-amber-400 text-neutral-200 shadow-lg"
+      className="fixed bottom-4 right-4 z-10 flex flex-col items-center gap-0.5 rounded-full bg-neutral-900/90 px-1 py-1 border-2 border-amber-400 text-neutral-200 shadow-lg lg:flex-row"
     >
       <button
         type="button"
@@ -231,7 +233,7 @@ export default function AutoScrollControl({
         disabled={speed <= 1}
         aria-label="Počasneje"
         title="Počasneje"
-        className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-neutral-800 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent active:scale-95"
+        className="order-3 flex h-8 w-8 lg:order-none items-center justify-center rounded-full hover:bg-neutral-800 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent active:scale-95"
       >
         <svg
           aria-hidden="true"
@@ -247,7 +249,7 @@ export default function AutoScrollControl({
         </svg>
       </button>
 
-      <span className="w-5 text-center text-xs font-medium tabular-nums select-none">{speed}</span>
+      <span className="order-2 w-5 text-center text-xs font-medium tabular-nums select-none lg:order-none">{speed}</span>
 
       <button
         type="button"
@@ -255,7 +257,7 @@ export default function AutoScrollControl({
         disabled={speed >= 13}
         aria-label="Hitreje"
         title="Hitreje"
-        className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-neutral-800 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent active:scale-95"
+        className="order-1 flex h-8 w-8 lg:order-none items-center justify-center rounded-full hover:bg-neutral-800 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent active:scale-95"
       >
         <svg
           aria-hidden="true"
@@ -271,14 +273,14 @@ export default function AutoScrollControl({
         </svg>
       </button>
 
-      <div className="mx-0.5 h-5 w-px bg-white/15" />
+      <div className="order-4 my-0.5 h-px w-5 bg-white/15 lg:order-none lg:mx-0.5 lg:my-0 lg:h-5 lg:w-px" />
 
       <button
         type="button"
         onClick={() => setIsPlaying((p) => !p)}
         aria-label={isPlaying ? "Premor" : "Nadaljuj"}
         title={isPlaying ? "Premor" : "Nadaljuj"}
-        className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-neutral-800 hover:text-white active:scale-95"
+        className="order-5 flex h-8 w-8 lg:order-none items-center justify-center rounded-full hover:bg-neutral-800 hover:text-white active:scale-95"
       >
         {isPlaying ? (
           <svg

@@ -332,7 +332,7 @@ export function FavoritesThisMonth({ songs, authorImages, ...handlers }: { songs
     <section className="mb-5">
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <h2 className="flex items-center gap-1.5 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
-          <StarIcon filled className="h-[18px] w-[18px] text-amber-500 dark:text-amber-400" />
+          <StarIcon filled={false} className="h-[18px] w-[18px] text-amber-500 dark:text-amber-400" />
           Priljubljeno {MONTH_GENITIVE[Number(key.slice(5)) - 1]}
         </h2>
       </div>

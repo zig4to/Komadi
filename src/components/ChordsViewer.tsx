@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import AutoScrollControl from "@/components/AutoScrollControl";
+import ChordDiagram from "@/components/ChordDiagram";
 import YouTubeMiniPlayer, { youTubeVideoId } from "@/components/YouTubeMiniPlayer";
 import {
   applyEditedText,
@@ -15,6 +16,7 @@ import {
   transposeChord,
   type ChordsLine,
 } from "@/lib/chords";
+import { findChordShapes, loadChordDb, type ChordPosition } from "@/lib/chordShapes";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { Song } from "@/types/song";
@@ -28,6 +30,9 @@ const FONT_KEY = "komadi:chords:font";
 const SIMPLIFY_KEY = "komadi:chords:simplify";
 const BG_KEY = "komadi:chords:bg";
 const CHORD_COLOR_KEY = "komadi:chords:chordColor";
+const FLOATING_PLAYER_KEY = "komadi:chords:floatingPlayer";
+// Izbrana različica prijema za vsak akord ({ "Dm": 1, … }).
+const SHAPE_CHOICE_KEY = "komadi:chords:shapeChoice";
 const transposeKey = (id: string) => `komadi:chords:transpose:${id}`;
 const workingVideoKey = (id: string) => `komadi:chords:video:${id}`;
 const MIN_FONT = 10;
@@ -112,6 +117,16 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
 
   useBackableOpen(true, onClose);
 
+  // Stran pod pregledovalnikom se ne pomika (in ne kaže svojega drsnika).
+  useEffect(() => {
+    const html = document.documentElement;
+    const previous = html.style.overflow;
+    html.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = previous;
+    };
+  }, []);
+
   useEffect(() => writeNumber(transposeKey(song.id), semitones), [song.id, semitones]);
   useEffect(() => writeNumber(FONT_KEY, fontSize), [fontSize]);
 
@@ -134,10 +149,22 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
     "--cv-panel": theme.panel,
     "--cv-border": theme.border,
     "--cv-chord": theme.light ? chordColor.light : chordColor.dark,
+    // Imena razdelkov (Intro, Chorus …): rumena kot ostali elementi; če so
+    // rumeni tudi akordi, oranžna, da se ločijo od njih.
+    "--cv-section":
+      chordColor.label === "Rumena"
+        ? theme.light ? "#c2410c" : "#fb923c"
+        : theme.light ? "#b45309" : "#fbbf24",
   } as CSSProperties;
 
   // Izbirnik teme: fixed pod gumbom (vrstica z gumbi ima overflow-hidden).
   const [themeMenuPos, setThemeMenuPos] = useState<{ top: number; left: number } | null>(null);
+  // Razdelek "Napredne nastavitve" na dnu menija ⚙ (razprt/strnjen).
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Napredno: "Predvajalnik med pomikanjem" — med samodejnim pomikanjem desno
+  // plavajoče kontrole glasbe (YouTubeMiniPlayer floatingHost). Globalno.
+  const [floatingPlayer, setFloatingPlayer] = useState(() => readNumber(FLOATING_PLAYER_KEY, 0) === 1);
+  useEffect(() => writeNumber(FLOATING_PLAYER_KEY, floatingPlayer ? 1 : 0), [floatingPlayer]);
   const themeButtonRef = useRef<HTMLButtonElement>(null);
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const closeThemeMenu = () => setThemeMenuPos(null);
@@ -191,7 +218,13 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
   // Gumb celozaslonsko: skrije obe zgornji vrstici (kot med samodejnim
   // pomikanjem) in, kjer gre (Fullscreen API — ne npr. v iPhone Safariju),
   // še vrstico brskalnika/sistema. Izhod: gumb v kotu ali Nazaj.
-  const rootRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  // Isti koren še kot stanje — cilj portala za plavajoči predvajalnik.
+  const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
+  const setRoot = useCallback((el: HTMLDivElement | null) => {
+    rootRef.current = el;
+    setRootEl(el);
+  }, []);
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
     // Izhod iz celozaslonskega načina brskalnika (npr. Android Nazaj) vrne vrstici.
@@ -264,12 +297,100 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
     </button>
   );
 
+  // Shema prijema ob prehodu z miško čez akord (na telefonu ob dotiku) —
+  // kot na Ultimate Guitar. Vsak akord ima več različic (odprta, barre …),
+  // med njimi puščici ‹ ›; izbira se zapomni za vsak akord (vse skladbe).
+  const [shapeTip, setShapeTip] = useState<{
+    name: string;
+    positions: ChordPosition[];
+    left: number;
+    top?: number;
+    bottom?: number;
+  } | null>(null);
+  const [shapeChoice, setShapeChoice] = useState<Record<string, number>>(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(SHAPE_CHOICE_KEY) ?? "{}");
+    } catch {
+      return {};
+    }
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SHAPE_CHOICE_KEY, JSON.stringify(shapeChoice));
+    } catch {}
+  }, [shapeChoice]);
+  // Miška: okno ostane odprto, ko jo premakneš z akorda nanj (kratek zamik pri skrivanju).
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const cancelHide = () => clearTimeout(hideTimerRef.current);
+  const scheduleHide = () => {
+    cancelHide();
+    hideTimerRef.current = setTimeout(() => setShapeTip(null), 250);
+  };
+  useEffect(() => () => clearTimeout(hideTimerRef.current), []);
+  const showShape = (name: string, el: HTMLElement) => {
+    cancelHide();
+    const r = el.getBoundingClientRect();
+    loadChordDb().then((db) => {
+      const positions = findChordShapes(db, name);
+      if (!positions.length) return setShapeTip(null);
+      // Nad akordom (spodnji rob okna 6 px nad njim); pod njim samo, če zgoraj ni prostora.
+      const above = r.top > 180;
+      setShapeTip({
+        name,
+        positions,
+        left: Math.max(8, Math.min(r.left + r.width / 2 - 55, window.innerWidth - 118)),
+        ...(above ? { bottom: window.innerHeight - r.top + 6 } : { top: r.bottom + 6 }),
+      });
+    });
+  };
+  const shapeIndex = shapeTip ? Math.min(shapeChoice[shapeTip.name] ?? 0, shapeTip.positions.length - 1) : 0;
+  const stepShape = (delta: number) => {
+    if (!shapeTip) return;
+    const n = shapeTip.positions.length;
+    setShapeChoice((prev) => ({ ...prev, [shapeTip.name]: (shapeIndex + delta + n) % n }));
+  };
+  useEffect(() => {
+    if (!shapeTip) return;
+    // Dotik drugam ali pomikanje skrije shemo (telefon — tam ni "mouseleave").
+    const hide = (e: Event) => {
+      if (!(e.target as HTMLElement).closest?.("[data-chord-name]")) setShapeTip(null);
+    };
+    const el = scrollRef.current;
+    const onScroll = () => setShapeTip(null);
+    document.addEventListener("pointerdown", hide);
+    el?.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      document.removeEventListener("pointerdown", hide);
+      el?.removeEventListener("scroll", onScroll);
+    };
+  }, [shapeTip]);
+  // Ime akorda (že transponirano/poenostavljeno) s shemo prijema.
+  const chordName = (name: string) => (
+    <span
+      data-chord-name
+      className="cursor-pointer"
+      onPointerEnter={(e) => {
+        if (e.pointerType === "mouse") showShape(name, e.currentTarget);
+      }}
+      onPointerLeave={(e) => {
+        if (e.pointerType === "mouse") scheduleHide();
+      }}
+      onClick={(e) => {
+        if ((e.nativeEvent as PointerEvent).pointerType === "mouse") return;
+        if (shapeTip?.name === name) setShapeTip(null);
+        else showShape(name, e.currentTarget);
+      }}
+    >
+      {name}
+    </span>
+  );
+
   // Ena vrstica pesmi ali opisa (glej ChordsLine v src/lib/chords.ts).
   // inBody: v pesmi (tablature skrite za gumbom "Tab"), sicer v opisu (vse vidno).
   const renderLine = (line: ChordsLine, i: number, inBody: boolean) => {
     if (line.kind === "section") {
       return (
-        <div key={i} className="mt-3 flex items-center gap-2 font-sans font-semibold text-(--cv-muted)">
+        <div key={i} className="mt-3 flex items-center gap-2 font-sans font-semibold text-(--cv-section)">
           {line.label}
           {inBody && sectionsWithTabs.has(i) && tabButton(i)}
         </div>
@@ -281,7 +402,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
           {layoutChordLine(line.chords, display).map((c, j) => (
             <span key={j}>
               {" ".repeat(c.pad)}
-              {c.name}
+              {chordName(c.name)}
             </span>
           ))}
         </div>
@@ -303,7 +424,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                 const name = display(c.name);
                 return (
                   <span key={j} className="whitespace-pre" style={{ minWidth: `${Math.max(4, name.length + 1)}ch` }}>
-                    {name}
+                    {chordName(name)}
                   </span>
                 );
               })}
@@ -322,7 +443,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                 {layoutChordLine(line.header, display).map((c, j) => (
                   <span key={j}>
                     {" ".repeat(c.pad)}
-                    {c.name}
+                    {chordName(c.name)}
                   </span>
                 ))}
               </div>
@@ -347,7 +468,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                 className="inline-flex max-w-full flex-col"
                 style={name ? { minWidth: `${name.length + (isLast ? 0 : 1)}ch` } : undefined}
               >
-                <span className="whitespace-pre font-bold text-(--cv-chord)">{name ?? " "}</span>
+                <span className="whitespace-pre font-bold text-(--cv-chord)">{name ? chordName(name) : " "}</span>
                 <span className="whitespace-pre-wrap">{c.lyric || " "}</span>
               </span>
             );
@@ -360,7 +481,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
         {line.segments.map((s, j) =>
           "chord" in s ? (
             <span key={j} className="font-bold text-(--cv-chord)">
-              {display(s.chord)}
+              {chordName(display(s.chord))}
             </span>
           ) : (
             <span key={j}>{s.text}</span>
@@ -375,7 +496,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
     "flex h-7 min-w-7 items-center justify-center rounded-full text-sm font-medium text-neutral-200 hover:bg-neutral-800 hover:text-white disabled:opacity-40 active:scale-95";
 
   return createPortal(
-    <div ref={rootRef} data-view-portal onClick={(e) => e.stopPropagation()} style={themeVars} className="fixed inset-0 z-50 flex flex-col bg-(--cv-bg)">
+    <div ref={setRoot} data-view-portal onClick={(e) => e.stopPropagation()} style={themeVars} className="fixed inset-0 z-50 flex flex-col bg-(--cv-bg)">
       {/* Med samodejnim pomikanjem zgornji vrstici zdrsneta gor (celozaslonski
           način), ob pavzi se vrneta. Skrito s CSS, ne odstranjeno — predvajalnik
           mora ostati, da glasba igra naprej. */}
@@ -389,11 +510,11 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
         // Brez transform: ta bi fixed sličico YouTube videa (znotraj vrstice) ujel v ta okvir.
         style={{ opacity: barsHidden ? 0 : 1, transition: `opacity ${BARS_TRANSITION}` }}
       >
-      <div className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2">
-        <span className="shrink-0 text-sm font-medium text-neutral-300">Akordi</span>
+      <div className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 lg:px-16">
         {videoIds.length > 0 ? <YouTubeMiniPlayer
             videoIds={videoIds}
             watchUrl={watchUrl ?? `https://www.youtube.com/watch?v=${videoIds[0]}`}
+            floatingHost={floatingPlayer && fullscreen ? rootEl : null}
             onPlaying={(id) => {
               try {
                 window.localStorage.setItem(workingVideoKey(song.id), id);
@@ -413,7 +534,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
         </button>
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900/80 px-3 py-1.5">
+      <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900/80 px-3 py-1.5 lg:px-16">
         <div
           className="flex items-center rounded-full border border-orange-400 py-0.5 pl-2.5 pr-0.5"
           role="group"
@@ -444,7 +565,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
             simplify ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
           }`}
         >
-          Poenostavi
+          Simpl
         </button>
         <div className="flex items-center rounded-full border border-orange-400 p-0.5" role="group" aria-label="Velikost pisave">
           <button
@@ -473,34 +594,16 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
           type="button"
           onClick={toggleThemeMenu}
           aria-expanded={themeMenuPos !== null}
-          title="Barva ozadja in akordov"
-          className={`flex h-8 items-center gap-1 rounded-full border border-orange-400 px-2.5 text-xs font-medium transition active:scale-95 ${
+          aria-label="Nastavitve"
+          title="Nastavitve"
+          className={`flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 transition active:scale-95 ${
             themeMenuPos ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
           }`}
         >
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-            <path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" />
-            <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
-            <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
-            <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
-            <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+            <circle cx="12" cy="12" r="3" />
           </svg>
-          Tema
-        </button>
-        <button
-          type="button"
-          onClick={editing ? cancelEdit : startEdit}
-          aria-pressed={editing}
-          title="Uredi besedilo in akorde"
-          className={`flex h-8 items-center gap-1 rounded-full border border-orange-400 px-2.5 text-xs font-medium transition active:scale-95 ${
-            editing ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
-          }`}
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-            <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-            <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
-          </svg>
-          Uredi
         </button>
         <button
           type="button"
@@ -535,10 +638,25 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
         <div
           ref={themeMenuRef}
           role="dialog"
-          aria-label="Tema"
+          aria-label="Nastavitve"
           style={{ top: themeMenuPos.top, left: themeMenuPos.left }}
           className="fixed z-10 w-56 space-y-3 rounded-xl border border-orange-400 bg-neutral-900 p-3 shadow-xl"
         >
+          <button
+            type="button"
+            onClick={() => {
+              if (!editing) return startEdit();
+              closeThemeMenu();
+              cancelEdit();
+            }}
+            className="flex w-full items-center gap-2 rounded-lg border border-neutral-700 px-2.5 py-1.5 text-left text-xs font-medium text-neutral-200 hover:border-orange-400 hover:text-white"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-amber-400">
+              <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
+            </svg>
+            {editing ? "Zapri urejanje" : "Uredi besedilo in akorde"}
+          </button>
           <div>
             <p className="mb-1.5 text-xs font-medium text-neutral-400">Ozadje</p>
             <div className="flex justify-between">
@@ -576,6 +694,51 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                 />
               ))}
             </div>
+          </div>
+          <div className="border-t border-neutral-700 pt-2">
+            <button
+              type="button"
+              onClick={() => setAdvancedOpen((v) => !v)}
+              aria-expanded={advancedOpen}
+              className="flex w-full items-center justify-between rounded-lg px-1 py-1 text-left text-xs font-medium text-neutral-200 hover:text-white"
+            >
+              Napredne nastavitve
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`h-3.5 w-3.5 text-amber-400 transition ${advancedOpen ? "rotate-180" : ""}`}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            {/* Prostor za napredne nastavitve (dodane kasneje). */}
+            {advancedOpen && (
+              <div className="space-y-2 px-1 pt-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-neutral-200">
+                    Predvajalnik med pomikanjem
+                    <span className="block text-[10px] leading-tight text-neutral-500">Glasba desno med samodejnim pomikanjem</span>
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={floatingPlayer}
+                    aria-label="Predvajalnik med pomikanjem"
+                    onClick={() => setFloatingPlayer((v) => !v)}
+                    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${floatingPlayer ? "bg-orange-400" : "bg-neutral-600"}`}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${floatingPlayer ? "translate-x-4" : ""}`}
+                    />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -618,7 +781,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
         </div>
       )}
 
-      <div ref={scrollRef} className={`min-h-0 flex-1 overflow-auto px-4 pb-32 pt-4 ${editing ? "hidden" : ""}`}>
+      <div ref={scrollRef} className={`min-h-0 flex-1 overflow-auto px-4 pb-32 pt-4 [scrollbar-width:none] lg:px-16 [&::-webkit-scrollbar]:hidden ${editing ? "hidden" : ""}`}>
         <div className="font-mono leading-snug text-(--cv-text)" style={{ fontSize }}>
           <div className="mb-4 font-sans">
             <h2 className="text-xl font-semibold text-(--cv-title)">{song.title}</h2>
@@ -657,6 +820,47 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
           {body.map((l, i) => renderLine(l, i, true))}
         </div>
       </div>
+
+      {shapeTip && (
+        <div
+          data-chord-name
+          onPointerEnter={(e) => {
+            if (e.pointerType === "mouse") cancelHide();
+          }}
+          onPointerLeave={(e) => {
+            if (e.pointerType === "mouse") scheduleHide();
+          }}
+          style={{ left: shapeTip.left, top: shapeTip.top, bottom: shapeTip.bottom }}
+          className="fixed z-20 rounded-xl border border-orange-400 bg-(--cv-panel) px-2 pb-1 pt-1.5 shadow-xl"
+        >
+          <ChordDiagram name={shapeTip.name} position={shapeTip.positions[shapeIndex]} />
+          {shapeTip.positions.length > 1 && (
+            <div className="flex items-center justify-between font-sans">
+              <button
+                type="button"
+                onClick={() => stepShape(-1)}
+                aria-label="Prejšnja različica prijema"
+                title="Prejšnja različica"
+                className="flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none text-(--cv-chord) hover:bg-orange-400/15 active:scale-95"
+              >
+                ‹
+              </button>
+              <span className="text-[10px] tabular-nums text-(--cv-muted)">
+                {shapeIndex + 1}/{shapeTip.positions.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => stepShape(1)}
+                aria-label="Naslednja različica prijema"
+                title="Naslednja različica"
+                className="flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none text-(--cv-chord) hover:bg-orange-400/15 active:scale-95"
+              >
+                ›
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {!editing && <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} onPlayingChange={setFullscreen} />}
     </div>,
