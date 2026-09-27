@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { createPortal } from "react-dom";
 import AutoScrollControl from "@/components/AutoScrollControl";
 import ChordDiagram from "@/components/ChordDiagram";
-import YouTubeMiniPlayer, { youTubeVideoId } from "@/components/YouTubeMiniPlayer";
+import YouTubeMiniPlayer, { youTubeVideoId, type PlayerController } from "@/components/YouTubeMiniPlayer";
 import {
   applyEditedText,
   findCapo,
@@ -17,7 +17,7 @@ import {
   type ChordsLine,
 } from "@/lib/chords";
 import { findChordShapes, loadChordDb, type ChordPosition } from "@/lib/chordShapes";
-import { alignLyrics, fetchLrcCandidates, lineAt, pickCandidate, type LrcCandidate } from "@/lib/syncedLyrics";
+import { alignLyrics, fetchLrcCandidates, lineProgressAt, pickCandidate, type LrcCandidate } from "@/lib/syncedLyrics";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { Song } from "@/types/song";
@@ -324,7 +324,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
   }, [song.id, song.title, song.author]);
   const [videoDuration, setVideoDuration] = useState(0);
   const lrc = useMemo(() => (lrcCandidates ? pickCandidate(lrcCandidates, videoDuration) : null), [lrcCandidates, videoDuration]);
-  const sync = useMemo(() => (lrc ? { ...alignLyrics(lrc.lines, body), total: lrc.lines.length } : null), [lrc, body]);
+  const sync = useMemo(() => (lrc ? { ...alignLyrics(lrc.lines, body), total: lrc.lines.filter((l) => l.text).length } : null), [lrc, body]);
   // Na voljo, če je besedilo s časi; sledi pa samo po gumbu "Smart play"
   // (navadni ▶ samo predvaja, kot prej).
   const smartAvailable = !!sync && sync.points.length > 0;
@@ -360,9 +360,36 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
     }, 700);
   };
   const [activeLine, setActiveLine] = useState(-1);
-  const onVideoTime = (seconds: number, duration: number) => {
+  // Telefon, med pavzo: tap na vrstico skoči tja in predvaja naprej.
+  const playerCtlRef = useRef<PlayerController | null>(null);
+  const playbackRef = useRef({ time: 0, playing: false });
+  const seekToLine = (lineIndex: number, e: React.MouseEvent) => {
+    if ((e.nativeEvent as PointerEvent).pointerType === "mouse") return;
+    if (!sync || playbackRef.current.playing) return;
+    // Tap na akord (shema), gumb ali povezavo ne premika predvajanja.
+    if ((e.target as HTMLElement).closest("[data-chord-name],button,a")) return;
+    // Vrstica brez besedila (akordi, naslov razdelka): prva naslednja z besedilom.
+    let target = -1;
+    for (let i = lineIndex; i <= lineIndex + 3 && target < 0; i++) if (sync.points.some((p) => p.lineIndex === i)) target = i;
+    if (target < 0) return;
+    // Ponovljena vrstica (refren, v akordih zapisan enkrat): ponovitev,
+    // časovno najbližja trenutnemu mestu; začetek njenega razpona.
+    const now = playbackRef.current.time - lrcOffset;
+    let best = -1;
+    sync.points.forEach((p, k) => {
+      if (p.lineIndex !== target) return;
+      if (best < 0 || Math.abs(p.time - now) < Math.abs(sync.points[best].time - now)) best = k;
+    });
+    while (best > 0 && sync.points[best - 1].lineIndex === target) best--;
+    if (playerCtlRef.current?.seekAndPlay(sync.points[best].time + lrcOffset - 0.3)) {
+      setSmartOn(true);
+      lastUserScrollRef.current = 0;
+    }
+  };
+  const onVideoTime = (seconds: number, duration: number, playing: boolean) => {
+    playbackRef.current = { time: seconds, playing };
     if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
-    setActiveLine(smartActive && sync ? lineAt(sync.points, seconds - lrcOffset) : -1);
+    setActiveLine(smartActive && sync ? lineProgressAt(sync.points, seconds - lrcOffset).lineIndex : -1);
   };
   // Ročno pomikanje (dotik, kolesce) za 4 s ustavi samodejno sledenje.
   const lastUserScrollRef = useRef(0);
@@ -613,6 +640,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
             smartAvailable={smartAvailable}
             smartOn={smartOn}
             onSmartToggle={setSmartOn}
+            controllerRef={playerCtlRef}
             onPlaying={(id) => {
               setPlayingVideo(id);
               try {
@@ -1008,10 +1036,11 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
             <div
               key={i}
               data-line={i}
+              onClick={(e) => seekToLine(i, e)}
               className={
                 smartActive && i === activeLine
-                  ? "-mx-1 rounded-md bg-[color-mix(in_srgb,var(--cv-section)_18%,transparent)] px-1 transition-colors lg:w-fit"
-                  : "transition-colors"
+                  ? "-ml-2 -mr-1 rounded-r-md bg-[color-mix(in_srgb,var(--cv-text)_8%,transparent)] pl-2 pr-1 shadow-[inset_1.5px_0_0_#fb923c] lg:w-fit lg:shadow-[inset_2px_0_0_#fb923c]"
+                  : "-ml-2 -mr-1 pl-2 pr-1 lg:w-fit"
               }
             >
               {renderLine(l, i, true)}

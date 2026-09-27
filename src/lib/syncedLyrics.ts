@@ -9,13 +9,14 @@ export type LrcLine = { time: number; text: string };
 // Ena različica posnetka iz LRCLIB (album, dolžina v sekundah, vrstice).
 export type LrcCandidate = { album: string; duration: number; lines: LrcLine[] };
 
-// "[01:02.13] Went down to Geisha Minah" → { time: 62.13, text: "…" }; prazne
-// vrstice (instrumentalni del) izpusti.
+// "[01:02.13] Went down to Geisha Minah" → { time: 62.13, text: "…" }. Prazne
+// vrstice (začetek instrumentalnega dela) ostanejo s text "" — označujejo
+// konec prejšnje vrstice (črta pod vrstico je takrat polna).
 export function parseLrc(text: string): LrcLine[] {
   const out: LrcLine[] = [];
   for (const raw of text.split(/\r?\n/)) {
     const m = raw.match(/^\[(\d+):(\d+(?:\.\d+)?)\]\s*(.*)$/);
-    if (m && m[3].trim()) out.push({ time: Number(m[1]) * 60 + Number(m[2]), text: m[3].trim() });
+    if (m) out.push({ time: Number(m[1]) * 60 + Number(m[2]), text: m[3].trim() });
   }
   return out;
 }
@@ -31,7 +32,8 @@ const cacheKey = (songId: string) => `komadi:chords:lrc:${songId}`;
 // in izvajalcem, ker po popravku zapisa (npr. "Papparazzi" → "Paparazzi")
 // stari (prazen) rezultat ne velja več.
 export async function fetchLrcCandidates(songId: string, title: string, author: string): Promise<LrcCandidate[]> {
-  const query = `${title}\n${author}`;
+  // "v2": od takrat so v shrambi tudi prazne vrstice (konci vrstic).
+  const query = `v2\n${title}\n${author}`;
   try {
     const cached = window.localStorage.getItem(cacheKey(songId));
     if (cached) {
@@ -47,7 +49,7 @@ export async function fetchLrcCandidates(songId: string, title: string, author: 
     .filter((d) => d.syncedLyrics)
     .slice(0, 8)
     .map((d) => ({ album: d.albumName ?? "", duration: d.duration ?? 0, lines: parseLrc(d.syncedLyrics!) }))
-    .filter((c) => c.lines.length > 0);
+    .filter((c) => c.lines.some((l) => l.text));
   try {
     window.localStorage.setItem(cacheKey(songId), JSON.stringify({ query, candidates }));
   } catch {}
@@ -117,7 +119,8 @@ function lineLyric(line: ChordsLine): string | null {
   return null;
 }
 
-export type SyncPoint = { time: number; lineIndex: number };
+// time = začetek vrstice LRC, end = začetek naslednje (tudi prazne) vrstice LRC.
+export type SyncPoint = { time: number; end: number; lineIndex: number };
 
 // Vsaki vrstici LRC poišče vrstico pesmi (indeks v body): najprej od
 // pravkar povezane naprej (do 20 vrstic — ista vrstica je dovoljena, ker je v
@@ -147,8 +150,13 @@ export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncP
     if (!w.length) continue;
     let best = -1;
     let bestScore = 0;
-    for (let j = pos; j < Math.min(lyricLines.length, pos + 20); j++) {
-      const score = similarity(w, lyricLines[j].words) - (j - pos) * 0.01;
+    // Tudi do 6 vrstic nazaj: refren, ki ga pevec ponovi, v akordih pa je na
+    // tem mestu zapisan enkrat ("Rekla je nemorem" ×2 v Sam prjatla), naj ostane
+    // tu — ne skoči na isto besedilo v naslednjem refrenu nižje in ne preskoči
+    // kitice. Dlje ko je vrstica (naprej ali nazaj), manj je verjetna.
+    for (let j = Math.max(0, pos - 6); j < Math.min(lyricLines.length, pos + 20); j++) {
+      const distance = j >= pos ? (j - pos) * 0.02 : (pos - j) * 0.03;
+      const score = similarity(w, lyricLines[j].words) - distance;
       if (score > bestScore) {
         bestScore = score;
         best = j;
@@ -166,22 +174,32 @@ export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncP
     if (best < 0 || bestScore < 0.4) continue;
     matched++;
     pos = best;
-    points.push({ time: line.time, lineIndex: lyricLines[best].index });
+    points.push({ time: line.time, end: lrc[k + 1]?.time ?? line.time + 5, lineIndex: lyricLines[best].index });
   }
   return { points, matched };
 }
 
-// Vrstica pesmi za dani čas (zadnja točka, ki se je že začela); pred prvo -1.
-export function lineAt(points: SyncPoint[], time: number): number {
+// Vrstica pesmi za dani čas (zadnja točka, ki se je že začela; pred prvo -1)
+// in koliko je je že odpetega (0 … 1) — za črto pod vrstico. Več zaporednih
+// vrstic LRC v isti vrstici pesmi je en razpon: od prve do konca zadnje.
+export function lineProgressAt(points: SyncPoint[], time: number): { lineIndex: number; progress: number } {
   let lo = 0;
   let hi = points.length - 1;
-  let found = -1;
+  let idx = -1;
   while (lo <= hi) {
     const mid = (lo + hi) >> 1;
     if (points[mid].time <= time) {
-      found = points[mid].lineIndex;
+      idx = mid;
       lo = mid + 1;
     } else hi = mid - 1;
   }
-  return found;
+  if (idx < 0) return { lineIndex: -1, progress: 0 };
+  const lineIndex = points[idx].lineIndex;
+  let first = idx;
+  while (first > 0 && points[first - 1].lineIndex === lineIndex) first--;
+  let last = idx;
+  while (last + 1 < points.length && points[last + 1].lineIndex === lineIndex) last++;
+  const start = points[first].time;
+  const span = Math.max(0.1, points[last].end - start);
+  return { lineIndex, progress: Math.min(1, Math.max(0, (time - start) / span)) };
 }

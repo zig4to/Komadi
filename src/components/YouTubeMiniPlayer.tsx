@@ -79,6 +79,10 @@ function formatTime(s: number) {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 }
 
+// Upravljanje predvajalnika od zunaj (ChordsViewer: tap na vrstico med
+// pavzo). seekAndPlay vrne false, če predvajalnik še ni zagnan.
+export type PlayerController = { seekAndPlay: (seconds: number) => boolean };
+
 export default function YouTubeMiniPlayer({
   videoIds,
   watchUrl,
@@ -88,6 +92,7 @@ export default function YouTubeMiniPlayer({
   smartAvailable = false,
   smartOn = false,
   onSmartToggle,
+  controllerRef,
 }: {
   videoIds: string[];
   watchUrl: string;
@@ -105,6 +110,7 @@ export default function YouTubeMiniPlayer({
   smartAvailable?: boolean;
   smartOn?: boolean;
   onSmartToggle?: (on: boolean) => void;
+  controllerRef?: React.RefObject<PlayerController | null>;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
@@ -207,6 +213,21 @@ export default function YouTubeMiniPlayer({
   useEffect(() => {
     onTimeRef.current?.(current, duration, playing);
   }, [current, duration, playing]);
+
+  useEffect(() => {
+    if (!controllerRef) return;
+    controllerRef.current = {
+      seekAndPlay: (seconds) => {
+        const player = playerRef.current;
+        if (!player) return false;
+        const t = Math.max(0, seconds);
+        player.seekTo(t, true);
+        setCurrent(t);
+        player.playVideo();
+        return true;
+      },
+    };
+  });
 
   if (errorCode !== null || videoIds.length === 0) {
     return (
