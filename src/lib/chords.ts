@@ -21,6 +21,8 @@ export type ChordsLine =
 
 const CHORD_RE = /\[ch\](.*?)\[\/ch\]/g;
 const SECTION_RE = /^\[([^\]]+)\]$/;
+// Razdelek z opombo: "[Intro 1] (fade in)", "[Chorus] (x4)", "[Verse]:", "[Solo] x2".
+const SECTION_NOTE_RE = /^\[([^\]]+)\]\s*:?((?:\s*\([^)]*\))*(?:\s*(?:x\d+|\d+x))?)\s*$/i;
 // Razdelek brez oglatih oklepajev ("Intro", "Verse 1:", "Chorus x2", "Refren
 // (2x)") — samo ime razdelka v svoji vrstici, sicer bi npr. "Intro" pred prvo
 // vrstico akordov obtičal v opisu.
@@ -234,6 +236,8 @@ function parseLine(line: string): ChordsLine {
   const trimmed = line.trim();
   const section = trimmed.match(SECTION_RE);
   if (section && !trimmed.startsWith("[ch]")) return { kind: "section", label: section[1] };
+  const noted = trimmed.match(SECTION_NOTE_RE);
+  if (noted && !trimmed.startsWith("[ch]")) return { kind: "section", label: `${noted[1]} ${noted[2]}`.replace(/\s+/g, " ").trim() };
   if (PLAIN_SECTION_RE.test(trimmed)) return { kind: "section", label: trimmed.replace(/\s*:$/, "") };
 
   const segments: ({ chord: string } | { text: string })[] = [];
