@@ -4,7 +4,8 @@
 // tu jih ignoriramo), sekcije kot samostojna vrstica "[Verse 1]".
 
 export type ChordsLine =
-  | { kind: "section"; label: string }
+  // tabLabel: kratek naslov iz besedila nad tablaturo ("Solo") — ne začne pesmi.
+  | { kind: "section"; label: string; tabLabel?: true }
   // Vrstica samih akordov: col = stolpec (znak) nad besedilom spodaj.
   | { kind: "chords"; chords: { col: number; name: string }[] }
   // Vrstica akordov + besedilo pod njo, razrezano na kose: vsak akord je
@@ -13,13 +14,100 @@ export type ChordsLine =
   // transpoziciji (daljše ime razmakne besedilo) in pri prelomu vrstice.
   | { kind: "pair"; chunks: { chord: string | null; lyric: string }[] }
   // Besedilo, lahko z vmesnimi akordi (npr. "[Intro] F C/E ... (Hold …)").
-  | { kind: "text"; segments: ({ chord: string } | { text: string })[] };
+  | { kind: "text"; segments: ({ chord: string } | { text: string })[] }
+  // Tablatura: zaporedne vrstice strun ("e|--5--|"), izrisane kot celota brez
+  // preloma (široke se pomikajo vodoravno), z morebitno vrstico akordov nad njimi.
+  | { kind: "tab"; header: { col: number; name: string }[] | null; lines: string[] };
 
 const CHORD_RE = /\[ch\](.*?)\[\/ch\]/g;
 const SECTION_RE = /^\[([^\]]+)\]$/;
+// Samostojno ime akorda (za vrstico akordov nad tablaturo, zapisano brez [ch]).
+const CHORD_TOKEN_RE = /^[A-G][#b]?(m|maj|min|dim|aug|sus|add|M|\+|°|\d|\(|\)|#|b)*(\/[A-G][#b]?)?$/;
+
+const lineText = (l: ChordsLine) =>
+  l.kind === "text" ? l.segments.map((s) => ("text" in s ? s.text : s.chord)).join("") : "";
+
+// Ime strune na začetku vrstice tablature (H = B v slovenskem/nemškem zapisu).
+const STRING_NAME = "[A-Ha-h][#b]?";
+const NAMED_STAFF_RE = new RegExp(`^\\s*${STRING_NAME}\\s*[|:-]`);
+
+// Vrstica strun: "e|--5--|", "Eb|---7~---| x4", "G-14-14~--|", "|--0--|" — večinoma pomišljaji.
+function isTabStaff(l: ChordsLine) {
+  if (l.kind !== "text") return false;
+  // UG včasih ime strune označi kot akord ("[ch]G[/ch]|---"): dovoljeno samo to.
+  if (l.segments.some((s, i) => "chord" in s && (i > 0 || !/^[A-H][#b]?$/.test(s.chord)))) return false;
+  const t = lineText(l).trim();
+  const dashes = (t.match(/-/g) ?? []).length;
+  const ratio = dashes / t.replace(/\s/g, "").length;
+  // Ime strune + "|" je dovolj zanesljivo tudi za kratko vrstico ("G|-1---|").
+  if (new RegExp(`^${STRING_NAME}\\s*[|:]`).test(t)) return dashes >= 3 && ratio >= 0.25;
+  // Brez "|" za imenom ("G-14h15-x-14~---|"): zaključni "|" dopušča več številk.
+  if (new RegExp(`^${STRING_NAME}\\s*-`).test(t)) return t.endsWith("|") ? dashes >= 4 && ratio >= 0.15 : dashes >= 6 && ratio >= 0.3;
+  return /^[|:]?-/.test(t) && dashes >= 6 && ratio >= 0.4;
+}
+
+// Štetje dob nad tablaturo ("1 + 2 + 3 + 4 +", "   1   2   3   4", "  .   .") —
+// del tablature, skrito skupaj z njo.
+function isCountLine(l: ChordsLine | undefined) {
+  if (!l || l.kind !== "text" || l.segments.some((s) => "chord" in s)) return false;
+  const t = lineText(l);
+  return /^[\s\d+.&]+$/.test(t) && /[\d.]/.test(t);
+}
+
+// Kratek naslov tik nad tablaturo ("Solo", "Riff:", "Chords:") — postane sekcija,
+// da ima svoj gumb "Tab".
+function tabLabel(l: ChordsLine | undefined) {
+  if (!l || l.kind !== "text" || l.segments.some((s) => "chord" in s)) return null;
+  const t = lineText(l).trim();
+  return /^[\p{L} ]{2,20}:?$/u.test(t) ? t.replace(/:$/, "") : null;
+}
+
+function isNamedStaff(line: string) {
+  return NAMED_STAFF_RE.test(line);
+}
+
+// Vrstica nad tablaturo, ki jo pripnemo k njej: vrstica [ch] akordov ali
+// besedilo iz samih imen akordov ("      B        F#m").
+function tabHeader(l: ChordsLine | undefined): { col: number; name: string }[] | null {
+  if (!l) return null;
+  if (l.kind === "chords") return l.chords;
+  if (l.kind !== "text") return null;
+  // [ch] akordi v oklepajih: "  ([ch]C[/ch])     ([ch]G[/ch])".
+  if (l.segments.some((s) => "chord" in s)) {
+    if (!l.segments.every((s) => "chord" in s || /^[\s()]*$/.test(s.text))) return null;
+    const chords: { col: number; name: string }[] = [];
+    let col = 0;
+    for (const s of l.segments) {
+      if ("chord" in s) chords.push({ col, name: s.chord });
+      col += "chord" in s ? s.chord.length : s.text.length;
+    }
+    return chords;
+  }
+  // Tudi akordi v oklepajih ("(C)   (G)"): ime brez oklepajev, en stolpec desno.
+  const tokens = [...lineText(l).matchAll(/\(?(\S+?)\)?(?=\s|$)/g)];
+  if (!tokens.length || !tokens.every((m) => CHORD_TOKEN_RE.test(m[1]))) return null;
+  return tokens.map((m) => ({ col: m.index + (m[0].startsWith("(") ? 1 : 0), name: m[1] }));
+}
 
 export function parseChords(content: string): ChordsLine[] {
-  const lines = content.replace(/\[\/?tab\]/g, "").replace(/\r\n/g, "\n").split("\n").map(parseLine);
+  const parsed = content.replace(/\[\/?tab\]/g, "").replace(/\r\n/g, "\n").split("\n").map(parseLine);
+  // Najprej tablature, da vrstica akordov nad njimi ne postane par z besedilom.
+  const lines: ChordsLine[] = [];
+  for (let i = 0; i < parsed.length; i++) {
+    if (!isTabStaff(parsed[i])) {
+      lines.push(parsed[i]);
+      continue;
+    }
+    const staff: string[] = [];
+    while (i < parsed.length && isTabStaff(parsed[i])) staff.push(lineText(parsed[i++]).replace(/\s+$/, ""));
+    i--;
+    while (isCountLine(lines[lines.length - 1])) staff.unshift(lineText(lines.pop()!).replace(/\s+$/, ""));
+    const header = tabHeader(lines[lines.length - 1]);
+    if (header) lines.pop();
+    const label = tabLabel(lines[lines.length - 1]);
+    if (label) lines[lines.length - 1] = { kind: "section", label, tabLabel: true };
+    lines.push({ kind: "tab", header, lines: staff });
+  }
   const out: ChordsLine[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -36,11 +124,78 @@ export function parseChords(content: string): ChordsLine[] {
   return out;
 }
 
+// Urejanje v aplikaciji (gumb "Uredi" v ChordsViewer.tsx): UG zapis ↔ navadno
+// besedilo "akordi nad besedilom", brez [ch]/[tab] oznak.
+export function toEditableText(content: string): string {
+  return content.replace(/\r\n/g, "\n").replace(/\[\/?tab\]/g, "").replace(CHORD_RE, "$1");
+}
+
+// Akord v vrstici, ki jo je napisal uporabnik (H = B v slovenskem zapisu, "C*").
+const EDIT_CHORD_RE = /^[A-H][#b]?(m|maj|min|dim|aug|sus|add|M|\+|°|\d|\(|\)|#|b)*(\/[A-H][#b]?)?\*?$/;
+// Okraski, ki smejo stati v vrstici akordov: "x2", "2x", "-", "/", "%", "N.C.", "...".
+const CHORD_LINE_DECOR_RE = /^(x\d+|\d+x|-+|\/|%|N\.C\.?|\.{2,}|\*+|:)$/i;
+// Kosi vrstice akordov: vse razen presledkov, "|", "(" in ")" (takti, oklepaji).
+const CHORD_PIECE_RE = /[^\s|()]+/g;
+
+// Ena vrstica iz urejevalnika v UG zapis: vrstica iz samih akordov (in
+// okraskov) dobi [ch] oznake na istih stolpcih; razdelki, tablature in
+// besedilo ostanejo, kot so.
+function editedLineToUg(line: string): string {
+  if (SECTION_RE.test(line.trim()) || isTabStaff(parseLine(line))) return line;
+  // Oznaka razdelka na začetku vrstice ("[Intro] F C/E") ostane.
+  const prefix = line.match(/^\s*\[[^\]]*\]/)?.[0] ?? "";
+  const rest = line.slice(prefix.length);
+  const pieces = rest.match(CHORD_PIECE_RE) ?? [];
+  if (!pieces.some((p) => EDIT_CHORD_RE.test(p))) return line;
+  if (!pieces.every((p) => EDIT_CHORD_RE.test(p) || CHORD_LINE_DECOR_RE.test(p))) return line;
+  return prefix + rest.replace(CHORD_PIECE_RE, (p) => (EDIT_CHORD_RE.test(p) ? `[ch]${p}[/ch]` : p));
+}
+
+// Shrani urejeno besedilo: vrstice, ki jih uporabnik ni spremenil (LCS
+// primerjava z izvirnikom), ostanejo točno take kot v UG zapisu — [ch] v
+// diagramih, taktih, sredi besedila … se ne izgubijo; pretvorijo se samo nove
+// ali spremenjene vrstice.
+export function applyEditedText(original: string, edited: string): string {
+  const ug = original.replace(/\r\n/g, "\n").split("\n");
+  const plain = toEditableText(original).split("\n");
+  const next = edited.replace(/\r\n/g, "\n").split("\n");
+  const n = plain.length;
+  const m = next.length;
+  // lcs[i][j] = dolžina najdaljšega skupnega podzaporedja plain[i..], next[j..].
+  const lcs = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
+  for (let i = n - 1; i >= 0; i--)
+    for (let j = m - 1; j >= 0; j--)
+      lcs[i][j] = plain[i] === next[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+  const out: string[] = [];
+  let i = 0;
+  let j = 0;
+  while (j < m) {
+    if (i < n && plain[i] === next[j]) {
+      out.push(ug[i]);
+      i++;
+      j++;
+    } else if (i < n && lcs[i + 1][j] >= lcs[i][j + 1]) i++;
+    else out.push(editedLineToUg(next[j++]));
+  }
+  return out.join("\n");
+}
+
 // Opis na začetku UG zapisa (naslov, album, avtor transkripcije, opombe …) —
 // vse pred prvo sekcijo ali prvo vrstico z akordi — ločeno od pesmi.
+// Tablatura začne pesem le, če ima imena strun; črta iz pomišljajev
+// ("------------......" pod naslovom) ostane v opisu.
 export function splitDescription(lines: ChordsLine[]): { description: ChordsLine[]; body: ChordsLine[] } {
-  let start = lines.findIndex((l) => l.kind !== "text");
+  let start = lines.findIndex(
+    (l) =>
+      (l.kind === "section" && !l.tabLabel) ||
+      l.kind === "chords" ||
+      l.kind === "pair" ||
+      (l.kind === "tab" && (l.header !== null || l.lines.some(isNamedStaff))),
+  );
   if (start === -1) start = 0;
+  // Naslov tablature ("Picking") gre skupaj s tablaturo v pesem.
+  const prev = lines[start - 1];
+  if (prev?.kind === "section" && prev.tabLabel) start--;
   const isBlank = (l: ChordsLine) => l.kind === "text" && l.segments.every((s) => "text" in s && !s.text.trim());
   const description = lines.slice(0, start);
   while (description.length && isBlank(description[description.length - 1])) description.pop();

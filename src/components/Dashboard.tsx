@@ -2350,7 +2350,6 @@ export default function Dashboard() {
           <FavoritesArchive
             songs={songs}
             authorImages={authorImages}
-            onToggleFavorite={handleToggleFavorite}
             onFilterAuthor={(author) => {
               setFavArchiveOpen(false);
               handleFilterByAuthor(author);
@@ -3275,7 +3274,6 @@ export default function Dashboard() {
                 <FavoritesThisMonth
                   songs={songs}
                   authorImages={authorImages}
-                  onToggleFavorite={handleToggleFavorite}
                   onFilterAuthor={handleFilterByAuthor}
                   onChordsClick={handleChordsClick}
                   onAddToJam={handleAddToJam}

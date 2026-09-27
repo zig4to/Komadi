@@ -62,18 +62,16 @@ function StarIcon({ filled, className, strokeWidth = 1.8 }: { filled: boolean; c
 
 // Strnjena kartica priljubljene skladbe (ena vrstica): majhna slika avtorja
 // levo (brez slike: kvadrat v barvi avtorja z začetnico), naslov/avtor/datum
-// in pod njima gumba Akordi/Poslušaj na sredini, zvezdica za odstranitev desno.
+// in pod njima gumba Akordi/Poslušaj na sredini, okrasna zvezda desno.
 export function FavoriteCard({
   song,
   authorImage,
-  onToggleFavorite,
   onFilterAuthor,
   onChordsClick,
   onAddToJam,
 }: {
   song: Song;
   authorImage: string | null;
-  onToggleFavorite: (song: Song) => void;
   onFilterAuthor?: (author: string) => void;
   onChordsClick?: (song: Song) => void;
   onAddToJam?: (song: Song) => void;
@@ -175,24 +173,21 @@ export function FavoriteCard({
         </span>
       </div>
 
-      {/* Velika obrobna zvezda kot ikona v ozadju, ki jo desni rob kartice
-          odreže (overflow-hidden). Klik odstrani iz priljubljenih. */}
-      <button
-        type="button"
-        onClick={() => onToggleFavorite(song)}
-        title="Odstrani iz priljubljenih"
-        aria-label="Odstrani iz priljubljenih"
-        className="absolute -right-5 top-1/2 -z-10 -translate-y-1/2 text-amber-500 opacity-20 transition hover:opacity-70 dark:text-amber-400"
+      {/* Velika obrobna zvezda kot okrasna ikona v ozadju, ki jo desni rob
+          kartice odreže (overflow-hidden). Ni klikljiva — iz priljubljenih se
+          skladba odstrani samo v meniju SongCard (Priljubljena). */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-5 top-1/2 -z-10 -translate-y-1/2 text-amber-500 opacity-20 dark:text-amber-400"
       >
         <StarIcon filled={false} strokeWidth={1} className="h-14 w-14" />
-      </button>
+      </span>
     </div>
   );
 }
 
 type CardHandlers = {
   authorImages: Record<string, string>;
-  onToggleFavorite: (song: Song) => void;
   onFilterAuthor?: (author: string) => void;
   onChordsClick?: (song: Song) => void;
   onAddToJam?: (song: Song) => void;
