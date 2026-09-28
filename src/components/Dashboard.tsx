@@ -1469,11 +1469,11 @@ export default function Dashboard({ user }: { user: User }) {
     if (!me || me.id !== user.id || !view) return;
     sendView({ type: "view", leaderId: user.id, leaderName: myDisplayName ?? "", songId: me.songId, since: me.since, ...view });
   };
-  // Pogled vodje (ChordsViewer onLocalView): pošlji največ ~6× na sekundo, zadnjega vedno.
+  // Pogled vodje (ChordsViewer onLocalView): pošlji največ ~10× na sekundo, zadnjega vedno.
   const sendTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const onLeaderView = (view: LocalView) => {
     lastViewRef.current = view;
-    const wait = 160 - (Date.now() - lastSentRef.current);
+    const wait = 90 - (Date.now() - lastSentRef.current);
     clearTimeout(sendTimerRef.current);
     const flush = () => {
       lastSentRef.current = Date.now();

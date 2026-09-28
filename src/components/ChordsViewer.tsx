@@ -706,15 +706,52 @@ export default function ChordsViewer({
   useEffect(() => {
     if (isLeader) reportView();
   }, [isLeader, reportView, smartActive, activeLine, activeChord, barsHidden]);
-  // Sledilec: na vrhu ista vrstica kot pri vodji.
+  // Sledilec: na vrhu ista vrstica kot pri vodji. Sporočilo da samo cilj;
+  // pomik proti njemu je gladek (vsaka sličica, eksponentno približevanje),
+  // namesto skoka ob vsakem sporočilu (~10/s), ki je bil sunkovit.
   const remoteAnchorKey = remote ? `${remote.anchor.line}:${remote.anchor.frac}` : "";
+  const followTargetRef = useRef<number | null>(null);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !remote) return;
-    const top = anchorScrollTop(el, remote.anchor);
-    if (top != null && Math.abs(el.scrollTop - top) > 1) el.scrollTop = top;
+    followTargetRef.current = anchorScrollTop(el, remote.anchor);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remoteAnchorKey, fontSize]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !isFollowing) return;
+    // Dotik/kolesce sledilca: 3 s brez sledenja, nato gladko nazaj k vodji.
+    let userUntil = 0;
+    const mark = () => {
+      userUntil = performance.now() + 3000;
+    };
+    el.addEventListener("touchstart", mark, { passive: true });
+    el.addEventListener("wheel", mark, { passive: true });
+    // Natančen (necel) položaj — brskalnik scrollTop zaokroži na piksle.
+    let pos = el.scrollTop;
+    let last = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const target = followTargetRef.current;
+      const dt = Math.min(100, now - last);
+      last = now;
+      if (target != null && now >= userUntil) {
+        if (Math.abs(el.scrollTop - Math.round(pos)) > 2) pos = el.scrollTop;
+        const diff = target - pos;
+        // Velik skok (nova skladba, drug del pesmi): takoj, brez dolge animacije.
+        if (Math.abs(diff) > el.clientHeight * 1.5 || Math.abs(diff) < 0.3) pos = target;
+        else pos += diff * (1 - Math.exp(-dt / 120));
+        if (Math.round(pos) !== el.scrollTop) el.scrollTop = pos;
+      } else pos = el.scrollTop;
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener("touchstart", mark);
+      el.removeEventListener("wheel", mark);
+    };
+  }, [isFollowing]);
   // Vodja izstopi iz celozaslonskega načina → tudi sledilec (če je vstopil).
   const remoteFullscreen = !!remote?.fullscreen;
   useEffect(() => {
