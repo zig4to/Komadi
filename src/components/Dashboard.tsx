@@ -1573,6 +1573,8 @@ export default function Dashboard({ user }: { user: User }) {
         sendView({ type: "close", leaderId: user.id });
         sharedLeaderRef.current = null;
         setSharedLeader(null);
+      } else if (leaderActive) {
+        setFollowingLeader(false);
       }
     };
     window.addEventListener("komadi-storage", onStore);
@@ -1596,6 +1598,16 @@ export default function Dashboard({ user }: { user: User }) {
       cancelled = true;
     };
   }, [leaderSongId, allSongs, sharedJamSongs]);
+  // Spet sledi vodji (gumb "Sledi" v pregledovalniku ali na strani Skupnega Jama).
+  const followLeader = () => {
+    if (!sharedLeader) return;
+    setFollowingLeader(true);
+    expectedOpenRef.current = sharedLeader.songId;
+    openChordsViewer(sharedLeader.songId);
+  };
+  const leaderSong = sharedLeader
+    ? (allSongs.find((x) => x.id === sharedLeader.songId) ?? sharedJamSongs[sharedLeader.songId] ?? null)
+    : null;
   const viewerShared: SharedViewProp | undefined = !presenceTracking
     ? undefined
     : amLeader
@@ -1611,16 +1623,11 @@ export default function Dashboard({ user }: { user: User }) {
           ? {
               role: "paused",
               leaderName: sharedLeader.name,
-              onFollow: () => {
-                setFollowingLeader(true);
-                expectedOpenRef.current = sharedLeader.songId;
-                openChordsViewer(sharedLeader.songId);
-              },
+              onFollow: followLeader,
             }
           : undefined;
   // Naloži ob odprtju Jama (tudi po osvežitvi); naprej skrbi realtime.
   useEffect(() => {
-    if (!jamOpen) return;
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase
@@ -1645,6 +1652,12 @@ export default function Dashboard({ user }: { user: User }) {
     if (error || !data) return error?.message ?? "Napaka pri dodajanju.";
     setSharedJamItems((prev) => (prev.some((x) => x.id === data.id) ? prev : [...prev, data as SharedJamItem]));
     return null;
+  }
+  // "Dodaj v Skupni Jam" iz menija kartice (SongCard, FavoriteCard); skladbe,
+  // ki je že v Skupnem Jamu, ne doda znova.
+  function handleAddToSharedJam(song: Song) {
+    if (sharedJamItems.some((x) => x.song_id === song.id)) return;
+    addToSharedJam(song, song.title, song.author);
   }
   async function handleToggleSharedJamPlayed(id: string) {
     const item = sharedJamItems.find((x) => x.id === id);
@@ -2488,6 +2501,7 @@ export default function Dashboard({ user }: { user: User }) {
                       handleFilterByAuthor(author);
                     }}
                     onAddToJam={handleAddToJam}
+                    onAddToSharedJam={handleAddToSharedJam}
                     onChordsClick={handleChordsClick}
                     onReported={handleReported}
                     onToggleFavorite={handleToggleFavorite}
@@ -2501,6 +2515,19 @@ export default function Dashboard({ user }: { user: User }) {
           {jamShared ? (
             <>
               {sharedJamError && <p className="text-sm text-red-600 dark:text-red-400">{sharedJamError}</p>}
+              {sharedLeader && !amLeader && !followingLeader && (
+                <button
+                  type="button"
+                  onClick={followLeader}
+                  className="flex w-full items-center justify-between gap-3 rounded-xl border border-fuchsia-500/50 bg-fuchsia-500/10 px-4 py-2.5 text-left text-sm text-neutral-800 transition hover:bg-fuchsia-500/20 dark:text-neutral-200"
+                >
+                  <span className="min-w-0 truncate">
+                    <span className="font-semibold">{sharedLeader.name}</span> ima odprte akorde
+                    {leaderSong ? `: ${leaderSong.title}` : ""}
+                  </span>
+                  <span className="shrink-0 rounded-full bg-fuchsia-600 px-3 py-1 text-xs font-medium text-white">Sledi</span>
+                </button>
+              )}
               <JamBoard
                 items={sharedBoardItems}
                 librarySongs={songs}
@@ -2765,6 +2792,7 @@ export default function Dashboard({ user }: { user: User }) {
                     handleFilterByAuthor(author);
                   }}
                   onAddToJam={handleAddToJam}
+                  onAddToSharedJam={handleAddToSharedJam}
                   onChordsClick={handleChordsClick}
                   onReported={handleReported}
                   onToggleFavorite={handleToggleFavorite}
@@ -2786,6 +2814,7 @@ export default function Dashboard({ user }: { user: User }) {
             }}
             onChordsClick={handleChordsClick}
             onAddToJam={handleAddToJam}
+            onAddToSharedJam={handleAddToSharedJam}
           />
         </div>
       ) : queueOpen ? (
@@ -3102,6 +3131,7 @@ export default function Dashboard({ user }: { user: User }) {
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                       onAddToJam={handleAddToJam}
+                      onAddToSharedJam={handleAddToSharedJam}
                       onChordsClick={handleChordsClick}
                       onReported={handleReported}
                       onToggleFavorite={handleToggleFavorite}
@@ -3383,6 +3413,7 @@ export default function Dashboard({ user }: { user: User }) {
                 onAddSimilar={handleAddSimilar}
                 onFilterAuthor={handleFilterByAuthor}
                 onAddToJam={handleAddToJam}
+                onAddToSharedJam={handleAddToSharedJam}
                 onChordsClick={handleChordsClick}
                 onReported={handleReported}
                 onToggleFavorite={handleToggleFavorite}
@@ -3423,6 +3454,7 @@ export default function Dashboard({ user }: { user: User }) {
                             onAddSimilar={handleAddSimilar}
                             onFilterAuthor={handleFilterByAuthor}
                             onAddToJam={handleAddToJam}
+                            onAddToSharedJam={handleAddToSharedJam}
                             onChordsClick={handleChordsClick}
                             onReported={handleReported}
                             onToggleFavorite={handleToggleFavorite}
@@ -3823,6 +3855,7 @@ export default function Dashboard({ user }: { user: User }) {
                   onFilterAuthor={handleFilterByAuthor}
                   onChordsClick={handleChordsClick}
                   onAddToJam={handleAddToJam}
+                  onAddToSharedJam={handleAddToSharedJam}
                 />
                 <HomeHighlights
                   eras={eraHighlights}
@@ -4108,6 +4141,7 @@ export default function Dashboard({ user }: { user: User }) {
                             onAddSimilar={handleAddSimilar}
                             onFilterAuthor={handleFilterByAuthor}
                             onAddToJam={handleAddToJam}
+                            onAddToSharedJam={handleAddToSharedJam}
                             onChordsClick={handleChordsClick}
                             onReported={handleReported}
                             onToggleFavorite={handleToggleFavorite}

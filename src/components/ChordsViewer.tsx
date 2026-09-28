@@ -125,6 +125,15 @@ export default function ChordsViewer({
   shared?: SharedViewProp;
 }) {
   const follower = shared?.role === "follower" ? shared : null;
+  const [followPillHidden, setFollowPillHidden] = useState(false);
+  const isFollowing = !!follower;
+  useEffect(() => {
+    if (!isFollowing) return;
+    const t = setTimeout(() => setFollowPillHidden(true), 5000);
+    return () => clearTimeout(t);
+  }, [isFollowing]);
+  // Po skritju napisa ✕ pomeni "Ne sledi" (zapre akorde, sledenje se ustavi).
+  const closeAsUnfollow = isFollowing && followPillHidden;
   const remote = follower?.remote ?? null;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [semitones, setSemitones] = useState(() => readNumber(transposeKey(song.id), 0));
@@ -1037,13 +1046,18 @@ export default function ChordsViewer({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Zapri"
-          title="Zapri"
-          className="shrink-0 p-1 text-neutral-300 hover:text-white"
+          aria-label={closeAsUnfollow ? "Ne sledi" : "Zapri"}
+          title={closeAsUnfollow ? `Ne sledi več: ${follower?.leaderName}` : "Zapri"}
+          className={
+            closeAsUnfollow
+              ? "flex shrink-0 items-center gap-1 rounded-full bg-fuchsia-600 py-1 pl-1.5 pr-2.5 text-xs font-medium text-white active:scale-95"
+              : "shrink-0 p-1 text-neutral-300 hover:text-white"
+          }
         >
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={closeAsUnfollow ? "h-4 w-4" : "h-5 w-5"}>
             <path d="M18 6 6 18M6 6l12 12" />
           </svg>
+          {closeAsUnfollow && "Ne sledi"}
         </button>
       </div>
 
@@ -1184,6 +1198,20 @@ export default function ChordsViewer({
       </div>
       </div>
       </div>
+
+      {closeAsUnfollow && barsHidden && !isFullscreen && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="fixed right-3 top-3 z-10 flex items-center gap-1 rounded-full bg-fuchsia-600/90 py-1 pl-1.5 pr-2.5 font-sans text-xs font-medium text-white backdrop-blur active:scale-95"
+          style={{ top: "calc(env(safe-area-inset-top) + 0.75rem)" }}
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+          Ne sledi
+        </button>
+      )}
 
       {isFullscreen && (
         <button
@@ -1688,7 +1716,7 @@ export default function ChordsViewer({
         </div>
       )}
 
-      {shared && shared.role !== "leader" && (
+      {shared && shared.role !== "leader" && !(shared.role === "follower" && followPillHidden) && (
         <div
           className="fixed left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-fuchsia-400/70 bg-neutral-950/90 py-1 pl-3 pr-1 font-sans text-xs text-neutral-100 shadow-lg backdrop-blur"
           style={{ top: "calc(env(safe-area-inset-top) + 0.5rem)" }}

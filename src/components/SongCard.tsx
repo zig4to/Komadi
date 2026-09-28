@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import ChordsButtons from "@/components/ChordsButtons";
+import { JamTargetItems } from "@/components/JamTargetMenu";
 import { authorAccentHsl } from "@/lib/authorColor";
 import { PORTRAIT_FOCUS_Y } from "@/lib/constants";
 import { supabase } from "@/lib/supabaseClient";
@@ -22,6 +23,7 @@ export default function SongCard({
   onAddSimilar,
   onFilterAuthor,
   onAddToJam,
+  onAddToSharedJam,
   onChordsClick,
   onReported,
   onToggleFavorite,
@@ -37,6 +39,8 @@ export default function SongCard({
   onFilterAuthor?: (author: string) => void;
   onChordsClick?: (song: Song) => void;
   onAddToJam?: (song: Song) => void;
+  // Z njim "Dodaj v Jam" v meniju razpre izbiro: privat ali Skupni Jam.
+  onAddToSharedJam?: (song: Song) => void;
   onReported?: (report: SongReport) => void;
   onToggleFavorite?: (song: Song) => void;
   // Način "Skupno" (skladba drugega uporabnika): v meniju je samo "Uvozi v
@@ -62,6 +66,7 @@ export default function SongCard({
   const [portraitSrc, setPortraitSrc] = useState<string | null>(null);
 
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [jamChoiceOpen, setJamChoiceOpen] = useState(false);
   const [actionsMenuPos, setActionsMenuPos] = useState<{ top: number; left: number } | null>(null);
   const actionsButtonRef = useRef<HTMLButtonElement>(null);
   const actionsMenuPanelRef = useRef<HTMLDivElement>(null);
@@ -300,6 +305,7 @@ export default function SongCard({
                 setActionsMenuPos({ top: rect.bottom + 4, left: rect.right - 192 });
               }
               setActionsOpen((v) => !v);
+              setJamChoiceOpen(false);
             }}
             aria-haspopup="menu"
             aria-expanded={actionsOpen}
@@ -397,9 +403,11 @@ export default function SongCard({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (onAddToSharedJam) return setJamChoiceOpen((v) => !v);
                       setActionsOpen(false);
                       onAddToJam(song);
                     }}
+                    aria-expanded={onAddToSharedJam ? jamChoiceOpen : undefined}
                     className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-violet-600 hover:bg-neutral-100 dark:text-violet-400 dark:hover:bg-neutral-800"
                   >
                     <svg
@@ -416,6 +424,18 @@ export default function SongCard({
                     </svg>
                     Dodaj v Jam
                   </button>
+                )}
+                {onAddToJam && onAddToSharedJam && jamChoiceOpen && (
+                  <div className="ml-3 border-l border-violet-500/30 pl-1">
+                    <JamTargetItems
+                      onPick={(target) => {
+                        setActionsOpen(false);
+                        setJamChoiceOpen(false);
+                        if (target === "private") onAddToJam(song);
+                        else onAddToSharedJam(song);
+                      }}
+                    />
+                  </div>
                 )}
 
                 {!onImport && (

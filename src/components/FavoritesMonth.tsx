@@ -1,5 +1,6 @@
 "use client";
 
+import JamTargetMenu from "@/components/JamTargetMenu";
 import { useEffect, useRef, useState } from "react";
 import ChordsButtons from "@/components/ChordsButtons";
 import { authorAccentHex } from "@/lib/authorColor";
@@ -69,12 +70,14 @@ export function FavoriteCard({
   onFilterAuthor,
   onChordsClick,
   onAddToJam,
+  onAddToSharedJam,
 }: {
   song: Song;
   authorImage: string | null;
   onFilterAuthor?: (author: string) => void;
   onChordsClick?: (song: Song) => void;
   onAddToJam?: (song: Song) => void;
+  onAddToSharedJam?: (song: Song) => void;
 }) {
   const accent = authorAccentHex(song.author);
   const [portraitSrc, setPortraitSrc] = useState<string | null>(null);
@@ -83,6 +86,8 @@ export function FavoriteCard({
   // Kratek vizualni znak (kljukica namesto strele), da je jasno, da je klik
   // na "Dodaj v Jam" nekaj naredil — enak vzorec kot na SongCard.tsx.
   const [jamAdded, setJamAdded] = useState(false);
+  // Izbira privat / Skupni Jam (JamTargetMenu), pod gumbom.
+  const [jamMenuAnchor, setJamMenuAnchor] = useState<DOMRect | null>(null);
   const jamAddedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -90,6 +95,12 @@ export function FavoriteCard({
     },
     [],
   );
+
+  const showJamAdded = () => {
+    setJamAdded(true);
+    if (jamAddedTimer.current) clearTimeout(jamAddedTimer.current);
+    jamAddedTimer.current = setTimeout(() => setJamAdded(false), 1400);
+  };
 
   return (
     <div
@@ -143,10 +154,13 @@ export function FavoriteCard({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
+                if (onAddToSharedJam) {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setJamMenuAnchor((open) => (open ? null : rect));
+                  return;
+                }
                 onAddToJam(song);
-                setJamAdded(true);
-                if (jamAddedTimer.current) clearTimeout(jamAddedTimer.current);
-                jamAddedTimer.current = setTimeout(() => setJamAdded(false), 1400);
+                showJamAdded();
               }}
               aria-label={jamAdded ? "Dodano v Jam" : "Dodaj v Jam"}
               title={jamAdded ? "Dodano v Jam" : "Dodaj v Jam"}
@@ -170,6 +184,18 @@ export function FavoriteCard({
               </svg>
             </button>
           )}
+          {jamMenuAnchor && onAddToJam && onAddToSharedJam && (
+            <JamTargetMenu
+              anchor={jamMenuAnchor}
+              onClose={() => setJamMenuAnchor(null)}
+              onPick={(target) => {
+                setJamMenuAnchor(null);
+                if (target === "private") onAddToJam(song);
+                else onAddToSharedJam(song);
+                showJamAdded();
+              }}
+            />
+          )}
         </span>
       </div>
 
@@ -187,6 +213,7 @@ export function FavoriteCard({
 }
 
 type CardHandlers = {
+  onAddToSharedJam?: (song: Song) => void;
   authorImages: Record<string, string>;
   onFilterAuthor?: (author: string) => void;
   onChordsClick?: (song: Song) => void;
