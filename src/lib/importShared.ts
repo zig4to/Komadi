@@ -59,6 +59,7 @@ export async function importSharedSongs(sources: Song[]): Promise<Song[]> {
     lrc_offsets: s.lrc_offsets ?? {},
     synced_lines: s.synced_lines ?? null,
     preferred_video_id: s.preferred_video_id ?? null,
+    synced_chords: s.synced_chords ?? null,
     imported_from: s.id,
   }));
   const { data, error } = await supabase.from("songs").insert(rows).select();

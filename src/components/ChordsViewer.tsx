@@ -19,16 +19,19 @@ import {
 import { findChordShapes, loadChordDb, type ChordPosition } from "@/lib/chordShapes";
 import {
   alignLyrics,
+  chordAt,
+  flattenChordSections,
   fetchLrcCandidates,
   lineProgressAt,
-  lyricLineIndexes,
+  instrumentalPoints,
+  recordableLineIndexes,
   manualSyncPoints,
   pickCandidate,
   type LrcCandidate,
 } from "@/lib/syncedLyrics";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
-import type { Song } from "@/types/song";
+import type { ChordSection, Song } from "@/types/song";
 
 // Vgrajen pregledovalnik akordov (v slogu UG Tabs app): songs.chords_text
 // (UG markup) izrisan kot tekst — akordi nad besedilom, transpozicija,
@@ -51,7 +54,15 @@ const LRC_OFFSET_STEP = 0.25;
 // "Posnemi čase" (ročni časi vrstic za Smart play) — zaenkrat test samo na
 // teh skladbah (primerjava naslova brez velikih črk); za vse jih odpre, ko
 // uporabnik potrdi.
-const SYNC_RECORDER_TEST_TITLES = ["nisem več s tabo"];
+// m:ss za časovni razpon instrumentalnega dela.
+const formatSec = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, "0")}`;
+// Id novega instrumentalnega dela (klicano samo iz dogodkov).
+const newSectionId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `s${Date.now()}`;
+const SYNC_RECORDER_TEST_TITLES = ["nisem več s tabo", "water witch"];
+// Smart play označi tudi instrumentalne dele (intro, solo …) med premori v
+// petju — test samo na teh skladbah.
+const INSTRUMENTAL_TEST_TITLES = ["water witch"];
 const lrcOffsetsKey = (id: string) => `komadi:chords:lrcOffsets:${id}`;
 const transposeKey = (id: string) => `komadi:chords:transpose:${id}`;
 const workingVideoKey = (id: string) => `komadi:chords:video:${id}`;
@@ -347,13 +358,22 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
       const points = manualSyncPoints(syncedLines.points);
       return { points, matched: points.length, total: points.length, manual: true };
     }
-    return lrc
-      ? { ...alignLyrics(lrc.lines, body), total: lrc.lines.filter((l) => l.text).length, manual: false }
-      : null;
-  }, [syncedLines, lrc, body]);
-  // Na voljo, če je besedilo s časi; sledi pa samo po gumbu "Smart play"
-  // (navadni ▶ samo predvaja, kot prej).
-  const smartAvailable = !!sync && sync.points.length > 0;
+    if (!lrc) return null;
+    const aligned = alignLyrics(lrc.lines, body);
+    const points = INSTRUMENTAL_TEST_TITLES.includes(song.title.trim().toLowerCase())
+      ? [...aligned.points, ...instrumentalPoints(aligned.points, lrc.lines, body)].sort((a, b) => a.time - b.time)
+      : aligned.points;
+    return { points, matched: aligned.matched, total: lrc.lines.filter((l) => l.text).length, manual: false };
+  }, [syncedLines, lrc, body, song.title]);
+  // Ročno posneti časi posameznih akordov (songs.synced_chords) — dodatna
+  // plast: ob času se obarva prav ta akord (intro, solo …).
+  // Razdeljeno na instrumentalne dele (Intro, Instrumental 1 …), vsak s svojim zamikom.
+  const [syncedChords, setSyncedChords] = useState(song.synced_chords?.sections ? song.synced_chords : null);
+  const chordPoints = useMemo(() => flattenChordSections(syncedChords?.sections ?? []), [syncedChords]);
+  const [activeChord, setActiveChord] = useState<{ line: number; chord: number } | null>(null);
+  // Na voljo, če je besedilo s časi ali posneti akordi; sledi pa samo po
+  // gumbu "Smart play" (navadni ▶ samo predvaja, kot prej).
+  const smartAvailable = (!!sync && sync.points.length > 0) || chordPoints.length > 0;
   const [smartOn, setSmartOn] = useState(false);
   const smartActive = smartAvailable && smartOn;
   // Posnetek, ki trenutno igra (onPlaying) — zamik velja zanj.
@@ -394,56 +414,200 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
   // Tap na vrstico v besedilu premakne cursor (npr. nazaj na refren, ki se
   // ponovi, a je v akordih zapisan enkrat).
   const recorderAllowed = SYNC_RECORDER_TEST_TITLES.includes(song.title.trim().toLowerCase());
-  const lyricLines = useMemo(() => lyricLineIndexes(body), [body]);
-  const [recorder, setRecorder] = useState<{ taps: { t: number; line: number }[]; cursor: number } | null>(null);
+  // Z besedilom in instrumentalne (samo akordi) — tudi intro/solo dobita tap.
+  const lyricLines = useMemo(() => recordableLineIndexes(body), [body]);
+  // Snemalnik: vrstice (TAP) + akordi, razdeljeni na instrumentalne dele.
+  // Začne se z že shranjenim (intro danes, solo drugič). history = dejanja
+  // tega snemanja, da ↶ razveljavi zadnje (vrstico, akord ali Konec).
+  type RecAction =
+    | { kind: "line" }
+    | { kind: "chord"; sectionId: string }
+    | { kind: "end"; sectionId: string; prev: number | null };
+  const [recorder, setRecorder] = useState<{
+    lines: { t: number; line: number }[];
+    cursor: number;
+    sections: ChordSection[];
+    activeId: string | null;
+    history: RecAction[];
+    dirty: boolean;
+  } | null>(null);
   const [recorderMsg, setRecorderMsg] = useState<string | null>(null);
   const [recorderSaving, setRecorderSaving] = useState(false);
   const nextLyricLine = (from: number) => lyricLines.find((i) => i >= from) ?? -1;
   const startRecorder = () => {
-    if (!lyricLines.length) return;
-    setRecorder({ taps: [], cursor: lyricLines[0] });
+    const lines = [...(syncedLines?.points ?? [])].sort((a, b) => a.t - b.t);
+    const sections = syncedChords?.sections ?? [];
+    const lastLine = lines[lines.length - 1];
+    setRecorder({
+      lines,
+      cursor: lastLine ? nextLyricLine(lastLine.line + 1) : (lyricLines[0] ?? -1),
+      sections,
+      activeId: sections[sections.length - 1]?.id ?? null,
+      history: [],
+      dirty: false,
+    });
     setSmartOn(false);
-    setRecorderMsg("Zaženi posnetek z ▶ in tapni TAP, ko se začne označena vrstica.");
+    setRecorderMsg(
+      "Zaženi ▶. TAP = začetek označene vrstice. Za instrumentalni del izberi (ali dodaj) del desno in klikaj akorde, ko zazvenijo.",
+    );
     closeThemeMenu();
   };
-  const recordTap = () => {
-    if (!recorder || recorder.cursor < 0) return;
+  // Privzeto ime: prvi del "Intro", nato "Instrumental 1", "Instrumental 2" …
+  const defaultSectionName = (sections: ChordSection[]) =>
+    sections.length === 0 ? "Intro" : `Instrumental ${sections.filter((s) => s.name !== "Intro").length + 1}`;
+  const addSection = () => {
+    if (!recorder) return;
+    const section: ChordSection = { id: newSectionId(), name: defaultSectionName(recorder.sections), offset: 0, end: null, points: [] };
+    setRecorder({ ...recorder, sections: [...recorder.sections, section], activeId: section.id, dirty: true });
+  };
+  const updateSection = (id: string, change: (s: ChordSection) => ChordSection) => {
+    if (!recorder) return;
+    setRecorder({ ...recorder, sections: recorder.sections.map((s) => (s.id === id ? change(s) : s)), dirty: true });
+  };
+  const renameSection = (id: string) => {
+    const current = recorder?.sections.find((s) => s.id === id);
+    const name = current && window.prompt("Ime dela", current.name)?.trim();
+    if (name) updateSection(id, (s) => ({ ...s, name }));
+  };
+  const deleteSection = (id: string) => {
+    if (!recorder) return;
+    const section = recorder.sections.find((s) => s.id === id);
+    if (section?.points.length && !window.confirm(`Izbrišem del "${section.name}" (${section.points.length} akordov)?`)) return;
+    const sections = recorder.sections.filter((s) => s.id !== id);
+    setRecorder({
+      ...recorder,
+      sections,
+      activeId: recorder.activeId === id ? (sections[sections.length - 1]?.id ?? null) : recorder.activeId,
+      history: recorder.history.filter((a) => a.kind === "line" || a.sectionId !== id),
+      dirty: true,
+    });
+  };
+  // Pregled dela: predvajaj od 2 s pred njegovim prvim akordom.
+  const previewSection = (section: ChordSection) => {
+    if (!section.points.length) return;
+    const start = Math.min(...section.points.map((p) => p.t)) + section.offset;
+    if (!playerCtlRef.current?.seekAndPlay(Math.max(0, start - 2)))
+      setRecorderMsg("Najprej enkrat zaženi posnetek z ▶.");
+  };
+  // Točen čas predvajalnika; null (+ opozorilo), če posnetek ne igra.
+  const recordTime = () => {
     const t = playerCtlRef.current?.currentTime();
     if (t == null || !playbackRef.current.playing) {
       setRecorderMsg("Najprej zaženi posnetek z ▶.");
-      return;
+      return null;
     }
     setRecorderMsg(null);
+    return Math.round(t * 100) / 100;
+  };
+  const recordTap = () => {
+    if (!recorder || recorder.cursor < 0) return;
+    const t = recordTime();
+    if (t == null) return;
     setRecorder({
-      taps: [...recorder.taps, { t: Math.round(t * 100) / 100, line: recorder.cursor }],
+      ...recorder,
+      lines: [...recorder.lines, { t, line: recorder.cursor }],
       cursor: nextLyricLine(recorder.cursor + 1),
+      history: [...recorder.history, { kind: "line" }],
+      dirty: true,
     });
   };
-  const undoTap = () => {
-    if (!recorder?.taps.length) return;
-    const last = recorder.taps[recorder.taps.length - 1];
-    setRecorder({ taps: recorder.taps.slice(0, -1), cursor: last.line });
+  // Klik na akord: v aktivni del (brez njega se ustvari "Intro").
+  const recordChord = (line: number, chord: number) => {
+    if (!recorder) return;
+    const t = recordTime();
+    if (t == null) return;
+    let sections = recorder.sections;
+    let activeId = recorder.activeId;
+    if (!activeId || !sections.some((s) => s.id === activeId)) {
+      const section: ChordSection = { id: newSectionId(), name: defaultSectionName(sections), offset: 0, end: null, points: [] };
+      sections = [...sections, section];
+      activeId = section.id;
+    }
+    // Čas brez zamika dela — tako se ob pregledu obarva natanko ob kliku.
+    const id = activeId;
+    setRecorder({
+      ...recorder,
+      sections: sections.map((s) => (s.id === id ? { ...s, points: [...s.points, { t: t - s.offset, line, chord }] } : s)),
+      activeId: id,
+      history: [...recorder.history, { kind: "chord", sectionId: id }],
+      dirty: true,
+    });
   };
+  // "Konec" aktivnega dela: od tu ni obarvan noben akord (začetek petja, premor).
+  const recordStop = () => {
+    const section = recorder?.sections.find((s) => s.id === recorder.activeId);
+    if (!recorder || !section) return;
+    const t = recordTime();
+    if (t == null) return;
+    setRecorder({
+      ...recorder,
+      sections: recorder.sections.map((s) => (s.id === section.id ? { ...s, end: t - s.offset } : s)),
+      history: [...recorder.history, { kind: "end", sectionId: section.id, prev: section.end }],
+      dirty: true,
+    });
+  };
+  // Vrstica, ki je ne želiš označiti (npr. ponovljeni takti): brez tapa naprej.
+  const skipLine = () => {
+    if (!recorder || recorder.cursor < 0) return;
+    setRecorder({ ...recorder, cursor: nextLyricLine(recorder.cursor + 1) });
+  };
+  const undoTap = () => {
+    const last = recorder?.history[recorder.history.length - 1];
+    if (!recorder || !last) return;
+    const history = recorder.history.slice(0, -1);
+    if (last.kind === "line") {
+      const removed = recorder.lines[recorder.lines.length - 1];
+      setRecorder({ ...recorder, lines: recorder.lines.slice(0, -1), cursor: removed?.line ?? recorder.cursor, history });
+      return;
+    }
+    setRecorder({
+      ...recorder,
+      sections: recorder.sections.map((s) =>
+        s.id !== last.sectionId ? s : last.kind === "chord" ? { ...s, points: s.points.slice(0, -1) } : { ...s, end: last.prev },
+      ),
+      activeId: last.sectionId,
+      history,
+    });
+  };
+  // Osnutek med snemanjem: obarvanje po vseh delih (za pregled z ▶) in
+  // podčrtani akordi aktivnega dela.
+  const draftChordPoints = useMemo(() => flattenChordSections(recorder?.sections ?? []), [recorder]);
+  const recordedChords = useMemo(() => {
+    const active = recorder?.sections.find((s) => s.id === recorder.activeId);
+    return new Set(active?.points.map((p) => `${p.line}:${p.chord}`) ?? []);
+  }, [recorder]);
   const saveRecorder = async () => {
-    if (!recorder?.taps.length || !playingVideo) return;
-    const next = { videoId: playingVideo, points: [...recorder.taps].sort((a, b) => a.t - b.t) };
+    if (!recorder?.dirty || !playingVideo) return;
+    const linePoints = [...recorder.lines].sort((a, b) => a.t - b.t);
+    const sections = recorder.sections.filter((s) => s.points.length);
+    // Shrani samo plasti, ki imajo točke (ali so jih imele): Water Witch s
+    // samimi akordi pusti vrstice iz LRCLIB pri miru.
+    const nextLines = linePoints.length ? { videoId: syncedLines?.videoId ?? playingVideo, points: linePoints } : null;
+    const nextChords = sections.length ? { videoId: syncedChords?.videoId ?? playingVideo, sections } : null;
+    const update: Record<string, unknown> = {};
+    if (nextLines || syncedLines) update.synced_lines = nextLines;
+    if (nextChords || syncedChords) update.synced_chords = nextChords;
     setRecorderSaving(true);
-    const { error } = await supabase.from("songs").update({ synced_lines: next }).eq("id", song.id);
+    const { error } = await supabase.from("songs").update(update).eq("id", song.id);
     setRecorderSaving(false);
     if (error) {
       setRecorderMsg(`Shranjevanje ni uspelo: ${error.message}`);
       return;
     }
-    setSyncedLines(next);
+    if ("synced_lines" in update) setSyncedLines(nextLines);
+    if ("synced_chords" in update) setSyncedChords(nextChords);
     setRecorder(null);
     setRecorderMsg(null);
     setSmartOn(true);
   };
   const deleteSyncedLines = async () => {
-    if (!window.confirm("Izbrišem ročno posnete čase za to skladbo?")) return;
-    const { error } = await supabase.from("songs").update({ synced_lines: null }).eq("id", song.id);
+    if (!window.confirm("Izbrišem ročno posnete čase (vrstice in akorde) za to skladbo?")) return;
+    const { error } = await supabase.from("songs").update({ synced_lines: null, synced_chords: null }).eq("id", song.id);
     if (error) window.alert(`Brisanje ni uspelo: ${error.message}`);
-    else setSyncedLines(null);
+    else {
+      setSyncedLines(null);
+      setSyncedChords(null);
+    }
   };
 
   const seekToLine = (lineIndex: number, e: React.MouseEvent) => {
@@ -479,7 +643,14 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
     playbackRef.current = { time: seconds, playing };
     if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
     setActiveLine(smartActive && sync ? lineProgressAt(sync.points, seconds - lrcOffset).lineIndex : -1);
+    // Akordi: čas posnetka brez zamika LRC (vsak del ima svoj zamik); med
+    // snemanjem po osnutku, da se pregled z ▶ takoj vidi.
+    const pts = recorder ? draftChordPoints : smartActive ? chordPoints : [];
+    const chord = pts.length ? chordAt(pts, seconds) : null;
+    setActiveChord((prev) => (prev?.line === chord?.line && prev?.chord === chord?.chord ? prev : chord));
   };
+  // Pomik: aktivni akord (intro, solo …) ima prednost pred vrstico.
+  const scrollLine = activeChord ? activeChord.line : activeLine;
   // Ročno pomikanje (dotik, kolesce) za 4 s ustavi samodejno sledenje.
   const lastUserScrollRef = useRef(0);
   useEffect(() => {
@@ -499,13 +670,13 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
   }, [smartActive]);
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el || activeLine < 0 || Date.now() - lastUserScrollRef.current < 4000) return;
-    const line = el.querySelector<HTMLElement>(`[data-line="${activeLine}"]`);
+    if (!el || scrollLine < 0 || Date.now() - lastUserScrollRef.current < 4000) return;
+    const line = el.querySelector<HTMLElement>(`[data-line="${scrollLine}"]`);
     if (!line) return;
     // Trenutna vrstica ~ tretjino od vrha vidnega dela.
     const top = el.scrollTop + line.getBoundingClientRect().top - el.getBoundingClientRect().top - el.clientHeight / 3;
     el.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-  }, [activeLine]);
+  }, [scrollLine]);
 
   // Snemanje časov: vrstica, ki jo naslednji tap označi, ~ tretjino od vrha.
   const recorderCursor = recorder?.cursor ?? -1;
@@ -610,26 +781,41 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
       el?.removeEventListener("scroll", onScroll);
     };
   }, [shapeTip]);
-  // Ime akorda (že transponirano/poenostavljeno) s shemo prijema.
-  const chordName = (name: string) => (
-    <span
-      data-chord-name
-      className="cursor-pointer"
-      onPointerEnter={(e) => {
-        if (e.pointerType === "mouse") showShape(name, e.currentTarget);
-      }}
-      onPointerLeave={(e) => {
-        if (e.pointerType === "mouse") scheduleHide();
-      }}
-      onClick={(e) => {
-        if ((e.nativeEvent as PointerEvent).pointerType === "mouse") return;
-        if (shapeTip?.name === name) setShapeTip(null);
-        else showShape(name, e.currentTarget);
-      }}
-    >
-      {name}
-    </span>
-  );
+  // Ime akorda (že transponirano/poenostavljeno) s shemo prijema. at = mesto
+  // v telesu pesmi (vrstica, zaporedni akord v njej) — samo v telesu: med
+  // snemanjem klik zapiše čas akorda, med Smart playem se obarva aktivni.
+  const chordName = (name: string, at?: { line: number; chord: number }) => {
+    const key = at ? `${at.line}:${at.chord}` : null;
+    // activeChord: med Smart playem iz shranjenih delov, med snemanjem iz osnutka.
+    const active = !!at && activeChord?.line === at.line && activeChord.chord === at.chord;
+    const recorded = !!recorder && !!key && recordedChords.has(key);
+    return (
+      <span
+        data-chord-name
+        className={`cursor-pointer ${
+          // Senca namesto odmika: obarvano ozadje brez premika postavitve.
+          active ? "rounded-sm bg-orange-400 text-neutral-950 shadow-[0_0_0_2px_#fb923c]" : ""
+        } ${recorded && !active ? "underline decoration-orange-400 decoration-dotted underline-offset-4" : ""}`}
+        onPointerEnter={(e) => {
+          if (e.pointerType === "mouse" && !recorder) showShape(name, e.currentTarget);
+        }}
+        onPointerLeave={(e) => {
+          if (e.pointerType === "mouse") scheduleHide();
+        }}
+        onClick={(e) => {
+          if (recorder) {
+            if (at) recordChord(at.line, at.chord);
+            return;
+          }
+          if ((e.nativeEvent as PointerEvent).pointerType === "mouse") return;
+          if (shapeTip?.name === name) setShapeTip(null);
+          else showShape(name, e.currentTarget);
+        }}
+      >
+        {name}
+      </span>
+    );
+  };
 
   // Ena vrstica pesmi ali opisa (glej ChordsLine v src/lib/chords.ts).
   // inBody: v pesmi (tablature skrite za gumbom "Tab"), sicer v opisu (vse vidno).
@@ -648,7 +834,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
           {layoutChordLine(line.chords, display).map((c, j) => (
             <span key={j}>
               {" ".repeat(c.pad)}
-              {chordName(c.name)}
+              {chordName(c.name, inBody ? { line: i, chord: j } : undefined)}
             </span>
           ))}
         </div>
@@ -670,7 +856,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                 const name = display(c.name);
                 return (
                   <span key={j} className="whitespace-pre" style={{ minWidth: `${Math.max(4, name.length + 1)}ch` }}>
-                    {chordName(name)}
+                    {chordName(name, inBody ? { line: i, chord: j } : undefined)}
                   </span>
                 );
               })}
@@ -689,7 +875,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                 {layoutChordLine(line.header, display).map((c, j) => (
                   <span key={j}>
                     {" ".repeat(c.pad)}
-                    {chordName(c.name)}
+                    {chordName(c.name, inBody ? { line: i, chord: j } : undefined)}
                   </span>
                 ))}
               </div>
@@ -714,7 +900,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                 className="inline-flex max-w-full flex-col"
                 style={name ? { minWidth: `${name.length + (isLast ? 0 : 1)}ch` } : undefined}
               >
-                <span className="whitespace-pre font-bold text-(--cv-chord)">{name ? chordName(name) : " "}</span>
+                <span className="whitespace-pre font-bold text-(--cv-chord)">{name ? chordName(name, inBody ? { line: i, chord: j } : undefined) : " "}</span>
                 <span className="whitespace-pre-wrap">{c.lyric || " "}</span>
               </span>
             );
@@ -727,7 +913,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
         {line.segments.map((s, j) =>
           "chord" in s ? (
             <span key={j} className="font-bold text-(--cv-chord)">
-              {chordName(display(s.chord))}
+              {chordName(display(s.chord), inBody ? { line: i, chord: j } : undefined)}
             </span>
           ) : (
             <span key={j}>{s.text}</span>
@@ -1043,6 +1229,12 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                 </div>
                 <div className="border-t border-neutral-700 pt-2">
                   <span className="text-xs text-neutral-200">Pametni predvajalnik</span>
+                  {chordPoints.length > 0 && (
+                    <span className="block text-[10px] leading-tight text-neutral-500">
+                      Instrumentalni deli: {syncedChords?.sections.map((s) => s.name).join(", ")} (
+                      {chordPoints.filter((p) => !("stop" in p)).length} akordov)
+                    </span>
+                  )}
                   <span className="block text-[10px] leading-tight text-neutral-500">
                     {sync?.manual
                       ? `Ročno posneti časi: ${sync.points.length} tapov. Zaženi z gumbom Smart play levo od ▶.`
@@ -1093,9 +1285,9 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                         onClick={startRecorder}
                         className="rounded-full border border-orange-400 px-2.5 py-1 text-[11px] font-medium text-amber-400 hover:bg-orange-400/15"
                       >
-                        {syncedLines ? "Posnemi čase znova" : "Posnemi čase"}
+                        {syncedLines || syncedChords ? "Nadaljuj snemanje časov" : "Posnemi čase"}
                       </button>
-                      {syncedLines && (
+                      {(syncedLines || syncedChords) && (
                         <button
                           type="button"
                           onClick={deleteSyncedLines}
@@ -1253,59 +1445,166 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
 
       {recorder && (
         <div
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-orange-400 bg-neutral-950/95 px-3 pt-2 font-sans text-neutral-100 backdrop-blur"
+          className="relative z-30 shrink-0 border-t border-orange-400 bg-neutral-950/95 px-3 pt-2 font-sans text-neutral-100 backdrop-blur"
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
         >
-          <div className="mx-auto max-w-xl">
+          <div className="mx-auto max-w-2xl">
             <div className="mb-2 flex items-center justify-between gap-2 text-xs text-neutral-300">
               <span>
                 Posnemi čase ·{" "}
                 {recorder.cursor >= 0
                   ? `vrstica ${lyricLines.indexOf(recorder.cursor) + 1}/${lyricLines.length}`
-                  : "konec besedila"}{" "}
-                · tapov {recorder.taps.length}
+                  : "konec besedila"}
               </span>
-              <span className="hidden text-neutral-500 lg:inline">Preslednica = TAP · Backspace = nazaj</span>
+              <span className="hidden text-neutral-500 lg:inline">Preslednica = TAP · Backspace = nazaj · klik na akord = v izbrani del</span>
             </div>
             {recorderMsg && <p className="mb-2 text-xs text-amber-400">{recorderMsg}</p>}
-            <div className="flex items-stretch gap-2">
+            <div className="mb-2 flex items-stretch gap-1.5 text-sm">
               <button
                 type="button"
                 onClick={() => {
-                  if (!recorder.taps.length || window.confirm("Zavržem posnete čase?")) {
+                  if (!recorder.dirty || window.confirm("Zavržem spremembe?")) {
                     setRecorder(null);
                     setRecorderMsg(null);
                   }
                 }}
-                className="rounded-xl border border-neutral-600 px-3 text-sm text-neutral-300 active:scale-95"
+                className="rounded-xl border border-neutral-600 px-3 py-2 text-neutral-300 active:scale-95"
               >
                 Prekliči
               </button>
               <button
                 type="button"
                 onClick={undoTap}
-                disabled={!recorder.taps.length}
-                aria-label="Razveljavi zadnji tap"
+                disabled={!recorder.history.length}
+                aria-label="Razveljavi zadnji zapis"
                 className="rounded-xl border border-neutral-600 px-3 text-lg text-neutral-300 active:scale-95 disabled:opacity-40"
               >
                 ↶
               </button>
               <button
                 type="button"
-                onClick={recordTap}
+                onClick={skipLine}
                 disabled={recorder.cursor < 0}
-                className="flex-1 rounded-xl bg-orange-500 py-4 text-lg font-bold tracking-wide text-white active:scale-[0.98] disabled:opacity-40"
+                className="rounded-xl border border-neutral-600 px-3 text-neutral-300 active:scale-95 disabled:opacity-40"
               >
-                TAP
+                Preskoči
+              </button>
+              <button
+                type="button"
+                onClick={recordStop}
+                disabled={!recorder.activeId}
+                title="Konec izbranega dela: od tu ni obarvan noben akord"
+                className="rounded-xl border border-neutral-600 px-3 text-neutral-300 active:scale-95 disabled:opacity-40"
+              >
+                Konec
               </button>
               <button
                 type="button"
                 onClick={saveRecorder}
-                disabled={!recorder.taps.length || !playingVideo || recorderSaving}
-                className="rounded-xl border border-orange-400 px-3 text-sm font-semibold text-amber-400 active:scale-95 disabled:opacity-40"
+                disabled={!recorder.dirty || !playingVideo || recorderSaving}
+                className="ml-auto rounded-xl border border-orange-400 px-3 font-semibold text-amber-400 active:scale-95 disabled:opacity-40"
               >
                 {recorderSaving ? "…" : "Shrani"}
               </button>
+            </div>
+            <div className="flex items-stretch gap-2">
+              <button
+                type="button"
+                onClick={recordTap}
+                disabled={recorder.cursor < 0}
+                className="w-2/5 shrink-0 rounded-xl bg-orange-500 py-4 text-lg font-bold tracking-wide text-white active:scale-[0.98] disabled:opacity-40"
+              >
+                TAP
+                <span className="block text-[10px] font-medium tracking-normal opacity-80">vrstica</span>
+              </button>
+              {/* Instrumentalni deli: izbrani prejme klike na akorde. */}
+              <div className="min-w-0 flex-1 rounded-xl border border-neutral-700 p-1">
+                <div className="max-h-36 space-y-1 overflow-y-auto">
+                  {recorder.sections.map((section) => {
+                    const active = section.id === recorder.activeId;
+                    const times = section.points.map((p) => p.t + section.offset);
+                    const from = times.length ? Math.min(...times) : null;
+                    const to = times.length
+                      ? (section.end != null ? section.end + section.offset : Math.max(...times) + 4)
+                      : null;
+                    return (
+                      <div
+                        key={section.id}
+                        className={`flex items-center gap-1 rounded-lg border px-1.5 py-1 text-[11px] ${
+                          active ? "border-orange-400 bg-orange-400/10" : "border-transparent bg-neutral-900"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setRecorder({ ...recorder, activeId: section.id })}
+                          onDoubleClick={() => renameSection(section.id)}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <span className={`block truncate font-semibold ${active ? "text-amber-400" : "text-neutral-100"}`}>
+                            {section.name}
+                          </span>
+                          <span className="block truncate text-[10px] text-neutral-500">
+                            {from != null && to != null ? `${formatSec(from)}–${formatSec(to)} · ` : ""}
+                            {section.points.length} akordov
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => renameSection(section.id)}
+                          aria-label={`Preimenuj ${section.name}`}
+                          className="px-0.5 text-neutral-400 hover:text-white"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => previewSection(section)}
+                          disabled={!section.points.length}
+                          aria-label={`Predvajaj ${section.name}`}
+                          className="px-0.5 text-amber-400 disabled:opacity-30"
+                        >
+                          ▶
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateSection(section.id, (s) => ({ ...s, offset: Math.round((s.offset - LRC_OFFSET_STEP) * 4) / 4 }))}
+                          aria-label="Zamik −0,25 s"
+                          className="rounded border border-neutral-600 px-1 text-neutral-300"
+                        >
+                          −
+                        </button>
+                        <span className="w-9 text-center tabular-nums text-neutral-300">
+                          {section.offset > 0 ? "+" : ""}
+                          {section.offset.toFixed(2).replace(".", ",")}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateSection(section.id, (s) => ({ ...s, offset: Math.round((s.offset + LRC_OFFSET_STEP) * 4) / 4 }))}
+                          aria-label="Zamik +0,25 s"
+                          className="rounded border border-neutral-600 px-1 text-neutral-300"
+                        >
+                          +
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteSection(section.id)}
+                          aria-label={`Izbriši ${section.name}`}
+                          className="px-0.5 text-neutral-500 hover:text-red-400"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={addSection}
+                  className="mt-1 w-full rounded-lg border border-dashed border-orange-400/60 py-1 text-[11px] font-medium text-amber-400 hover:bg-orange-400/10"
+                >
+                  + Nov del
+                </button>
+              </div>
             </div>
           </div>
         </div>

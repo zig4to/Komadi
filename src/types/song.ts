@@ -58,6 +58,25 @@ export interface Song {
   // YouTube posnetek, izbran v izbirniku mini predvajalnika — prvi kandidat
   // na vseh napravah (0032_add_preferred_video_id.sql).
   preferred_video_id?: string | null;
+  // Ročno posneti časi posameznih akordov (0033_add_synced_chords.sql).
+  synced_chords?: SyncedChords | null;
+}
+
+// Posnet akord: t = čas v posnetku, line = vrstica v telesu pesmi, chord =
+// zaporedni akord v tej vrstici.
+export type ChordTap = { t: number; line: number; chord: number };
+// En instrumentalni del (Intro, Instrumental 1 …): lasten zamik (s) in
+// konec ("Konec"; brez njega 4 s po zadnjem akordu).
+export interface ChordSection {
+  id: string;
+  name: string;
+  offset: number;
+  end: number | null;
+  points: ChordTap[];
+}
+export interface SyncedChords {
+  videoId: string;
+  sections: ChordSection[];
 }
 
 export interface SyncedLines {
@@ -67,7 +86,7 @@ export interface SyncedLines {
 
 export type NewSong = Omit<
   Song,
-  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids" | "lrc_offsets" | "user_id" | "imported_from" | "review_pending" | "synced_lines" | "preferred_video_id"
+  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids" | "lrc_offsets" | "user_id" | "imported_from" | "review_pending" | "synced_lines" | "preferred_video_id" | "synced_chords"
 >;
 
 export interface SimilarSong {

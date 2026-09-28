@@ -185,10 +185,106 @@ export function lyricLineIndexes(body: ChordsLine[]): number[] {
   return body.flatMap((l, i) => (lineLyric(l) ? [i] : []));
 }
 
+// Vrstice, po katerih teče tapkanje: z besedilom in instrumentalne (samo
+// akordi, npr. "| Fm | Bbm |" v introu ali solu). Razdelki in tablature ne.
+export function recordableLineIndexes(body: ChordsLine[]): number[] {
+  return body.flatMap((l, i) =>
+    lineLyric(l) || l.kind === "chords" || (l.kind === "text" && l.segments.some((s) => "chord" in s)) ? [i] : [],
+  );
+}
+
+// Razdelek, ki je instrumentalen po imenu (Intro, Solo, Outro, Uvod …).
+const INSTRUMENTAL_RE = /intro|solo|interlude|instrument|outro|riff|break|bridge|uvod|vmes|kitar|coda|ending/i;
+
+// Instrumentalni deli med petjem (za besedilo iz LRCLIB): pred prvo zapeto
+// vrstico (intro) in v premorih — prazna vrstica LRC (konec petja), ki ji
+// naslednja zapeta sledi šele čez ≥ MIN_GAP s — označi razdelek z
+// instrumentalnim imenom, ki v akordih stoji med okoliškima povezanima
+// vrsticama, sicer prvo vrstico samih akordov vmes. Vrne dodatne točke.
+const MIN_GAP = 6;
+export function instrumentalPoints(points: SyncPoint[], lrc: LrcLine[], body: ChordsLine[]): SyncPoint[] {
+  if (!points.length) return [];
+  const isChordLine = (l: ChordsLine) =>
+    l.kind === "chords" || (l.kind === "text" && !lineLyric(l) && l.segments.some((s) => "chord" in s));
+  const isInstrumentalSection = (l: ChordsLine) => l.kind === "section" && INSTRUMENTAL_RE.test(l.label);
+  // Najprej instrumentalni razdelek v [from, to), sicer prva vrstica akordov
+  // (za intro: prva vrstica akordov pred prvo zapeto).
+  const findTarget = (from: number, to: number) => {
+    for (let i = from; i < to; i++) if (isInstrumentalSection(body[i])) return i;
+    for (let i = from; i < to; i++) if (isChordLine(body[i])) return i;
+    return -1;
+  };
+  const extra: SyncPoint[] = [];
+  const first = points[0];
+  if (first.time >= MIN_GAP / 2) {
+    const target = findTarget(0, first.lineIndex);
+    if (target >= 0) extra.push({ time: 0, end: first.time, lineIndex: target });
+  }
+  for (let k = 0; k < lrc.length; k++) {
+    if (lrc[k].text.trim()) continue;
+    const start = lrc[k].time;
+    const nextSung = lrc.slice(k + 1).find((l) => l.text.trim());
+    if (!nextSung || nextSung.time - start < MIN_GAP) continue;
+    // Okoliški povezani vrstici (zadnja pred premorom, prva po njem).
+    const prev = [...points].reverse().find((p) => p.time < start);
+    const next = points.find((p) => p.time >= nextSung.time);
+    if (!prev || !next) continue;
+    // Naslednja zapeta vrstica je nižje: iščemo vmes. Sicer (skok nazaj na
+    // refren, zapisan enkrat) samo instrumentalni razdelek do 15 vrstic nižje.
+    const target =
+      next.lineIndex > prev.lineIndex
+        ? findTarget(prev.lineIndex + 1, next.lineIndex)
+        : (() => {
+            for (let i = prev.lineIndex + 1; i < Math.min(body.length, prev.lineIndex + 16); i++)
+              if (isInstrumentalSection(body[i])) return i;
+            return -1;
+          })();
+    if (target >= 0) extra.push({ time: start, end: nextSung.time, lineIndex: target });
+  }
+  return extra;
+}
+
 // Ročno posneti časi (songs.synced_lines) v isto obliko kot alignLyrics.
 export function manualSyncPoints(points: { t: number; line: number }[]): SyncPoint[] {
   const sorted = [...points].sort((a, b) => a.t - b.t);
   return sorted.map((p, k) => ({ time: p.t, end: sorted[k + 1]?.t ?? p.t + 5, lineIndex: p.line }));
+}
+
+// Deli z akordi (synced_chords.sections) v en časovno urejen seznam točk:
+// vsak čas + zamik dela, na koncu dela "stop" (Konec ali 4 s po zadnjem).
+const SECTION_TAIL = 4;
+export function flattenChordSections(
+  sections: { offset: number; end: number | null; points: { t: number; line: number; chord: number }[] }[],
+): ({ t: number; line: number; chord: number } | { t: number; stop: true })[] {
+  const out: ({ t: number; line: number; chord: number } | { t: number; stop: true })[] = [];
+  for (const s of sections) {
+    if (!s.points.length) continue;
+    const pts = [...s.points].sort((a, b) => a.t - b.t);
+    for (const p of pts) out.push({ ...p, t: p.t + s.offset });
+    const last = pts[pts.length - 1].t;
+    out.push({ t: (s.end != null && s.end > last ? s.end : last + SECTION_TAIL) + s.offset, stop: true });
+  }
+  return out.sort((a, b) => a.t - b.t);
+}
+
+// Akord, ki je ob danem času obarvan (ročno posneti synced_chords): zadnja
+// točka s t ≤ time; točka "stop" ali čas pred prvo = null. points po času.
+export function chordAt(
+  points: ({ t: number; line: number; chord: number } | { t: number; stop: true })[],
+  time: number,
+): { line: number; chord: number } | null {
+  let lo = 0;
+  let hi = points.length - 1;
+  let idx = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (points[mid].t <= time) {
+      idx = mid;
+      lo = mid + 1;
+    } else hi = mid - 1;
+  }
+  const p = points[idx];
+  return !p || "stop" in p ? null : { line: p.line, chord: p.chord };
 }
 
 // Vrstica pesmi za dani čas (zadnja točka, ki se je že začela; pred prvo -1)
