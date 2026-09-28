@@ -10,9 +10,11 @@
 //   (brez --id: vse skladbe s chords_text in praznim youtube_embed_ids, v paketih)
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-if (!supabaseUrl || !anonKey) {
-  console.error("Manjkata NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY (glej .env.local).");
+// Service role ključ (samo .env.local, nikoli NEXT_PUBLIC_) obide RLS — po
+// 0029_add_user_accounts.sql anon ključ brez prijave ne vidi nobene skladbe.
+const apiKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!supabaseUrl || !apiKey) {
+  console.error("Manjkata NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (glej .env.local).");
   process.exit(1);
 }
 
@@ -25,7 +27,7 @@ const PAUSE_MS = 60_000;
 const MAX_IDS = 8;
 const MAX_SECONDS = 8 * 60;
 
-const headers = { apikey: anonKey, Authorization: `Bearer ${anonKey}` };
+const headers = { apikey: apiKey, Authorization: `Bearer ${apiKey}` };
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 

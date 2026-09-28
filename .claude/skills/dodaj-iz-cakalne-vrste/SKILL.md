@@ -6,14 +6,20 @@ description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v
 ## Kontekst repozitorija (ne raziskuj, samo uporabi)
 
 - Next.js static-export app "Bitne Tabs", edini backend je Supabase (tabele
-  `songs`, `author_images`, `queued_songs`, ...), brez avtentikacije, RLS
-  dovoljuje javno branje/pisanje z anon ključem.
+  `songs`, `author_images`, `queued_songs`, ...). Aplikacija ima prijavo
+  (0029_add_user_accounts.sql): vsaka tabela razen `author_images` ima
+  `user_id`, RLS pusti anon ključu brez prijave NIČ. Skill zato uporablja
+  `SUPABASE_SERVICE_ROLE_KEY` (obide RLS).
 - `.env.local` v korenu repozitorija vsebuje `NEXT_PUBLIC_SUPABASE_URL` in
-  `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Node skripte jih berejo prek
-  `node --env-file=.env.local ...`.
-- `queued_songs` (stolpca `title`, `author`, poleg `id`/`added_at`) drži
-  hitre predloge, dodane prek gumba "Hitro" v aplikaciji — SAMO naslov in
-  avtor, brez ostalih podatkov.
+  `SUPABASE_SERVICE_ROLE_KEY` (nikoli z `NEXT_PUBLIC_`). Node skripte ju
+  berejo prek `node --env-file=.env.local ...`.
+- `queued_songs` (stolpci `title`, `author`, `user_id`, poleg `id`/`added_at`)
+  drži hitre predloge, dodane prek gumba "Hitro" v aplikaciji — SAMO naslov
+  in avtor, brez ostalih podatkov. `user_id` pove, v čigavo knjižnico gre
+  skladba: vsak zapis, ki ga iz nje narediš (`songs`, `import_batches`),
+  MORA dobiti isti `user_id` (service role ključ nima `auth.uid()`, zato
+  default ne deluje). Preverjanje, ali skladba že obstaja (korak 3), delaj
+  samo med skladbami istega `user_id`.
 - Stolpci `songs`: id, title, author, genre, era, favorite, mood, origin,
   image_url, chords_url, chords_source_url, zabrenkaj_url, chords_text, youtube_url,
   other_chords_url, spotify_url, youtube_music_url, youtube_embed_ids, import_batch_id, copy_count, jam_added_at,
@@ -45,7 +51,7 @@ description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v
 ```
 node --env-file=.env.local -e "
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 fetch(url + '/rest/v1/queued_songs?select=*&order=added_at.asc', {
   headers: { apikey: key, Authorization: 'Bearer ' + key }
 }).then(r => r.json()).then(d => console.log(JSON.stringify(d, null, 2)));
@@ -241,7 +247,8 @@ Za vsako skladbo razišči (splet, če nisi prepričan — ne ugibaj):
 
 ### 5b. Ustvari uvoz (batch)
 Vsak zagon tega skilla je EN uvoz. Tik pred vstavljanjem ustvari vrstico v
-`import_batches` (`POST /rest/v1/import_batches`, telo `{}`,
+`import_batches` (`POST /rest/v1/import_batches`, telo `{ "user_id": <user_id iz queued_songs> }`
+— če izbrane skladbe pripadajo različnim uporabnikom, en batch na uporabnika,
 `Prefer: return=representation`) in si zapomni njen `id`. Tabelo doda
 migracija `supabase/migrations/0021_add_import_batches.sql` — če ne obstaja
 (napaka "relation ... does not exist"), uporabnika prosi, naj jo zažene, in
@@ -251,7 +258,7 @@ izpuščenih je prav tako koristno.
 
 ### 6. Vstavi v bazo
 En skupen insert v `songs` (`Prefer: return=representation`, da dobiš
-`id`-je nazaj): `import_batch_id: <id iz koraka 5b>`, `title`, `author` (iz queued_songs, po možnosti poravnano na
+`id`-je nazaj): `user_id: <user_id vrstice iz queued_songs>`, `import_batch_id: <id iz koraka 5b>`, `title`, `author` (iz queued_songs, po možnosti poravnano na
 obstoječi zapis avtorja v bazi, če je bil najden pri koraku 3), `genre`,
 `era`, `favorite: false`, `mood`, `origin`, `image_url: null`,
 `chords_url: null`, `chords_source_url: <UG link>`,

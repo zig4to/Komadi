@@ -25,6 +25,8 @@ export default function SongCard({
   onChordsClick,
   onReported,
   onToggleFavorite,
+  onImport,
+  inLibrary = false,
   highlighted = false,
 }: {
   song: Song;
@@ -37,6 +39,11 @@ export default function SongCard({
   onAddToJam?: (song: Song) => void;
   onReported?: (report: SongReport) => void;
   onToggleFavorite?: (song: Song) => void;
+  // Način "Skupno" (skladba drugega uporabnika): v meniju je samo "Uvozi v
+  // mojo knjižnico" — urejanje, playliste in prijave so za tujo skladbo
+  // skrite (RLS jih tako ali tako zavrne).
+  onImport?: (song: Song) => void;
+  inLibrary?: boolean;
   highlighted?: boolean;
 }) {
   // Podobno (similar-songs) — začasno onemogočeno.
@@ -325,6 +332,41 @@ export default function SongCard({
                 style={{ top: actionsMenuPos.top, left: actionsMenuPos.left }}
                 className="fixed z-50 w-48 space-y-0.5 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
               >
+                {onImport && (
+                  <button
+                    type="button"
+                    disabled={inLibrary}
+                    onClick={() => {
+                      setActionsOpen(false);
+                      onImport(song);
+                    }}
+                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-emerald-600 hover:bg-neutral-100 disabled:opacity-50 disabled:hover:bg-transparent dark:text-emerald-400 dark:hover:bg-neutral-800"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-[13px] w-[13px] shrink-0"
+                    >
+                      {inLibrary ? (
+                        <path d="M20 6 9 17l-5-5" />
+                      ) : (
+                        <>
+                          <path d="M12 3v12" />
+                          <path d="m7 10 5 5 5-5" />
+                          <path d="M5 21h14" />
+                        </>
+                      )}
+                    </svg>
+                    {inLibrary ? "Že v moji knjižnici" : "Uvozi v mojo knjižnico"}
+                  </button>
+                )}
+
+                {!onImport && (
                 <button
                   type="button"
                   onClick={() => {
@@ -348,6 +390,7 @@ export default function SongCard({
                   </svg>
                   Uredi
                 </button>
+                )}
 
                 {onAddToJam && (
                   <button
@@ -375,6 +418,7 @@ export default function SongCard({
                   </button>
                 )}
 
+                {!onImport && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -403,6 +447,7 @@ export default function SongCard({
                   </svg>
                   Dodaj v playlisto
                 </button>
+                )}
 
                 {onToggleFavorite && (
                   <button
@@ -430,6 +475,7 @@ export default function SongCard({
                   </button>
                 )}
 
+                {!onImport && (
                 <button
                   type="button"
                   onClick={() => {
@@ -454,6 +500,7 @@ export default function SongCard({
                   </svg>
                   Prijavi napako
                 </button>
+                )}
 
                 {onDelete && (
                   <button

@@ -43,11 +43,16 @@ export interface Song {
   goal_added_at: string | null;
   goal_learned: boolean;
   created_at: string;
+  // Lastnik skladbe (0029_add_user_accounts.sql) — vsak uporabnik ima svojo
+  // knjižnico, skladbe drugih so vidne le v načinu "Skupno".
+  user_id: string;
+  // Skladba drugega uporabnika, iz katere je bila ta uvožena prek "Skupno".
+  imported_from: string | null;
 }
 
 export type NewSong = Omit<
   Song,
-  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids" | "lrc_offsets"
+  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids" | "lrc_offsets" | "user_id" | "imported_from"
 >;
 
 export interface SimilarSong {

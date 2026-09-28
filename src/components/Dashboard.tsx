@@ -1,7 +1,10 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import ChordsButtons from "@/components/ChordsButtons";
+import UserAvatar from "@/components/UserAvatar";
+import { dedupeShared, importSharedSongs, songMatchKey } from "@/lib/importShared";
 import Filters, { FiltersToggle } from "@/components/Filters";
 import FeaturedArtists from "@/components/FeaturedArtists";
 import HomeHighlights, {
@@ -95,8 +98,16 @@ function groupByRecent(
     .map(({ label, songs }) => ({ label, songs }));
 }
 
-export default function Dashboard() {
+export default function Dashboard({ user }: { user: User }) {
   const [songs, setSongs] = useState<Song[]>([]);
+  // "Skupno": skladbe drugih uporabnikov (select na songs je odprt za vse
+  // prijavljene, glej 0029_add_user_accounts.sql), naložene ob prvem vklopu.
+  // Iz njih si uporabnik skladbe uvozi v svojo knjižnico.
+  const [sharedOn, setSharedOn] = usePersistentBool("komadi:shared:open", false);
+  const [sharedSongs, setSharedSongs] = useState<Song[] | null>(null);
+  const [sharedError, setSharedError] = useState<string | null>(null);
+  const [importMessage, setImportMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
   const [authorImages, setAuthorImages] = useState<Record<string, string>>({});
   // Prijave napak (tabela song_reports, gumb "Prijavi napako" v SongCard.tsx).
   // Skladbe z odprto prijavo so skrite iz seznama "Vsi Komadi" in prikazane
@@ -267,9 +278,12 @@ export default function Dashboard() {
     if (!isSupabaseConfigured) return;
     let cancelled = false;
     (async () => {
+      // Filter po user_id je obvezen: RLS pusti brati skladbe vseh
+      // prijavljenih (zaradi "Skupno").
       const { data, error } = await supabase
         .from("songs")
         .select("*")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (cancelled) return;
       if (error) {
@@ -282,7 +296,24 @@ export default function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user.id]);
+
+  useEffect(() => {
+    if (!sharedOn || sharedSongs) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("songs")
+        .select("*")
+        .neq("user_id", user.id);
+      if (cancelled) return;
+      if (error) setSharedError(error.message);
+      else setSharedSongs(dedupeShared(data as Song[]));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sharedOn, sharedSongs, user.id]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -394,7 +425,8 @@ export default function Dashboard() {
       .channel("songs-and-extras")
       .on<Song>(
         "postgres_changes",
-        { event: "*", schema: "public", table: "songs" },
+        // Samo lastne skladbe — RLS bi sicer pošiljal spremembe vseh uporabnikov.
+        { event: "*", schema: "public", table: "songs", filter: `user_id=eq.${user.id}` },
         (payload) => {
           if (payload.eventType === "INSERT") {
             const song = payload.new;
@@ -457,7 +489,7 @@ export default function Dashboard() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user.id]);
 
   async function handleSetAuthorImage(author: string, imageUrl: string | null) {
     const prev = authorImages;
@@ -601,9 +633,10 @@ export default function Dashboard() {
       .slice(0, 20);
   }, [songs, goalPickerQuery]);
 
+  // V načinu "Skupno" isti filtri veljajo za skladbe drugih uporabnikov.
   const filteredSongs = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
-    return songs.filter((s) => {
+    return (sharedOn ? (sharedSongs ?? []) : songs).filter((s) => {
       if (q && !`${s.title} ${s.author}`.toLowerCase().includes(q))
         return false;
       if (filters.genres.length && !filters.genres.includes(s.genre))
@@ -616,10 +649,48 @@ export default function Dashboard() {
         (!s.origin || !filters.origins.includes(s.origin))
       )
         return false;
-      if (filters.favoriteOnly && !s.favorite) return false;
+      if (filters.favoriteOnly && !sharedOn && !s.favorite) return false;
       return true;
     });
-  }, [songs, filters]);
+  }, [songs, sharedOn, sharedSongs, filters]);
+
+  // Skladbe drugih, ki jih že imam (isti naslov+avtor ali že uvožene).
+  const myLibraryKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const s of songs) {
+      keys.add(songMatchKey(s));
+      if (s.imported_from) keys.add(s.imported_from);
+    }
+    return keys;
+  }, [songs]);
+  const inMyLibrary = (s: Song) => myLibraryKeys.has(s.id) || myLibraryKeys.has(songMatchKey(s));
+
+  function closeShared() {
+    setSharedOn(false);
+    setImportMessage(null);
+  }
+  useBackableOpen(sharedOn, closeShared);
+
+  async function handleImportShared(list: Song[]) {
+    const todo = list.filter((s) => !inMyLibrary(s));
+    if (!todo.length) return;
+    setImportBusy(true);
+    setImportMessage(null);
+    try {
+      const imported = await importSharedSongs(todo);
+      setSongs((prev) => [...imported.filter((n) => !prev.some((s) => s.id === n.id)), ...prev]);
+      setImportMessage({
+        text:
+          imported.length === 1
+            ? `"${imported[0].title}" je v tvoji knjižnici.`
+            : `${imported.length} skladb je v tvoji knjižnici.`,
+        error: false,
+      });
+    } catch (e) {
+      setImportMessage({ text: `Uvoz ni uspel: ${(e as Error).message}`, error: true });
+    }
+    setImportBusy(false);
+  }
 
   const displaySongs = useMemo(() => {
     const byTitle = (a: Song, b: Song) => a.title.localeCompare(b.title, "sl");
@@ -1374,7 +1445,7 @@ export default function Dashboard() {
   }
 
   function pickRandom() {
-    const pool = filteredSongs.length ? filteredSongs : songs;
+    const pool = !sharedOn && filteredSongs.length ? filteredSongs : songs;
     setRandomPickFromPartial(false);
     setRandomFive(null);
     if (!pool.length) {
@@ -1403,7 +1474,7 @@ export default function Dashboard() {
   // ponovnem kliku znova premeša) seznam 5 naključnih skladb iz istega
   // nabora kot navadno "Naključno" (upošteva aktivne filtre, če obstajajo).
   function pickRandomFive() {
-    const pool = filteredSongs.length ? filteredSongs : songs;
+    const pool = !sharedOn && filteredSongs.length ? filteredSongs : songs;
     const shuffled = [...pool].sort(() => Math.random() - 0.5);
     setRandomFive(shuffled.slice(0, 5));
   }
@@ -1831,6 +1902,9 @@ export default function Dashboard() {
                 </span>
               </button>
               <div className="ml-1.5">
+                <UserAvatar user={user} />
+              </div>
+              <div className="ml-1">
                 <SettingsMenu
                   onImported={(imported) =>
                     setSongs((prev) => [...imported, ...prev])
@@ -3290,6 +3364,44 @@ export default function Dashboard() {
                 Popularno
               </button>
               <FiltersToggle />
+              <button
+                type="button"
+                data-view-toggle
+                onClick={() => {
+                  if (sharedOn) {
+                    closeShared();
+                  } else {
+                    setActiveView("list");
+                    setSharedError(null);
+                    setSharedSongs(null);
+                    setSharedOn(true);
+                  }
+                }}
+                aria-pressed={sharedOn}
+                title="Skladbe drugih uporabnikov — uvozi jih v svojo knjižnico"
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-sky-500/50 px-4 py-2 text-sm font-medium transition dark:border-sky-400/50 ${
+                  sharedOn
+                    ? "bg-[linear-gradient(115deg,#0284c7_15%,#38bdf8_100%)] text-white"
+                    : "bg-[linear-gradient(115deg,rgba(14,165,233,0.14)_15%,rgba(14,165,233,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(14,165,233,0.24)_15%,rgba(14,165,233,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(14,165,233,0.32)_15%,rgba(14,165,233,0.1)_95%)]"
+                }`}
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`h-4 w-4 shrink-0 ${sharedOn ? "text-white" : "text-sky-600 dark:text-sky-400"}`}
+                >
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                Skupno
+              </button>
             </div>
           </div>
 
@@ -3304,6 +3416,7 @@ export default function Dashboard() {
             !loading &&
             !loadError &&
             activeView === "list" &&
+            !sharedOn &&
             !hasActiveFilters(filters) && (
               <div className="mt-3! space-y-0">
                 <FavoritesThisMonth
@@ -3446,14 +3559,17 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2">
                     <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100">
-                      {songsHeading}
+                      {sharedOn ? "Skupno" : songsHeading}
                     </h2>
                     <SortMenu value={songSort} onChange={setSongSort} />
                   </div>
-                  {hasActiveFilters(filters) || authorFilter ? (
+                  {sharedOn || hasActiveFilters(filters) || authorFilter ? (
                     <button
                       type="button"
-                      onClick={handleBackFromFilter}
+                      onClick={() => {
+                        if (sharedOn) closeShared();
+                        handleBackFromFilter();
+                      }}
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
                     >
                       <svg
@@ -3495,17 +3611,96 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                {(songsVisible || hasActiveFilters(filters)) && (
+                {sharedOn && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                      Skladbe drugih uporabnikov. V meniju kartice jih uvoziš v svojo knjižnico
+                      (akordi, povezave in besedilo pridejo zraven).
+                    </p>
+                    {sharedError && (
+                      <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-950/50 dark:text-red-400">
+                        Napaka pri nalaganju: {sharedError}
+                      </p>
+                    )}
+                    {!sharedSongs && !sharedError && (
+                      <p className="text-sm text-neutral-500">Nalagam skupne skladbe…</p>
+                    )}
+                    {(() => {
+                      const importable = displaySongs.filter((s) => !inMyLibrary(s));
+                      return (
+                        importable.length > 0 && (
+                          <button
+                            type="button"
+                            disabled={importBusy}
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  `Uvozim ${importable.length} ${importable.length === 1 ? "skladbo" : "skladb"} v tvojo knjižnico?`,
+                                )
+                              )
+                                handleImportShared(importable);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-500/10 disabled:opacity-50 dark:border-emerald-400/50 dark:text-emerald-400"
+                          >
+                            <svg
+                              aria-hidden="true"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={1.8}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-4 w-4 shrink-0"
+                            >
+                              <path d="M12 3v12" />
+                              <path d="m7 10 5 5 5-5" />
+                              <path d="M5 21h14" />
+                            </svg>
+                            {importBusy ? "Uvažam…" : `Uvozi vse prikazane (${importable.length})`}
+                          </button>
+                        )
+                      );
+                    })()}
+                    {importMessage && (
+                      <p
+                        className={`rounded-lg px-3 py-2 text-sm ${
+                          importMessage.error
+                            ? "bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400"
+                            : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                        }`}
+                      >
+                        {importMessage.text}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {(sharedOn || songsVisible || hasActiveFilters(filters)) && (
                   <>
-                    {displaySongs.length === 0 && (
+                    {displaySongs.length === 0 && (!sharedOn || sharedSongs) && (
                       <p className="text-sm text-neutral-500">
-                        {songs.length === 0
-                          ? "Baza je še prazna — dodaj prvo skladbo."
-                          : "Nobena skladba ne ustreza izbranim filtrom."}
+                        {sharedOn
+                          ? sharedSongs?.length
+                            ? "Nobena skladba ne ustreza izbranim filtrom."
+                            : "Drugi uporabniki še nimajo skladb."
+                          : songs.length === 0
+                            ? "Tvoja knjižnica je še prazna — dodaj prvo skladbo ali jo uvozi iz \"Skupno\"."
+                            : "Nobena skladba ne ustreza izbranim filtrom."}
                       </p>
                     )}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {displaySongs.slice(0, visibleResults).map((song) => (
+                      {displaySongs.slice(0, visibleResults).map((song) =>
+                        sharedOn ? (
+                          <SongCard
+                            key={song.id}
+                            song={song}
+                            authorImage={authorImages[song.author] ?? null}
+                            onEdit={() => {}}
+                            onFilterAuthor={handleFilterByAuthor}
+                            onImport={(s) => handleImportShared([s])}
+                            inLibrary={inMyLibrary(song)}
+                          />
+                        ) : (
                         <div key={song.id}>
                           <SongCard
                             song={song}
@@ -3521,7 +3716,8 @@ export default function Dashboard() {
                           />
                           {randomPick?.id !== song.id && renderEditForm(song)}
                         </div>
-                      ))}
+                        ),
+                      )}
                     </div>
                     {displaySongs.length > visibleResults && (
                       <LoadMoreSentinel
@@ -3539,7 +3735,9 @@ export default function Dashboard() {
       )}
 
       {(() => {
-        const chordsSong = openChordsId ? songs.find((s) => s.id === openChordsId && s.chords_text) : undefined;
+        const chordsSong = openChordsId
+          ? [...songs, ...(sharedSongs ?? [])].find((s) => s.id === openChordsId && s.chords_text)
+          : undefined;
         return chordsSong ? <ChordsViewer key={chordsSong.id} song={chordsSong} onClose={closeChordsViewer} /> : null;
       })()}
     </div>

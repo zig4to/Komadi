@@ -9,11 +9,13 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Service role ključ (samo .env.local, nikoli NEXT_PUBLIC_) obide RLS — po
+// 0029_add_user_accounts.sql anon ključ brez prijave ne vidi nobene skladbe.
+const apiKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !anonKey) {
+if (!supabaseUrl || !apiKey) {
   console.error(
-    "Manjkata NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY (glej .env.local).",
+    "Manjkata NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (glej .env.local).",
   );
   process.exit(1);
 }
@@ -26,8 +28,8 @@ async function fetchAllSongs() {
   for (;;) {
     const res = await fetch(`${supabaseUrl}/rest/v1/songs?select=*&order=created_at.asc`, {
       headers: {
-        apikey: anonKey,
-        Authorization: `Bearer ${anonKey}`,
+        apikey: apiKey,
+        Authorization: `Bearer ${apiKey}`,
         Range: `${from}-${from + PAGE_SIZE - 1}`,
       },
     });

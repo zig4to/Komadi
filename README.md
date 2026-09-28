@@ -209,12 +209,18 @@ Pravila:
 
 Po izbiri datoteke se prikaže povzetek (koliko skladb, morebitna opozorila) — šele s klikom na "Uvozi" se skladbe dejansko zapišejo v bazo.
 
-## Varnostna opomba
+## Prijava uporabnikov
 
-Aplikacija nima prijave — `anon` ključ omogoča branje in pisanje vsem, ki poznajo URL aplikacije. Za osebno/lokalno rabo je to v redu. Če jo objaviš javno (npr. na Vercelu), razmisli o:
+Aplikacija zahteva prijavo z računom **TomStudios** (isti Supabase projekt in Supabase Auth kot hub `TomsStudios`). Registracija je omejena na povabljene: e-pošto je treba prej dodati v tabelo `allowed_emails` (glej `TomsStudios/supabase/001_allowed_emails.sql`). Na `zig4to.github.io` si Komadi s hubom delijo sejo, zato je uporabnik, prijavljen v hubu, prijavljen tudi tu. Povezava iz drugega izvora lahko sejo prinese v hashu (`#sb_at=…&sb_rt=…`).
 
-- Vercel Password Protection (zaščiti celoten deployment z geslom), ali
-- Supabase Auth + prijava v aplikaciji.
+Vsak uporabnik ima **svojo knjižnico** (skladbe, Jam, Mojih 20, playliste, čakalna vrsta, prijave napak). Nov uporabnik začne prazen. Gumb **"Skupno"** pokaže skladbe vseh drugih uporabnikov: v meniju kartice je "Uvozi v mojo knjižnico", nad seznamom pa "Uvozi vse prikazane". Slike avtorjev (`author_images`) so skupne.
+
+**Enkratna nastavitev:**
+
+1. Račun `ziga.skater@gmail.com` mora obstajati (enkrat se prijavi/registriraj v hubu), ker mu migracija dodeli vse obstoječe podatke.
+2. Ob objavi te verzije v Supabase SQL Editorju zaženi `supabase/migrations/0029_add_user_accounts.sql`. Stara verzija brez prijave po tem ne vidi več ničesar.
+3. Supabase → Authentication → URL Configuration → **Redirect URLs** dodaj `https://zig4to.github.io/Komadi/` in `https://localhost:3000/` (povezave v e-poštnih sporočilih za potrditev računa in novo geslo).
+4. V `.env.local` dodaj `SUPABASE_SERVICE_ROLE_KEY=...` (Project Settings → API → service_role). Rabijo ga `npm run backup`, `scripts/fill-*.mjs` in skill `dodaj-iz-cakalne-vrste`. Nikoli ga ne poimenuj z `NEXT_PUBLIC_` in ga ne dodaj med GitHub secrete, ker bi prišel v javni bundle.
 
 ## Deploy na GitHub Pages
 
@@ -229,7 +235,7 @@ Aplikacija je nastavljena za statični izvoz (`output: "export"` v `next.config.
 4. Vsak push na `main` avtomatsko zgradi in objavi stran na `https://<uporabnik>.github.io/<repo-ime>/`.
    Prvi deploy lahko sprožiš tudi ročno: zavihek **Actions → Deploy to GitHub Pages → Run workflow**.
 
-⚠️ **Varnostna opomba za javni GitHub Pages deploy:** stran bo dostopna vsakomur, ki pozna URL, in trenutno (brez prijave) lahko vsak obiskovalec dodaja/ureja/briše skladbe v tvoji bazi, ker RLS politike dovoljujejo javni zapis. Za osebno rabo je to običajno sprejemljivo tveganje (nihče drug ne pozna URL-ja), a če želiš dodatno zaščito, razmisli o preprostem geslu ob vstopu v aplikacijo ali o Supabase Auth.
+Dostop do podatkov varuje prijava (glej "Prijava uporabnikov"): RLS brez prijave ne pusti ničesar brati ali pisati.
 
 ## Deploy na Vercel (alternativa)
 
