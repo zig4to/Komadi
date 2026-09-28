@@ -51,11 +51,23 @@ export interface Song {
   // Dodal jo je skill dodaj-iz-cakalne-vrste in še čaka na stran "Pregled in
   // odobritev" — do odobritve je ni v knjižnici (0030_add_review_pending.sql).
   review_pending: boolean;
+  // Ročno posneti časi vrstic za Smart play (0031_add_synced_lines.sql):
+  // line = indeks vrstice v telesu pesmi (parseChords), t = sekunde v
+  // posnetku videoId. Ima prednost pred LRCLIB.
+  synced_lines?: SyncedLines | null;
+  // YouTube posnetek, izbran v izbirniku mini predvajalnika — prvi kandidat
+  // na vseh napravah (0032_add_preferred_video_id.sql).
+  preferred_video_id?: string | null;
+}
+
+export interface SyncedLines {
+  videoId: string;
+  points: { t: number; line: number }[];
 }
 
 export type NewSong = Omit<
   Song,
-  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids" | "lrc_offsets" | "user_id" | "imported_from" | "review_pending"
+  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids" | "lrc_offsets" | "user_id" | "imported_from" | "review_pending" | "synced_lines" | "preferred_video_id"
 >;
 
 export interface SimilarSong {

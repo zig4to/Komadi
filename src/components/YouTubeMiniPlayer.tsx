@@ -74,14 +74,34 @@ export function youTubeVideoId(url: string | null | undefined): string | null {
   }
 }
 
+// Naslov in kanal posnetka za izbirnik (YouTube oEmbed, dovoli CORS, brez
+// ključa); predpomnjeno za celo sejo. null = ni podatka (zasebno/izbrisano).
+type VideoInfo = { title: string; channel: string } | null;
+const videoInfoCache = new Map<string, Promise<VideoInfo>>();
+function fetchVideoInfo(id: string): Promise<VideoInfo> {
+  let p = videoInfoCache.get(id);
+  if (!p) {
+    p = fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => (d ? { title: String(d.title ?? ""), channel: String(d.author_name ?? "") } : null))
+      .catch(() => null);
+    videoInfoCache.set(id, p);
+  }
+  return p;
+}
+
 function formatTime(s: number) {
   const t = Math.max(0, Math.floor(s));
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 }
 
 // Upravljanje predvajalnika od zunaj (ChordsViewer: tap na vrstico med
-// pavzo). seekAndPlay vrne false, če predvajalnik še ni zagnan.
-export type PlayerController = { seekAndPlay: (seconds: number) => boolean };
+// pavzo). seekAndPlay vrne false, če predvajalnik še ni zagnan; currentTime
+// (točen čas, ne zadnji 250-ms onTime — za snemanje časov vrstic) vrne null.
+export type PlayerController = {
+  seekAndPlay: (seconds: number) => boolean;
+  currentTime: () => number | null;
+};
 
 export default function YouTubeMiniPlayer({
   videoIds,
@@ -93,6 +113,8 @@ export default function YouTubeMiniPlayer({
   smartOn = false,
   onSmartToggle,
   controllerRef,
+  preferredId = null,
+  onSelect,
 }: {
   videoIds: string[];
   watchUrl: string;
@@ -111,6 +133,10 @@ export default function YouTubeMiniPlayer({
   smartOn?: boolean;
   onSmartToggle?: (on: boolean) => void;
   controllerRef?: React.RefObject<PlayerController | null>;
+  // Izbirnik posnetka: izbira se shrani (ChordsViewer → songs.preferred_video_id);
+  // onSelect vrne napako ali null, preferredId je trenutno shranjeni posnetek.
+  preferredId?: string | null;
+  onSelect?: (videoId: string) => Promise<string | null>;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
@@ -124,6 +150,22 @@ export default function YouTubeMiniPlayer({
   // dovoli vgradnje) naloži naslednjega V ISTI predvajalnik (loadVideoById),
   // brez novega iframea; na koncu pokaže kodo napake.
   const attemptRef = useRef(0);
+  // Izbirnik posnetka: kandidati iz ChordsViewer + ročno dodani (povezava).
+  const [ids, setIds] = useState(videoIds);
+  const idsRef = useRef(ids);
+  useEffect(() => {
+    idsRef.current = ids;
+  });
+  // Posnetek, ki je naložen v predvajalnik (za kljukico v izbirniku).
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
+  const [pickerPos, setPickerPos] = useState<{ top: number; right: number } | null>(null);
+  const [infos, setInfos] = useState<Record<string, VideoInfo | undefined>>({});
+  const [customUrl, setCustomUrl] = useState("");
+  const [customError, setCustomError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const pickerButtonRef = useRef<HTMLButtonElement>(null);
   // Telefon brez dotika (gesta) ne dovoli samodejnega zagona z zvokom: po
   // samodejnem preklopu na naslednji video ta obvisi v stanju "še ni začel".
   // Če se v 3 s ne začne, gumb vrnemo v ▶ — naslednji dotik ga zažene.
@@ -149,12 +191,13 @@ export default function YouTubeMiniPlayer({
     if (!host || started) return;
     setStarted(true);
     setLoading(true);
+    setCurrentId(idsRef.current[attemptRef.current]);
     loadYouTubeApi().then((YT) => {
       if (!hostRef.current) return;
       const el = document.createElement("div");
       host.appendChild(el);
       playerRef.current = new YT.Player(el, {
-        videoId: videoIds[0],
+        videoId: idsRef.current[attemptRef.current],
         width: 200,
         height: 200,
         playerVars: { playsinline: 1, rel: 0, modestbranding: 1, autoplay: 1, origin: window.location.origin },
@@ -174,15 +217,17 @@ export default function YouTubeMiniPlayer({
             }
             if (e.data === 1) {
               setDuration(playerRef.current?.getDuration() ?? 0);
-              onPlayingRef.current?.(videoIds[attemptRef.current]);
+              onPlayingRef.current?.(idsRef.current[attemptRef.current]);
             }
           },
           onError: (e) => {
-            const failedId = videoIds[attemptRef.current];
+            const failedId = idsRef.current[attemptRef.current];
             console.warn(`YouTube napaka ${e.data} za video ${failedId}`);
+            setFailedIds((prev) => new Set(prev).add(failedId));
             attemptRef.current++;
-            const next = videoIds[attemptRef.current];
+            const next = idsRef.current[attemptRef.current];
             if (next) {
+              setCurrentId(next);
               playerRef.current?.loadVideoById(next);
               armStallTimer();
             }
@@ -226,21 +271,167 @@ export default function YouTubeMiniPlayer({
         player.playVideo();
         return true;
       },
+      currentTime: () => playerRef.current?.getCurrentTime() ?? null,
     };
   });
 
-  if (errorCode !== null || videoIds.length === 0) {
-    return (
-      <a
-        href={watchUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-xs text-neutral-400 underline hover:text-white"
-      >
-        Odpri na YouTubu{errorCode !== null && ` (napaka ${errorCode})`}
-      </a>
-    );
+  // Izbirnik: naslovi se naložijo ob prvem odprtju.
+  useEffect(() => {
+    if (!pickerPos) return;
+    let cancelled = false;
+    for (const id of ids) {
+      if (id in infos) continue;
+      fetchVideoInfo(id).then((info) => {
+        if (!cancelled) setInfos((prev) => ({ ...prev, [id]: info }));
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [pickerPos, ids, infos]);
+  useEffect(() => {
+    if (!pickerPos) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!pickerRef.current?.contains(t) && !pickerButtonRef.current?.contains(t)) setPickerPos(null);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [pickerPos]);
+
+  // Izbira posnetka: naloži ga v isti predvajalnik (ali ga ob prvem zagonu
+  // ustvari z njim); onPlaying si ga zapomni kot prvega za naslednjič.
+  function selectVideo(id: string) {
+    const index = idsRef.current.indexOf(id);
+    if (index < 0) return;
+    setPickerPos(null);
+    setSaveError(null);
+    onSelect?.(id).then((err) => setSaveError(err));
+    attemptRef.current = index;
+    setErrorCode(null);
+    setCurrentId(id);
+    const player = playerRef.current;
+    if (!player) return start();
+    setLoading(true);
+    setCurrent(0);
+    player.loadVideoById(id);
+    armStallTimer();
   }
+  function addCustomVideo() {
+    const id = youTubeVideoId(customUrl.trim()) ?? (/^[w-]{11}$/.test(customUrl.trim()) ? customUrl.trim() : null);
+    if (!id) {
+      setCustomError("To ni povezava do YouTube posnetka.");
+      return;
+    }
+    setCustomError(null);
+    setCustomUrl("");
+    if (!idsRef.current.includes(id)) {
+      const next = [...idsRef.current, id];
+      idsRef.current = next;
+      setIds(next);
+    }
+    selectVideo(id);
+  }
+
+  // Gumb "Izberi posnetek" + spustni seznam (fixed pod gumbom — zgornja
+  // vrstica pregledovalnika ima overflow-hidden).
+  const picker = (
+    <>
+      <button
+        ref={pickerButtonRef}
+        type="button"
+        onClick={(e) => {
+          if (pickerPos) return setPickerPos(null);
+          const r = e.currentTarget.getBoundingClientRect();
+          setPickerPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+        }}
+        aria-expanded={!!pickerPos}
+        aria-label="Izberi posnetek"
+        title="Izberi posnetek"
+        className={`shrink-0 rounded p-1 hover:text-white ${pickerPos ? "text-amber-400" : "text-neutral-400"}`}
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+          <path d="M3 6h13M3 12h13M3 18h9" />
+          <path d="M17 15v6l4-3-4-3z" fill="currentColor" />
+        </svg>
+      </button>
+      {pickerPos && (
+        <div
+          ref={pickerRef}
+          role="listbox"
+          aria-label="Posnetki"
+          style={{ top: pickerPos.top, right: pickerPos.right }}
+          className="fixed z-40 w-[min(22rem,calc(100vw-1rem))] rounded-xl border border-orange-400 bg-neutral-900 p-1.5 font-sans shadow-xl"
+        >
+          <p className="px-2 pb-1 pt-0.5 text-[11px] font-medium text-neutral-400">Kateri posnetek naj se predvaja?</p>
+          {saveError && <p className="px-2 pb-1 text-[10px] text-red-400">Izbira ni shranjena: {saveError}</p>}
+          <ul className="max-h-[50vh] space-y-0.5 overflow-y-auto">
+            {ids.map((id) => {
+              const info = infos[id];
+              const active = id === currentId;
+              const failed = failedIds.has(id);
+              return (
+                <li key={id}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => selectVideo(id)}
+                    className={`flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-neutral-800 ${active ? "bg-orange-400/10" : ""}`}
+                  >
+                    <img
+                      src={`https://i.ytimg.com/vi/${id}/default.jpg`}
+                      alt=""
+                      loading="lazy"
+                      className="h-9 w-12 shrink-0 rounded object-cover"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className={`line-clamp-2 text-xs leading-snug ${active ? "text-amber-400" : "text-neutral-100"}`}>
+                        {info === undefined ? "Nalagam …" : info ? info.title : `Posnetek ${id}`}
+                      </span>
+                      <span className="block truncate text-[10px] text-neutral-500">
+                        {failed
+                          ? "Ne dovoli predvajanja v aplikaciji"
+                          : [info?.channel, id === preferredId ? "izbran" : null].filter(Boolean).join(" · ")}
+                      </span>
+                    </span>
+                    {active && (
+                      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-4 w-4 shrink-0 text-amber-400">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              addCustomVideo();
+            }}
+            className="mt-1 flex gap-1.5 border-t border-neutral-800 px-1 pt-1.5"
+          >
+            <input
+              type="url"
+              value={customUrl}
+              onChange={(e) => setCustomUrl(e.target.value)}
+              placeholder="Prilepi YouTube povezavo"
+              className="min-w-0 flex-1 rounded-lg border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs text-neutral-100 outline-none focus:border-orange-400"
+            />
+            <button type="submit" className="shrink-0 rounded-lg border border-orange-400 px-2 text-xs text-amber-400 hover:bg-orange-400/15">
+              Predvajaj
+            </button>
+          </form>
+          {customError && <p className="px-2 pt-1 text-[10px] text-red-400">{customError}</p>}
+        </div>
+      )}
+    </>
+  );
+
+  // Noben posnetek ne dela: namesto kontrol povezava na YouTube, izbirnik in
+  // skrit predvajalnik (hostRef) ostaneta, da lahko izbereš drug posnetek.
+  const failedAll = errorCode !== null || ids.length === 0;
 
   const ready = started && !loading;
 
@@ -279,70 +470,85 @@ export default function YouTubeMiniPlayer({
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
-      {smartAvailable && (
-        <button
-          type="button"
-          onClick={() => {
-            if (smartOn) return onSmartToggle?.(false);
-            onSmartToggle?.(true);
-            if (!playing) togglePlay();
-          }}
-          disabled={loading}
-          aria-pressed={smartOn}
-          aria-label={smartOn ? "Izklopi Smart play" : "Smart play: akordi sledijo petju"}
-          title={smartOn ? "Izklopi Smart play" : "Smart play: akordi sledijo petju"}
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 transition disabled:opacity-60 active:scale-95 ${
-            smartOn ? "bg-orange-400 text-neutral-900" : "text-amber-400 hover:bg-orange-400/15"
-          }`}
+      {failedAll ? (
+        <a
+          href={watchUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-neutral-400 underline hover:text-white"
         >
-          {/* Predvajaj + vrstice besedila. */}
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-            <path d="M3 5.5v7l5.5-3.5L3 5.5z" fill="currentColor" stroke="none" />
-            <path d="M12 7h9M12 12h9M3 17h18" />
-          </svg>
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={togglePlay}
-        disabled={loading}
-        aria-label={playing ? "Premor" : "Predvajaj"}
-        title={playing ? "Premor" : "Predvajaj skladbo"}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-60 active:scale-95"
-      >
-        {playIcon}
-      </button>
-      <button
-        type="button"
-        onClick={restart}
-        disabled={!ready}
-        aria-label="Na začetek skladbe"
-        title="Na začetek skladbe"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-40 active:scale-95"
-      >
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-          <path d="M6 5h2.5v14H6zM20 5v14L9 12l11-7z" />
-        </svg>
-      </button>
+          Odpri na YouTubu{errorCode !== null && ` (napaka ${errorCode})`}
+        </a>
+      ) : (
+        <>
+          {smartAvailable && (
+            <button
+              type="button"
+              onClick={() => {
+                if (smartOn) return onSmartToggle?.(false);
+                onSmartToggle?.(true);
+                if (!playing) togglePlay();
+              }}
+              disabled={loading}
+              aria-pressed={smartOn}
+              aria-label={smartOn ? "Izklopi Smart play" : "Smart play: akordi sledijo petju"}
+              title={smartOn ? "Izklopi Smart play" : "Smart play: akordi sledijo petju"}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 transition disabled:opacity-60 active:scale-95 ${
+                smartOn ? "bg-orange-400 text-neutral-900" : "text-amber-400 hover:bg-orange-400/15"
+              }`}
+            >
+              {/* Predvajaj + vrstice besedila. */}
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="M3 5.5v7l5.5-3.5L3 5.5z" fill="currentColor" stroke="none" />
+                <path d="M12 7h9M12 12h9M3 17h18" />
+              </svg>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={togglePlay}
+            disabled={loading}
+            aria-label={playing ? "Premor" : "Predvajaj"}
+            title={playing ? "Premor" : "Predvajaj skladbo"}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-60 active:scale-95"
+          >
+            {playIcon}
+          </button>
+          <button
+            type="button"
+            onClick={restart}
+            disabled={!ready}
+            aria-label="Na začetek skladbe"
+            title="Na začetek skladbe"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-40 active:scale-95"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+              <path d="M6 5h2.5v14H6zM20 5v14L9 12l11-7z" />
+            </svg>
+          </button>
 
-      <input
-        type="range"
-        min={0}
-        max={Math.max(1, Math.floor(duration))}
-        step={1}
-        value={Math.min(Math.floor(current), Math.floor(duration))}
-        onChange={(e) => {
-          const t = Number(e.target.value);
-          setCurrent(t);
-          playerRef.current?.seekTo(t, true);
-        }}
-        disabled={!ready || duration === 0}
-        aria-label="Položaj v skladbi"
-        className="h-1 min-w-0 flex-1 cursor-pointer accent-orange-400 disabled:opacity-40"
-      />
-      <span className="shrink-0 text-[11px] tabular-nums text-neutral-400">
-        {formatTime(current)} / {formatTime(duration)}
-      </span>
+          <input
+            type="range"
+            min={0}
+            max={Math.max(1, Math.floor(duration))}
+            step={1}
+            value={Math.min(Math.floor(current), Math.floor(duration))}
+            onChange={(e) => {
+              const t = Number(e.target.value);
+              setCurrent(t);
+              playerRef.current?.seekTo(t, true);
+            }}
+            disabled={!ready || duration === 0}
+            aria-label="Položaj v skladbi"
+            className="h-1 min-w-0 flex-1 cursor-pointer accent-orange-400 disabled:opacity-40"
+          />
+          <span className="shrink-0 text-[11px] tabular-nums text-neutral-400">
+            {formatTime(current)} / {formatTime(duration)}
+          </span>
+
+        </>
+      )}
+      {picker}
 
       <button
         type="button"

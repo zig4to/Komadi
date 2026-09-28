@@ -17,7 +17,15 @@ import {
   type ChordsLine,
 } from "@/lib/chords";
 import { findChordShapes, loadChordDb, type ChordPosition } from "@/lib/chordShapes";
-import { alignLyrics, fetchLrcCandidates, lineProgressAt, pickCandidate, type LrcCandidate } from "@/lib/syncedLyrics";
+import {
+  alignLyrics,
+  fetchLrcCandidates,
+  lineProgressAt,
+  lyricLineIndexes,
+  manualSyncPoints,
+  pickCandidate,
+  type LrcCandidate,
+} from "@/lib/syncedLyrics";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { Song } from "@/types/song";
@@ -40,6 +48,10 @@ const SHAPE_CHOICE_KEY = "komadi:chords:shapeChoice";
 // 0028 ni pognana.
 // Korak zamika (s).
 const LRC_OFFSET_STEP = 0.25;
+// "Posnemi čase" (ročni časi vrstic za Smart play) — zaenkrat test samo na
+// teh skladbah (primerjava naslova brez velikih črk); za vse jih odpre, ko
+// uporabnik potrdi.
+const SYNC_RECORDER_TEST_TITLES = ["nisem več s tabo"];
 const lrcOffsetsKey = (id: string) => `komadi:chords:lrcOffsets:${id}`;
 const transposeKey = (id: string) => `komadi:chords:transpose:${id}`;
 const workingVideoKey = (id: string) => `komadi:chords:video:${id}`;
@@ -115,6 +127,8 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
     } catch {}
     return [
       ...new Set([
+        // Izbran v izbirniku posnetka (shranjen v bazi, velja na vseh napravah).
+        song.preferred_video_id,
         remembered,
         youTubeVideoId(song.youtube_url),
         youTubeVideoId(song.youtube_music_url),
@@ -122,6 +136,8 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
       ]),
     ].filter((id): id is string => Boolean(id));
   });
+
+  const [preferredVideo, setPreferredVideo] = useState(song.preferred_video_id ?? null);
 
   useBackableOpen(true, onClose);
 
@@ -324,7 +340,17 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
   }, [song.id, song.title, song.author]);
   const [videoDuration, setVideoDuration] = useState(0);
   const lrc = useMemo(() => (lrcCandidates ? pickCandidate(lrcCandidates, videoDuration) : null), [lrcCandidates, videoDuration]);
-  const sync = useMemo(() => (lrc ? { ...alignLyrics(lrc.lines, body), total: lrc.lines.filter((l) => l.text).length } : null), [lrc, body]);
+  // Ročno posneti časi (songs.synced_lines) imajo prednost pred LRCLIB.
+  const [syncedLines, setSyncedLines] = useState(song.synced_lines ?? null);
+  const sync = useMemo(() => {
+    if (syncedLines?.points.length) {
+      const points = manualSyncPoints(syncedLines.points);
+      return { points, matched: points.length, total: points.length, manual: true };
+    }
+    return lrc
+      ? { ...alignLyrics(lrc.lines, body), total: lrc.lines.filter((l) => l.text).length, manual: false }
+      : null;
+  }, [syncedLines, lrc, body]);
   // Na voljo, če je besedilo s časi; sledi pa samo po gumbu "Smart play"
   // (navadni ▶ samo predvaja, kot prej).
   const smartAvailable = !!sync && sync.points.length > 0;
@@ -363,7 +389,70 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
   // Telefon, med pavzo: tap na vrstico skoči tja in predvaja naprej.
   const playerCtlRef = useRef<PlayerController | null>(null);
   const playbackRef = useRef({ time: 0, playing: false });
+  // "Posnemi čase": med predvajanjem uporabnik tapne ob začetku vsake zapete
+  // vrstice; cursor = vrstica (indeks v body), ki jo naslednji tap označi.
+  // Tap na vrstico v besedilu premakne cursor (npr. nazaj na refren, ki se
+  // ponovi, a je v akordih zapisan enkrat).
+  const recorderAllowed = SYNC_RECORDER_TEST_TITLES.includes(song.title.trim().toLowerCase());
+  const lyricLines = useMemo(() => lyricLineIndexes(body), [body]);
+  const [recorder, setRecorder] = useState<{ taps: { t: number; line: number }[]; cursor: number } | null>(null);
+  const [recorderMsg, setRecorderMsg] = useState<string | null>(null);
+  const [recorderSaving, setRecorderSaving] = useState(false);
+  const nextLyricLine = (from: number) => lyricLines.find((i) => i >= from) ?? -1;
+  const startRecorder = () => {
+    if (!lyricLines.length) return;
+    setRecorder({ taps: [], cursor: lyricLines[0] });
+    setSmartOn(false);
+    setRecorderMsg("Zaženi posnetek z ▶ in tapni TAP, ko se začne označena vrstica.");
+    closeThemeMenu();
+  };
+  const recordTap = () => {
+    if (!recorder || recorder.cursor < 0) return;
+    const t = playerCtlRef.current?.currentTime();
+    if (t == null || !playbackRef.current.playing) {
+      setRecorderMsg("Najprej zaženi posnetek z ▶.");
+      return;
+    }
+    setRecorderMsg(null);
+    setRecorder({
+      taps: [...recorder.taps, { t: Math.round(t * 100) / 100, line: recorder.cursor }],
+      cursor: nextLyricLine(recorder.cursor + 1),
+    });
+  };
+  const undoTap = () => {
+    if (!recorder?.taps.length) return;
+    const last = recorder.taps[recorder.taps.length - 1];
+    setRecorder({ taps: recorder.taps.slice(0, -1), cursor: last.line });
+  };
+  const saveRecorder = async () => {
+    if (!recorder?.taps.length || !playingVideo) return;
+    const next = { videoId: playingVideo, points: [...recorder.taps].sort((a, b) => a.t - b.t) };
+    setRecorderSaving(true);
+    const { error } = await supabase.from("songs").update({ synced_lines: next }).eq("id", song.id);
+    setRecorderSaving(false);
+    if (error) {
+      setRecorderMsg(`Shranjevanje ni uspelo: ${error.message}`);
+      return;
+    }
+    setSyncedLines(next);
+    setRecorder(null);
+    setRecorderMsg(null);
+    setSmartOn(true);
+  };
+  const deleteSyncedLines = async () => {
+    if (!window.confirm("Izbrišem ročno posnete čase za to skladbo?")) return;
+    const { error } = await supabase.from("songs").update({ synced_lines: null }).eq("id", song.id);
+    if (error) window.alert(`Brisanje ni uspelo: ${error.message}`);
+    else setSyncedLines(null);
+  };
+
   const seekToLine = (lineIndex: number, e: React.MouseEvent) => {
+    if (recorder) {
+      if ((e.target as HTMLElement).closest("[data-chord-name],button,a")) return;
+      const line = nextLyricLine(lineIndex);
+      if (line >= 0 && line <= lineIndex + 3) setRecorder({ ...recorder, cursor: line });
+      return;
+    }
     if ((e.nativeEvent as PointerEvent).pointerType === "mouse") return;
     if (!sync || playbackRef.current.playing) return;
     // Tap na akord (shema), gumb ali povezavo ne premika predvajanja.
@@ -417,6 +506,42 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
     const top = el.scrollTop + line.getBoundingClientRect().top - el.getBoundingClientRect().top - el.clientHeight / 3;
     el.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
   }, [activeLine]);
+
+  // Snemanje časov: vrstica, ki jo naslednji tap označi, ~ tretjino od vrha.
+  const recorderCursor = recorder?.cursor ?? -1;
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || recorderCursor < 0) return;
+    const line = el.querySelector<HTMLElement>(`[data-line="${recorderCursor}"]`);
+    if (!line) return;
+    const top = el.scrollTop + line.getBoundingClientRect().top - el.getBoundingClientRect().top - el.clientHeight / 3;
+    el.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }, [recorderCursor]);
+  // Računalnik: preslednica = TAP, Backspace = razveljavi zadnji tap.
+  const recordTapRef = useRef(recordTap);
+  const undoTapRef = useRef(undoTap);
+  useEffect(() => {
+    recordTapRef.current = recordTap;
+    undoTapRef.current = undoTap;
+  });
+  const recording = !!recorder;
+  useEffect(() => {
+    if (!recording) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).closest("input,textarea")) return;
+      // Fokusiran gumb (npr. TAP po kliku) preslednico sproži sam kot klik.
+      if (e.code === "Space" && (e.target as HTMLElement).closest("button")) return;
+      if (e.code === "Space") {
+        e.preventDefault();
+        recordTapRef.current();
+      } else if (e.key === "Backspace") {
+        e.preventDefault();
+        undoTapRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [recording]);
 
   // Shema prijema ob prehodu z miško čez akord (na telefonu ob dotiku) —
   // kot na Ultimate Guitar. Vsak akord ima več različic (odprta, barre …),
@@ -632,22 +757,36 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
         style={{ opacity: barsHidden ? 0 : 1, transition: `opacity ${BARS_TRANSITION}` }}
       >
       <div className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 lg:px-16">
-        {videoIds.length > 0 ? <YouTubeMiniPlayer
+        {/* Tudi brez kandidatov: v izbirniku posnetka lahko prilepiš povezavo. */}
+        <YouTubeMiniPlayer
             videoIds={videoIds}
-            watchUrl={watchUrl ?? `https://www.youtube.com/watch?v=${videoIds[0]}`}
+            watchUrl={
+              watchUrl ??
+              (videoIds[0]
+                ? `https://www.youtube.com/watch?v=${videoIds[0]}`
+                : `https://www.youtube.com/results?search_query=${encodeURIComponent(`${song.author} ${song.title}`)}`)
+            }
             floatingHost={floatingPlayer && fullscreen ? rootEl : null}
             onTime={onVideoTime}
             smartAvailable={smartAvailable}
             smartOn={smartOn}
             onSmartToggle={setSmartOn}
             controllerRef={playerCtlRef}
+            preferredId={preferredVideo}
+            onSelect={async (id) => {
+              const prev = preferredVideo;
+              setPreferredVideo(id);
+              const { error } = await supabase.from("songs").update({ preferred_video_id: id }).eq("id", song.id);
+              if (error) setPreferredVideo(prev);
+              return error ? error.message : null;
+            }}
             onPlaying={(id) => {
               setPlayingVideo(id);
               try {
                 window.localStorage.setItem(workingVideoKey(song.id), id);
               } catch {}
             }}
-          /> : <span className="flex-1" />}
+          />
         <button
           type="button"
           onClick={onClose}
@@ -905,7 +1044,9 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                 <div className="border-t border-neutral-700 pt-2">
                   <span className="text-xs text-neutral-200">Pametni predvajalnik</span>
                   <span className="block text-[10px] leading-tight text-neutral-500">
-                    {lrcError
+                    {sync?.manual
+                      ? `Ročno posneti časi: ${sync.points.length} tapov. Zaženi z gumbom Smart play levo od ▶.`
+                      : lrcError
                       ? `Napaka: ${lrcError}`
                       : !lrcCandidates
                         ? "Iščem besedilo s časi …"
@@ -943,6 +1084,26 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                           +0,25 s
                         </button>
                       </div>
+                    </div>
+                  )}
+                  {recorderAllowed && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        onClick={startRecorder}
+                        className="rounded-full border border-orange-400 px-2.5 py-1 text-[11px] font-medium text-amber-400 hover:bg-orange-400/15"
+                      >
+                        {syncedLines ? "Posnemi čase znova" : "Posnemi čase"}
+                      </button>
+                      {syncedLines && (
+                        <button
+                          type="button"
+                          onClick={deleteSyncedLines}
+                          className="rounded-full border border-neutral-600 px-2.5 py-1 text-[11px] text-neutral-300 hover:border-red-400 hover:text-red-400"
+                        >
+                          Izbriši posnete čase
+                        </button>
+                      )}
                     </div>
                   )}
                   {smartAvailable && lrcOffsetError && (
@@ -1038,7 +1199,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
               data-line={i}
               onClick={(e) => seekToLine(i, e)}
               className={
-                smartActive && i === activeLine
+                (smartActive && i === activeLine) || i === recorderCursor
                   ? "-ml-2 -mr-1 rounded-r-md bg-[color-mix(in_srgb,var(--cv-text)_8%,transparent)] pl-2 pr-1 shadow-[inset_1.5px_0_0_#fb923c] lg:w-fit lg:shadow-[inset_2px_0_0_#fb923c]"
                   : "-ml-2 -mr-1 pl-2 pr-1 lg:w-fit"
               }
@@ -1090,8 +1251,68 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
         </div>
       )}
 
+      {recorder && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-orange-400 bg-neutral-950/95 px-3 pt-2 font-sans text-neutral-100 backdrop-blur"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
+          <div className="mx-auto max-w-xl">
+            <div className="mb-2 flex items-center justify-between gap-2 text-xs text-neutral-300">
+              <span>
+                Posnemi čase ·{" "}
+                {recorder.cursor >= 0
+                  ? `vrstica ${lyricLines.indexOf(recorder.cursor) + 1}/${lyricLines.length}`
+                  : "konec besedila"}{" "}
+                · tapov {recorder.taps.length}
+              </span>
+              <span className="hidden text-neutral-500 lg:inline">Preslednica = TAP · Backspace = nazaj</span>
+            </div>
+            {recorderMsg && <p className="mb-2 text-xs text-amber-400">{recorderMsg}</p>}
+            <div className="flex items-stretch gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!recorder.taps.length || window.confirm("Zavržem posnete čase?")) {
+                    setRecorder(null);
+                    setRecorderMsg(null);
+                  }
+                }}
+                className="rounded-xl border border-neutral-600 px-3 text-sm text-neutral-300 active:scale-95"
+              >
+                Prekliči
+              </button>
+              <button
+                type="button"
+                onClick={undoTap}
+                disabled={!recorder.taps.length}
+                aria-label="Razveljavi zadnji tap"
+                className="rounded-xl border border-neutral-600 px-3 text-lg text-neutral-300 active:scale-95 disabled:opacity-40"
+              >
+                ↶
+              </button>
+              <button
+                type="button"
+                onClick={recordTap}
+                disabled={recorder.cursor < 0}
+                className="flex-1 rounded-xl bg-orange-500 py-4 text-lg font-bold tracking-wide text-white active:scale-[0.98] disabled:opacity-40"
+              >
+                TAP
+              </button>
+              <button
+                type="button"
+                onClick={saveRecorder}
+                disabled={!recorder.taps.length || !playingVideo || recorderSaving}
+                className="rounded-xl border border-orange-400 px-3 text-sm font-semibold text-amber-400 active:scale-95 disabled:opacity-40"
+              >
+                {recorderSaving ? "…" : "Shrani"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Med pametnim sledenjem ni ročnega autoscrolla — ne bi se smela tepsti. */}
-      {!editing && !smartActive && <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} onPlayingChange={setFullscreen} />}
+      {!editing && !smartActive && !recorder && <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} onPlayingChange={setFullscreen} />}
     </div>,
     document.body,
   );

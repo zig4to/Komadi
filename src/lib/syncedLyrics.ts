@@ -179,6 +179,18 @@ export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncP
   return { points, matched };
 }
 
+// Indeksi vrstic telesa pesmi, ki imajo besedilo — po njih teče snemanje
+// časov ("Posnemi čase" v ChordsViewer.tsx).
+export function lyricLineIndexes(body: ChordsLine[]): number[] {
+  return body.flatMap((l, i) => (lineLyric(l) ? [i] : []));
+}
+
+// Ročno posneti časi (songs.synced_lines) v isto obliko kot alignLyrics.
+export function manualSyncPoints(points: { t: number; line: number }[]): SyncPoint[] {
+  const sorted = [...points].sort((a, b) => a.t - b.t);
+  return sorted.map((p, k) => ({ time: p.t, end: sorted[k + 1]?.t ?? p.t + 5, lineIndex: p.line }));
+}
+
 // Vrstica pesmi za dani čas (zadnja točka, ki se je že začela; pred prvo -1)
 // in koliko je je že odpetega (0 … 1) — za črto pod vrstico. Več zaporednih
 // vrstic LRC v isti vrstici pesmi je en razpon: od prve do konca zadnje.

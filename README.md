@@ -221,7 +221,9 @@ Vsak uporabnik ima **svojo knjižnico** (skladbe, Jam, Mojih 20, playliste, čak
 2. Ob objavi te verzije v Supabase SQL Editorju zaženi `supabase/migrations/0029_add_user_accounts.sql`. Stara verzija brez prijave po tem ne vidi več ničesar.
 3. Supabase → Authentication → URL Configuration → **Redirect URLs** dodaj `https://zig4to.github.io/Komadi/` in `https://localhost:3000/` (povezave v e-poštnih sporočilih za potrditev računa in novo geslo).
 4. Zaženi še `supabase/migrations/0030_add_review_pending.sql` (stran "Pregled in odobritev": skladbe, ki jih doda skill `dodaj-iz-cakalne-vrste`, so v knjižnici šele po odobritvi).
-5. V `.env.local` dodaj `SUPABASE_SERVICE_ROLE_KEY=...` (Project Settings → API → service_role). Rabijo ga `npm run backup`, `scripts/fill-*.mjs` in skill `dodaj-iz-cakalne-vrste`. Nikoli ga ne poimenuj z `NEXT_PUBLIC_` in ga ne dodaj med GitHub secrete, ker bi prišel v javni bundle.
+5. Zaženi `supabase/migrations/0031_add_synced_lines.sql` (ročno posneti časi vrstic za Smart play, "Posnemi čase").
+6. Zaženi `supabase/migrations/0032_add_preferred_video_id.sql` (posnetek, izbran v izbirniku mini predvajalnika, velja na vseh napravah).
+7. V `.env.local` dodaj `SUPABASE_SERVICE_ROLE_KEY=...` (Project Settings → API → service_role). Rabijo ga `npm run backup`, `scripts/fill-*.mjs` in skill `dodaj-iz-cakalne-vrste`. Nikoli ga ne poimenuj z `NEXT_PUBLIC_` in ga ne dodaj med GitHub secrete, ker bi prišel v javni bundle.
 
 ## Deploy na GitHub Pages
 
