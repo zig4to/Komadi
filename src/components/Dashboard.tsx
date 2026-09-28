@@ -2352,6 +2352,45 @@ export default function Dashboard({ user }: { user: User }) {
                   Dodaj nov komad
                 </span>
               </button>
+              {/* "Skupno": skladbe drugih uporabnikov (uvoz v mojo knjižnico). */}
+              <button
+                type="button"
+                data-view-toggle
+                onClick={() => {
+                  if (sharedOn) {
+                    closeShared();
+                  } else {
+                    setActiveView("list");
+                    setSharedError(null);
+                    setSharedSongs(null);
+                    setSharedOn(true);
+                  }
+                }}
+                aria-pressed={sharedOn}
+                aria-label="Skupno"
+                title="Skupno — skladbe drugih uporabnikov, uvozi jih v svojo knjižnico"
+                className={`ml-1.5 inline-flex items-center justify-center rounded-full border border-sky-500/50 p-2.5 transition dark:border-sky-400/50 ${
+                  sharedOn
+                    ? "bg-[linear-gradient(115deg,#0284c7_15%,#38bdf8_100%)] text-white"
+                    : "bg-transparent text-sky-600 hover:bg-sky-500/10 dark:text-sky-400"
+                }`}
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-[18px] w-[18px] shrink-0"
+                >
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </button>
               <div className="ml-1.5">
                 <SettingsMenu
                   user={user}
@@ -3761,44 +3800,6 @@ export default function Dashboard({ user }: { user: User }) {
                 Popularno
               </button>
               <FiltersToggle />
-              <button
-                type="button"
-                data-view-toggle
-                onClick={() => {
-                  if (sharedOn) {
-                    closeShared();
-                  } else {
-                    setActiveView("list");
-                    setSharedError(null);
-                    setSharedSongs(null);
-                    setSharedOn(true);
-                  }
-                }}
-                aria-pressed={sharedOn}
-                title="Skladbe drugih uporabnikov — uvozi jih v svojo knjižnico"
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-sky-500/50 px-4 py-2 text-sm font-medium transition dark:border-sky-400/50 ${
-                  sharedOn
-                    ? "bg-[linear-gradient(115deg,#0284c7_15%,#38bdf8_100%)] text-white"
-                    : "bg-[linear-gradient(115deg,rgba(14,165,233,0.14)_15%,rgba(14,165,233,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(14,165,233,0.24)_15%,rgba(14,165,233,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(14,165,233,0.32)_15%,rgba(14,165,233,0.1)_95%)]"
-                }`}
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={`h-4 w-4 shrink-0 ${sharedOn ? "text-white" : "text-sky-600 dark:text-sky-400"}`}
-                >
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-                Skupno
-              </button>
             </div>
           </div>
 
