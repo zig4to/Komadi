@@ -28,6 +28,8 @@ export default function SettingsMenu({
   onOpenFavArchive,
   onOpenJamArchive,
   favArchiveMonthCount = 0,
+  onOpenReview,
+  reviewCount = 0,
 }: {
   onImported?: (songs: Song[]) => void;
   onOpenGoal?: () => void;
@@ -47,6 +49,9 @@ export default function SettingsMenu({
   // Odpre Jam s prikazanim arhivom preteklih Jamov.
   onOpenJamArchive?: () => void;
   favArchiveMonthCount?: number;
+  // Odpre celostransko stran "Pregled in odobritev" (skladbe z review_pending).
+  onOpenReview?: () => void;
+  reviewCount?: number;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -560,6 +565,49 @@ export default function SettingsMenu({
               </button>
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              onOpenReview?.();
+            }}
+            className="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          >
+            <span className="flex items-center gap-2">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-[18px] w-[18px] shrink-0"
+              >
+                <path d="M21.8 10A10 10 0 1 1 17 3.34" />
+                <path d="m9 11 3 3L22 4" />
+              </svg>
+              Pregled in odobritev
+              {reviewCount > 0 && (
+                <span className="rounded-full bg-teal-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                  {reviewCount}
+                </span>
+              )}
+            </span>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4 shrink-0"
+            >
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
 
           <button
             type="button"

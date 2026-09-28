@@ -48,11 +48,14 @@ export interface Song {
   user_id: string;
   // Skladba drugega uporabnika, iz katere je bila ta uvožena prek "Skupno".
   imported_from: string | null;
+  // Dodal jo je skill dodaj-iz-cakalne-vrste in še čaka na stran "Pregled in
+  // odobritev" — do odobritve je ni v knjižnici (0030_add_review_pending.sql).
+  review_pending: boolean;
 }
 
 export type NewSong = Omit<
   Song,
-  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids" | "lrc_offsets" | "user_id" | "imported_from"
+  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids" | "lrc_offsets" | "user_id" | "imported_from" | "review_pending"
 >;
 
 export interface SimilarSong {

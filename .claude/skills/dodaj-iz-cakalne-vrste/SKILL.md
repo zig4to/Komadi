@@ -258,7 +258,9 @@ izpuščenih je prav tako koristno.
 
 ### 6. Vstavi v bazo
 En skupen insert v `songs` (`Prefer: return=representation`, da dobiš
-`id`-je nazaj): `user_id: <user_id vrstice iz queued_songs>`, `import_batch_id: <id iz koraka 5b>`, `title`, `author` (iz queued_songs, po možnosti poravnano na
+`id`-je nazaj): `review_pending: true` (OBVEZNO — skladba gre najprej na
+stran "Pregled in odobritev" v aplikaciji in je v knjižnici šele, ko jo
+uporabnik odobri; `0030_add_review_pending.sql`), `user_id: <user_id vrstice iz queued_songs>`, `import_batch_id: <id iz koraka 5b>`, `title`, `author` (iz queued_songs, po možnosti poravnano na
 obstoječi zapis avtorja v bazi, če je bil najden pri koraku 3), `genre`,
 `era`, `favorite: false`, `mood`, `origin`, `image_url: null`,
 `chords_url: null`, `chords_source_url: <UG link>`,
@@ -356,4 +358,6 @@ povezav YouTube/YouTube Music/Spotify so bile najdene — za manjkajoče
 na kratko zakaj, in ali ima "Akordi v aplikaciji" (korak 7b)),
 koliko jih je bilo izpuščenih zaradi podvojitve in
 katere so še vedno v čakalni vrsti (izbrane
-ali ne), ali so bile dodane nove slike avtorjev. Brez git commit/push.
+ali ne), ali so bile dodane nove slike avtorjev. Na koncu povej, da nove
+skladbe čakajo na strani ⋮ → "Pregled in odobritev" in jih je treba tam
+pregledati in odobriti, preden so med vsemi skladbami. Brez git commit/push.

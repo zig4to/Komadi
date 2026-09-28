@@ -99,7 +99,21 @@ function groupByRecent(
 }
 
 export default function Dashboard({ user }: { user: User }) {
-  const [songs, setSongs] = useState<Song[]>([]);
+  // allSongs = vse moje vrstice; `songs` (knjižnica, vsi ostali pogledi) brez
+  // tistih, ki še čakajo na "Pregled in odobritev" (review_pending, dodal jih
+  // je skill dodaj-iz-cakalne-vrste). setSongs vedno dela na allSongs.
+  const [allSongs, setSongs] = useState<Song[]>([]);
+  const songs = useMemo(() => allSongs.filter((s) => !s.review_pending), [allSongs]);
+  const reviewSongs = useMemo(
+    () =>
+      allSongs
+        .filter((s) => s.review_pending)
+        .sort((a, b) => a.created_at.localeCompare(b.created_at)),
+    [allSongs],
+  );
+  const [reviewOpen, setReviewOpen] = usePersistentBool("komadi:review:open", false);
+  const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set());
+  const [reviewError, setReviewError] = useState<string | null>(null);
   // "Skupno": skladbe drugih uporabnikov (select na songs je odprt za vse
   // prijavljene, glej 0029_add_user_accounts.sql), naložene ob prvem vklopu.
   // Iz njih si uporabnik skladbe uvozi v svojo knjižnico.
@@ -305,7 +319,8 @@ export default function Dashboard({ user }: { user: User }) {
       const { data, error } = await supabase
         .from("songs")
         .select("*")
-        .neq("user_id", user.id);
+        .neq("user_id", user.id)
+        .eq("review_pending", false);
       if (cancelled) return;
       if (error) setSharedError(error.message);
       else setSharedSongs(dedupeShared(data as Song[]));
@@ -657,12 +672,12 @@ export default function Dashboard({ user }: { user: User }) {
   // Skladbe drugih, ki jih že imam (isti naslov+avtor ali že uvožene).
   const myLibraryKeys = useMemo(() => {
     const keys = new Set<string>();
-    for (const s of songs) {
+    for (const s of allSongs) {
       keys.add(songMatchKey(s));
       if (s.imported_from) keys.add(s.imported_from);
     }
     return keys;
-  }, [songs]);
+  }, [allSongs]);
   const inMyLibrary = (s: Song) => myLibraryKeys.has(s.id) || myLibraryKeys.has(songMatchKey(s));
 
   function closeShared() {
@@ -944,6 +959,7 @@ export default function Dashboard({ user }: { user: User }) {
     setFixOpen(false);
     setQueueOpen(false);
     setPlaylistsOpen(false);
+    setReviewOpen(false);
     setFavArchiveOpen(true);
     window.scrollTo({ top: 0 });
   }
@@ -954,6 +970,7 @@ export default function Dashboard({ user }: { user: User }) {
     setFixOpen(false);
     setQueueOpen(false);
     setFavArchiveOpen(false);
+    setReviewOpen(false);
     setPlaylistsOpen(true);
     window.scrollTo({ top: 0 });
   }
@@ -963,6 +980,7 @@ export default function Dashboard({ user }: { user: User }) {
     setGoalOpen(false);
     setFixOpen(false);
     setFavArchiveOpen(false);
+    setReviewOpen(false);
     setPlaylistsOpen(false);
     setQueueOpen(true);
     refreshImportBatches();
@@ -1040,11 +1058,44 @@ export default function Dashboard({ user }: { user: User }) {
     }
   }
 
+  function openReview() {
+    setJamOpen(false);
+    setGoalOpen(false);
+    setQueueOpen(false);
+    setFixOpen(false);
+    setFavArchiveOpen(false);
+    setPlaylistsOpen(false);
+    setReviewError(null);
+    setReviewOpen(true);
+    window.scrollTo({ top: 0 });
+  }
+
+  // "Odobri": skladba gre iz pregleda v knjižnico (review_pending = false),
+  // optimistično z vrnitvijo ob napaki.
+  async function handleApprove(list: Song[]) {
+    if (!list.length) return;
+    const ids = list.map((s) => s.id);
+    setReviewError(null);
+    setApprovingIds((prev) => new Set([...prev, ...ids]));
+    const { error } = await supabase.from("songs").update({ review_pending: false }).in("id", ids);
+    setApprovingIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.delete(id));
+      return next;
+    });
+    if (error) {
+      setReviewError(`Odobritev ni uspela: ${error.message}`);
+      return;
+    }
+    setSongs((prev) => prev.map((s) => (ids.includes(s.id) ? { ...s, review_pending: false } : s)));
+  }
+
   function openFix(songId?: string) {
     setJamOpen(false);
     setGoalOpen(false);
     setQueueOpen(false);
     setFavArchiveOpen(false);
+    setReviewOpen(false);
     setPlaylistsOpen(false);
     setFixOpen(true);
     const song = songId ? songs.find((s) => s.id === songId) : undefined;
@@ -1395,6 +1446,7 @@ export default function Dashboard({ user }: { user: User }) {
   useBackableOpen(goalOpen, () => setGoalOpen(false));
   useBackableOpen(fixOpen, () => setFixOpen(false));
   useBackableOpen(queueOpen, () => setQueueOpen(false));
+  useBackableOpen(reviewOpen, () => setReviewOpen(false));
   useBackableOpen(favArchiveOpen, () => setFavArchiveOpen(false));
   useBackableOpen(playlistsOpen, () => setPlaylistsOpen(false));
   useBackableOpen(goalPickerOpen, () => setGoalPickerOpen(false));
@@ -1421,7 +1473,7 @@ export default function Dashboard({ user }: { user: User }) {
 
   async function handleDelete(id: string) {
     if (!confirm("Izbrišem to skladbo iz baze?")) return;
-    const prev = songs;
+    const prev = allSongs;
     setSongs((s) => s.filter((song) => song.id !== id));
     const { error } = await supabase.from("songs").delete().eq("id", id);
     if (error) {
@@ -1793,6 +1845,46 @@ export default function Dashboard({ user }: { user: User }) {
               Nazaj
             </button>
           </>
+        ) : reviewOpen ? (
+          <>
+            <h1 className="flex items-center gap-2">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-6 w-6 shrink-0 text-teal-600 dark:text-teal-400"
+              >
+                <path d="M21.8 10A10 10 0 1 1 17 3.34" />
+                <path d="m9 11 3 3L22 4" />
+              </svg>
+              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
+                Pregled in odobritev
+              </span>
+            </h1>
+            <button
+              type="button"
+              onClick={() => setReviewOpen(false)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-teal-600 dark:text-neutral-300 dark:hover:text-teal-400"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4 shrink-0"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              Nazaj
+            </button>
+          </>
         ) : fixOpen ? (
           <>
             <h1 className="flex items-center gap-2">
@@ -1914,6 +2006,7 @@ export default function Dashboard({ user }: { user: User }) {
                     setFixOpen(false);
                     setQueueOpen(false);
                     setFavArchiveOpen(false);
+                    setReviewOpen(false);
                     setPlaylistsOpen(false);
                     setGoalOpen(true);
                   }}
@@ -1928,12 +2021,15 @@ export default function Dashboard({ user }: { user: User }) {
                     refreshQueued();
                   }}
                   onOpenFix={openFix}
+                  onOpenReview={openReview}
+                  reviewCount={reviewSongs.length}
                   onOpenFavArchive={openFavArchive}
                   onOpenJamArchive={() => {
                     setGoalOpen(false);
                     setFixOpen(false);
                     setQueueOpen(false);
                     setFavArchiveOpen(false);
+                    setReviewOpen(false);
                     setPlaylistsOpen(false);
                     setJamOpen(true);
                     openJamArchive();
@@ -2613,6 +2709,107 @@ export default function Dashboard({ user }: { user: User }) {
           </>
           )}
         </div>
+      ) : reviewOpen ? (
+        <div className="mt-3! space-y-4">
+          <hr className="border-t border-neutral-200 dark:border-neutral-800" />
+
+          {reviewError && (
+            <p className="text-sm text-red-600 dark:text-red-400">{reviewError}</p>
+          )}
+
+          {reviewSongs.length === 0 ? (
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              Ni skladb za pregled. Nove skladbe iz čakalne vrste se pokažejo tukaj, ko jih obdela Claude.
+            </p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                  Preglej akorde vsake skladbe in jo odobri — šele potem je med vsemi skladbami.
+                  Popravke narediš v meniju kartice (Uredi), napačno skladbo izbrišeš.
+                </p>
+                {reviewSongs.length > 1 && (
+                  <button
+                    type="button"
+                    disabled={approvingIds.size > 0}
+                    onClick={() => {
+                      if (window.confirm(`Odobrim vseh ${reviewSongs.length} skladb?`)) handleApprove(reviewSongs);
+                    }}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-teal-500/60 px-4 py-2 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 disabled:opacity-50 dark:text-teal-400"
+                  >
+                    Odobri vse ({reviewSongs.length})
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {reviewSongs.map((song) => (
+                  <div
+                    key={song.id}
+                    className="overflow-hidden rounded-2xl border-2 border-teal-500/60 bg-teal-500/[0.06] shadow-sm dark:border-teal-400/50 dark:bg-teal-400/[0.05]"
+                  >
+                    <div className="flex items-center gap-1.5 bg-teal-500/15 px-3 py-1.5 text-xs font-semibold text-teal-800 dark:bg-teal-400/15 dark:text-teal-300">
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.8}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-[13px] w-[13px] shrink-0"
+                      >
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v5l3.5 2" />
+                      </svg>
+                      Čaka na odobritev
+                      <span className="ml-auto font-medium text-teal-700/80 dark:text-teal-300/80">
+                        {new Date(song.created_at).toLocaleDateString("sl-SI")}
+                      </span>
+                    </div>
+                    <div className="p-2">
+                      <SongCard
+                        song={song}
+                        authorImage={authorImages[song.author] ?? null}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                      />
+                      {renderEditForm(song)}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-dashed border-teal-500/50 px-3 pb-3 pt-2.5 text-xs text-neutral-600 dark:border-teal-400/40 dark:text-neutral-300">
+                      <span>{song.genre}</span>
+                      <span>{formatEraLabel(song.era)}</span>
+                      {song.mood && <span>{song.mood}</span>}
+                      {song.origin && <span>{song.origin}</span>}
+                      {!song.chords_text && (
+                        <span className="text-amber-600 dark:text-amber-400">brez akordov v aplikaciji</span>
+                      )}
+                      <button
+                        type="button"
+                        disabled={approvingIds.has(song.id)}
+                        onClick={() => handleApprove([song])}
+                        className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-50"
+                      >
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2.2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="h-4 w-4 shrink-0"
+                        >
+                          <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                        {approvingIds.has(song.id) ? "Odobravam…" : "Odobri"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       ) : fixOpen ? (
         <div className="mt-3! space-y-4">
           <hr className="border-t border-neutral-200 dark:border-neutral-800" />
@@ -3189,6 +3386,7 @@ export default function Dashboard({ user }: { user: User }) {
                   setFixOpen(false);
                   setQueueOpen(false);
                   setFavArchiveOpen(false);
+                  setReviewOpen(false);
                   setPlaylistsOpen(false);
                 }}
                 disabled={!isSupabaseConfigured}
@@ -3736,7 +3934,7 @@ export default function Dashboard({ user }: { user: User }) {
 
       {(() => {
         const chordsSong = openChordsId
-          ? [...songs, ...(sharedSongs ?? [])].find((s) => s.id === openChordsId && s.chords_text)
+          ? [...allSongs, ...(sharedSongs ?? [])].find((s) => s.id === openChordsId && s.chords_text)
           : undefined;
         return chordsSong ? <ChordsViewer key={chordsSong.id} song={chordsSong} onClose={closeChordsViewer} /> : null;
       })()}
