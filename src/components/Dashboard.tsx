@@ -1770,7 +1770,6 @@ export default function Dashboard({ user }: { user: User }) {
               </span>
             </h1>
             <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-2 lg:flex">
-            <div className="relative">
             <button
               type="button"
               onClick={toggleJamShared}
@@ -1799,8 +1798,6 @@ export default function Dashboard({ user }: { user: User }) {
               </svg>
               Skupni Jam
             </button>
-            {presenceDots && <div className="absolute left-1/2 top-full mt-1.5 -translate-x-1/2">{presenceDots}</div>}
-            </div>
             <button
               type="button"
               onClick={() => (jamArchiveOpen ? setJamArchiveOpen(false) : openJamArchive())}
@@ -1828,6 +1825,13 @@ export default function Dashboard({ user }: { user: User }) {
               </svg>
               Arhiv
             </button>
+            {/* Kdo ima trenutno odprt Skupni Jam (Presence). */}
+            {presenceDots && (
+              <div className="ml-1 flex items-center gap-2 whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400">
+                Trenutno v Jamu:
+                {presenceDots}
+              </div>
+            )}
             </div>
             <button
               type="button"
