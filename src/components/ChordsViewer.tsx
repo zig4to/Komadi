@@ -51,15 +51,11 @@ const SHAPE_CHOICE_KEY = "komadi:chords:shapeChoice";
 // 0028 ni pognana.
 // Korak zamika (s).
 const LRC_OFFSET_STEP = 0.25;
-// "Posnemi čase" (ročni časi vrstic za Smart play) — zaenkrat test samo na
-// teh skladbah (primerjava naslova brez velikih črk); za vse jih odpre, ko
-// uporabnik potrdi.
 // m:ss za časovni razpon instrumentalnega dela.
 const formatSec = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, "0")}`;
 // Id novega instrumentalnega dela (klicano samo iz dogodkov).
 const newSectionId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `s${Date.now()}`;
-const SYNC_RECORDER_TEST_TITLES = ["nisem več s tabo", "water witch"];
 // Smart play označi tudi instrumentalne dele (intro, solo …) med premori v
 // petju — test samo na teh skladbah.
 const INSTRUMENTAL_TEST_TITLES = ["water witch"];
@@ -413,7 +409,6 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
   // vrstice; cursor = vrstica (indeks v body), ki jo naslednji tap označi.
   // Tap na vrstico v besedilu premakne cursor (npr. nazaj na refren, ki se
   // ponovi, a je v akordih zapisan enkrat).
-  const recorderAllowed = SYNC_RECORDER_TEST_TITLES.includes(song.title.trim().toLowerCase());
   // Z besedilom in instrumentalne (samo akordi) — tudi intro/solo dobita tap.
   const lyricLines = useMemo(() => recordableLineIndexes(body), [body]);
   // Snemalnik: vrstice (TAP) + akordi, razdeljeni na instrumentalne dele.
@@ -1278,7 +1273,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                       </div>
                     </div>
                   )}
-                  {recorderAllowed && (
+                  {(
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <button
                         type="button"
