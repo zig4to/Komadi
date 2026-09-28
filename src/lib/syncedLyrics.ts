@@ -66,6 +66,21 @@ export function pickCandidate(candidates: LrcCandidate[], videoDuration: number)
   );
 }
 
+// Različica, ki se najbolje poveže z zapisom akordov (delež povezanih
+// vrstic); med tistimi, ki so vsaj 90 % najboljše, tista z dolžino, najbližjo
+// videu. Samo po dolžini je včasih zmagala druga skladba ali drugo besedilo z
+// naključno podobno dolžino (Born on the Bayou, Colt 45 … 0 % povezanih).
+export function pickBestCandidate(candidates: LrcCandidate[], videoDuration: number, body: ChordsLine[]): LrcCandidate | null {
+  if (candidates.length <= 1) return candidates[0] ?? null;
+  const scored = candidates.map((c) => {
+    const total = c.lines.filter((l) => l.text).length;
+    return { c, ratio: total ? alignLyrics(c.lines, body).matched / total : 0 };
+  });
+  const best = Math.max(...scored.map((s) => s.ratio));
+  const good = scored.filter((s) => s.ratio >= best * 0.9).map((s) => s.c);
+  return pickCandidate(good, videoDuration);
+}
+
 // Primerjava besedila: male črke, brez diakritike in ločil ("Moët" = "moet",
 // UG zapis "Mo&euml;t" prav tako).
 function words(text: string): string[] {

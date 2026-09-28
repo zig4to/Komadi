@@ -3,29 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
+import { fullNameFor, initialsFor } from "@/lib/userName";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 
 // Krog z začetnicami prijavljenega uporabnika + pojavno okno z imenom,
 // e-pošto in odjavo — enako kot v hubu TomStudios (auth.js, "Krog z
-// začetnicami"). Ime iz user_metadata v več oblikah (first/last_name iz
-// registracije, sicer given/family_name ali full_name/name/display_name).
-function fullNameFor(user: User): string {
-  const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
-  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
-  const first = str(meta.first_name) || str(meta.given_name);
-  const last = str(meta.last_name) || str(meta.family_name);
-  return `${first} ${last}`.trim() || str(meta.full_name) || str(meta.name) || str(meta.display_name);
-}
-
-function initialsFor(user: User): string {
-  const words = fullNameFor(user).split(/\s+/).filter(Boolean);
-  if (words.length) {
-    const ini = (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : "")).toUpperCase();
-    if (ini) return ini;
-  }
-  return (user.email ?? "").slice(0, 2).toUpperCase() || "?";
-}
-
+// začetnicami"). Ime in začetnice: src/lib/userName.ts.
 export default function UserAvatar({ user: initialUser }: { user: User }) {
   const [user, setUser] = useState(initialUser);
   const [open, setOpen] = useState(false);

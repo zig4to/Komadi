@@ -26,7 +26,7 @@ import {
   instrumentalPoints,
   recordableLineIndexes,
   manualSyncPoints,
-  pickCandidate,
+  pickBestCandidate,
   type LrcCandidate,
 } from "@/lib/syncedLyrics";
 import { supabase } from "@/lib/supabaseClient";
@@ -346,7 +346,11 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
     };
   }, [song.id, song.title, song.author]);
   const [videoDuration, setVideoDuration] = useState(0);
-  const lrc = useMemo(() => (lrcCandidates ? pickCandidate(lrcCandidates, videoDuration) : null), [lrcCandidates, videoDuration]);
+  // Različica z najboljšo povezavo z akordi, nato najbližja dolžini videa.
+  const lrc = useMemo(
+    () => (lrcCandidates ? pickBestCandidate(lrcCandidates, videoDuration, body) : null),
+    [lrcCandidates, videoDuration, body],
+  );
   // Ročno posneti časi (songs.synced_lines) imajo prednost pred LRCLIB.
   const [syncedLines, setSyncedLines] = useState(song.synced_lines ?? null);
   const sync = useMemo(() => {
@@ -1074,6 +1078,20 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
             )}
           </div>
         )}
+        {/* Računalnik: "Posnemi čase" v vrstici (na telefonu v ⚙ → Napredne nastavitve). */}
+        <button
+          type="button"
+          onClick={startRecorder}
+          disabled={!!recorder}
+          aria-pressed={!!recorder}
+          title="Posnemi čase vrstic in akordov za Smart play"
+          className={`hidden h-8 items-center gap-1.5 rounded-full border border-orange-400 px-3 text-xs transition active:scale-95 lg:flex ${
+            recorder ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
+          }`}
+        >
+          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-500" />
+          {syncedLines || syncedChords ? "Nadaljuj snemanje" : "Posnemi čase"}
+        </button>
         <button
           ref={themeButtonRef}
           type="button"
@@ -1275,10 +1293,11 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
                   )}
                   {(
                     <div className="mt-2 flex flex-wrap gap-1.5">
+                      {/* Na računalniku je ta gumb v orodni vrstici. */}
                       <button
                         type="button"
                         onClick={startRecorder}
-                        className="rounded-full border border-orange-400 px-2.5 py-1 text-[11px] font-medium text-amber-400 hover:bg-orange-400/15"
+                        className="rounded-full border border-orange-400 px-2.5 py-1 text-[11px] font-medium text-amber-400 hover:bg-orange-400/15 lg:hidden"
                       >
                         {syncedLines || syncedChords ? "Nadaljuj snemanje časov" : "Posnemi čase"}
                       </button>
@@ -1438,9 +1457,11 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
         </div>
       )}
 
+      {/* Telefon: pod pesmijo (v stolpcu, ne čez konec). Računalnik: plavajoče
+          čez desno polovico — besedilo je poravnano levo in ostane vidno. */}
       {recorder && (
         <div
-          className="relative z-30 shrink-0 border-t border-orange-400 bg-neutral-950/95 px-3 pt-2 font-sans text-neutral-100 backdrop-blur"
+          className="relative z-30 shrink-0 border-t border-orange-400 bg-neutral-950/95 px-3 pt-2 font-sans text-neutral-100 backdrop-blur lg:fixed lg:bottom-0 lg:right-0 lg:w-1/2 lg:rounded-tl-xl lg:border-l"
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
         >
           <div className="mx-auto max-w-2xl">

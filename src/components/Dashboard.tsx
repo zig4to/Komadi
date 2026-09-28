@@ -4,6 +4,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import ChordsButtons from "@/components/ChordsButtons";
 import UserAvatar from "@/components/UserAvatar";
+import JamBoard, { type JamBoardItem } from "@/components/JamBoard";
+import { fullNameFor } from "@/lib/userName";
 import { dedupeShared, importSharedSongs, songMatchKey } from "@/lib/importShared";
 import Filters, { FiltersToggle } from "@/components/Filters";
 import FeaturedArtists from "@/components/FeaturedArtists";
@@ -45,6 +47,7 @@ import type {
   QueuedSong,
   ImportBatch,
   JamHistoryEntry,
+  SharedJamItem,
 } from "@/types/song";
 
 const QUEUE_TABS = ["queue", "reports", "history"] as const;
@@ -203,7 +206,6 @@ export default function Dashboard({ user }: { user: User }) {
   // Obstojno stanje (localStorage), da osvežitev strani med jam sessionom ne
   // vrže nazaj na domačo stran — glej usePersistentBool.
   const [jamOpen, setJamOpen] = usePersistentBool("komadi:jam:open", false);
-  const [jamPickerOpen, setJamPickerOpen] = useState(false);
   // Telefon: med iskanjem (fokus ali vpisano besedilo) se iskalno polje
   // razširi čez prosti prostor, gumba Jam/Playliste pa skrčita v ikoni.
   const [searchFocused, setSearchFocused] = useState(false);
@@ -225,12 +227,13 @@ export default function Dashboard({ user }: { user: User }) {
   const [jamArchiveOpen, setJamArchiveOpen] = useState(false);
   const [jamHistory, setJamHistory] = useState<JamHistoryEntry[]>([]);
   const [jamHistoryError, setJamHistoryError] = useState<string | null>(null);
-  const [jamPickerQuery, setJamPickerQuery] = useState("");
   const [jamExtras, setJamExtras] = useState<JamExtra[]>([]);
-  const [jamQuickAddOpen, setJamQuickAddOpen] = useState(false);
-  const [jamQuickAddTitle, setJamQuickAddTitle] = useState("");
-  const [jamQuickAddAuthor, setJamQuickAddAuthor] = useState("");
-  const [jamQuickAddError, setJamQuickAddError] = useState<string | null>(null);
+  // "Skupni Jam" (tabela shared_jam_items): ena vrsta za vse uporabnike, zavihek
+  // levo od "Arhiv". sharedJamSongs = skladbe drugih uporabnikov, na katere kaže.
+  const [jamShared, setJamShared] = usePersistentBool("komadi:jam:shared", false);
+  const [sharedJamItems, setSharedJamItems] = useState<SharedJamItem[]>([]);
+  const [sharedJamSongs, setSharedJamSongs] = useState<Record<string, Song>>({});
+  const [sharedJamError, setSharedJamError] = useState<string | null>(null);
   // "Mojih 20 skladb": osebni seznam za naučit do konca leta — isti vzorec
   // kot Jam (persist odprtost, iskalni izbirnik, "Skladbe ni" hitri vnos),
   // samo z own poljema (goal_added_at/goal_learned, goal_extras) in brez
@@ -500,6 +503,22 @@ export default function Dashboard({ user }: { user: User }) {
           }
         },
       )
+      .on<SharedJamItem>(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "shared_jam_items" },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            const item = payload.new;
+            setSharedJamItems((prev) => (prev.some((x) => x.id === item.id) ? prev : [...prev, item]));
+          } else if (payload.eventType === "UPDATE") {
+            const item = payload.new;
+            setSharedJamItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, ...item } : x)));
+          } else if (payload.eventType === "DELETE") {
+            const id = payload.old.id;
+            if (id) setSharedJamItems((prev) => prev.filter((x) => x.id !== id));
+          }
+        },
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -575,27 +594,18 @@ export default function Dashboard({ user }: { user: User }) {
     ];
     return items.sort((a, b) => a.addedAt.localeCompare(b.addedAt));
   }, [jamSongs, jamExtras]);
-
-  // "Trenutna"/"Naslednja" oznaki v Jam čakalni vrsti sledita prvima dvema
-  // še neobkljukanima skladbama v vrstnem redu vrste — ko se prva obkljuka,
-  // se avtomatsko premakneta na naslednji še neodigrani skladbi.
-  const firstUnplayedJamKey = useMemo(
-    () => jamItems.find((item) => !item.played)?.key ?? null,
+  const privateBoardItems = useMemo<JamBoardItem[]>(
+    () =>
+      jamItems.map((item) => ({
+        key: item.key,
+        title: item.title,
+        author: item.author,
+        played: item.played,
+        song: item.kind === "song" ? item.song : null,
+      })),
     [jamItems],
   );
-  const secondUnplayedJamKey = useMemo(() => {
-    const unplayed = jamItems.filter((item) => !item.played);
-    return unplayed[1]?.key ?? null;
-  }, [jamItems]);
-
-  const jamPickerResults = useMemo(() => {
-    const q = jamPickerQuery.trim().toLowerCase();
-    if (!q) return [];
-    return songs
-      .filter((s) => !s.jam_added_at)
-      .filter((s) => `${s.title} ${s.author}`.toLowerCase().includes(q))
-      .slice(0, 20);
-  }, [songs, jamPickerQuery]);
+  const jamSongIds = useMemo(() => new Set(jamSongs.map((s) => s.id)), [jamSongs]);
 
   const goalSongs = useMemo(
     () =>
@@ -1249,8 +1259,6 @@ export default function Dashboard({ user }: { user: User }) {
           : x,
       ),
     );
-    setJamPickerOpen(false);
-    setJamPickerQuery("");
     await supabase
       .from("songs")
       .update({ jam_added_at: jamAddedAt, jam_played: false })
@@ -1267,6 +1275,7 @@ export default function Dashboard({ user }: { user: User }) {
 
   async function openJamArchive() {
     setJamArchiveOpen(true);
+    setJamShared(false);
     const { data, error } = await supabase
       .from("jam_history")
       .select("*")
@@ -1304,28 +1313,16 @@ export default function Dashboard({ user }: { user: User }) {
 
   // "Skladbe ni" — hiter vnos naslova/avtorja, ki gre samo v Jam (ločena
   // tabela jam_extras), ne v glavno knjižnico songs.
-  async function handleAddJamExtra() {
-    const title = jamQuickAddTitle.trim();
-    const author = jamQuickAddAuthor.trim();
-    if (!title || !author) {
-      setJamQuickAddError("Naslov in avtor sta obvezna.");
-      return;
-    }
+  async function addJamExtra(title: string, author: string): Promise<string | null> {
     const { data, error } = await supabase
       .from("jam_extras")
       .insert({ title, author })
       .select()
       .single();
-    if (error || !data) {
-      setJamQuickAddError(error?.message ?? "Napaka pri dodajanju.");
-      return;
-    }
+    if (error || !data) return error?.message ?? "Napaka pri dodajanju.";
     setJamExtras((s) => [...s, data as JamExtra]);
     recordJamHistory({ song_id: null, title, author, added_at: (data as JamExtra).added_at });
-    setJamQuickAddOpen(false);
-    setJamQuickAddTitle("");
-    setJamQuickAddAuthor("");
-    setJamQuickAddError(null);
+    return null;
   }
 
   async function handleToggleJamExtraPlayed(extra: JamExtra) {
@@ -1342,6 +1339,86 @@ export default function Dashboard({ user }: { user: User }) {
   async function handleRemoveJamExtra(extra: JamExtra) {
     setJamExtras((s) => s.filter((x) => x.id !== extra.id));
     await supabase.from("jam_extras").delete().eq("id", extra.id);
+  }
+
+  // --- Skupni Jam --------------------------------------------------------
+  // Skladbe drugih uporabnikov v Skupnem Jamu (za akorde): naloži manjkajoče.
+  useEffect(() => {
+    const missing = [
+      ...new Set(
+        sharedJamItems
+          .map((x) => x.song_id)
+          .filter((id): id is string => !!id && !allSongs.some((s) => s.id === id) && !(id in sharedJamSongs)),
+      ),
+    ];
+    if (!missing.length) return;
+    let cancelled = false;
+    supabase
+      .from("songs")
+      .select("*")
+      .in("id", missing)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        setSharedJamSongs((prev) => ({ ...prev, ...Object.fromEntries((data as Song[]).map((s) => [s.id, s])) }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sharedJamItems, allSongs, sharedJamSongs]);
+  const sharedJamSong = (id: string | null) =>
+    id ? (allSongs.find((s) => s.id === id) ?? sharedJamSongs[id] ?? null) : null;
+  // Ime za krogec z začetnicami pri drugih uporabnikih.
+  const myDisplayName = fullNameFor(user) || user.email || null;
+  const sharedBoardItems: JamBoardItem[] = sharedJamItems.map((item) => ({
+    key: item.id,
+    title: item.title,
+    author: item.author,
+    played: item.played,
+    song: sharedJamSong(item.song_id),
+    addedByName: item.added_by_name,
+  }));
+  const sharedJamSongIds = new Set(sharedJamItems.flatMap((x) => (x.song_id ? [x.song_id] : [])));
+  // Naloži ob odprtju Jama (tudi po osvežitvi); naprej skrbi realtime.
+  useEffect(() => {
+    if (!jamOpen) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("shared_jam_items")
+        .select("*")
+        .order("added_at", { ascending: true });
+      if (cancelled) return;
+      setSharedJamError(error ? error.message : null);
+      if (data) setSharedJamItems(data as SharedJamItem[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [jamOpen]);
+
+  async function addToSharedJam(song: Song | null, title: string, author: string): Promise<string | null> {
+    const { data, error } = await supabase
+      .from("shared_jam_items")
+      .insert({ song_id: song?.id ?? null, title, author, added_by_name: myDisplayName })
+      .select()
+      .single();
+    if (error || !data) return error?.message ?? "Napaka pri dodajanju.";
+    setSharedJamItems((prev) => (prev.some((x) => x.id === data.id) ? prev : [...prev, data as SharedJamItem]));
+    return null;
+  }
+  async function handleToggleSharedJamPlayed(id: string) {
+    const item = sharedJamItems.find((x) => x.id === id);
+    if (!item) return;
+    const played = !item.played;
+    setSharedJamItems((prev) => prev.map((x) => (x.id === id ? { ...x, played } : x)));
+    const { error } = await supabase.from("shared_jam_items").update({ played }).eq("id", id);
+    if (error) setSharedJamItems((prev) => prev.map((x) => (x.id === id ? { ...x, played: item.played } : x)));
+  }
+  async function handleRemoveSharedJam(id: string) {
+    const prev = sharedJamItems;
+    setSharedJamItems((items) => items.filter((x) => x.id !== id));
+    const { error } = await supabase.from("shared_jam_items").delete().eq("id", id);
+    if (error) setSharedJamItems(prev);
   }
 
   async function handleAddToGoal(song: Song) {
@@ -1441,8 +1518,13 @@ export default function Dashboard({ user }: { user: User }) {
   useBackableOpen(quickAddOpen, closeQuickAdd);
   useBackableOpen(voiceAddOpen, () => setVoiceAddOpen(false));
   useBackableOpen(jamOpen, () => setJamOpen(false));
-  useBackableOpen(jamPickerOpen, () => setJamPickerOpen(false));
   useBackableOpen(jamOpen && jamArchiveOpen, () => setJamArchiveOpen(false));
+  // Skupni Jam: Nazaj vrne na osebni Jam.
+  useBackableOpen(jamOpen && jamShared && !jamArchiveOpen, () => setJamShared(false));
+  function toggleJamShared() {
+    setJamArchiveOpen(false);
+    setJamShared(!jamShared || jamArchiveOpen);
+  }
   useBackableOpen(goalOpen, () => setGoalOpen(false));
   useBackableOpen(fixOpen, () => setFixOpen(false));
   useBackableOpen(queueOpen, () => setQueueOpen(false));
@@ -1626,15 +1708,44 @@ export default function Dashboard({ user }: { user: User }) {
                 <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
               </svg>
               <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
-                Bitne Jam!
+                {jamShared && !jamArchiveOpen ? "Skupni Jam" : "Bitne Jam!"}
               </span>
             </h1>
+            <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-2 lg:flex">
+            <button
+              type="button"
+              onClick={toggleJamShared}
+              aria-pressed={jamShared && !jamArchiveOpen}
+              title={jamShared ? "Nazaj na moj Jam" : "Skupni Jam — vidijo in dodajajo vsi uporabniki"}
+              className={`inline-flex items-center gap-1.5 rounded-full border border-fuchsia-500/40 px-4 py-1.5 text-sm font-medium transition ${
+                jamShared && !jamArchiveOpen
+                  ? "bg-fuchsia-600 text-white"
+                  : "text-neutral-600 hover:bg-fuchsia-500/10 hover:text-fuchsia-600 dark:text-neutral-300 dark:hover:text-fuchsia-400"
+              }`}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4 shrink-0"
+              >
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              Skupni Jam
+            </button>
             <button
               type="button"
               onClick={() => (jamArchiveOpen ? setJamArchiveOpen(false) : openJamArchive())}
               aria-pressed={jamArchiveOpen}
               title={jamArchiveOpen ? "Nazaj na trenutni Jam" : "Arhiv preteklih Jamov"}
-              className={`absolute left-1/2 hidden -translate-x-1/2 items-center gap-1.5 rounded-full border border-fuchsia-500/40 px-4 py-1.5 text-sm font-medium transition lg:inline-flex ${
+              className={`inline-flex items-center gap-1.5 rounded-full border border-fuchsia-500/40 px-4 py-1.5 text-sm font-medium transition ${
                 jamArchiveOpen
                   ? "bg-fuchsia-600 text-white"
                   : "text-neutral-600 hover:bg-fuchsia-500/10 hover:text-fuchsia-600 dark:text-neutral-300 dark:hover:text-fuchsia-400"
@@ -1656,6 +1767,7 @@ export default function Dashboard({ user }: { user: User }) {
               </svg>
               Arhiv
             </button>
+            </div>
             <button
               type="button"
               onClick={() => {
@@ -2045,6 +2157,33 @@ export default function Dashboard({ user }: { user: User }) {
 
       {jamOpen ? (
         <div className="mt-3! space-y-4">
+          <div className="flex lg:hidden">
+            <button
+              type="button"
+              onClick={toggleJamShared}
+              aria-pressed={jamShared}
+              className={`inline-flex items-center gap-1.5 rounded-full border border-fuchsia-500/40 px-4 py-1.5 text-sm font-medium transition ${
+                jamShared ? "bg-fuchsia-600 text-white" : "text-neutral-600 dark:text-neutral-300"
+              }`}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4 shrink-0"
+              >
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              {jamShared ? "Skupni Jam · nazaj na moj Jam" : "Skupni Jam"}
+            </button>
+          </div>
           <hr className="border-t border-neutral-200 dark:border-neutral-800" />
 
           {jamArchiveOpen ? (
@@ -2074,231 +2213,45 @@ export default function Dashboard({ user }: { user: User }) {
             />
           ) : (
           <>
-          {jamPickerOpen ? (
-            <div className="space-y-3">
-              <input
-                autoFocus
-                value={jamPickerQuery}
-                onChange={(e) => setJamPickerQuery(e.target.value)}
-                placeholder="Išči po naslovu ali avtorju…"
-                className="w-full rounded-full border border-fuchsia-500/40 bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] px-4 py-2 text-sm text-neutral-800 placeholder-neutral-500 transition focus:outline-none dark:border-fuchsia-400/40 dark:text-neutral-200 dark:placeholder-neutral-500"
-              />
-              {jamPickerQuery.trim() && jamPickerResults.length === 0 && (
-                <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                  Ni zadetkov.
-                </p>
-              )}
-              <div className="space-y-1.5">
-                {jamPickerResults.map((song) => (
-                  <button
-                    key={song.id}
-                    type="button"
-                    onClick={() => handleAddToJam(song)}
-                    className="block w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm hover:border-fuchsia-500 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-fuchsia-400"
-                  >
-                    <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                      {song.title}
-                    </span>
-                    <span className="text-neutral-500 dark:text-neutral-400">
-                      {" "}
-                      — {song.author}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setJamPickerOpen(false);
-                  setJamPickerQuery("");
+          {jamShared ? (
+            <>
+              {sharedJamError && <p className="text-sm text-red-600 dark:text-red-400">{sharedJamError}</p>}
+              <JamBoard
+                items={sharedBoardItems}
+                librarySongs={songs}
+                excludeIds={sharedJamSongIds}
+                onAddSong={(song) => addToSharedJam(song, song.title, song.author)}
+                onQuickAdd={(title, author) => addToSharedJam(null, title, author)}
+                onTogglePlayed={(item) => handleToggleSharedJamPlayed(item.key)}
+                onRemove={(item) => handleRemoveSharedJam(item.key)}
+                // Popularnost (copy_count) samo za lastne skladbe.
+                onChordsClick={(song) => {
+                  if (song.user_id === user.id) handleChordsClick(song);
                 }}
-                className="text-sm text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
-              >
-                Prekliči
-              </button>
-            </div>
+                showAddedBy
+              />
+            </>
           ) : (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setJamPickerOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-fuchsia-500/40 bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.24)_15%,rgba(192,38,211,0.06)_95%)] dark:border-fuchsia-400/40 dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.32)_15%,rgba(192,38,211,0.1)_95%)]"
-                >
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.8}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-4 w-4 shrink-0 text-fuchsia-600 dark:text-fuchsia-400"
-                  >
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                  Dodaj skladbo v Jam
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setJamQuickAddOpen(true);
-                    setJamQuickAddError(null);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-600 transition hover:border-fuchsia-500 hover:text-fuchsia-600 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-fuchsia-400 dark:hover:text-fuchsia-400"
-                >
-                  Skladbe ni
-                </button>
-              </div>
-
-              {jamQuickAddOpen && (
-                <div className="space-y-2 rounded-lg border border-fuchsia-500/40 bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] p-3 dark:border-fuchsia-400/40">
-                  <input
-                    autoFocus
-                    value={jamQuickAddTitle}
-                    onChange={(e) => setJamQuickAddTitle(e.target.value)}
-                    placeholder="Naslov skladbe"
-                    className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
-                  />
-                  <input
-                    value={jamQuickAddAuthor}
-                    onChange={(e) => setJamQuickAddAuthor(e.target.value)}
-                    placeholder="Avtor"
-                    className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
-                  />
-                  {jamQuickAddError && (
-                    <p className="text-sm text-red-600 dark:text-red-400">
-                      {jamQuickAddError}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={handleAddJamExtra}
-                      className="rounded-full bg-fuchsia-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-fuchsia-500"
-                    >
-                      Potrdi
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setJamQuickAddOpen(false);
-                        setJamQuickAddTitle("");
-                        setJamQuickAddAuthor("");
-                        setJamQuickAddError(null);
-                      }}
-                      className="text-sm text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
-                    >
-                      Prekliči
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {jamItems.length === 0 ? (
-                <p className="py-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
-                  Jam je še prazen.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {jamItems.map((item, i) => (
-                    <Fragment key={item.key}>
-                      {item.key === firstUnplayedJamKey && (
-                        <p className="flex items-center gap-1.5 pl-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
-                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                          Trenutna skladba
-                        </p>
-                      )}
-                      {item.key === secondUnplayedJamKey && (
-                        <p className="flex items-center gap-1.5 pl-1 text-[11px] font-semibold uppercase tracking-wide text-sky-600 dark:text-sky-400">
-                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" />
-                          Naslednja skladba
-                        </p>
-                      )}
-                      <div
-                        className={`flex items-center gap-2 rounded-full border bg-white py-2 pr-4 pl-2 dark:bg-neutral-900 ${
-                          item.key === firstUnplayedJamKey
-                            ? "border-emerald-400 dark:border-emerald-600"
-                            : "border-neutral-200 dark:border-neutral-800"
-                        }`}
-                      >
-                        <span
-                          className={`w-6 shrink-0 text-right text-lg font-semibold ${
-                            item.key === secondUnplayedJamKey
-                              ? "text-sky-600 dark:text-sky-400"
-                              : item.played
-                                ? "text-neutral-300 dark:text-neutral-700"
-                                : "text-neutral-400 dark:text-neutral-600"
-                          }`}
-                        >
-                          {i + 1}
-                        </span>
-                        <input
-                          type="checkbox"
-                          checked={item.played}
-                          onChange={() =>
-                            item.kind === "song"
-                              ? handleToggleJamPlayed(item.song)
-                              : handleToggleJamExtraPlayed(item.extra)
-                          }
-                          className="h-4 w-4 shrink-0 rounded border-neutral-300 text-fuchsia-600 focus:ring-fuchsia-500 dark:border-neutral-700 dark:bg-neutral-800"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p
-                            className={`truncate text-sm font-medium ${
-                              item.played
-                                ? "text-neutral-400 line-through dark:text-neutral-600"
-                                : item.key === secondUnplayedJamKey
-                                  ? "text-sky-600 dark:text-sky-400"
-                                  : "text-neutral-900 dark:text-neutral-100"
-                            }`}
-                          >
-                            {item.title}
-                          </p>
-                          <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">
-                            {item.author}
-                          </p>
-                        </div>
-                        {item.kind === "song" && (
-                          <ChordsButtons
-                            song={item.song}
-                            onChordsClick={handleChordsClick}
-                            stacked
-                            merged
-                            menuAlign="right"
-                          />
-                        )}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            item.kind === "song"
-                              ? handleRemoveFromJam(item.song)
-                              : handleRemoveJamExtra(item.extra)
-                          }
-                          aria-label="Odstrani iz Jama"
-                          title="Odstrani iz Jama"
-                          className="-ml-0.5 shrink-0 p-1 text-neutral-400 hover:text-red-600 dark:text-neutral-500 dark:hover:text-red-400"
-                        >
-                          <svg
-                            aria-hidden="true"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={1.8}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="h-4 w-4"
-                          >
-                            <path d="M18 6 6 18M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    </Fragment>
-                  ))}
-                </div>
-              )}
-            </div>
+            <JamBoard
+              items={privateBoardItems}
+              librarySongs={songs}
+              excludeIds={jamSongIds}
+              onAddSong={handleAddToJam}
+              onQuickAdd={addJamExtra}
+              onTogglePlayed={(board) => {
+                const item = jamItems.find((x) => x.key === board.key);
+                if (!item) return;
+                if (item.kind === "song") handleToggleJamPlayed(item.song);
+                else handleToggleJamExtraPlayed(item.extra);
+              }}
+              onRemove={(board) => {
+                const item = jamItems.find((x) => x.key === board.key);
+                if (!item) return;
+                if (item.kind === "song") handleRemoveFromJam(item.song);
+                else handleRemoveJamExtra(item.extra);
+              }}
+              onChordsClick={handleChordsClick}
+            />
           )}
           </>
           )}
@@ -3934,7 +3887,7 @@ export default function Dashboard({ user }: { user: User }) {
 
       {(() => {
         const chordsSong = openChordsId
-          ? [...allSongs, ...(sharedSongs ?? [])].find((s) => s.id === openChordsId && s.chords_text)
+          ? [...allSongs, ...(sharedSongs ?? []), ...Object.values(sharedJamSongs)].find((s) => s.id === openChordsId && s.chords_text)
           : undefined;
         return chordsSong ? <ChordsViewer key={chordsSong.id} song={chordsSong} onClose={closeChordsViewer} /> : null;
       })()}

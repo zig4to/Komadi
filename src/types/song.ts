@@ -119,6 +119,20 @@ export interface PlaylistSong {
   added_at: string;
 }
 
+// Vrstica Skupnega Jama (tabela shared_jam_items, 0034_add_shared_jam.sql) —
+// ena vrsta za vse uporabnike. song_id: skladba iz knjižnice kateregakoli
+// uporabnika, null = "Skladbe ni".
+export interface SharedJamItem {
+  id: string;
+  song_id: string | null;
+  title: string;
+  author: string;
+  added_by: string;
+  added_by_name: string | null;
+  added_at: string;
+  played: boolean;
+}
+
 export interface JamExtra {
   id: string;
   title: string;
