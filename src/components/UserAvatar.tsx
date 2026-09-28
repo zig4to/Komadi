@@ -1,43 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { fullNameFor, initialsFor } from "@/lib/userName";
-import { useBackableOpen } from "@/lib/useBackableOpen";
 
-// Krog z začetnicami prijavljenega uporabnika + pojavno okno z imenom,
-// e-pošto in odjavo — enako kot v hubu TomStudios (auth.js, "Krog z
-// začetnicami"). Ime in začetnice: src/lib/userName.ts.
-export default function UserAvatar({ user: initialUser }: { user: User }) {
+// Razdelek "Uporabnik" na vrhu menija ⋮ (SettingsMenu.tsx): krog z
+// začetnicami, ime in e-pošta, obrazec za ime (če ga ni) in odjava — enako
+// kot v hubu TomStudios (auth.js). Ime in začetnice: src/lib/userName.ts.
+export default function UserMenuSection({ user: initialUser }: { user: User }) {
   const [user, setUser] = useState(initialUser);
   const [open, setOpen] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [nameMsg, setNameMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
   const fullName = fullNameFor(user);
-
-  useBackableOpen(open, () => setOpen(false));
-
-  // pointerdown namesto click: na iOS Safari se "click" na neinteraktivnih
-  // elementih ne sproži zanesljivo (enako kot v hubu).
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   async function saveName(e: React.FormEvent) {
     e.preventDefault();
@@ -56,26 +34,36 @@ export default function UserAvatar({ user: initialUser }: { user: User }) {
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={`Prijavljen: ${fullName || user.email}`}
-        title={fullName || user.email}
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-[linear-gradient(135deg,#10b981,#0891b2)] text-xs font-semibold tracking-wide text-white shadow-sm transition hover:brightness-110"
+        className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
       >
-        {initialsFor(user)}
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#10b981,#0891b2)] text-[9px] font-semibold tracking-wide text-white">
+            {initialsFor(user)}
+          </span>
+          <span className="truncate">Uporabnik</span>
+        </span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.8}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`h-4 w-4 shrink-0 transition-transform ${open ? "" : "-rotate-90"}`}
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </button>
 
       {open && (
-        <div
-          role="dialog"
-          aria-label="Uporabnik"
-          className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-neutral-200 bg-white p-3 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
-        >
-          {fullName && <p className="truncate text-sm font-semibold">{fullName}</p>}
+        <div className="mt-1 px-3 pb-2 pt-1">
+          {fullName && <p className="truncate text-sm font-semibold text-neutral-800 dark:text-neutral-100">{fullName}</p>}
           <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{user.email}</p>
 
           {!fullName && (
@@ -112,10 +100,7 @@ export default function UserAvatar({ user: initialUser }: { user: User }) {
 
           <button
             type="button"
-            onClick={() => {
-              setOpen(false);
-              supabase.auth.signOut();
-            }}
+            onClick={() => supabase.auth.signOut()}
             className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
           >
             <svg
@@ -136,6 +121,6 @@ export default function UserAvatar({ user: initialUser }: { user: User }) {
           </button>
         </div>
       )}
-    </div>
+    </>
   );
 }

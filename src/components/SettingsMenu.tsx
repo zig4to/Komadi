@@ -1,5 +1,7 @@
 "use client";
 
+import type { User } from "@supabase/supabase-js";
+import UserMenuSection from "@/components/UserAvatar";
 import { useEffect, useRef, useState } from "react";
 import { runBackup, shareBackup } from "@/lib/backup";
 import { parseImportJson, parseImportText, type ParsedImport } from "@/lib/importSongs";
@@ -30,6 +32,7 @@ export default function SettingsMenu({
   favArchiveMonthCount = 0,
   onOpenReview,
   reviewCount = 0,
+  user,
 }: {
   onImported?: (songs: Song[]) => void;
   onOpenGoal?: () => void;
@@ -52,6 +55,8 @@ export default function SettingsMenu({
   // Odpre celostransko stran "Pregled in odobritev" (skladbe z review_pending).
   onOpenReview?: () => void;
   reviewCount?: number;
+  // Prijavljeni uporabnik — razdelek "Uporabnik" na vrhu menija.
+  user?: User;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -246,6 +251,7 @@ export default function SettingsMenu({
           role="menu"
           className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-neutral-200 bg-white p-1.5 text-sm shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
         >
+          {user && <UserMenuSection user={user} />}
           <button
             type="button"
             onClick={() => setSettingsOpen((v) => !v)}

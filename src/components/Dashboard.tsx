@@ -3,7 +3,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import ChordsButtons from "@/components/ChordsButtons";
-import UserAvatar from "@/components/UserAvatar";
 import JamBoard, { type JamBoardItem } from "@/components/JamBoard";
 import { fullNameFor, initialsOf } from "@/lib/userName";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -38,7 +37,14 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { usePersistentBool } from "@/lib/usePersistentBool";
 import { usePersistentString } from "@/lib/usePersistentString";
-import { closeChordsViewer, useOpenChordsSongId } from "@/lib/openChords";
+import { closeChordsViewer, openChordsViewer, useOpenChordsSongId } from "@/lib/openChords";
+import {
+  SHARED_VIEW_HEARTBEAT_MS,
+  SHARED_VIEW_STALE_MS,
+  type LocalView,
+  type SharedViewMessage,
+} from "@/lib/sharedChordsView";
+import type { SharedViewProp } from "@/components/ChordsViewer";
 import type {
   GoalExtra,
   JamExtra,
@@ -1436,6 +1442,182 @@ export default function Dashboard({ user }: { user: User }) {
         )}
       </div>
     ) : null;
+
+  // --- Skupni pogled akordov (Skupni Jam) --------------------------------
+  // Kdor prvi v Skupnem Jamu odpre akorde, vodi; ostali (ki sledijo) vidijo
+  // isto skladbo na isti višini, njegov Smart play in celozaslonski način.
+  // Supabase Realtime Broadcast, nič v bazi (src/lib/sharedChordsView.ts).
+  type SharedLeader = { id: string; name: string; songId: string; since: number; view: LocalView | null; seen: number };
+  const [sharedLeader, setSharedLeader] = useState<SharedLeader | null>(null);
+  const [followingLeader, setFollowingLeader] = useState(true);
+  const viewChannelRef = useRef<RealtimeChannel | null>(null);
+  const sharedLeaderRef = useRef<SharedLeader | null>(null);
+  const followingRef = useRef(true);
+  // Odprtje/zaprtje, ki ga je sprožilo sledenje (ne moj klik).
+  const expectedOpenRef = useRef<string | null | undefined>(undefined);
+  const lastSentRef = useRef(0);
+  const lastViewRef = useRef<LocalView | null>(null);
+  const amLeader = sharedLeader?.id === user.id;
+  useEffect(() => {
+    sharedLeaderRef.current = sharedLeader;
+    followingRef.current = followingLeader;
+  });
+  const sendView = (msg: SharedViewMessage) =>
+    viewChannelRef.current?.send({ type: "broadcast", event: "view", payload: msg });
+  const sendLeaderView = (view: LocalView | null) => {
+    const me = sharedLeaderRef.current;
+    if (!me || me.id !== user.id || !view) return;
+    sendView({ type: "view", leaderId: user.id, leaderName: myDisplayName ?? "", songId: me.songId, since: me.since, ...view });
+  };
+  // Pogled vodje (ChordsViewer onLocalView): pošlji največ ~6× na sekundo, zadnjega vedno.
+  const sendTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const onLeaderView = (view: LocalView) => {
+    lastViewRef.current = view;
+    const wait = 160 - (Date.now() - lastSentRef.current);
+    clearTimeout(sendTimerRef.current);
+    const flush = () => {
+      lastSentRef.current = Date.now();
+      sendLeaderView(lastViewRef.current);
+    };
+    if (wait <= 0) flush();
+    else sendTimerRef.current = setTimeout(flush, wait);
+  };
+  useEffect(() => {
+    if (!presenceTracking) return;
+    const channel = supabase.channel("shared-jam-view", { config: { broadcast: { self: false } } });
+    channel
+      .on("broadcast", { event: "view" }, ({ payload }) => {
+        const msg = payload as SharedViewMessage;
+        const current = sharedLeaderRef.current;
+        if (msg.type === "close") {
+          if (current?.id !== msg.leaderId) return;
+          setSharedLeader(null);
+          if (followingRef.current) {
+            expectedOpenRef.current = null;
+            closeChordsViewer();
+          }
+          return;
+        }
+        // "Vodi prvi": ob sočasnem odprtju ostane tisti, ki je začel prej.
+        const stale = !current || Date.now() - current.seen > SHARED_VIEW_STALE_MS;
+        const earlier = current && (msg.since < current.since || (msg.since === current.since && msg.leaderId < current.id));
+        if (!(stale || current.id === msg.leaderId || earlier)) return;
+        setSharedLeader({ id: msg.leaderId, name: msg.leaderName, songId: msg.songId, since: msg.since, view: msg, seen: Date.now() });
+        if (followingRef.current) {
+          let open: string | null = null;
+          try {
+            open = window.localStorage.getItem("komadi:chords:open");
+          } catch {}
+          if (open !== msg.songId) {
+            expectedOpenRef.current = msg.songId;
+            openChordsViewer(msg.songId);
+          }
+        }
+      })
+      .subscribe((status) => {
+        // Ob (ponovnem) vstopu v Skupni Jam: privzeto sledim, brez starega vodje.
+        if (status !== "SUBSCRIBED") return;
+        setFollowingLeader(true);
+        setSharedLeader(null);
+      });
+    viewChannelRef.current = channel;
+    // Srčni utrip vodje in odstranitev vodje brez utripa.
+    const beat = setInterval(() => {
+      const me = sharedLeaderRef.current;
+      if (me?.id === user.id) sendLeaderView(lastViewRef.current);
+      else if (me && Date.now() - me.seen > SHARED_VIEW_STALE_MS) setSharedLeader(null);
+    }, SHARED_VIEW_HEARTBEAT_MS);
+    return () => {
+      clearInterval(beat);
+      clearTimeout(sendTimerRef.current);
+      if (sharedLeaderRef.current?.id === user.id) sendView({ type: "close", leaderId: user.id });
+      viewChannelRef.current = null;
+      supabase.removeChannel(channel);
+      sharedLeaderRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presenceTracking, user.id]);
+  // Moje odprtje/zaprtje akordov (klik), ne tisto iz sledenja: odprtje brez
+  // aktivnega vodje → vodim; če vodja že je → sledenje se ustavi (moja izbira).
+  useEffect(() => {
+    if (!presenceTracking) return;
+    let prev: string | null = null;
+    try {
+      prev = window.localStorage.getItem("komadi:chords:open");
+    } catch {}
+    const onStore = () => {
+      let open: string | null = null;
+      try {
+        open = window.localStorage.getItem("komadi:chords:open");
+      } catch {}
+      if (open === prev) return;
+      prev = open;
+      if (expectedOpenRef.current !== undefined && expectedOpenRef.current === open) {
+        expectedOpenRef.current = undefined;
+        return;
+      }
+      expectedOpenRef.current = undefined;
+      const leader = sharedLeaderRef.current;
+      const leaderActive = !!leader && (leader.id === user.id || Date.now() - leader.seen <= SHARED_VIEW_STALE_MS);
+      if (open) {
+        if (!leaderActive || leader?.id === user.id) {
+          const since = leader?.id === user.id ? leader.since : Date.now();
+          const next = { id: user.id, name: myDisplayName ?? "", songId: open, since, view: null, seen: Date.now() };
+          sharedLeaderRef.current = next;
+          setSharedLeader(next);
+          lastViewRef.current = null;
+        } else {
+          setFollowingLeader(false);
+        }
+      } else if (leader?.id === user.id) {
+        sendView({ type: "close", leaderId: user.id });
+        sharedLeaderRef.current = null;
+        setSharedLeader(null);
+      }
+    };
+    window.addEventListener("komadi-storage", onStore);
+    return () => window.removeEventListener("komadi-storage", onStore);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presenceTracking, user.id]);
+  // Skladba vodje iz tuje knjižnice: naloži jo, da se akordi lahko odprejo.
+  const leaderSongId = sharedLeader && !amLeader ? sharedLeader.songId : null;
+  useEffect(() => {
+    if (!leaderSongId || allSongs.some((x) => x.id === leaderSongId) || leaderSongId in sharedJamSongs) return;
+    let cancelled = false;
+    supabase
+      .from("songs")
+      .select("*")
+      .eq("id", leaderSongId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled && data) setSharedJamSongs((prev) => ({ ...prev, [data.id]: data as Song }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [leaderSongId, allSongs, sharedJamSongs]);
+  const viewerShared: SharedViewProp | undefined = !presenceTracking
+    ? undefined
+    : amLeader
+      ? { role: "leader", onLocalView: onLeaderView }
+      : sharedLeader && followingLeader
+        ? {
+            role: "follower",
+            leaderName: sharedLeader.name,
+            remote: sharedLeader.songId === openChordsId ? sharedLeader.view : null,
+            onStopFollowing: () => setFollowingLeader(false),
+          }
+        : sharedLeader
+          ? {
+              role: "paused",
+              leaderName: sharedLeader.name,
+              onFollow: () => {
+                setFollowingLeader(true);
+                expectedOpenRef.current = sharedLeader.songId;
+                openChordsViewer(sharedLeader.songId);
+              },
+            }
+          : undefined;
   // Naloži ob odprtju Jama (tudi po osvežitvi); naprej skrbi realtime.
   useEffect(() => {
     if (!jamOpen) return;
@@ -2171,10 +2353,8 @@ export default function Dashboard({ user }: { user: User }) {
                 </span>
               </button>
               <div className="ml-1.5">
-                <UserAvatar user={user} />
-              </div>
-              <div className="ml-1">
                 <SettingsMenu
+                  user={user}
                   onImported={(imported) =>
                     setSongs((prev) => [...imported, ...prev])
                   }
@@ -3955,7 +4135,7 @@ export default function Dashboard({ user }: { user: User }) {
         const chordsSong = openChordsId
           ? [...allSongs, ...(sharedSongs ?? []), ...Object.values(sharedJamSongs)].find((s) => s.id === openChordsId && s.chords_text)
           : undefined;
-        return chordsSong ? <ChordsViewer key={chordsSong.id} song={chordsSong} onClose={closeChordsViewer} /> : null;
+        return chordsSong ? <ChordsViewer key={chordsSong.id} song={chordsSong} onClose={closeChordsViewer} shared={viewerShared} /> : null;
       })()}
     </div>
   );

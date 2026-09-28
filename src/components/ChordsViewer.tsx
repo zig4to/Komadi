@@ -32,6 +32,15 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { ChordSection, Song } from "@/types/song";
+import { anchorScrollTop, computeAnchor, type LocalView } from "@/lib/sharedChordsView";
+
+// Skupni pogled v Skupnem Jamu (Dashboard.tsx, src/lib/sharedChordsView.ts):
+// vodja sporoča, kar vidi; sledilec prikaže vodjev pogled; "paused" = sledilec,
+// ki je sledenje ustavil.
+export type SharedViewProp =
+  | { role: "leader"; onLocalView: (view: LocalView) => void }
+  | { role: "follower"; leaderName: string; remote: LocalView | null; onStopFollowing: () => void }
+  | { role: "paused"; leaderName: string; onFollow: () => void };
 
 // Vgrajen pregledovalnik akordov (v slogu UG Tabs app): songs.chords_text
 // (UG markup) izrisan kot tekst — akordi nad besedilom, transpozicija,
@@ -106,7 +115,17 @@ function writeNumber(key: string, value: number) {
   } catch {}
 }
 
-export default function ChordsViewer({ song, onClose }: { song: Song; onClose: () => void }) {
+export default function ChordsViewer({
+  song,
+  onClose,
+  shared,
+}: {
+  song: Song;
+  onClose: () => void;
+  shared?: SharedViewProp;
+}) {
+  const follower = shared?.role === "follower" ? shared : null;
+  const remote = follower?.remote ?? null;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [semitones, setSemitones] = useState(() => readNumber(transposeKey(song.id), 0));
   const [fontSize, setFontSize] = useState(() => readNumber(FONT_KEY, 15));
@@ -278,7 +297,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
   };
   useBackableOpen(isFullscreen, exitFullscreen);
   // Zgornji vrstici skrite: med samodejnim pomikanjem ali v celozaslonskem načinu.
-  const barsHidden = fullscreen || isFullscreen;
+  const barsHidden = fullscreen || isFullscreen || !!remote?.fullscreen;
 
   const shift = (d: number) => setSemitones((s) => wrap(s + d));
   const display = (name: string) => {
@@ -649,7 +668,50 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
     setActiveChord((prev) => (prev?.line === chord?.line && prev?.chord === chord?.chord ? prev : chord));
   };
   // Pomik: aktivni akord (intro, solo …) ima prednost pred vrstico.
-  const scrollLine = activeChord ? activeChord.line : activeLine;
+  const leaderReport = shared?.role === "leader" ? shared.onLocalView : null;
+  const leaderReportRef = useRef(leaderReport);
+  const leaderViewRef = useRef<Omit<LocalView, "anchor">>({ smart: null, fullscreen: false });
+  useEffect(() => {
+    leaderReportRef.current = leaderReport;
+    leaderViewRef.current = {
+      smart: smartActive ? { line: activeLine, chord: activeChord } : null,
+      fullscreen: barsHidden,
+    };
+  });
+  const reportView = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || !leaderReportRef.current) return;
+    leaderReportRef.current({ anchor: computeAnchor(el), ...leaderViewRef.current });
+  }, []);
+  const isLeader = !!leaderReport;
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !isLeader) return;
+    el.addEventListener("scroll", reportView, { passive: true });
+    reportView();
+    return () => el.removeEventListener("scroll", reportView);
+  }, [isLeader, reportView]);
+  useEffect(() => {
+    if (isLeader) reportView();
+  }, [isLeader, reportView, smartActive, activeLine, activeChord, barsHidden]);
+  // Sledilec: na vrhu ista vrstica kot pri vodji.
+  const remoteAnchorKey = remote ? `${remote.anchor.line}:${remote.anchor.frac}` : "";
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !remote) return;
+    const top = anchorScrollTop(el, remote.anchor);
+    if (top != null && Math.abs(el.scrollTop - top) > 1) el.scrollTop = top;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remoteAnchorKey, fontSize]);
+  // Vodja izstopi iz celozaslonskega načina → tudi sledilec (če je vstopil).
+  const remoteFullscreen = !!remote?.fullscreen;
+  useEffect(() => {
+    if (!remoteFullscreen && follower && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }, [remoteFullscreen, follower]);
+  const scrollLine = follower ? -1 : activeChord ? activeChord.line : activeLine;
+  // Kar je označeno: pri sledilcu vodjev Smart play, sicer lasten.
+  const shownLine = follower ? (remote?.smart?.line ?? -1) : smartActive ? activeLine : -1;
+  const shownChord = follower ? (remote?.smart?.chord ?? null) : activeChord;
   // Ročno pomikanje (dotik, kolesce) za 4 s ustavi samodejno sledenje.
   const lastUserScrollRef = useRef(0);
   useEffect(() => {
@@ -786,7 +848,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
   const chordName = (name: string, at?: { line: number; chord: number }) => {
     const key = at ? `${at.line}:${at.chord}` : null;
     // activeChord: med Smart playem iz shranjenih delov, med snemanjem iz osnutka.
-    const active = !!at && activeChord?.line === at.line && activeChord.chord === at.chord;
+    const active = !!at && shownChord?.line === at.line && shownChord.chord === at.chord;
     const recorded = !!recorder && !!key && recordedChords.has(key);
     return (
       <span
@@ -1405,7 +1467,7 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
               data-line={i}
               onClick={(e) => seekToLine(i, e)}
               className={
-                (smartActive && i === activeLine) || i === recorderCursor
+                i === shownLine || i === recorderCursor
                   ? "-ml-2 -mr-1 rounded-r-md bg-[color-mix(in_srgb,var(--cv-text)_8%,transparent)] pl-2 pr-1 shadow-[inset_1.5px_0_0_#fb923c] lg:w-fit lg:shadow-[inset_2px_0_0_#fb923c]"
                   : "-ml-2 -mr-1 pl-2 pr-1 lg:w-fit"
               }
@@ -1626,8 +1688,36 @@ export default function ChordsViewer({ song, onClose }: { song: Song; onClose: (
         </div>
       )}
 
+      {shared && shared.role !== "leader" && (
+        <div
+          className="fixed left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-fuchsia-400/70 bg-neutral-950/90 py-1 pl-3 pr-1 font-sans text-xs text-neutral-100 shadow-lg backdrop-blur"
+          style={{ top: "calc(env(safe-area-inset-top) + 0.5rem)" }}
+        >
+          <span className="truncate">
+            {shared.role === "follower" ? "Slediš: " : "Vodi: "}
+            <span className="font-semibold text-fuchsia-300">{shared.leaderName}</span>
+          </span>
+          {shared.role === "follower" && remoteFullscreen && !isFullscreen && typeof document !== "undefined" && document.fullscreenEnabled && (
+            <button
+              type="button"
+              onClick={() => document.documentElement.requestFullscreen().catch(() => {})}
+              className="rounded-full border border-orange-400 px-2 py-0.5 text-amber-400"
+            >
+              Celozaslonsko
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={shared.role === "follower" ? shared.onStopFollowing : shared.onFollow}
+            className="rounded-full bg-fuchsia-600 px-2.5 py-0.5 font-medium text-white"
+          >
+            {shared.role === "follower" ? "Ne sledi" : "Sledi"}
+          </button>
+        </div>
+      )}
+
       {/* Med pametnim sledenjem ni ročnega autoscrolla — ne bi se smela tepsti. */}
-      {!editing && !smartActive && !recorder && <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} onPlayingChange={setFullscreen} />}
+      {!editing && !smartActive && !recorder && !follower && <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} onPlayingChange={setFullscreen} />}
     </div>,
     document.body,
   );
