@@ -187,9 +187,38 @@ export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncP
       }
     }
     if (best < 0 || bestScore < 0.4) continue;
+    // Polnilo iz ene ponovljene besede ("Run, run, run, run", "la la la"): delno
+    // ujemanje (skupen "run" z "You'd better run, better run") ni dovolj —
+    // sicer povleče pos nazaj in naslednji refren se vrne na prejšnjega.
+    if (w.length >= 3 && new Set(w).size === 1 && bestScore < 0.8) continue;
     matched++;
-    pos = best;
-    points.push({ time: line.time, end: lrc[k + 1]?.time ?? line.time + 5, lineIndex: lyricLines[best].index });
+    const end = lrc[k + 1]?.time ?? line.time + 5;
+    points.push({ time: line.time, end, lineIndex: lyricLines[best].index });
+    // Ena vrstica LRC čez več vrstic akordov ("You'd better run, better run, outrun
+    // my gun" = "You'd better run, better run" + "Outrun my gun" v Pumped Up
+    // Kicks): naslednje vrstice, katerih besede so v preostanku vrstice LRC, se
+    // porabijo (oznaka gre nanje ob sorazmernem času). Sicer je pos obstal na
+    // prvi in ponovljen refren se je vračal na začetni par namesto naprej.
+    const rest = [...w];
+    for (const x of lyricLines[best].words) {
+      const i = rest.findIndex((r) => sameWord(r, x));
+      if (i >= 0) rest.splice(i, 1);
+    }
+    let last = best;
+    let before = w.length - rest.length;
+    while (last + 1 < lyricLines.length && rest.length) {
+      const next = lyricLines[last + 1].words;
+      const hits = next.filter((x) => rest.some((r) => sameWord(r, x)));
+      if (hits.length / next.length < 0.8) break;
+      for (const x of hits) {
+        const i = rest.findIndex((r) => sameWord(r, x));
+        if (i >= 0) rest.splice(i, 1);
+      }
+      last++;
+      points.push({ time: line.time + ((end - line.time) * before) / w.length, end, lineIndex: lyricLines[last].index });
+      before += hits.length;
+    }
+    pos = last;
   }
   return { points, matched };
 }

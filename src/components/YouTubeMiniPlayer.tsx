@@ -108,6 +108,7 @@ export default function YouTubeMiniPlayer({
   watchUrl,
   onPlaying,
   floatingHost,
+  sliderHost,
   onTime,
   smartAvailable = false,
   smartOn = false,
@@ -124,6 +125,9 @@ export default function YouTubeMiniPlayer({
   // pravokotniku desno (portal v ta element — koren pregledovalnika, da ga
   // pokaže tudi celozaslonski način brskalnika). null = ni prikazan.
   floatingHost?: HTMLElement | null;
+  // Drsnik po skladbi (in čas) v lastni vrstici pod zgornjo (ChordsViewer) —
+  // portal v ta element; brez njega ostane v vrstici s kontrolami.
+  sliderHost?: HTMLElement | null;
   // "Pametni predvajalnik": trenutni čas in dolžina videa (ob predvajanju
   // vsakih 250 ms in ob preskoku z drsnikom/gumbi).
   onTime?: (seconds: number, duration: number, playing: boolean) => void;
@@ -465,6 +469,28 @@ export default function YouTubeMiniPlayer({
       <path d="M8 5v14l11-7-11-7z" />
     </svg>
   );
+  const seekBar = (
+    <>
+      <input
+        type="range"
+        min={0}
+        max={Math.max(1, Math.floor(duration))}
+        step={1}
+        value={Math.min(Math.floor(current), Math.floor(duration))}
+        onChange={(e) => {
+          const t = Number(e.target.value);
+          setCurrent(t);
+          playerRef.current?.seekTo(t, true);
+        }}
+        disabled={!ready || duration === 0}
+        aria-label="Položaj v skladbi"
+        className="h-1 min-w-0 flex-1 cursor-pointer accent-orange-400 disabled:opacity-40"
+      />
+      <span className="shrink-0 text-[11px] tabular-nums text-neutral-400">
+        {formatTime(current)} / {formatTime(duration)}
+      </span>
+    </>
+  );
   const floatButton =
     "flex h-9 w-9 items-center justify-center rounded-full text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-40 active:scale-95";
 
@@ -527,24 +553,8 @@ export default function YouTubeMiniPlayer({
             </svg>
           </button>
 
-          <input
-            type="range"
-            min={0}
-            max={Math.max(1, Math.floor(duration))}
-            step={1}
-            value={Math.min(Math.floor(current), Math.floor(duration))}
-            onChange={(e) => {
-              const t = Number(e.target.value);
-              setCurrent(t);
-              playerRef.current?.seekTo(t, true);
-            }}
-            disabled={!ready || duration === 0}
-            aria-label="Položaj v skladbi"
-            className="h-1 min-w-0 flex-1 cursor-pointer accent-orange-400 disabled:opacity-40"
-          />
-          <span className="shrink-0 text-[11px] tabular-nums text-neutral-400">
-            {formatTime(current)} / {formatTime(duration)}
-          </span>
+          {/* Računalnik: drsnik v tej vrstici; telefon: v lastni vrstici (sliderHost). */}
+          {sliderHost ? <div className="hidden min-w-0 flex-1 items-center gap-2 lg:flex">{seekBar}</div> : seekBar}
 
         </>
       )}
@@ -573,6 +583,10 @@ export default function YouTubeMiniPlayer({
             : "pointer-events-none fixed -left-[9999px] top-0 opacity-0"
         }
       />
+
+      {sliderHost &&
+        !failedAll &&
+        createPortal(<div className="flex w-full items-center gap-2">{seekBar}</div>, sliderHost)}
 
       {floatingHost &&
         createPortal(

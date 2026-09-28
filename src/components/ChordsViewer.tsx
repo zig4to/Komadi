@@ -280,6 +280,9 @@ export default function ChordsViewer({
   // Koren pregledovalnika — cilj portala za plavajoči predvajalnik.
   const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
   const setRoot = useCallback((el: HTMLDivElement | null) => setRootEl(el), []);
+  // Telefon: vrstica samo za drsnik po skladbi (YouTubeMiniPlayer sliderHost).
+  const [sliderHostEl, setSliderHostEl] = useState<HTMLDivElement | null>(null);
+  const setSliderHost = useCallback((el: HTMLDivElement | null) => setSliderHostEl(el), []);
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
     // Izhod iz celozaslonskega načina brskalnika (npr. Android Nazaj) vrne vrstici.
@@ -1023,6 +1026,7 @@ export default function ChordsViewer({
                 : `https://www.youtube.com/results?search_query=${encodeURIComponent(`${song.author} ${song.title}`)}`)
             }
             floatingHost={floatingPlayer && fullscreen ? rootEl : null}
+            sliderHost={sliderHostEl}
             onTime={onVideoTime}
             smartAvailable={smartAvailable}
             smartOn={smartOn}
@@ -1060,6 +1064,9 @@ export default function ChordsViewer({
           {closeAsUnfollow && "Ne sledi"}
         </button>
       </div>
+
+      {/* Telefon: drsnik po skladbi čez celo širino, med zgornjo vrstico in orodji. */}
+      <div ref={setSliderHost} className="flex shrink-0 items-center bg-neutral-900 px-4 pb-2 empty:hidden lg:hidden" />
 
       <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900/80 px-3 py-1.5 lg:px-16">
         <div
