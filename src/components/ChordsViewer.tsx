@@ -129,7 +129,7 @@ export default function ChordsViewer({
   const isFollowing = !!follower;
   useEffect(() => {
     if (!isFollowing) return;
-    const t = setTimeout(() => setFollowPillHidden(true), 5000);
+    const t = setTimeout(() => setFollowPillHidden(true), 3000);
     return () => clearTimeout(t);
   }, [isFollowing]);
   // Po skritju napisa ✕ pomeni "Ne sledi" (zapre akorde, sledenje se ustavi).
@@ -1725,10 +1725,10 @@ export default function ChordsViewer({
 
       {shared && shared.role !== "leader" && !(shared.role === "follower" && followPillHidden) && (
         <div
-          className="fixed left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-fuchsia-400/70 bg-neutral-950/90 py-1 pl-3 pr-1 font-sans text-xs text-neutral-100 shadow-lg backdrop-blur"
+          className="fixed left-1/2 z-40 flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 items-center gap-2.5 rounded-full border border-fuchsia-400/70 bg-neutral-950/90 py-1.5 pl-4 pr-1.5 font-sans text-sm text-neutral-100 shadow-lg backdrop-blur"
           style={{ top: "calc(env(safe-area-inset-top) + 0.5rem)" }}
         >
-          <span className="truncate">
+          <span className="whitespace-nowrap">
             {shared.role === "follower" ? "Slediš: " : "Vodi: "}
             <span className="font-semibold text-fuchsia-300">{shared.leaderName}</span>
           </span>
