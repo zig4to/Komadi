@@ -5,7 +5,8 @@ import type { User } from "@supabase/supabase-js";
 import ChordsButtons from "@/components/ChordsButtons";
 import UserAvatar from "@/components/UserAvatar";
 import JamBoard, { type JamBoardItem } from "@/components/JamBoard";
-import { fullNameFor } from "@/lib/userName";
+import { fullNameFor, initialsOf } from "@/lib/userName";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { dedupeShared, importSharedSongs, songMatchKey } from "@/lib/importShared";
 import Filters, { FiltersToggle } from "@/components/Filters";
 import FeaturedArtists from "@/components/FeaturedArtists";
@@ -1378,6 +1379,63 @@ export default function Dashboard({ user }: { user: User }) {
     addedByName: item.added_by_name,
   }));
   const sharedJamSongIds = new Set(sharedJamItems.flatMap((x) => (x.song_id ? [x.song_id] : [])));
+  // Kdo ima trenutno odprt Skupni Jam (Supabase Realtime Presence, nič v bazi):
+  // krogci z začetnicami pod gumbom "Skupni Jam". Naročen, ko je Jam odprt —
+  // vidiš prisotne tudi iz osebnega Jama; javiš se (track) samo, dokler imaš
+  // odprt Skupni Jam.
+  const [jamPresence, setJamPresence] = useState<{ id: string; name: string }[]>([]);
+  const presenceChannelRef = useRef<RealtimeChannel | null>(null);
+  const presenceTrackRef = useRef(false);
+  const presenceNameRef = useRef(myDisplayName ?? "");
+  useEffect(() => {
+    presenceTrackRef.current = jamOpen && jamShared && !jamArchiveOpen;
+    presenceNameRef.current = myDisplayName ?? "";
+  });
+  useEffect(() => {
+    if (!jamOpen) return;
+    const channel = supabase.channel("shared-jam-presence", { config: { presence: { key: user.id } } });
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState<{ name: string }>();
+        setJamPresence(Object.entries(state).map(([id, metas]) => ({ id, name: metas[0]?.name ?? "" })));
+      })
+      .subscribe((status) => {
+        if (status !== "SUBSCRIBED") return;
+        presenceChannelRef.current = channel;
+        if (presenceTrackRef.current) channel.track({ name: presenceNameRef.current });
+      });
+    return () => {
+      presenceChannelRef.current = null;
+      supabase.removeChannel(channel);
+    };
+  }, [jamOpen, user.id]);
+  const presenceTracking = jamOpen && jamShared && !jamArchiveOpen;
+  useEffect(() => {
+    const channel = presenceChannelRef.current;
+    if (!channel) return;
+    if (presenceTracking) channel.track({ name: myDisplayName ?? "" });
+    else channel.untrack();
+  }, [presenceTracking, myDisplayName]);
+  const presenceDots =
+    jamOpen && jamPresence.length > 0 ? (
+      <div className="flex -space-x-1.5" aria-label={`V Skupnem Jamu: ${jamPresence.map((p) => p.name).join(", ")}`}>
+        {jamPresence.slice(0, 6).map((p) => (
+          <span
+            key={p.id}
+            title={p.id === user.id ? `${p.name} (ti)` : p.name}
+            style={{ backgroundColor: authorAccentHex(p.name || "?") }}
+            className="flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold text-white ring-2 ring-neutral-50 dark:ring-neutral-900"
+          >
+            {initialsOf(p.name)}
+          </span>
+        ))}
+        {jamPresence.length > 6 && (
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-500 text-[9px] font-semibold text-white ring-2 ring-neutral-50 dark:ring-neutral-900">
+            +{jamPresence.length - 6}
+          </span>
+        )}
+      </div>
+    ) : null;
   // Naloži ob odprtju Jama (tudi po osvežitvi); naprej skrbi realtime.
   useEffect(() => {
     if (!jamOpen) return;
@@ -1712,6 +1770,7 @@ export default function Dashboard({ user }: { user: User }) {
               </span>
             </h1>
             <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-2 lg:flex">
+            <div className="relative">
             <button
               type="button"
               onClick={toggleJamShared}
@@ -1740,6 +1799,8 @@ export default function Dashboard({ user }: { user: User }) {
               </svg>
               Skupni Jam
             </button>
+            {presenceDots && <div className="absolute left-1/2 top-full mt-1.5 -translate-x-1/2">{presenceDots}</div>}
+            </div>
             <button
               type="button"
               onClick={() => (jamArchiveOpen ? setJamArchiveOpen(false) : openJamArchive())}
@@ -2157,7 +2218,7 @@ export default function Dashboard({ user }: { user: User }) {
 
       {jamOpen ? (
         <div className="mt-3! space-y-4">
-          <div className="flex lg:hidden">
+          <div className="flex items-center gap-2 lg:hidden">
             <button
               type="button"
               onClick={toggleJamShared}
@@ -2183,6 +2244,7 @@ export default function Dashboard({ user }: { user: User }) {
               </svg>
               {jamShared ? "Skupni Jam · nazaj na moj Jam" : "Skupni Jam"}
             </button>
+            {presenceDots}
           </div>
           <hr className="border-t border-neutral-200 dark:border-neutral-800" />
 
