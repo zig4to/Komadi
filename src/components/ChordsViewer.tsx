@@ -870,18 +870,23 @@ export default function ChordsViewer({
   // Prikazljive vrstice pesmi: brez razdelkov, praznih vrstic in tablatur brez
   // vrstice akordov (te so v pesmi skrite). Instrumentalne vrstice (samo akordi)
   // ostanejo, da se tudi intro/interlude kaže po 3 vrstice.
-  const ssLines = useMemo(
-    () =>
-      body
-        .map((l, i) => ({ l, i }))
-        .filter(({ l }) => {
-          if (l.kind === "section") return false;
-          if (l.kind === "tab") return !!l.header;
-          if (l.kind === "text") return l.segments.some((sg) => "chord" in sg || sg.text.trim() !== "");
-          return true;
-        }),
-    [body],
-  );
+  // Prikazane vrstice; label = oznaka odseka (Intro, Verse, Chorus …) tik
+  // pred vrstico, prikazana nad njo kot v navadnem pogledu.
+  const ssLines = useMemo(() => {
+    const out: { l: ChordsLine; i: number; label?: string }[] = [];
+    let label: string | undefined;
+    body.forEach((l, i) => {
+      if (l.kind === "section") {
+        label = l.label;
+        return;
+      }
+      if (l.kind === "tab" && !l.header) return;
+      if (l.kind === "text" && !l.segments.some((sg) => "chord" in sg || sg.text.trim() !== "")) return;
+      out.push({ l, i, label });
+      label = undefined;
+    });
+    return out;
+  }, [body]);
   // Neprekinjeno pomikanje (kot samodejno pomikanje): vidnih je ~4 vrstice,
   // trenutna (Smart play) je ob začetku v 2. vrstici, med petjem se pogled
   // sorazmerno s časom pomika navzgor, da je ob koncu vrstice v 2. vrstici že
@@ -910,7 +915,7 @@ export default function ChordsViewer({
       const availH = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
       inner.style.fontSize = "20px";
       const w = inner.scrollWidth;
-      const rows = [...inner.children] as HTMLElement[];
+      const rows = [...inner.querySelectorAll<HTMLElement>("[data-ss-line]")];
       const avgH = rows.reduce((h, r) => h + r.offsetHeight, 0) / Math.max(1, rows.length);
       if (!w || !avgH || availW <= 0) return;
       const k = Math.min(availW / w, availH / (3 * avgH));
@@ -943,7 +948,8 @@ export default function ChordsViewer({
     let slot = 0;
     let boxH = box.clientHeight;
     const measure = () => {
-      const rows = [...inner.children] as HTMLElement[];
+      // Merjena je vrstica sama (ne oznaka odseka nad njo).
+      const rows = [...inner.querySelectorAll<HTMLElement>("[data-ss-line]")];
       tops = rows.map((r) => r.offsetTop);
       // Stalen odmik ene "vrstice" nad trenutno (mediana višin) — z višino
       // prejšnje vrstice (samo akordi = pol nižja) je pogled skočil nazaj.
@@ -1017,6 +1023,29 @@ export default function ChordsViewer({
       ro.disconnect();
     };
   }, [ssShowLines, ssLines]);
+  // Med predvajanjem "Sam špili" se zaslon ne sme temniti/zakleniti (Screen
+  // Wake Lock). Brskalnik ključavnico sprosti, ko je zavihek skrit, zato jo ob
+  // vrnitvi (visibilitychange) zahtevamo znova. Brez podpore se ne zgodi nič.
+  useEffect(() => {
+    if (!ssShowLines || !("wakeLock" in navigator)) return;
+    let lock: WakeLockSentinel | null = null;
+    let cancelled = false;
+    const acquire = async () => {
+      if (document.visibilityState !== "visible" || (lock && !lock.released)) return;
+      try {
+        const l = await navigator.wakeLock.request("screen");
+        if (cancelled) l.release().catch(() => {});
+        else lock = l;
+      } catch {}
+    };
+    acquire();
+    document.addEventListener("visibilitychange", acquire);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", acquire);
+      lock?.release().catch(() => {});
+    };
+  }, [ssShowLines]);
   // Ob zaprtju: izhod iz celozaslonskega načina in sprostitev ležeče usmeritve.
   useEffect(() => {
     if (!samSpili) return;
@@ -2189,9 +2218,15 @@ export default function ChordsViewer({
                 {/* relative: offsetTop vrstic je glede na ta blok; spodnji odmik, da se tudi
                     zadnje vrstice lahko pomaknejo v 2. vrstico. */}
                 <div ref={ssLinesRef} className="relative w-max font-mono leading-snug will-change-transform" style={{ fontSize: 20 }}>
-                  {ssLines.map(({ l, i }) => (
+                  {ssLines.map(({ l, i, label }) => (
+                    <div key={i}>
+                    {label && (
+                      <div className="font-sans font-semibold text-(--cv-section)" style={{ fontSize: "0.6em", marginTop: "0.5em" }}>
+                        {label}
+                      </div>
+                    )}
                     <div
-                      key={i}
+                      data-ss-line
                       // Večji odmik oranžne črte od besedila kot v navadnem Smart playu (v em — velika pisava).
                       style={SS_LINE_INSET}
                       onClick={(e) => ssSeekToLine(i, e)}
@@ -2202,6 +2237,7 @@ export default function ChordsViewer({
                       }
                     >
                       {renderLine(l, i, true)}
+                    </div>
                     </div>
                   ))}
                 </div>

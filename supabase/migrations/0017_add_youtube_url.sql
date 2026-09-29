@@ -4,4 +4,4 @@
 -- (ListenButton.tsx).
 
 alter table public.songs
-  add column if not exists youtube_url text;
+  add column if not exists y
