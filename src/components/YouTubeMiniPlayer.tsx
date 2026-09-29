@@ -101,6 +101,10 @@ function formatTime(s: number) {
 export type PlayerController = {
   seekAndPlay: (seconds: number) => boolean;
   currentTime: () => number | null;
+  // "Sam špili" (ChordsViewer): predvajaj — ob prvem klicu ustvari predvajalnik
+  // (klic mora priti iz uporabnikovega dotika) — in pavza.
+  play: () => void;
+  pause: () => void;
 };
 
 export default function YouTubeMiniPlayer({
@@ -276,6 +280,11 @@ export default function YouTubeMiniPlayer({
         return true;
       },
       currentTime: () => playerRef.current?.getCurrentTime() ?? null,
+      play: () => {
+        if (!playerRef.current) start();
+        else playerRef.current.playVideo();
+      },
+      pause: () => playerRef.current?.pauseVideo(),
     };
   });
 

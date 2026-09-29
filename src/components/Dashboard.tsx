@@ -23,6 +23,7 @@ import JamArchive from "@/components/JamArchive";
 import Playlists from "@/components/Playlists";
 import VoiceQuickAdd from "@/components/VoiceQuickAdd";
 import AddChoiceIcons from "@/components/AddChoiceIcons";
+import ChordsTextEditor from "@/components/ChordsTextEditor";
 import { ImportHistory, ImportReports } from "@/components/ImportTabs";
 import { FavoritesArchive, FavoritesThisMonth, favoriteArchiveMonths } from "@/components/FavoritesMonth";
 import { authorAccentHex } from "@/lib/authorColor";
@@ -37,7 +38,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { usePersistentBool } from "@/lib/usePersistentBool";
 import { usePersistentString } from "@/lib/usePersistentString";
-import { closeChordsViewer, openChordsViewer, useOpenChordsSongId } from "@/lib/openChords";
+import { closeChordsViewer, openChordsViewer, useOpenChordsMode, useOpenChordsSongId } from "@/lib/openChords";
 import {
   SHARED_VIEW_HEARTBEAT_MS,
   SHARED_VIEW_STALE_MS,
@@ -145,6 +146,8 @@ export default function Dashboard({ user }: { user: User }) {
   const [noteSaving, setNoteSaving] = useState(false);
   // Skladba, pri kateri čaka potrditev "Je bila skladba res popravljena?".
   const [confirmResolveId, setConfirmResolveId] = useState<string | null>(null);
+  // Napredni urejevalnik besedila z akordi ("Uredi besedilo" na strani Popravi skladbe).
+  const [chordsEditSong, setChordsEditSong] = useState<Song | null>(null);
   // "Čakalna vrsta" (tabela queued_songs, gumb "Hitro" ob "Dodaj skladbo"):
   // hiter pregled v SettingsMenu.tsx + celostranski pogled (queueOpen).
   const [queuedSongs, setQueuedSongs] = useState<QueuedSong[]>([]);
@@ -220,6 +223,8 @@ export default function Dashboard({ user }: { user: User }) {
   // "Akordi v aplikaciji": odprta skladba je v localStorage (src/lib/openChords.ts),
   // da po osvežitvi ostane odprta; pregledovalnik se izriše samo tu.
   const openChordsId = useOpenChordsSongId();
+  // "samspili" = pregledovalnik se odpre v pogledu "Sam špili" (3 vrstice).
+  const openChordsMode = useOpenChordsMode();
   // Seznam skladb se riše po RESULTS_PAGE kartic, naslednje ob pomiku do dna
   // (LoadMoreSentinel). Brez tega je vsaka od prvih črk v iskanju (ujema se
   // skoraj vseh ~290 skladb) in brisanje zadnje črke (spet cel seznam)
@@ -2452,6 +2457,20 @@ export default function Dashboard({ user }: { user: User }) {
         )}
       </header>
 
+      {/* Napredni urejevalnik besedila z akordi (portal čez cel zaslon) — odpre ga
+          "Uredi besedilo" na straneh Popravi skladbe in Pregled in odobritev. */}
+      {chordsEditSong && (
+        <ChordsTextEditor
+          song={chordsEditSong}
+          onClose={() => setChordsEditSong(null)}
+          onSaved={(chordsText) =>
+            setSongs((prev) =>
+              prev.map((x) => (x.id === chordsEditSong.id ? { ...x, chords_text: chordsText } : x)),
+            )
+          }
+        />
+      )}
+
       {jamOpen ? (
         <div className="mt-3! space-y-4">
           <div className="flex items-center gap-2 lg:hidden">
@@ -3052,9 +3071,17 @@ export default function Dashboard({ user }: { user: User }) {
                       )}
                       <button
                         type="button"
+                        onClick={() => setChordsEditSong(song)}
+                        title="Napredni urejevalnik besedila z akordi in tablatur"
+                        className="ml-auto inline-flex items-center rounded-full border border-orange-400/60 px-3 py-1.5 text-sm font-medium text-orange-700 transition hover:bg-orange-400/10 dark:text-orange-300"
+                      >
+                        Uredi besedilo
+                      </button>
+                      <button
+                        type="button"
                         disabled={approvingIds.has(song.id)}
                         onClick={() => handleApprove([song])}
-                        className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-50"
                       >
                         <svg
                           aria-hidden="true"
@@ -3256,7 +3283,7 @@ export default function Dashboard({ user }: { user: User }) {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex gap-2 pt-1">
+                      <div className="grid grid-cols-2 gap-2 pt-1">
                         <button
                           type="button"
                           onClick={() =>
@@ -3264,16 +3291,24 @@ export default function Dashboard({ user }: { user: User }) {
                               ? closeForm()
                               : handleEdit(song)
                           }
-                          className="flex-1 rounded-lg border border-sky-500/50 px-2 py-1.5 text-xs font-medium text-sky-600 hover:bg-sky-500/10 dark:text-sky-400"
+                          className="rounded-lg border border-sky-500/50 px-2 py-1.5 text-xs font-medium text-sky-600 hover:bg-sky-500/10 dark:text-sky-400"
                         >
                           {editing?.id === song.id ? "Zapri urejanje" : "Uredi"}
                         </button>
                         <button
                           type="button"
                           onClick={() => setConfirmResolveId(song.id)}
-                          className="flex-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-emerald-500"
+                          className="rounded-lg bg-emerald-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-emerald-500"
                         >
                           ✓ Popravljeno
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setChordsEditSong(song)}
+                          title="Napredni urejevalnik besedila z akordi in tablatur"
+                          className="rounded-lg border border-orange-400/60 px-2 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-400/10 dark:text-orange-300"
+                        >
+                          Uredi besedilo
                         </button>
                       </div>
                     )}
@@ -4170,7 +4205,15 @@ export default function Dashboard({ user }: { user: User }) {
         const chordsSong = openChordsId
           ? [...allSongs, ...(sharedSongs ?? []), ...Object.values(sharedJamSongs)].find((s) => s.id === openChordsId && s.chords_text)
           : undefined;
-        return chordsSong ? <ChordsViewer key={chordsSong.id} song={chordsSong} onClose={closeChordsViewer} shared={viewerShared} /> : null;
+        return chordsSong ? (
+          <ChordsViewer
+            key={chordsSong.id + (openChordsMode ?? "")}
+            song={chordsSong}
+            onClose={closeChordsViewer}
+            shared={viewerShared}
+            samSpili={openChordsMode === "samspili"}
+          />
+        ) : null;
       })()}
     </div>
   );

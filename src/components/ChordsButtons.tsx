@@ -4,7 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import ListenButton from "@/components/ListenButton";
 import PdfViewer from "@/components/PdfViewer";
-import { openChordsViewer } from "@/lib/openChords";
+import { enterLandscapeFullscreen, openChordsViewer } from "@/lib/openChords";
+
+// "Sam špili" (celozaslonski pogled s 3 vrsticami, ChordsViewer samSpili) —
+// zaenkrat samo za testne skladbe.
+const SAM_SPILI_TEST_TITLES = ["ti si mi u krvi"];
 import type { Song } from "@/types/song";
 
 // Skrajšana različica gumbov "UG Tabs"/"PDF akordi" iz SongCard.tsx (samo
@@ -126,6 +130,34 @@ export default function ChordsButtons({
               style={{ top: menuPos.top, left: menuPos.left, right: menuPos.right }}
               className="fixed z-50 w-40 space-y-0.5 rounded-xl border border-amber-400 bg-white p-1.5 shadow-xl dark:border-amber-400/70 dark:bg-neutral-900"
             >
+              {song.chords_text && SAM_SPILI_TEST_TITLES.includes(song.title.trim().toLowerCase()) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    enterLandscapeFullscreen();
+                    openChordsViewer(song.id, "samspili");
+                    onChordsClick?.(song);
+                  }}
+                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-[13px] w-[13px] shrink-0 text-orange-500"
+                  >
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <path d="M12 19v3" />
+                  </svg>
+                  Sam špili
+                </button>
+              )}
               {song.chords_text && (
                 <button
                   type="button"

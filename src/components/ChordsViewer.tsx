@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import AutoScrollControl from "@/components/AutoScrollControl";
 import ChordDiagram from "@/components/ChordDiagram";
 import YouTubeMiniPlayer, { youTubeVideoId, type PlayerController } from "@/components/YouTubeMiniPlayer";
+import { enterLandscapeFullscreen } from "@/lib/openChords";
 import {
   applyEditedText,
   findCapo,
@@ -68,6 +69,8 @@ const newSectionId = () =>
 // Smart play označi tudi instrumentalne dele (intro, solo …) med premori v
 // petju — test samo na teh skladbah.
 const INSTRUMENTAL_TEST_TITLES = ["water witch"];
+// "Sam špili": odmik besedila od oranžne črte (poudarek vrstice).
+const SS_LINE_INSET = { marginLeft: "-0.45em", paddingLeft: "0.45em" } as const;
 const lrcOffsetsKey = (id: string) => `komadi:chords:lrcOffsets:${id}`;
 const transposeKey = (id: string) => `komadi:chords:transpose:${id}`;
 const workingVideoKey = (id: string) => `komadi:chords:video:${id}`;
@@ -119,10 +122,14 @@ export default function ChordsViewer({
   song,
   onClose,
   shared,
+  samSpili = false,
 }: {
   song: Song;
   onClose: () => void;
   shared?: SharedViewProp;
+  // "Sam špili": celozaslonski (ležeči) pogled, ki med Smart playem kaže samo
+  // 3 vrstice — trenutno na vrhu, čez vso širino (glej overlay spodaj).
+  samSpili?: boolean;
 }) {
   const follower = shared?.role === "follower" ? shared : null;
   const [followPillHidden, setFollowPillHidden] = useState(false);
@@ -437,6 +444,10 @@ export default function ChordsViewer({
     }, 700);
   };
   const [activeLine, setActiveLine] = useState(-1);
+  // Ali posnetek trenutno igra (za "Sam špili": začetni zaslon ↔ 3 vrstice).
+  const [videoPlaying, setVideoPlaying] = useState(false);
+  // "Sam špili": kliknjen Play, posnetek se še nalaga.
+  const [ssRequested, setSsRequested] = useState(false);
   // Telefon, med pavzo: tap na vrstico skoči tja in predvaja naprej.
   const playerCtlRef = useRef<PlayerController | null>(null);
   const playbackRef = useRef({ time: 0, playing: false });
@@ -671,6 +682,8 @@ export default function ChordsViewer({
   };
   const onVideoTime = (seconds: number, duration: number, playing: boolean) => {
     playbackRef.current = { time: seconds, playing };
+    setVideoPlaying(playing);
+    if (playing) setSsRequested(false);
     if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
     setActiveLine(smartActive && sync ? lineProgressAt(sync.points, seconds - lrcOffset).lineIndex : -1);
     // Akordi: čas posnetka brez zamika LRC (vsak del ima svoj zamik); med
@@ -787,6 +800,113 @@ export default function ChordsViewer({
     const top = el.scrollTop + line.getBoundingClientRect().top - el.getBoundingClientRect().top - el.clientHeight / 3;
     el.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
   }, [scrollLine]);
+
+  // --- "Sam špili": 3 vrstice čez cel zaslon ---
+  // Prikazljive vrstice pesmi: brez razdelkov, praznih vrstic in tablatur brez
+  // vrstice akordov (te so v pesmi skrite). Instrumentalne vrstice (samo akordi)
+  // ostanejo, da se tudi intro/interlude kaže po 3 vrstice.
+  const ssLines = useMemo(
+    () =>
+      body
+        .map((l, i) => ({ l, i }))
+        .filter(({ l }) => {
+          if (l.kind === "section") return false;
+          if (l.kind === "tab") return !!l.header;
+          if (l.kind === "text") return l.segments.some((sg) => "chord" in sg || sg.text.trim() !== "");
+          return true;
+        }),
+    [body],
+  );
+  // Strani po 3 vrstice: stran ostane pri miru, dokler se ne odpojejo vse tri
+  // (poudarek se premika znotraj nje), nato se naenkrat zamenja z naslednjo.
+  // Nova stran se začne tudi ob vsaki menjavi instrumentalno ↔ besedilo, da je
+  // intro/interlude iz 1–2 vrstic sam na strani, prva vrstica verza pa šele v
+  // predogledu pod črto. Pred prvo zapeto vrstico (intro) prva stran.
+  const ssPages = useMemo(() => {
+    // Instrumentalna vrstica = samo akordi, brez besedila.
+    const isInstrumental = (l: ChordsLine) => {
+      if (l.kind === "chords" || l.kind === "tab") return true;
+      if (l.kind === "pair") return l.chunks.every((c) => !c.lyric.trim());
+      if (l.kind === "text") return l.segments.every((sg) => "chord" in sg || !sg.text.trim());
+      return false;
+    };
+    const pages: { start: number; end: number }[] = [];
+    ssLines.forEach(({ l }, k) => {
+      const last = pages[pages.length - 1];
+      const instr = isInstrumental(l);
+      const prevInstr = k > 0 && isInstrumental(ssLines[k - 1].l);
+      if (!last || last.end - last.start >= 3 || instr !== prevInstr) pages.push({ start: k, end: k + 1 });
+      else last.end = k + 1;
+    });
+    return pages;
+  }, [ssLines]);
+  const ssPos = activeLine < 0 ? 0 : Math.max(0, ssLines.findIndex(({ i }) => i >= activeLine));
+  const ssPageIdx = Math.max(0, ssPages.findIndex((p) => ssPos >= p.start && ssPos < p.end));
+  const ssPage = ssPages[ssPageIdx] ?? { start: 0, end: 0 };
+  const ssStart = ssPage.start;
+  const ssWindow = ssLines.slice(ssPage.start, ssPage.end);
+  const ssNextPage = ssPages[ssPageIdx + 1];
+  const ssNext = ssNextPage ? ssLines[ssNextPage.start] : null;
+  const ssWindowKey = ssStart + ":" + ssWindow.map(({ i }) => i).join(",");
+  const ssBoxRef = useRef<HTMLDivElement>(null);
+  const ssLinesRef = useRef<HTMLDivElement>(null);
+  // Velikost pisave: najdaljša od treh vrstic zapolni širino, vse tri pa
+  // morajo iti po višini. Merjeno pri 20 px in linearno povečano; pisava se
+  // nastavi neposredno na element (brez stanja, ob vsaki menjavi okna).
+  useEffect(() => {
+    const box = ssBoxRef.current;
+    const inner = ssLinesRef.current;
+    if (!samSpili || !box || !inner) return;
+    const fit = () => {
+      inner.style.fontSize = "20px";
+      const w = inner.scrollWidth;
+      const h = inner.scrollHeight;
+      if (!w || !h) return;
+      const k = Math.min(box.clientWidth / w, box.clientHeight / h);
+      inner.style.fontSize = `${Math.max(14, Math.floor(20 * k * 0.97))}px`;
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [samSpili, ssWindowKey, videoPlaying]);
+  // Ob zaprtju: izhod iz celozaslonskega načina in sprostitev ležeče usmeritve.
+  useEffect(() => {
+    if (!samSpili) return;
+    return () => {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      try {
+        (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.();
+      } catch {}
+    };
+  }, [samSpili]);
+  // Play: samo predvajanje. Celozaslonsko/ležeče se vklopi že ob kliku na
+  // "Sam špili" v meniju (enterLandscapeFullscreen) ali z gumbom ⛶ — ne tukaj,
+  // ker requestFullscreen porabi dovoljenje klika in bi YouTube ostal ustavljen.
+  const ssPlay = () => {
+    setSmartOn(true);
+    setSsRequested(true);
+    playerCtlRef.current?.play();
+  };
+  // Če se predvajanje ne začne (brskalnik ga je blokiral), gumb po 6 s spet
+  // deluje — drugi dotik kliče playVideo neposredno in zažene.
+  useEffect(() => {
+    if (!ssRequested) return;
+    const t = setTimeout(() => setSsRequested(false), 6000);
+    return () => clearTimeout(t);
+  }, [ssRequested]);
+  const [ssIsFullscreen, setSsIsFullscreen] = useState(false);
+  useEffect(() => {
+    if (!samSpili) return;
+    const onChange = () => setSsIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, [samSpili]);
+  const ssPause = () => {
+    setSsRequested(false);
+    playerCtlRef.current?.pause();
+  };
+  const ssShowLines = samSpili && videoPlaying;
 
   // Snemanje časov: vrstica, ki jo naslednji tap označi, ~ tretjino od vrha.
   const recorderCursor = recorder?.cursor ?? -1;
@@ -1789,7 +1909,116 @@ export default function ChordsViewer({
       )}
 
       {/* Med pametnim sledenjem ni ročnega autoscrolla — ne bi se smela tepsti. */}
-      {!editing && !smartActive && !recorder && !follower && <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} onPlayingChange={setFullscreen} />}
+      {!editing && !smartActive && !recorder && !follower && !samSpili && <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} onPlayingChange={setFullscreen} />}
+
+      {/* "Sam špili": prekrije pregledovalnik (predvajalnik ostane spodaj in igra). */}
+      {samSpili && (
+        <div className="absolute inset-0 z-40 flex flex-col bg-(--cv-bg) text-(--cv-text)">
+          {ssShowLines ? (
+            <>
+              <button
+                type="button"
+                onClick={ssPause}
+                aria-label="Pavza"
+                title="Pavza"
+                style={{ top: "max(0.75rem, env(safe-area-inset-top))", right: "max(0.75rem, env(safe-area-inset-right))" }}
+                className="absolute z-10 flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/70 bg-(--cv-bg)/70 text-orange-400 opacity-80 transition hover:opacity-100 active:scale-95"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+                  <rect x="6" y="5" width="4" height="14" rx="1" />
+                  <rect x="14" y="5" width="4" height="14" rx="1" />
+                </svg>
+              </button>
+              {/* Odmik od robov (tudi izrez/zaobljeni robovi telefona v ležečem načinu). */}
+              <div
+                ref={ssBoxRef}
+                className="min-h-0 flex-1 overflow-hidden"
+                style={{
+                  paddingTop: "max(1.75rem, env(safe-area-inset-top))",
+                  paddingRight: "max(2.5rem, calc(env(safe-area-inset-right) + 1.25rem), 3vw)",
+                  paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
+                  paddingLeft: "max(2.5rem, calc(env(safe-area-inset-left) + 1.25rem), 3vw)",
+                }}
+              >
+                <div ref={ssLinesRef} className="w-max font-mono leading-snug" style={{ fontSize: 20 }}>
+                  {ssWindow.map(({ l, i }) => (
+                    <div
+                      key={i}
+                      // Večji odmik oranžne črte od besedila kot v navadnem Smart playu (v em — velika pisava).
+                      style={SS_LINE_INSET}
+                      className={
+                        i === activeLine
+                          ? "-mr-1 rounded-r-md bg-[color-mix(in_srgb,var(--cv-text)_8%,transparent)] pr-1 shadow-[inset_2px_0_0_#fb923c]"
+                          : "-mr-1 pr-1"
+                      }
+                    >
+                      {renderLine(l, i, true)}
+                    </div>
+                  ))}
+                  {/* Črta in predogled prve vrstice naslednjih treh. */}
+                  {ssNext && (
+                    <>
+                      <div className="border-t border-(--cv-border)" style={{ marginTop: "0.35em", marginBottom: "0.3em" }} />
+                      <div style={SS_LINE_INSET} className="-mr-1 pr-1 opacity-40">{renderLine(ssNext.l, ssNext.i, true)}</div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Zapri"
+                title="Zapri"
+                className="absolute right-3 top-3 p-1.5 text-(--cv-muted) hover:text-(--cv-text)"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+              {!ssIsFullscreen && (
+                <button
+                  type="button"
+                  onClick={enterLandscapeFullscreen}
+                  aria-label="Celozaslonsko"
+                  title="Celozaslonsko (ležeče)"
+                  className="absolute right-12 top-3 p-1.5 text-(--cv-muted) hover:text-(--cv-text)"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+                  </svg>
+                </button>
+              )}
+              <div>
+                <p className="text-4xl font-bold leading-tight sm:text-6xl">{song.title}</p>
+                <p className="mt-2 text-xl text-(--cv-muted) sm:text-3xl">{song.author}</p>
+              </div>
+              <button
+                type="button"
+                onClick={ssPlay}
+                disabled={ssRequested}
+                aria-label="Predvajaj"
+                title="Predvajaj"
+                className="flex h-24 w-24 items-center justify-center rounded-full bg-orange-400 text-neutral-900 shadow-lg transition hover:bg-orange-300 active:scale-95 disabled:opacity-70 sm:h-28 sm:w-28"
+              >
+                {ssRequested ? (
+                  <span className="h-8 w-8 animate-spin rounded-full border-4 border-neutral-900/30 border-t-neutral-900" />
+                ) : (
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="ml-1.5 h-12 w-12">
+                    <path d="M7 4.5v15l12.5-7.5L7 4.5z" />
+                  </svg>
+                )}
+              </button>
+              {!smartAvailable && (
+                <p className="text-sm text-(--cv-muted)">Za to skladbo še ni besedila s časi — Smart play ne bo sledil petju.</p>
+              )}
+              <p className="hidden text-sm text-(--cv-muted) portrait:block">Za večje vrstice obrni telefon v ležeči položaj.</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>,
     document.body,
   );

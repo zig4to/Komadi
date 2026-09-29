@@ -326,3 +326,49 @@ export function layoutChordLine(
     return { pad, name };
   });
 }
+
+// --- Napredni urejevalnik besedila z akordi (ChordsTextEditor.tsx) ---
+
+// Vrstica navadnega besedila (brez UG oznak), ki je vrstica akordov: vsaj en
+// akord, vse ostalo samo okraski ("x2", "|", "N.C." …).
+export function isChordLineText(line: string): boolean {
+  const rest = line.replace(/^\s*\[[^\]]*\]/, "");
+  const pieces = rest.match(CHORD_PIECE_RE) ?? [];
+  return (
+    pieces.some((p) => EDIT_CHORD_RE.test(p)) &&
+    pieces.every((p) => EDIT_CHORD_RE.test(p) || CHORD_LINE_DECOR_RE.test(p))
+  );
+}
+
+// Vrstica strune tablature ("e|--5--|", "G-14-14~--|").
+export function isTabStaffText(line: string): boolean {
+  return isTabStaff(parseLine(line));
+}
+
+// Vrstica razdelka ("[Chorus]", "[Verse 1]").
+export function isSectionText(line: string): boolean {
+  return SECTION_RE.test(line.trim());
+}
+
+// Transponira vrstico akordov iz urejevalnika; akordi ostanejo v svojih
+// stolpcih (če se ime podaljša, se naslednji zamakne — layoutChordLine).
+// Druge vrstice vrne nespremenjene. H (slovenski zapis) se prebere kot B.
+export function transposeEditedLine(line: string, semitones: number): string {
+  if (!isChordLineText(line)) return line;
+  const prefix = line.match(/^\s*\[[^\]]*\]/)?.[0] ?? "";
+  const rest = line.slice(prefix.length);
+  const tokens: { col: number; name: string }[] = [];
+  // Deli po presledkih, da takti "|" in oklepaji ostanejo na svojih mestih.
+  const re = /\S+/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(rest))) tokens.push({ col: m.index, name: m[0] });
+  const chordName = (t: string) => {
+    if (!EDIT_CHORD_RE.test(t)) return t;
+    const star = t.endsWith("*") ? "*" : "";
+    const base = (star ? t.slice(0, -1) : t).replace(/^H/, "B").replace(/\/H/, "/B");
+    return transposeChord(base, semitones) + star;
+  };
+  let out = "";
+  for (const { pad, name } of layoutChordLine(tokens, chordName)) out += " ".repeat(pad) + name;
+  return prefix + out;
+}
