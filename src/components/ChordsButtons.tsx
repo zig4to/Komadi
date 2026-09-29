@@ -151,9 +151,8 @@ export default function ChordsButtons({
                     strokeLinejoin="round"
                     className="h-[13px] w-[13px] shrink-0 text-orange-500"
                   >
-                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                    <path d="M12 19v3" />
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M10 8.5v7l5.5-3.5z" />
                   </svg>
                   Sam špili
                 </button>
