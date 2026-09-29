@@ -482,6 +482,8 @@ export default function ChordsViewer({
                   color: markFill ? "#0a0a0a" : shownChordColor,
                   boxShadow: `0 0 0 ${markWidth} ${markBorder}`,
                   borderRadius: markRadius,
+                  padding: "0 0.2em",
+                  margin: "0 -0.2em",
                 }}
               >
                 Am
@@ -1574,8 +1576,10 @@ export default function ChordsViewer({
       <span
         data-chord-name
         className={`cursor-pointer ${
-          // Senca namesto odmika: obarvano ozadje brez premika postavitve.
-          active ? "rounded-(--cv-mark-radius) bg-(--cv-mark-bg) text-(--cv-mark-text) shadow-[0_0_0_var(--cv-mark-width)_var(--cv-mark-border)]" : ""
+          // Senca namesto odmika: obarvano ozadje brez premika postavitve;
+          // px + enak negativni mx = malo prostora levo/desno znotraj obrobe,
+          // postavitev se ne premakne.
+          active ? "-mx-[0.2em] px-[0.2em] rounded-(--cv-mark-radius) bg-(--cv-mark-bg) text-(--cv-mark-text) shadow-[0_0_0_var(--cv-mark-width)_var(--cv-mark-border)]" : ""
         } ${recorded && !active ? "underline decoration-orange-400 decoration-dotted underline-offset-4" : ""}`}
         onPointerEnter={(e) => {
           if (e.pointerType === "mouse" && !recorder) showShape(name, e.currentTarget);

@@ -8,7 +8,7 @@ import { enterLandscapeFullscreen, openChordsViewer } from "@/lib/openChords";
 
 // "Sam špili" (celozaslonski pogled s 3 vrsticami, ChordsViewer samSpili) —
 // zaenkrat samo za testne skladbe.
-const SAM_SPILI_TEST_TITLES = ["ti si mi u krvi"];
+const SAM_SPILI_TEST_TITLES = ["ti si mi u krvi", "water witch"];
 import type { Song } from "@/types/song";
 
 // Skrajšana različica gumbov "UG Tabs"/"PDF akordi" iz SongCard.tsx (samo
