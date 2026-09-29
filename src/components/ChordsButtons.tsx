@@ -8,7 +8,7 @@ import { enterLandscapeFullscreen, openChordsViewer } from "@/lib/openChords";
 
 // "Sam špili" (celozaslonski pogled s 3 vrsticami, ChordsViewer samSpili) —
 // zaenkrat samo za testne skladbe.
-const SAM_SPILI_TEST_TITLES = ["ti si mi u krvi", "water witch"];
+const SAM_SPILI_TEST_TITLES = ["ti si mi u krvi", "water witch", "happy xmas (war is over)"];
 import type { Song } from "@/types/song";
 
 // Skrajšana različica gumbov "UG Tabs"/"PDF akordi" iz SongCard.tsx (samo
@@ -22,6 +22,7 @@ export default function ChordsButtons({
   stacked = false,
   merged = false,
   menuAlign = "left",
+  iconOnly = false,
 }: {
   song: Song;
   onChordsClick?: (song: Song) => void;
@@ -38,6 +39,8 @@ export default function ChordsButtons({
   // gumb tik ob desnem robu vrstice (CompactRow na "Popularno"), da se meni
   // ne razteza čez desni rob zaslona.
   menuAlign?: "left" | "right";
+  // Gumb "Akordi" samo z ikono, brez besedila (Jam — privat in Skupni).
+  iconOnly?: boolean;
 }) {
   const [pdfOpen, setPdfOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -98,6 +101,7 @@ export default function ChordsButtons({
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           title="Akordi"
+          aria-label="Akordi"
           className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-400/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400"
         >
           <svg
@@ -115,7 +119,7 @@ export default function ChordsButtons({
             <circle cx="9.7" cy="11.2" r="1.3" />
             <circle cx="14.3" cy="16.8" r="1.3" />
           </svg>
-          Akordi
+          {!iconOnly && "Akordi"}
         </button>
         <ListenButton song={song} menuAlign={menuAlign} />
 

@@ -13,11 +13,18 @@ export type LocalView = {
   anchor: ViewAnchor;
   smart: { line: number; chord: { line: number; chord: number } | null } | null;
   fullscreen: boolean;
+  // "Sam špili": položaj v vrsticah (indeks v ssLines + napredek, -1 = pred
+  // prvo), hitrost (vrstic/s, za gladko ocenjevanje med sporočili), poudarjena
+  // vrstica telesa in ali igra. Samo ko ima vodja odprt Sam špili in že igra.
+  ss?: SamSpiliView;
 };
+
+export type SamSpiliView = { row: number; speed: number; hl: number; playing: boolean };
 
 export type SharedViewMessage =
   // since = kdaj je vodja začel voditi — ob sočasnem odprtju vodi tisti, ki je začel prej.
-  | ({ type: "view"; leaderId: string; leaderName: string; songId: string; since: number } & LocalView)
+  // mode = način pregledovalnika pri vodji ("samspili" ali null) — sledilci ga odprejo enako.
+  | ({ type: "view"; leaderId: string; leaderName: string; songId: string; since: number; mode?: "samspili" | null } & LocalView)
   | { type: "close"; leaderId: string };
 
 export const SHARED_VIEW_HEARTBEAT_MS = 2000;

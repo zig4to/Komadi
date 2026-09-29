@@ -264,7 +264,7 @@ export default function JamBoard({
                   <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{item.author}</p>
                 </div>
                 {item.song && (
-                  <ChordsButtons song={item.song} onChordsClick={onChordsClick} stacked merged menuAlign="right" />
+                  <ChordsButtons song={item.song} onChordsClick={onChordsClick} stacked merged iconOnly menuAlign="right" />
                 )}
                 <button
                   type="button"

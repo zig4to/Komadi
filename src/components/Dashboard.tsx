@@ -1452,7 +1452,8 @@ export default function Dashboard({ user }: { user: User }) {
   // Kdor prvi v Skupnem Jamu odpre akorde, vodi; ostali (ki sledijo) vidijo
   // isto skladbo na isti višini, njegov Smart play in celozaslonski način.
   // Supabase Realtime Broadcast, nič v bazi (src/lib/sharedChordsView.ts).
-  type SharedLeader = { id: string; name: string; songId: string; since: number; view: LocalView | null; seen: number };
+  // mode = način pregledovalnika pri vodji ("samspili" = Sam špili, null = navaden).
+  type SharedLeader = { id: string; name: string; songId: string; since: number; view: LocalView | null; seen: number; mode?: "samspili" | null };
   const [sharedLeader, setSharedLeader] = useState<SharedLeader | null>(null);
   const [followingLeader, setFollowingLeader] = useState(true);
   const viewChannelRef = useRef<RealtimeChannel | null>(null);
@@ -1463,16 +1464,31 @@ export default function Dashboard({ user }: { user: User }) {
   const lastSentRef = useRef(0);
   const lastViewRef = useRef<LocalView | null>(null);
   const amLeader = sharedLeader?.id === user.id;
+  const openChordsModeRef = useRef(openChordsMode);
   useEffect(() => {
     sharedLeaderRef.current = sharedLeader;
     followingRef.current = followingLeader;
+    openChordsModeRef.current = openChordsMode;
   });
+  // Odpri akorde kot vodja (isti način — Sam špili ali navaden), če še niso tako odprti.
+  const openLikeLeader = (songId: string, mode: "samspili" | null | undefined) => {
+    let open: string | null = null;
+    let openMode: string | null = null;
+    try {
+      open = window.localStorage.getItem("komadi:chords:open");
+      openMode = window.localStorage.getItem("komadi:chords:mode");
+    } catch {}
+    if (open === songId && (openMode ?? null) === (mode ?? null)) return;
+    // Samo menjava načina iste skladbe ne sproži dogodka "odprtje" (onStore), zato brez pričakovanja.
+    if (open !== songId) expectedOpenRef.current = songId;
+    openChordsViewer(songId, mode ?? undefined);
+  };
   const sendView = (msg: SharedViewMessage) =>
     viewChannelRef.current?.send({ type: "broadcast", event: "view", payload: msg });
   const sendLeaderView = (view: LocalView | null) => {
     const me = sharedLeaderRef.current;
     if (!me || me.id !== user.id || !view) return;
-    sendView({ type: "view", leaderId: user.id, leaderName: myDisplayName ?? "", songId: me.songId, since: me.since, ...view });
+    sendView({ type: "view", leaderId: user.id, leaderName: myDisplayName ?? "", songId: me.songId, since: me.since, mode: openChordsModeRef.current, ...view });
   };
   // Pogled vodje (ChordsViewer onLocalView): pošlji največ ~10× na sekundo, zadnjega vedno.
   const sendTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -1507,17 +1523,8 @@ export default function Dashboard({ user }: { user: User }) {
         const stale = !current || Date.now() - current.seen > SHARED_VIEW_STALE_MS;
         const earlier = current && (msg.since < current.since || (msg.since === current.since && msg.leaderId < current.id));
         if (!(stale || current.id === msg.leaderId || earlier)) return;
-        setSharedLeader({ id: msg.leaderId, name: msg.leaderName, songId: msg.songId, since: msg.since, view: msg, seen: Date.now() });
-        if (followingRef.current) {
-          let open: string | null = null;
-          try {
-            open = window.localStorage.getItem("komadi:chords:open");
-          } catch {}
-          if (open !== msg.songId) {
-            expectedOpenRef.current = msg.songId;
-            openChordsViewer(msg.songId);
-          }
-        }
+        setSharedLeader({ id: msg.leaderId, name: msg.leaderName, songId: msg.songId, since: msg.since, view: msg, seen: Date.now(), mode: msg.mode ?? null });
+        if (followingRef.current) openLikeLeader(msg.songId, msg.mode);
       })
       .subscribe((status) => {
         // Ob (ponovnem) vstopu v Skupni Jam: privzeto sledim, brez starega vodje.
@@ -1607,8 +1614,7 @@ export default function Dashboard({ user }: { user: User }) {
   const followLeader = () => {
     if (!sharedLeader) return;
     setFollowingLeader(true);
-    expectedOpenRef.current = sharedLeader.songId;
-    openChordsViewer(sharedLeader.songId);
+    openLikeLeader(sharedLeader.songId, sharedLeader.mode);
   };
   const leaderSong = sharedLeader
     ? (allSongs.find((x) => x.id === sharedLeader.songId) ?? sharedJamSongs[sharedLeader.songId] ?? null)

@@ -34,7 +34,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { ChordSection, Song } from "@/types/song";
-import { anchorScrollTop, computeAnchor, type LocalView } from "@/lib/sharedChordsView";
+import { anchorScrollTop, computeAnchor, type LocalView, type SamSpiliView } from "@/lib/sharedChordsView";
 
 // Skupni pogled v Skupnem Jamu (Dashboard.tsx, src/lib/sharedChordsView.ts):
 // vodja sporoča, kar vidi; sledilec prikaže vodjev pogled; "paused" = sledilec,
@@ -841,7 +841,8 @@ export default function ChordsViewer({
   // "Sam špili": drsnik čez celo skladbo (spodaj), odpre ga gumb v stolpcu.
   const [ssSeekOpen, setSsSeekOpen] = useState(false);
   const [ssTime, setSsTime] = useState(0);
-  const ssShowLines = samSpili && ssHasPlayed;
+  // Sledilec (Skupni Jam) vidi vrstice, ko vodja v Sam špili že igra.
+  const ssShowLines = samSpili && (follower ? !!remote?.ss : ssHasPlayed);
   // Telefon, med pavzo: tap na vrstico skoči tja in predvaja naprej.
   const playerCtlRef = useRef<PlayerController | null>(null);
   const playbackRef = useRef({ time: 0, playing: false });
@@ -1146,7 +1147,7 @@ export default function ChordsViewer({
   const reportView = useCallback(() => {
     const el = scrollRef.current;
     if (!el || !leaderReportRef.current) return;
-    leaderReportRef.current({ anchor: computeAnchor(el), ...leaderViewRef.current });
+    leaderReportRef.current({ anchor: computeAnchor(el), ...leaderViewRef.current, ...(ssLastRef.current ? { ss: ssLastRef.current } : {}) });
   }, []);
   const isLeader = !!leaderReport;
   useEffect(() => {
@@ -1275,6 +1276,15 @@ export default function ChordsViewer({
   useEffect(() => {
     ssSyncRef.current = { points: smartActive && sync ? sync.points : null, offset: lrcOffset };
   });
+  // Skupni Jam: vodja v Sam špili pošilja položaj iz zanke pomikanja (zadnji je
+  // v ssLastRef, da ga pošlje tudi reportView); sledilec ga bere iz
+  // ssRemoteRef (+ trenutek prejema) namesto lastnega časa posnetka.
+  const ssLastRef = useRef<SamSpiliView | null>(null);
+  const ssRemoteRef = useRef<{ view: SamSpiliView; at: number } | null>(null);
+  const remoteSs = follower && samSpili ? (remote?.ss ?? null) : null;
+  useEffect(() => {
+    ssRemoteRef.current = remoteSs ? { view: remoteSs, at: performance.now() } : null;
+  }, [remoteSs]);
   // Velikost pisave (enkrat za skladbo in ob spremembi velikosti zaslona):
   // najdaljša vrstica zapolni širino (do črte), po višini pa gredo ~3 vrstice. Merjeno
   // pri 20 px in linearno povečano; nastavljeno neposredno na element. Nobena
@@ -1350,9 +1360,43 @@ export default function ChordsViewer({
     let hl = -2;
     let last = performance.now();
     let raf = 0;
+    // Vodja: ocena hitrosti (vrstic/s) in zadnje poslano stanje.
+    let prevRow = NaN;
+    let prevAt = 0;
+    let speed = 0;
+    let sentAt = 0;
+    let sent: SamSpiliView | null = null;
+    const rowTarget = (rowPos: number) => {
+      if (rowPos < 0) return 0;
+      const k = Math.floor(rowPos);
+      if (tops[k] === undefined) return tops.length ? Math.max(0, tops[tops.length - 1] - slot) : 0;
+      const step = tops[k + 1] !== undefined ? tops[k + 1] - tops[k] : 0;
+      return Math.max(0, tops[k] - slot + step * (rowPos - k));
+    };
+    const ease = (target: number, dt: number) => {
+      const diff = target - pos;
+      // Prvi izris ali velik skok (previjanje): takoj; sicer kratko glajenje
+      // (cilj se zdaj premika zvezno, zato majhna zamuda).
+      if (Number.isNaN(pos) || Math.abs(diff) > boxH * 1.5 || Math.abs(diff) < 0.05) pos = target;
+      else pos += diff * (1 - Math.exp(-dt / 110));
+      inner.style.transform = `translate3d(0, ${-pos}px, 0)`;
+    };
     const tick = (now: number) => {
       const dt = Math.min(100, now - last);
       last = now;
+      // Sledilec: vodjev položaj, med sporočili ocenjen s hitrostjo (največ 0,6 s).
+      const rem = ssRemoteRef.current;
+      if (rem) {
+        const v = rem.view;
+        const rowPos = v.row < 0 ? -1 : v.row + (v.playing ? v.speed * Math.min(0.6, (now - rem.at) / 1000) : 0);
+        if (v.hl !== hl) {
+          hl = v.hl;
+          setSsHlLine(v.hl);
+        }
+        ease(rowTarget(rowPos), dt);
+        raf = requestAnimationFrame(tick);
+        return;
+      }
       const clock = ssClockRef.current;
       // Interpoliran čas; največ 0,6 s naprej brez nove osvežitve (zastoj).
       let t = clock.playing ? clock.t + Math.min(0.6, (now - clock.at) / 1000) : clock.t;
@@ -1379,18 +1423,26 @@ export default function ChordsViewer({
         hl = want;
         setSsHlLine(want);
       }
-      let target = 0;
       const k = rowFor(line);
-      if (k >= 0 && tops[k] !== undefined) {
-        const step = tops[k + 1] !== undefined ? tops[k + 1] - tops[k] : 0;
-        target = Math.max(0, tops[k] - slot + step * progress);
+      const rowPos = k >= 0 ? k + progress : -1;
+      ease(rowTarget(rowPos), dt);
+      // Vodja v Skupnem Jamu: položaj ~10× na sekundo (ob spremembi), sicer 1× na sekundo.
+      if (leaderReportRef.current) {
+        if (!Number.isNaN(prevRow) && rowPos >= 0 && prevRow >= 0 && Math.abs(rowPos - prevRow) < 1.5 && now > prevAt) {
+          const inst = ((rowPos - prevRow) * 1000) / (now - prevAt);
+          speed += (Math.max(0, inst) - speed) * 0.1;
+        } else if (Math.abs(rowPos - prevRow) >= 1.5) speed = 0;
+        prevRow = rowPos;
+        prevAt = now;
+        const view: SamSpiliView = { row: Math.round(rowPos * 1000) / 1000, speed: clock.playing ? Math.round(speed * 1000) / 1000 : 0, hl: want, playing: clock.playing };
+        const changed = !sent || sent.hl !== view.hl || sent.playing !== view.playing || Math.abs(sent.row - view.row) > 0.002;
+        if ((changed && now - sentAt >= 100) || now - sentAt >= 1000) {
+          sent = view;
+          sentAt = now;
+          ssLastRef.current = view;
+          reportView();
+        }
       }
-      const diff = target - pos;
-      // Prvi izris ali velik skok (previjanje): takoj; sicer kratko glajenje
-      // (cilj se zdaj premika zvezno, zato majhna zamuda).
-      if (Number.isNaN(pos) || Math.abs(diff) > boxH * 1.5 || Math.abs(diff) < 0.05) pos = target;
-      else pos += diff * (1 - Math.exp(-dt / 110));
-      inner.style.transform = `translate3d(0, ${-pos}px, 0)`;
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -1398,6 +1450,7 @@ export default function ChordsViewer({
       cancelAnimationFrame(raf);
       ro.disconnect();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ssShowLines, ssLines]);
   // Med predvajanjem "Sam špili" se zaslon ne sme temniti/zakleniti (Screen
   // Wake Lock). Brskalnik ključavnico sprosti, ko je zavihek skrit, zato jo ob
@@ -1448,7 +1501,14 @@ export default function ChordsViewer({
     const t = setTimeout(() => setSsRequested(false), 6000);
     return () => clearTimeout(t);
   }, [ssRequested]);
-  const [ssIsFullscreen, setSsIsFullscreen] = useState(false);
+  const [ssIsFullscreen, setSsIsFullscreen] = useState(() => typeof document !== "undefined" && !!document.fullscreenElement);
+  // Sledilec (Skupni Jam): celozaslonsko pokončno (brez zaklepanja v ležeče).
+  // Brskalnik zahteva dotik na tej napravi, zato ga sproži prvi dotik v Sam
+  // špili ali gumb na čakalnem zaslonu — samodejno ob odprtju ne gre.
+  const ssFollowerFullscreen = () => {
+    if (document.fullscreenElement || !document.fullscreenEnabled) return;
+    document.documentElement.requestFullscreen().catch(() => {});
+  };
   useEffect(() => {
     if (!samSpili) return;
     const onChange = () => setSsIsFullscreen(!!document.fullscreenElement);
@@ -2441,7 +2501,7 @@ export default function ChordsViewer({
 
       {shared && shared.role !== "leader" && !(shared.role === "follower" && followPillHidden) && (
         <div
-          className="fixed left-1/2 z-40 flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 items-center gap-2.5 rounded-full border border-fuchsia-400/70 bg-neutral-950/90 py-1.5 pl-4 pr-1.5 font-sans text-sm text-neutral-100 shadow-lg backdrop-blur"
+          className="fixed left-1/2 z-50 flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 items-center gap-2.5 rounded-full border border-fuchsia-400/70 bg-neutral-950/90 py-1.5 pl-4 pr-1.5 font-sans text-sm text-neutral-100 shadow-lg backdrop-blur"
           style={{ top: "calc(env(safe-area-inset-top) + 0.5rem)" }}
         >
           <span className="whitespace-nowrap">
@@ -2472,7 +2532,10 @@ export default function ChordsViewer({
 
       {/* "Sam špili": prekrije pregledovalnik (predvajalnik ostane spodaj in igra). */}
       {samSpili && (
-        <div className="absolute inset-0 z-40 flex flex-col overflow-hidden bg-(--cv-bg) text-(--cv-text)">
+        <div
+          className="absolute inset-0 z-40 flex flex-col overflow-hidden bg-(--cv-bg) text-(--cv-text)"
+          onClick={follower ? ssFollowerFullscreen : undefined}
+        >
           {ssShowLines ? (
             <>
               {/* Blaga navpična črta levo od stolpca gumbov — besedilo se konča pred njo;
@@ -2517,6 +2580,9 @@ export default function ChordsViewer({
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
               </button>
+              {/* Sledilec (Skupni Jam) nima lastnega predvajanja — samo meni in ⚙. */}
+              {!follower && (
+              <>
               {/* Pavza pusti pogled, kot je; isti gumb nato predvaja naprej. */}
               <button
                 type="button"
@@ -2585,6 +2651,8 @@ export default function ChordsViewer({
                   <path d="M3 12h4M13 12h8" /><circle cx="10" cy="12" r="3" />
                 </svg>
               </button>
+              </>
+              )}
               {/* Nastavitve: isti meni ⚙ kot v pregledovalniku (brez urejanja in snemanja). */}
               <button
                 ref={ssSettingsRef}
@@ -2672,7 +2740,7 @@ export default function ChordsViewer({
                       data-ss-line
                       // Večji odmik oranžne črte od besedila kot v navadnem Smart playu (v em — velika pisava).
                       style={SS_LINE_INSET}
-                      onClick={(e) => ssSeekToLine(i, e)}
+                      onClick={(e) => !follower && ssSeekToLine(i, e)}
                       className={
                         i === ssHlLine
                           ? "-mr-1 rounded-r-md bg-[color-mix(in_srgb,var(--cv-text)_8%,transparent)] pr-1 shadow-[inset_2px_0_0_#fb923c]"
@@ -2702,9 +2770,9 @@ export default function ChordsViewer({
               {!ssIsFullscreen && (
                 <button
                   type="button"
-                  onClick={enterLandscapeFullscreen}
+                  onClick={follower ? ssFollowerFullscreen : enterLandscapeFullscreen}
                   aria-label="Celozaslonsko"
-                  title="Celozaslonsko (ležeče)"
+                  title={follower ? "Celozaslonsko" : "Celozaslonsko (ležeče)"}
                   className="absolute right-12 top-3 p-1.5 text-(--cv-muted) hover:text-(--cv-text)"
                 >
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
@@ -2716,6 +2784,23 @@ export default function ChordsViewer({
                 <p className="text-4xl font-bold leading-tight sm:text-6xl">{song.title}</p>
                 <p className="mt-2 text-xl text-(--cv-muted) sm:text-3xl">{song.author}</p>
               </div>
+              {follower ? (
+                <div className="flex flex-col items-center gap-4">
+                  <p className="text-base text-(--cv-muted)">Čakaš, da {follower.leaderName} zažene skladbo …</p>
+                  {!ssIsFullscreen && typeof document !== "undefined" && document.fullscreenEnabled && (
+                    <button
+                      type="button"
+                      onClick={ssFollowerFullscreen}
+                      className="flex items-center gap-2 rounded-full border border-orange-400 px-4 py-2 text-sm font-medium text-orange-400 active:scale-95"
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+                      </svg>
+                      Celozaslonsko
+                    </button>
+                  )}
+                </div>
+              ) : (
               <button
                 type="button"
                 onClick={ssPlay}
@@ -2732,6 +2817,7 @@ export default function ChordsViewer({
                   </svg>
                 )}
               </button>
+              )}
               {!smartAvailable && (
                 <p className="text-sm text-(--cv-muted)">Za to skladbo še ni besedila s časi — Smart play ne bo sledil petju.</p>
               )}
