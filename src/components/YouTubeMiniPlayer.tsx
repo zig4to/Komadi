@@ -105,6 +105,8 @@ export type PlayerController = {
   // (klic mora priti iz uporabnikovega dotika) — in pavza.
   play: () => void;
   pause: () => void;
+  // Preskok za delta sekund (npr. ±5 v "Sam špili").
+  seekBy: (delta: number) => void;
 };
 
 export default function YouTubeMiniPlayer({
@@ -285,6 +287,13 @@ export default function YouTubeMiniPlayer({
         else playerRef.current.playVideo();
       },
       pause: () => playerRef.current?.pauseVideo(),
+      seekBy: (delta) => {
+        const player = playerRef.current;
+        if (!player) return;
+        const t = Math.max(0, Math.min(player.getDuration() || Infinity, player.getCurrentTime() + delta));
+        player.seekTo(t, true);
+        setCurrent(t);
+      },
     };
   });
 

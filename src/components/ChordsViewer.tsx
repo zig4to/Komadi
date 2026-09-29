@@ -71,6 +71,8 @@ const newSectionId = () =>
 const INSTRUMENTAL_TEST_TITLES = ["water witch"];
 // "Sam špili": odmik besedila od oranžne črte (poudarek vrstice).
 const SS_LINE_INSET = { marginLeft: "-0.45em", paddingLeft: "0.45em" } as const;
+// "Sam špili": koliko (tipičnih) vrstic nad trenutno ostane vidnih ob njenem začetku.
+const SS_SLOT_ROWS = 1.4;
 const lrcOffsetsKey = (id: string) => `komadi:chords:lrcOffsets:${id}`;
 const transposeKey = (id: string) => `komadi:chords:transpose:${id}`;
 const workingVideoKey = (id: string) => `komadi:chords:video:${id}`;
@@ -685,7 +687,9 @@ export default function ChordsViewer({
     setVideoPlaying(playing);
     if (playing) setSsRequested(false);
     if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
-    setActiveLine(smartActive && sync ? lineProgressAt(sync.points, seconds - lrcOffset).lineIndex : -1);
+    const prog = smartActive && sync ? lineProgressAt(sync.points, seconds - lrcOffset) : { lineIndex: -1, progress: 0 };
+    setActiveLine(prog.lineIndex);
+    ssProgressRef.current = { line: prog.lineIndex, progress: prog.progress };
     // Akordi: čas posnetka brez zamika LRC (vsak del ima svoj zamik); med
     // snemanjem po osnutku, da se pregled z ▶ takoj vidi.
     const pts = recorder ? draftChordPoints : smartActive ? chordPoints : [];
@@ -817,59 +821,74 @@ export default function ChordsViewer({
         }),
     [body],
   );
-  // Strani po 3 vrstice: stran ostane pri miru, dokler se ne odpojejo vse tri
-  // (poudarek se premika znotraj nje), nato se naenkrat zamenja z naslednjo.
-  // Nova stran se začne tudi ob vsaki menjavi instrumentalno ↔ besedilo, da je
-  // intro/interlude iz 1–2 vrstic sam na strani, prva vrstica verza pa šele v
-  // predogledu pod črto. Pred prvo zapeto vrstico (intro) prva stran.
-  const ssPages = useMemo(() => {
-    // Instrumentalna vrstica = samo akordi, brez besedila.
-    const isInstrumental = (l: ChordsLine) => {
-      if (l.kind === "chords" || l.kind === "tab") return true;
-      if (l.kind === "pair") return l.chunks.every((c) => !c.lyric.trim());
-      if (l.kind === "text") return l.segments.every((sg) => "chord" in sg || !sg.text.trim());
-      return false;
-    };
-    const pages: { start: number; end: number }[] = [];
-    ssLines.forEach(({ l }, k) => {
-      const last = pages[pages.length - 1];
-      const instr = isInstrumental(l);
-      const prevInstr = k > 0 && isInstrumental(ssLines[k - 1].l);
-      if (!last || last.end - last.start >= 3 || instr !== prevInstr) pages.push({ start: k, end: k + 1 });
-      else last.end = k + 1;
-    });
-    return pages;
-  }, [ssLines]);
-  const ssPos = activeLine < 0 ? 0 : Math.max(0, ssLines.findIndex(({ i }) => i >= activeLine));
-  const ssPageIdx = Math.max(0, ssPages.findIndex((p) => ssPos >= p.start && ssPos < p.end));
-  const ssPage = ssPages[ssPageIdx] ?? { start: 0, end: 0 };
-  const ssStart = ssPage.start;
-  const ssWindow = ssLines.slice(ssPage.start, ssPage.end);
-  const ssNextPage = ssPages[ssPageIdx + 1];
-  const ssNext = ssNextPage ? ssLines[ssNextPage.start] : null;
-  const ssWindowKey = ssStart + ":" + ssWindow.map(({ i }) => i).join(",");
+  // Neprekinjeno pomikanje (kot samodejno pomikanje): vidnih je ~4 vrstice,
+  // trenutna (Smart play) je ob začetku v 2. vrstici, med petjem se pogled
+  // sorazmerno s časom pomika navzgor, da je ob koncu vrstice v 2. vrstici že
+  // naslednja. Pred prvo zapeto vrstico (intro) je pogled na vrhu.
   const ssBoxRef = useRef<HTMLDivElement>(null);
   const ssLinesRef = useRef<HTMLDivElement>(null);
-  // Velikost pisave: najdaljša od treh vrstic zapolni širino, vse tri pa
-  // morajo iti po višini. Merjeno pri 20 px in linearno povečano; pisava se
-  // nastavi neposredno na element (brez stanja, ob vsaki menjavi okna).
+  // Napredek znotraj trenutne vrstice (0–1) iz lineProgressAt, osvežen ob
+  // vsakem času posnetka; zanka pomikanja ga bere vsako sličico.
+  const ssProgressRef = useRef({ line: -1, progress: 0 });
+  // Velikost pisave (enkrat za skladbo in ob spremembi velikosti zaslona):
+  // najdaljša vrstica zapolni širino, po višini pa gredo ~4 vrstice. Merjeno
+  // pri 20 px in linearno povečano; nastavljeno neposredno na element.
   useEffect(() => {
     const box = ssBoxRef.current;
     const inner = ssLinesRef.current;
-    if (!samSpili || !box || !inner) return;
+    if (!samSpili || !box || !inner || !ssLines.length) return;
     const fit = () => {
       inner.style.fontSize = "20px";
       const w = inner.scrollWidth;
-      const h = inner.scrollHeight;
-      if (!w || !h) return;
-      const k = Math.min(box.clientWidth / w, box.clientHeight / h);
+      const rows = [...inner.children] as HTMLElement[];
+      const avgH = rows.reduce((h, r) => h + r.offsetHeight, 0) / Math.max(1, rows.length);
+      if (!w || !avgH) return;
+      const k = Math.min(box.clientWidth / w, box.clientHeight / (4 * avgH));
       inner.style.fontSize = `${Math.max(14, Math.floor(20 * k * 0.97))}px`;
     };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(box);
     return () => ro.disconnect();
-  }, [samSpili, ssWindowKey, videoPlaying]);
+  }, [samSpili, ssLines, videoPlaying]);
+  // Zanka pomikanja: cilj = trenutna vrstica v 2. vrstici + napredek proti
+  // naslednji; položaj se cilju gladko približuje (vsaka sličica).
+  useEffect(() => {
+    const box = ssBoxRef.current;
+    const inner = ssLinesRef.current;
+    if (!samSpili || !videoPlaying || !box || !inner) return;
+    let pos = box.scrollTop;
+    let last = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const dt = Math.min(100, now - last);
+      last = now;
+      const { line, progress } = ssProgressRef.current;
+      const rows = [...inner.children] as HTMLElement[];
+      let target = 0;
+      const k = line < 0 ? -1 : ssLines.findIndex(({ i }) => i >= line);
+      if (k >= 0 && rows[k]) {
+        const cur = rows[k];
+        const next = rows[k + 1];
+        // Stalen odmik ene "vrstice" nad trenutno (da je ta v 2. vrstici):
+        // mediana višin vrstic. Stalen mora biti — z višino prejšnje vrstice
+        // (samo akordi = pol nižja) je pogled ob menjavi vrstice skočil nazaj.
+        const heights = rows.map((r) => r.offsetHeight).sort((x, y) => x - y);
+        // × SS_SLOT_ROWS: trenutna vrstica nekoliko nižje od točne 2. vrstice.
+        const slot = (heights[Math.floor(heights.length / 2)] ?? 0) * SS_SLOT_ROWS;
+        const step = next ? next.offsetTop - cur.offsetTop : 0;
+        target = Math.max(0, cur.offsetTop - slot + step * progress);
+      }
+      const diff = target - pos;
+      // Velik skok (previjanje): takoj; sicer gladko približevanje.
+      if (Math.abs(diff) > box.clientHeight * 1.5 || Math.abs(diff) < 0.3) pos = target;
+      else pos += diff * (1 - Math.exp(-dt / 220));
+      if (Math.round(pos) !== box.scrollTop) box.scrollTop = pos;
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [samSpili, videoPlaying, ssLines]);
   // Ob zaprtju: izhod iz celozaslonskega načina in sprostitev ležeče usmeritve.
   useEffect(() => {
     if (!samSpili) return;
@@ -1916,19 +1935,58 @@ export default function ChordsViewer({
         <div className="absolute inset-0 z-40 flex flex-col bg-(--cv-bg) text-(--cv-text)">
           {ssShowLines ? (
             <>
+              {/* Desno zgoraj: pavza, pod njo na začetek, 5 s naprej in 5 s nazaj. */}
+              <div
+                style={{ top: "max(0.75rem, env(safe-area-inset-top))", right: "max(0.75rem, env(safe-area-inset-right))" }}
+                className="absolute z-10 flex flex-col gap-2"
+              >
               <button
                 type="button"
                 onClick={ssPause}
                 aria-label="Pavza"
                 title="Pavza"
-                style={{ top: "max(0.75rem, env(safe-area-inset-top))", right: "max(0.75rem, env(safe-area-inset-right))" }}
-                className="absolute z-10 flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/70 bg-(--cv-bg)/70 text-orange-400 opacity-80 transition hover:opacity-100 active:scale-95"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/70 bg-(--cv-bg)/70 text-orange-400 opacity-80 transition hover:opacity-100 active:scale-95"
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
                   <rect x="6" y="5" width="4" height="14" rx="1" />
                   <rect x="14" y="5" width="4" height="14" rx="1" />
                 </svg>
               </button>
+              <button
+                type="button"
+                onClick={() => playerCtlRef.current?.seekAndPlay(0)}
+                aria-label="Na začetek"
+                title="Na začetek"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/70 bg-(--cv-bg)/70 text-orange-400 opacity-80 transition hover:opacity-100 active:scale-95"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <path d="M6 5v14" />
+                  <path d="M18 19 9 12l9-7z" fill="currentColor" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => playerCtlRef.current?.seekBy(5)}
+                aria-label="5 s naprej"
+                title="5 s naprej"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/70 bg-(--cv-bg)/70 text-orange-400 opacity-80 transition hover:opacity-100 active:scale-95"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <path d="M13 19l7-7-7-7" /><path d="M5 19l7-7-7-7" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => playerCtlRef.current?.seekBy(-5)}
+                aria-label="5 s nazaj"
+                title="5 s nazaj"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/70 bg-(--cv-bg)/70 text-orange-400 opacity-80 transition hover:opacity-100 active:scale-95"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <path d="M11 19l-7-7 7-7" /><path d="M19 19l-7-7 7-7" />
+                </svg>
+              </button>
+              </div>
               {/* Odmik od robov (tudi izrez/zaobljeni robovi telefona v ležečem načinu). */}
               <div
                 ref={ssBoxRef}
@@ -1940,8 +1998,10 @@ export default function ChordsViewer({
                   paddingLeft: "max(2.5rem, calc(env(safe-area-inset-left) + 1.25rem), 3vw)",
                 }}
               >
-                <div ref={ssLinesRef} className="w-max font-mono leading-snug" style={{ fontSize: 20 }}>
-                  {ssWindow.map(({ l, i }) => (
+                {/* relative: offsetTop vrstic je glede na ta blok; spodnji odmik, da se tudi
+                    zadnje vrstice lahko pomaknejo v 2. vrstico. */}
+                <div ref={ssLinesRef} className="relative w-max font-mono leading-snug" style={{ fontSize: 20, paddingBottom: "85vh" }}>
+                  {ssLines.map(({ l, i }) => (
                     <div
                       key={i}
                       // Večji odmik oranžne črte od besedila kot v navadnem Smart playu (v em — velika pisava).
@@ -1955,13 +2015,6 @@ export default function ChordsViewer({
                       {renderLine(l, i, true)}
                     </div>
                   ))}
-                  {/* Črta in predogled prve vrstice naslednjih treh. */}
-                  {ssNext && (
-                    <>
-                      <div className="border-t border-(--cv-border)" style={{ marginTop: "0.35em", marginBottom: "0.3em" }} />
-                      <div style={SS_LINE_INSET} className="-mr-1 pr-1 opacity-40">{renderLine(ssNext.l, ssNext.i, true)}</div>
-                    </>
-                  )}
                 </div>
               </div>
             </>
