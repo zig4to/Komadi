@@ -886,7 +886,7 @@ export default function ChordsViewer({
   // vsakem času posnetka; zanka pomikanja ga bere vsako sličico.
   const ssProgressRef = useRef({ line: -1, progress: 0 });
   // Velikost pisave (enkrat za skladbo in ob spremembi velikosti zaslona):
-  // najdaljša vrstica zapolni širino, po višini pa gredo ~4 vrstice. Merjeno
+  // najdaljša vrstica zapolni širino (do črte), po višini pa gredo ~3 vrstice. Merjeno
   // pri 20 px in linearno povečano; nastavljeno neposredno na element.
   useEffect(() => {
     const box = ssBoxRef.current;
@@ -903,8 +903,8 @@ export default function ChordsViewer({
       const rows = [...inner.children] as HTMLElement[];
       const avgH = rows.reduce((h, r) => h + r.offsetHeight, 0) / Math.max(1, rows.length);
       if (!w || !avgH || availW <= 0) return;
-      const k = Math.min(availW / w, availH / (4 * avgH));
-      let size = Math.max(14, Math.floor(20 * k * 0.94));
+      const k = Math.min(availW / w, availH / (3 * avgH));
+      let size = Math.max(14, Math.floor(20 * k));
       inner.style.fontSize = `${size}px`;
       // Preverjanje: če najširša vrstica (krepki akordi, zaokroževanje) še
       // gleda čez, pisavo zmanjšuj po 1 px, dokler ne gre vse v širino.
@@ -2068,7 +2068,7 @@ export default function ChordsViewer({
                 className="min-h-0 flex-1 overflow-hidden"
                 style={{
                   paddingTop: "max(1.75rem, env(safe-area-inset-top))",
-                  paddingRight: "calc(max(0.75rem, env(safe-area-inset-right)) + 3.625rem)",
+                  paddingRight: "calc(max(0.75rem, env(safe-area-inset-right)) + 3.125rem)",
                   paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
                   paddingLeft: "max(2.5rem, calc(env(safe-area-inset-left) + 1.25rem), 3vw)",
                 }}
