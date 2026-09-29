@@ -29,6 +29,7 @@ import {
   manualSyncPoints,
   pickBestCandidate,
   type LrcCandidate,
+  type SyncPoint,
 } from "@/lib/syncedLyrics";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
@@ -75,6 +76,10 @@ const SS_LINE_INSET = { marginLeft: "-0.45em", paddingLeft: "0.45em" } as const;
 const SS_SLOT_ROWS = 1.4;
 // "Sam špili": premor v petju (s), ki šteje kot instrumentalni del — poudarek se ugasne.
 const SS_GAP_MIN = 4;
+function fmtClock(s: number) {
+  const t = Math.max(0, Math.floor(s));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+}
 const lrcOffsetsKey = (id: string) => `komadi:chords:lrcOffsets:${id}`;
 const transposeKey = (id: string) => `komadi:chords:transpose:${id}`;
 const workingVideoKey = (id: string) => `komadi:chords:video:${id}`;
@@ -457,7 +462,13 @@ export default function ChordsViewer({
   const [ssHasPlayed, setSsHasPlayed] = useState(false);
   // "Sam špili": zapeta vrstica se je končala in sledi daljši instrumentalni
   // del (interlude, solo …) — poudarek (ozadje) se odstrani do naslednje vrstice.
-  const [ssInGap, setSsInGap] = useState(false);
+  // Poudarjena vrstica v "Sam špili" (-1 = nobena, npr. med instrumentalnim
+  // delom) — računa jo zanka pomikanja vsako sličico, stanje se nastavi le ob
+  // spremembi, zato poudarek ne zaostaja za 250-ms onTime.
+  const [ssHlLine, setSsHlLine] = useState(-1);
+  // "Sam špili": drsnik čez celo skladbo (spodaj), odpre ga gumb v stolpcu.
+  const [ssSeekOpen, setSsSeekOpen] = useState(false);
+  const [ssTime, setSsTime] = useState(0);
   const ssShowLines = samSpili && ssActive && ssHasPlayed;
   // Telefon, med pavzo: tap na vrstico skoči tja in predvaja naprej.
   const playerCtlRef = useRef<PlayerController | null>(null);
@@ -734,17 +745,12 @@ export default function ChordsViewer({
     if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
     const prog = smartActive && sync ? lineProgressAt(sync.points, seconds - lrcOffset) : { lineIndex: -1, progress: 0 };
     setActiveLine(prog.lineIndex);
-    ssProgressRef.current = { line: prog.lineIndex, progress: prog.progress };
-    if (samSpili && sync) {
-      // Zadnja točka pred zdaj; instrumentalni del = do naslednje zapete
-      // vrstice ≥ SS_GAP_MIN s. Kratki vdihi med vrsticami poudarka ne ugasnejo.
-      const t = seconds - lrcOffset;
-      let k = -1;
-      for (let j = 0; j < sync.points.length && sync.points[j].time <= t; j++) k = j;
-      const cur = k >= 0 ? sync.points[k] : null;
-      const next = sync.points[k + 1];
-      setSsInGap(!!cur && t > cur.end + 0.5 && (!next || next.time - cur.end >= SS_GAP_MIN));
-    }
+    // "Sam špili": zadnji čas + trenutek prejema; zanka pomikanja iz tega
+    // sproti izračuna čas med 250-ms osvežitvami (gladko, brez stopnic).
+    ssClockRef.current = { t: seconds, at: performance.now(), playing };
+    // Drsnik prevrtavanja: ponovni izris le, ko je odprt (sicer vsakih 250 ms
+    // ves pregledovalnik — zatikanje pomikanja).
+    if (samSpili && ssSeekOpen) setSsTime(seconds);
     // Akordi: čas posnetka brez zamika LRC (vsak del ima svoj zamik); med
     // snemanjem po osnutku, da se pregled z ▶ takoj vidi.
     const pts = recorder ? draftChordPoints : smartActive ? chordPoints : [];
@@ -884,7 +890,11 @@ export default function ChordsViewer({
   const ssLinesRef = useRef<HTMLDivElement>(null);
   // Napredek znotraj trenutne vrstice (0–1) iz lineProgressAt, osvežen ob
   // vsakem času posnetka; zanka pomikanja ga bere vsako sličico.
-  const ssProgressRef = useRef({ line: -1, progress: 0 });
+  const ssClockRef = useRef({ t: 0, at: 0, playing: false });
+  const ssSyncRef = useRef<{ points: SyncPoint[] | null; offset: number }>({ points: null, offset: 0 });
+  useEffect(() => {
+    ssSyncRef.current = { points: smartActive && sync ? sync.points : null, offset: lrcOffset };
+  });
   // Velikost pisave (enkrat za skladbo in ob spremembi velikosti zaslona):
   // najdaljša vrstica zapolni širino (do črte), po višini pa gredo ~3 vrstice. Merjeno
   // pri 20 px in linearno povečano; nastavljeno neposredno na element.
@@ -919,43 +929,93 @@ export default function ChordsViewer({
     return () => ro.disconnect();
   }, [samSpili, ssLines, ssShowLines]);
   // Zanka pomikanja: cilj = trenutna vrstica v 2. vrstici + napredek proti
-  // naslednji; položaj se cilju gladko približuje (vsaka sličica).
+  // naslednji. Vsako sličico: čas posnetka interpoliran od zadnjega onTime,
+  // vrstica/napredek izračunana sproti, premik s transform (podpiksli, brez
+  // zaokroževanja scrollTop), geometrija vrstic predpomnjena.
   useEffect(() => {
     const box = ssBoxRef.current;
     const inner = ssLinesRef.current;
     // Teče tudi med kratkim nalaganjem ob preskoku, da se pogled gladko premakne.
     if (!ssShowLines || !box || !inner) return;
-    let pos = box.scrollTop;
+    box.scrollTop = 0;
+    // Položaji vrstic: izmerjeni enkrat in ob spremembi velikosti (pisava).
+    let tops: number[] = [];
+    let slot = 0;
+    let boxH = box.clientHeight;
+    const measure = () => {
+      const rows = [...inner.children] as HTMLElement[];
+      tops = rows.map((r) => r.offsetTop);
+      // Stalen odmik ene "vrstice" nad trenutno (mediana višin) — z višino
+      // prejšnje vrstice (samo akordi = pol nižja) je pogled skočil nazaj.
+      const heights = rows.map((r) => r.offsetHeight).sort((x, y) => x - y);
+      slot = (heights[Math.floor(heights.length / 2)] ?? 0) * SS_SLOT_ROWS;
+      boxH = box.clientHeight;
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(inner);
+    ro.observe(box);
+    // Indeks v ssLines za vrstico telesa pesmi.
+    const rowOf = new Map<number, number>();
+    ssLines.forEach(({ i }, k) => rowOf.set(i, k));
+    const rowFor = (line: number) => {
+      if (line < 0) return -1;
+      const k = rowOf.get(line);
+      return k ?? ssLines.findIndex(({ i }) => i >= line);
+    };
+    let pos = NaN;
+    let shownT = 0;
+    let hl = -2;
     let last = performance.now();
     let raf = 0;
     const tick = (now: number) => {
       const dt = Math.min(100, now - last);
       last = now;
-      const { line, progress } = ssProgressRef.current;
-      const rows = [...inner.children] as HTMLElement[];
+      const clock = ssClockRef.current;
+      // Interpoliran čas; največ 0,6 s naprej brez nove osvežitve (zastoj).
+      let t = clock.playing ? clock.t + Math.min(0.6, (now - clock.at) / 1000) : clock.t;
+      // Nova osvežitev je lahko malo za ocenjenim — ne nazaj za drobce
+      // (tresenje); večji skok nazaj (previjanje) velja takoj.
+      if (clock.playing && t < shownT && shownT - t < 0.3) t = shownT;
+      shownT = t;
+      const { points, offset } = ssSyncRef.current;
+      let line = -1;
+      let progress = 0;
+      let gap = false;
+      if (points) {
+        const lt = t - offset;
+        ({ lineIndex: line, progress } = lineProgressAt(points, lt));
+        // Instrumentalni del: zapeta vrstica končana, naslednja ≥ SS_GAP_MIN s.
+        let k = -1;
+        for (let j = 0; j < points.length && points[j].time <= lt; j++) k = j;
+        const cur = k >= 0 ? points[k] : null;
+        const next = points[k + 1];
+        gap = !!cur && lt > cur.end + 0.5 && (!next || next.time - cur.end >= SS_GAP_MIN);
+      }
+      const want = gap ? -1 : line;
+      if (want !== hl) {
+        hl = want;
+        setSsHlLine(want);
+      }
       let target = 0;
-      const k = line < 0 ? -1 : ssLines.findIndex(({ i }) => i >= line);
-      if (k >= 0 && rows[k]) {
-        const cur = rows[k];
-        const next = rows[k + 1];
-        // Stalen odmik ene "vrstice" nad trenutno (da je ta v 2. vrstici):
-        // mediana višin vrstic. Stalen mora biti — z višino prejšnje vrstice
-        // (samo akordi = pol nižja) je pogled ob menjavi vrstice skočil nazaj.
-        const heights = rows.map((r) => r.offsetHeight).sort((x, y) => x - y);
-        // × SS_SLOT_ROWS: trenutna vrstica nekoliko nižje od točne 2. vrstice.
-        const slot = (heights[Math.floor(heights.length / 2)] ?? 0) * SS_SLOT_ROWS;
-        const step = next ? next.offsetTop - cur.offsetTop : 0;
-        target = Math.max(0, cur.offsetTop - slot + step * progress);
+      const k = rowFor(line);
+      if (k >= 0 && tops[k] !== undefined) {
+        const step = tops[k + 1] !== undefined ? tops[k + 1] - tops[k] : 0;
+        target = Math.max(0, tops[k] - slot + step * progress);
       }
       const diff = target - pos;
-      // Velik skok (previjanje): takoj; sicer gladko približevanje.
-      if (Math.abs(diff) > box.clientHeight * 1.5 || Math.abs(diff) < 0.3) pos = target;
-      else pos += diff * (1 - Math.exp(-dt / 220));
-      if (Math.round(pos) !== box.scrollTop) box.scrollTop = pos;
+      // Prvi izris ali velik skok (previjanje): takoj; sicer kratko glajenje
+      // (cilj se zdaj premika zvezno, zato majhna zamuda).
+      if (Number.isNaN(pos) || Math.abs(diff) > boxH * 1.5 || Math.abs(diff) < 0.05) pos = target;
+      else pos += diff * (1 - Math.exp(-dt / 110));
+      inner.style.transform = `translate3d(0, ${-pos}px, 0)`;
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
   }, [ssShowLines, ssLines]);
   // Ob zaprtju: izhod iz celozaslonskega načina in sprostitev ležeče usmeritve.
   useEffect(() => {
@@ -2061,7 +2121,60 @@ export default function ChordsViewer({
                   <path d="M11 19l-7-7 7-7" /><path d="M19 19l-7-7 7-7" />
                 </svg>
               </button>
+              <button
+                type="button"
+                onClick={() => setSsSeekOpen((o) => !o)}
+                aria-label="Prevrtavanje"
+                title="Prevrtavanje"
+                aria-pressed={ssSeekOpen}
+                className={`flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/70 text-orange-400 transition hover:opacity-100 active:scale-95 ${ssSeekOpen ? "bg-orange-400/20 opacity-100" : "bg-(--cv-bg)/70 opacity-80"}`}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <path d="M3 12h4M13 12h8" /><circle cx="10" cy="12" r="3" />
+                </svg>
+              </button>
               </div>
+              {/* Prevrtavanje: drsnik čez celo skladbo, kot v mini predvajalniku. */}
+              {ssSeekOpen && (
+                <div
+                  className="absolute inset-x-0 bottom-0 z-20 flex items-center gap-3 border-t border-orange-400/40 bg-(--cv-bg)/90 font-sans backdrop-blur"
+                  style={{
+                    paddingTop: "0.75rem",
+                    paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+                    paddingLeft: "max(1rem, env(safe-area-inset-left))",
+                    paddingRight: "max(1rem, env(safe-area-inset-right))",
+                  }}
+                >
+                  <span className="shrink-0 text-sm tabular-nums opacity-70">{fmtClock(ssTime)}</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(1, Math.floor(videoDuration))}
+                    step={1}
+                    value={Math.min(Math.floor(ssTime), Math.floor(videoDuration))}
+                    onChange={(e) => {
+                      const t = Number(e.target.value);
+                      setSsTime(t);
+                      playerCtlRef.current?.seekAndPlay(t);
+                    }}
+                    disabled={!videoDuration}
+                    aria-label="Položaj v skladbi"
+                    className="h-2 min-w-0 flex-1 cursor-pointer accent-orange-400 disabled:opacity-40"
+                  />
+                  <span className="shrink-0 text-sm tabular-nums opacity-70">{fmtClock(videoDuration)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSsSeekOpen(false)}
+                    aria-label="Zapri prevrtavanje"
+                    title="Zapri"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-orange-400 opacity-80 hover:opacity-100"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
               {/* Odmik od robov (tudi izrez/zaobljeni robovi telefona v ležečem načinu). */}
               <div
                 ref={ssBoxRef}
@@ -2075,7 +2188,7 @@ export default function ChordsViewer({
               >
                 {/* relative: offsetTop vrstic je glede na ta blok; spodnji odmik, da se tudi
                     zadnje vrstice lahko pomaknejo v 2. vrstico. */}
-                <div ref={ssLinesRef} className="relative w-max font-mono leading-snug" style={{ fontSize: 20, paddingBottom: "85vh" }}>
+                <div ref={ssLinesRef} className="relative w-max font-mono leading-snug will-change-transform" style={{ fontSize: 20 }}>
                   {ssLines.map(({ l, i }) => (
                     <div
                       key={i}
@@ -2083,7 +2196,7 @@ export default function ChordsViewer({
                       style={SS_LINE_INSET}
                       onClick={(e) => ssSeekToLine(i, e)}
                       className={
-                        i === activeLine && !ssInGap
+                        i === ssHlLine
                           ? "-mr-1 rounded-r-md bg-[color-mix(in_srgb,var(--cv-text)_8%,transparent)] pr-1 shadow-[inset_2px_0_0_#fb923c]"
                           : "-mr-1 pr-1"
                       }
