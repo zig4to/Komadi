@@ -53,6 +53,12 @@ const FONT_KEY = "komadi:chords:font";
 const SIMPLIFY_KEY = "komadi:chords:simplify";
 const BG_KEY = "komadi:chords:bg";
 const CHORD_COLOR_KEY = "komadi:chords:chordColor";
+const TEXT_COLOR_KEY = "komadi:chords:textColor";
+const SECTION_COLOR_KEY = "komadi:chords:sectionColor";
+const MARK_FILL_KEY = "komadi:chords:markFill";
+const MARK_BORDER_KEY = "komadi:chords:markBorder";
+const MARK_SHAPE_KEY = "komadi:chords:markShape";
+const MARK_WIDTH_KEY = "komadi:chords:markWidth";
 const FLOATING_PLAYER_KEY = "komadi:chords:floatingPlayer";
 // Izbrana različica prijema za vsak akord ({ "Dm": 1, … }).
 const SHAPE_CHOICE_KEY = "komadi:chords:shapeChoice";
@@ -95,8 +101,78 @@ const BACKGROUNDS = [
   { label: "Siva", light: true, bg: "#e5e5e5", text: "#171717", title: "#0a0a0a", muted: "#525252", panel: "#d4d4d4", border: "#a3a3a3" },
   { label: "Temno siva", light: false, bg: "#262626", text: "#f5f5f5", title: "#ffffff", muted: "#a3a3a3", panel: "#171717", border: "#525252" },
   { label: "Črna", light: false, bg: "#0a0a0a", text: "#f5f5f5", title: "#ffffff", muted: "#a3a3a3", panel: "#171717", border: "#525252" },
+  // Nova ozadja so dodana na konec (izbira je v localStorage shranjena kot
+  // indeks); vrstni red v izbirniku določa BACKGROUND_ORDER.
+  { label: "Grafit", light: false, bg: "#3a3a3a", text: "#f5f5f5", title: "#ffffff", muted: "#b4b4b4", panel: "#262626", border: "#5e5e5e" },
+  { label: "Antracit", light: false, bg: "#181818", text: "#f5f5f5", title: "#ffffff", muted: "#a3a3a3", panel: "#0f0f0f", border: "#4a4a4a" },
+  { label: "Rjava", light: false, bg: "#2a2019", text: "#f5ede6", title: "#ffffff", muted: "#b8a897", panel: "#1e1711", border: "#5a4a3d" },
+  { label: "Temno rjava", light: false, bg: "#18110c", text: "#f2e9e1", title: "#ffffff", muted: "#a89684", panel: "#0f0a07", border: "#4a3b30" },
+  { label: "Temno modra", light: false, bg: "#0b1422", text: "#eef3fa", title: "#ffffff", muted: "#94a3b8", panel: "#070d18", border: "#334155" },
+  { label: "Temno zelena", light: false, bg: "#0a1711", text: "#eef7f1", title: "#ffffff", muted: "#94ab9f", panel: "#06100b", border: "#2f4a3d" },
 ];
+// Od svetlega do temnega, rjava na koncu.
+const BACKGROUND_ORDER = [0, 1, 4, 2, 5, 3, 6, 7, 8, 9];
 const DEFAULT_BG = 3;
+// Barve besedila: "Samodejna" = barva, ki pripada ozadju (BACKGROUNDS.text);
+// ostale imajo svetlo različico za temna ozadja in temno za svetla.
+const TEXT_COLORS: { label: string; dark: string | null; light: string | null }[] = [
+  { label: "Samodejna", dark: null, light: null },
+  { label: "Kontrastna", dark: "#ffffff", light: "#000000" },
+  { label: "Topla", dark: "#f1e4cf", light: "#3b2a1e" },
+  { label: "Siva", dark: "#c4c4c4", light: "#4a4a4a" },
+  { label: "Hladna", dark: "#d9e6f5", light: "#1e2a44" },
+];
+// Barve pripisov (Intro, Verse, Chorus, Solo …): "Samodejna" = rumena, oz.
+// oranžna, kadar so rumeni/kremni tudi akordi.
+const SECTION_COLORS: { label: string; dark: string | null; light: string | null }[] = [
+  { label: "Samodejna", dark: null, light: null },
+  { label: "Siva", dark: "#a3a3a3", light: "#737373" },
+  { label: "Rumena", dark: "#fbbf24", light: "#b45309" },
+  { label: "Oranžna", dark: "#fb923c", light: "#c2410c" },
+  { label: "Rožnata", dark: "#f9a8d4", light: "#be185d" },
+  { label: "Vijolična", dark: "#c4b5fd", light: "#6d28d9" },
+  { label: "Modra", dark: "#7dd3fc", light: "#0369a1" },
+  { label: "Turkizna", dark: "#5eead4", light: "#0f766e" },
+  { label: "Zelena", dark: "#86efac", light: "#15803d" },
+  { label: "Kremna", dark: "#fde68a", light: "#92400e" },
+];
+// Premikajoča oznaka akorda (Smart play med introm, interludijem, solom …):
+// ozadje, obroba in oblika. Privzeto = kot doslej (oranžna, obroba enaka).
+// Ozadje null = brez (akord ostane v svoji barvi); obroba null = kot ozadje.
+const MARK_FILLS: { label: string; color: string | null }[] = [
+  { label: "Oranžna", color: "#fb923c" },
+  { label: "Rumena", color: "#fbbf24" },
+  { label: "Rdeča", color: "#f87171" },
+  { label: "Rožnata", color: "#f9a8d4" },
+  { label: "Vijolična", color: "#c4b5fd" },
+  { label: "Modra", color: "#38bdf8" },
+  { label: "Turkizna", color: "#5eead4" },
+  { label: "Zelena", color: "#4ade80" },
+  { label: "Bela", color: "#f5f5f5" },
+  { label: "Brez", color: null },
+];
+const MARK_BORDERS: { label: string; color: string | null }[] = [
+  { label: "Kot ozadje", color: null },
+  { label: "Oranžna", color: "#fb923c" },
+  { label: "Rumena", color: "#fbbf24" },
+  { label: "Rdeča", color: "#ef4444" },
+  { label: "Rožnata", color: "#ec4899" },
+  { label: "Vijolična", color: "#8b5cf6" },
+  { label: "Modra", color: "#0ea5e9" },
+  { label: "Zelena", color: "#22c55e" },
+  { label: "Bela", color: "#ffffff" },
+  { label: "Črna", color: "#0a0a0a" },
+];
+const MARK_SHAPES = [
+  { label: "Oglata", radius: "0px" },
+  { label: "Zaobljena", radius: "0.25rem" },
+  { label: "Bolj zaobljena", radius: "0.5rem" },
+  { label: "Pilula", radius: "9999px" },
+];
+const DEFAULT_MARK_SHAPE = 1;
+// Debelina obrobe oznake (px); privzeto 2 kot doslej.
+const MARK_WIDTHS = [1, 2, 3, 4];
+const DEFAULT_MARK_WIDTH = 1;
 // Barve akordov: svetlejša različica za temno ozadje, temnejša za svetlo.
 const CHORD_COLORS = [
   { label: "Rumena", dark: "#fbbf24", light: "#b45309" },
@@ -104,6 +180,12 @@ const CHORD_COLORS = [
   { label: "Rdeča", dark: "#f87171", light: "#dc2626" },
   { label: "Modra", dark: "#38bdf8", light: "#0369a1" },
   { label: "Zelena", dark: "#4ade80", light: "#15803d" },
+  // Dodatne, ki se ujamejo s temnimi ozadji (rjava, modra, zelena, siva).
+  { label: "Kremna", dark: "#fde68a", light: "#92400e" },
+  { label: "Rožnata", dark: "#f9a8d4", light: "#be185d" },
+  { label: "Vijolična", dark: "#c4b5fd", light: "#6d28d9" },
+  { label: "Turkizna", dark: "#5eead4", light: "#0f766e" },
+  { label: "Limeta", dark: "#bef264", light: "#4d7c0f" },
 ];
 
 function readNumber(key: string, fallback: number) {
@@ -214,47 +296,334 @@ export default function ChordsViewer({
   const [chordColorIndex, setChordColorIndex] = useState(() => readNumber(CHORD_COLOR_KEY, 0));
   useEffect(() => writeNumber(BG_KEY, bgIndex), [bgIndex]);
   useEffect(() => writeNumber(CHORD_COLOR_KEY, chordColorIndex), [chordColorIndex]);
+  const [textColorIndex, setTextColorIndex] = useState(() => readNumber(TEXT_COLOR_KEY, 0));
+  useEffect(() => writeNumber(TEXT_COLOR_KEY, textColorIndex), [textColorIndex]);
+  const [sectionColorIndex, setSectionColorIndex] = useState(() => readNumber(SECTION_COLOR_KEY, 0));
+  useEffect(() => writeNumber(SECTION_COLOR_KEY, sectionColorIndex), [sectionColorIndex]);
+  const [markFillIndex, setMarkFillIndex] = useState(() => readNumber(MARK_FILL_KEY, 0));
+  const [markBorderIndex, setMarkBorderIndex] = useState(() => readNumber(MARK_BORDER_KEY, 0));
+  const [markShapeIndex, setMarkShapeIndex] = useState(() => readNumber(MARK_SHAPE_KEY, DEFAULT_MARK_SHAPE));
+  useEffect(() => writeNumber(MARK_FILL_KEY, markFillIndex), [markFillIndex]);
+  useEffect(() => writeNumber(MARK_BORDER_KEY, markBorderIndex), [markBorderIndex]);
+  useEffect(() => writeNumber(MARK_SHAPE_KEY, markShapeIndex), [markShapeIndex]);
+  const [markWidthIndex, setMarkWidthIndex] = useState(() => readNumber(MARK_WIDTH_KEY, DEFAULT_MARK_WIDTH));
+  useEffect(() => writeNumber(MARK_WIDTH_KEY, markWidthIndex), [markWidthIndex]);
   const theme = BACKGROUNDS[bgIndex] ?? BACKGROUNDS[DEFAULT_BG];
   const chordColor = CHORD_COLORS[chordColorIndex] ?? CHORD_COLORS[0];
+  const textColorFor = (c: (typeof TEXT_COLORS)[number]) => (theme.light ? c.light : c.dark) ?? theme.text;
+  const textColor = textColorFor(TEXT_COLORS[textColorIndex] ?? TEXT_COLORS[0]);
+  const autoSectionColor =
+    chordColor.label === "Rumena" || chordColor.label === "Kremna"
+      ? theme.light ? "#c2410c" : "#fb923c"
+      : theme.light ? "#b45309" : "#fbbf24";
+  const sectionColorFor = (c: (typeof SECTION_COLORS)[number]) => (theme.light ? c.light : c.dark) ?? autoSectionColor;
+  const markFill = (MARK_FILLS[markFillIndex] ?? MARK_FILLS[0]).color;
+  const markBorder = (MARK_BORDERS[markBorderIndex] ?? MARK_BORDERS[0]).color ?? markFill ?? "transparent";
+  const markRadius = (MARK_SHAPES[markShapeIndex] ?? MARK_SHAPES[DEFAULT_MARK_SHAPE]).radius;
+  const markWidth = `${MARK_WIDTHS[markWidthIndex] ?? MARK_WIDTHS[DEFAULT_MARK_WIDTH]}px`;
+  const shownChordColor = theme.light ? chordColor.light : chordColor.dark;
   const themeVars = {
     "--cv-bg": theme.bg,
-    "--cv-text": theme.text,
+    "--cv-text": textColor,
     "--cv-title": theme.title,
     "--cv-muted": theme.muted,
     "--cv-panel": theme.panel,
     "--cv-border": theme.border,
     "--cv-chord": theme.light ? chordColor.light : chordColor.dark,
-    // Imena razdelkov (Intro, Chorus …): rumena kot ostali elementi; če so
-    // rumeni tudi akordi, oranžna, da se ločijo od njih.
-    "--cv-section":
-      chordColor.label === "Rumena"
-        ? theme.light ? "#c2410c" : "#fb923c"
-        : theme.light ? "#b45309" : "#fbbf24",
+    // Imena razdelkov (Intro, Chorus …): izbrana barva pripisov; samodejno
+    // rumena, če so rumeni tudi akordi, oranžna, da se ločijo od njih.
+    "--cv-section": sectionColorFor(SECTION_COLORS[sectionColorIndex] ?? SECTION_COLORS[0]),
+    // Premikajoča oznaka akorda; brez ozadja ostane akord v svoji barvi.
+    "--cv-mark-bg": markFill ?? "transparent",
+    "--cv-mark-text": markFill ? "#0a0a0a" : shownChordColor,
+    "--cv-mark-border": markBorder,
+    "--cv-mark-radius": markRadius,
+    "--cv-mark-width": markWidth,
   } as CSSProperties;
+  // Izbira barv (ozadje, besedilo, akordi, pripisi) — v meniju ⚙ (v "Sam špili" pod "Tema").
+  // Oba razdelka sta ob odprtju menija strnjena.
+  const [bgPickerOpen, setBgPickerOpen] = useState(false);
+  const [chordPickerOpen, setChordPickerOpen] = useState(false);
+  const [textPickerOpen, setTextPickerOpen] = useState(false);
+  const [sectionPickerOpen, setSectionPickerOpen] = useState(false);
+  const [markPickerOpen, setMarkPickerOpen] = useState(false);
+  // Podrazdelki premikajočih oznak (vsak razpirajoč).
+  const [markFillOpen, setMarkFillOpen] = useState(false);
+  const [markBorderOpen, setMarkBorderOpen] = useState(false);
+  const [markWidthOpen, setMarkWidthOpen] = useState(false);
+  const [markShapeOpen, setMarkShapeOpen] = useState(false);
+  // Krogec za izbiro barve oznake; "Brez"/"Kot ozadje" je prečrtan.
+  const markSwatch = (label: string, color: string | null, selected: boolean, onPick: () => void) => (
+    <button
+      key={label}
+      type="button"
+      onClick={onPick}
+      aria-pressed={selected}
+      title={label}
+      className="flex w-11 flex-col items-center gap-1 text-[11px] leading-tight text-neutral-300"
+    >
+      <span
+        style={{ backgroundColor: color ?? "transparent" }}
+        className={`relative h-7 w-7 overflow-hidden rounded-full border border-neutral-600 ${selected ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-neutral-900" : ""}`}
+      >
+        {!color && <span aria-hidden="true" className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 rotate-45 bg-neutral-500" />}
+      </span>
+      {label}
+    </button>
+  );
+  // "Sam špili" ⚙: razdelek "Tema" (izbirniki barv).
+  const [ssSettingsThemeOpen, setSsSettingsThemeOpen] = useState(false);
+  const pickerHeader = (label: string, open: boolean, toggle: () => void) => (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-expanded={open}
+      className={`flex w-full items-center justify-between text-left text-[13px] font-medium text-neutral-400 hover:text-neutral-200 ${open ? "mb-1.5" : ""}`}
+    >
+      {label}
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={`h-3.5 w-3.5 text-amber-400 transition ${open ? "rotate-180" : ""}`}
+      >
+        <path d="m6 9 6 6 6-6" />
+      </svg>
+    </button>
+  );
+  const themePickers = (
+    <>
+      <div>
+        {pickerHeader("Barva ozadja", bgPickerOpen, () => setBgPickerOpen((v) => !v))}
+        {bgPickerOpen && (
+        <div className="grid grid-cols-5 justify-items-center gap-y-2">
+          {BACKGROUND_ORDER.map((i) => {
+            const b = BACKGROUNDS[i];
+            return (
+              <button
+                key={b.label}
+                type="button"
+                onClick={() => setBgIndex(i)}
+                aria-pressed={bgIndex === i}
+                title={b.label}
+                className="flex w-11 flex-col items-center gap-1 text-[11px] leading-tight text-neutral-300"
+              >
+                <span
+                  style={{ backgroundColor: b.bg }}
+                  className={`h-7 w-7 rounded-full border border-neutral-600 ${bgIndex === i ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-neutral-900" : ""}`}
+                />
+                {b.label}
+              </button>
+            );
+          })}
+        </div>
+        )}
+      </div>
+      <div>
+        {pickerHeader("Barva besedila", textPickerOpen, () => setTextPickerOpen((v) => !v))}
+        {textPickerOpen && (
+        <div className="grid grid-cols-5 justify-items-center gap-y-2">
+          {TEXT_COLORS.map((c, i) => (
+            <button
+              key={c.label}
+              type="button"
+              onClick={() => setTextColorIndex(i)}
+              aria-pressed={textColorIndex === i}
+              title={c.label}
+              className="flex w-11 flex-col items-center gap-1 text-[11px] leading-tight text-neutral-300"
+            >
+              {/* Predogled: "Aa" v tej barvi na trenutnem ozadju. */}
+              <span
+                style={{ backgroundColor: theme.bg, color: textColorFor(c) }}
+                className={`flex h-7 w-7 items-center justify-center rounded-full border border-neutral-600 text-[11px] font-semibold ${textColorIndex === i ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-neutral-900" : ""}`}
+              >
+                Aa
+              </span>
+              {c.label}
+            </button>
+          ))}
+        </div>
+        )}
+      </div>
+      <div>
+        {pickerHeader("Barva akordov", chordPickerOpen, () => setChordPickerOpen((v) => !v))}
+        {chordPickerOpen && (
+        <div className="grid grid-cols-5 justify-items-center gap-y-2">
+          {CHORD_COLORS.map((c, i) => (
+            <button
+              key={c.label}
+              type="button"
+              onClick={() => setChordColorIndex(i)}
+              aria-pressed={chordColorIndex === i}
+              aria-label={c.label}
+              title={c.label}
+              style={{ backgroundColor: c.dark }}
+              className={`h-7 w-7 rounded-full ${chordColorIndex === i ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-neutral-900" : ""}`}
+            />
+          ))}
+        </div>
+        )}
+      </div>
+      <div>
+        {pickerHeader("Premikajoče oznake", markPickerOpen, () => setMarkPickerOpen((v) => !v))}
+        {markPickerOpen && (
+          // Črta levo: vse spodaj sodi v "Premikajoče oznake".
+          <div className="ml-1 space-y-2.5 border-l border-orange-400/40 pl-3">
+            {/* Predogled oznake na trenutnem ozadju. */}
+            <div style={{ backgroundColor: theme.bg }} className="flex justify-center gap-4 rounded-lg border border-neutral-700 py-2 font-mono text-sm font-bold">
+              <span style={{ color: shownChordColor }}>G</span>
+              <span
+                style={{
+                  backgroundColor: markFill ?? "transparent",
+                  color: markFill ? "#0a0a0a" : shownChordColor,
+                  boxShadow: `0 0 0 ${markWidth} ${markBorder}`,
+                  borderRadius: markRadius,
+                }}
+              >
+                Am
+              </span>
+              <span style={{ color: shownChordColor }}>F</span>
+            </div>
+            <div className="space-y-2.5">
+            <div>
+              {pickerHeader("Barva ozadja", markFillOpen, () => setMarkFillOpen((v) => !v))}
+              {markFillOpen && (
+              <div className="grid grid-cols-5 justify-items-center gap-y-2">
+                {MARK_FILLS.map((c, i) => markSwatch(c.label, c.color, markFillIndex === i, () => setMarkFillIndex(i)))}
+              </div>
+              )}
+            </div>
+            <div>
+              {pickerHeader("Barva obrobe", markBorderOpen, () => setMarkBorderOpen((v) => !v))}
+              {markBorderOpen && (
+              <div className="grid grid-cols-5 justify-items-center gap-y-2">
+                {MARK_BORDERS.map((c, i) => markSwatch(c.label, c.color, markBorderIndex === i, () => setMarkBorderIndex(i)))}
+              </div>
+              )}
+            </div>
+            <div>
+              {pickerHeader("Debelina obrobe", markWidthOpen, () => setMarkWidthOpen((v) => !v))}
+              {markWidthOpen && (
+              <div className="grid grid-cols-4 justify-items-center gap-y-2">
+                {MARK_WIDTHS.map((w, i) => (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => setMarkWidthIndex(i)}
+                    aria-pressed={markWidthIndex === i}
+                    title={`${w} px`}
+                    className="flex w-14 flex-col items-center gap-1 text-center text-[11px] leading-tight text-neutral-300"
+                  >
+                    <span
+                      style={{ borderWidth: w }}
+                      className={`h-6 w-10 rounded border-orange-400 ${markWidthIndex === i ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-neutral-900" : ""}`}
+                    />
+                    {w} px
+                  </button>
+                ))}
+              </div>
+              )}
+            </div>
+            <div>
+              {pickerHeader("Oblika", markShapeOpen, () => setMarkShapeOpen((v) => !v))}
+              {markShapeOpen && (
+              <div className="grid grid-cols-4 justify-items-center gap-y-2">
+                {MARK_SHAPES.map((sh, i) => (
+                  <button
+                    key={sh.label}
+                    type="button"
+                    onClick={() => setMarkShapeIndex(i)}
+                    aria-pressed={markShapeIndex === i}
+                    title={sh.label}
+                    className="flex w-14 flex-col items-center gap-1 text-center text-[11px] leading-tight text-neutral-300"
+                  >
+                    <span
+                      style={{ borderRadius: sh.radius }}
+                      className={`h-6 w-10 border-2 border-orange-400 bg-orange-400/30 ${markShapeIndex === i ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-neutral-900" : ""}`}
+                    />
+                    {sh.label}
+                  </button>
+                ))}
+              </div>
+              )}
+            </div>
+            </div>
+          </div>
+        )}
+      </div>
+      <div>
+        {pickerHeader("Barva pripisov", sectionPickerOpen, () => setSectionPickerOpen((v) => !v))}
+        {sectionPickerOpen && (
+        <div className="grid grid-cols-5 justify-items-center gap-y-2">
+          {SECTION_COLORS.map((c, i) => (
+            <button
+              key={c.label}
+              type="button"
+              onClick={() => setSectionColorIndex(i)}
+              aria-pressed={sectionColorIndex === i}
+              title={c.label}
+              className="flex w-11 flex-col items-center gap-1 text-[11px] leading-tight text-neutral-300"
+            >
+              {/* Predogled: pripis v tej barvi na trenutnem ozadju. */}
+              <span
+                style={{ backgroundColor: theme.bg, color: sectionColorFor(c) }}
+                className={`flex h-7 w-7 items-center justify-center rounded-full border border-neutral-600 font-sans text-[9px] font-semibold ${sectionColorIndex === i ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-neutral-900" : ""}`}
+              >
+                Intro
+              </span>
+              {c.label}
+            </button>
+          ))}
+        </div>
+        )}
+      </div>
+    </>
+  );
+  // "Sam špili": stranska vrstica z gumbi (skrita desno, odpre jo gumb Meni).
+  const [ssSidebarOpen, setSsSidebarOpen] = useState(false);
 
   // Izbirnik teme: fixed pod gumbom (vrstica z gumbi ima overflow-hidden).
-  const [themeMenuPos, setThemeMenuPos] = useState<{ top: number; left: number } | null>(null);
+  // V "Sam špili" (ssSettingsRef) se odpre levo od gumba in navzgor od njegovega dna.
+  const [themeMenuPos, setThemeMenuPos] = useState<{ top?: number; bottom?: number; left: number; maxHeight?: number } | null>(null);
   // Razdelek "Napredne nastavitve" na dnu menija ⚙ (razprt/strnjen).
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Podrazdelek "Pametni predvajalnik" v naprednih nastavitvah (razprt/strnjen).
+  const [smartInfoOpen, setSmartInfoOpen] = useState(false);
   // Napredno: "Predvajalnik med pomikanjem" — med samodejnim pomikanjem desno
   // plavajoče kontrole glasbe (YouTubeMiniPlayer floatingHost). Globalno.
   const [floatingPlayer, setFloatingPlayer] = useState(() => readNumber(FLOATING_PLAYER_KEY, 0) === 1);
   useEffect(() => writeNumber(FLOATING_PLAYER_KEY, floatingPlayer ? 1 : 0), [floatingPlayer]);
   const themeButtonRef = useRef<HTMLButtonElement>(null);
+  const ssSettingsRef = useRef<HTMLButtonElement>(null);
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const closeThemeMenu = () => setThemeMenuPos(null);
   const toggleThemeMenu = () => {
     if (themeMenuPos) return closeThemeMenu();
     const r = themeButtonRef.current?.getBoundingClientRect();
     if (!r) return;
-    setThemeMenuPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 232)) });
+    setThemeMenuPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 296)) });
+  };
+  // Ob zaprtju stranske vrstice se zapre tudi njen meni ⚙.
+  const toggleSsSidebar = () => {
+    if (ssSidebarOpen) closeThemeMenu();
+    setSsSidebarOpen((o) => !o);
+  };
+  const toggleSsSettings = () => {
+    if (themeMenuPos) return closeThemeMenu();
+    const r = ssSettingsRef.current?.getBoundingClientRect();
+    if (!r) return;
+    setThemeMenuPos({ bottom: window.innerHeight - r.bottom, left: Math.max(8, r.left - 12 - 288), maxHeight: r.bottom - 8 });
   };
   useBackableOpen(themeMenuPos !== null, closeThemeMenu);
   useEffect(() => {
     if (!themeMenuPos) return;
     const onDown = (e: PointerEvent) => {
       const t = e.target as Node;
-      if (themeMenuRef.current?.contains(t) || themeButtonRef.current?.contains(t)) return;
+      if (themeMenuRef.current?.contains(t) || themeButtonRef.current?.contains(t) || ssSettingsRef.current?.contains(t)) return;
       setThemeMenuPos(null);
     };
     document.addEventListener("pointerdown", onDown);
@@ -456,8 +825,9 @@ export default function ChordsViewer({
   // "Sam špili": kliknjen Play, posnetek se še nalaga.
   const [ssRequested, setSsRequested] = useState(false);
   // "Sam špili": uporabnik je pritisnil Play (in ne Pavze) / posnetek je že kdaj
-  // igral. Vrstice so vidne, dokler uporabnik ne da pavze — kratko nalaganje
-  // ob preskoku (±5 s, na začetek) NE vrne začetnega zaslona.
+  // igral. Ko je posnetek enkrat igral, vrstice ostanejo vidne — tudi med
+  // pavzo (pogled obstane, gumb Pavza postane Play) in med kratkim nalaganjem
+  // ob preskoku (±5 s, na začetek).
   const [ssActive, setSsActive] = useState(false);
   const [ssHasPlayed, setSsHasPlayed] = useState(false);
   // "Sam špili": zapeta vrstica se je končala in sledi daljši instrumentalni
@@ -469,7 +839,7 @@ export default function ChordsViewer({
   // "Sam špili": drsnik čez celo skladbo (spodaj), odpre ga gumb v stolpcu.
   const [ssSeekOpen, setSsSeekOpen] = useState(false);
   const [ssTime, setSsTime] = useState(0);
-  const ssShowLines = samSpili && ssActive && ssHasPlayed;
+  const ssShowLines = samSpili && ssHasPlayed;
   // Telefon, med pavzo: tap na vrstico skoči tja in predvaja naprej.
   const playerCtlRef = useRef<PlayerController | null>(null);
   const playbackRef = useRef({ time: 0, playing: false });
@@ -734,7 +1104,10 @@ export default function ChordsViewer({
         seconds = sync.points[j].end + lrcOffset;
       }
     }
-    if (playerCtlRef.current?.seekAndPlay(Math.max(0, seconds))) setSmartOn(true);
+    if (playerCtlRef.current?.seekAndPlay(Math.max(0, seconds))) {
+      setSmartOn(true);
+      setSsActive(true);
+    }
   };
   const onVideoTime = (seconds: number, duration: number, playing: boolean) => {
     playbackRef.current = { time: seconds, playing };
@@ -902,7 +1275,8 @@ export default function ChordsViewer({
   });
   // Velikost pisave (enkrat za skladbo in ob spremembi velikosti zaslona):
   // najdaljša vrstica zapolni širino (do črte), po višini pa gredo ~3 vrstice. Merjeno
-  // pri 20 px in linearno povečano; nastavljeno neposredno na element.
+  // pri 20 px in linearno povečano; nastavljeno neposredno na element. Nobena
+  // vrstica se ne prelomi.
   useEffect(() => {
     const box = ssBoxRef.current;
     const inner = ssLinesRef.current;
@@ -1201,7 +1575,7 @@ export default function ChordsViewer({
         data-chord-name
         className={`cursor-pointer ${
           // Senca namesto odmika: obarvano ozadje brez premika postavitve.
-          active ? "rounded-sm bg-orange-400 text-neutral-950 shadow-[0_0_0_2px_#fb923c]" : ""
+          active ? "rounded-(--cv-mark-radius) bg-(--cv-mark-bg) text-(--cv-mark-text) shadow-[0_0_0_var(--cv-mark-width)_var(--cv-mark-border)]" : ""
         } ${recorded && !active ? "underline decoration-orange-400 decoration-dotted underline-offset-4" : ""}`}
         onPointerEnter={(e) => {
           if (e.pointerType === "mouse" && !recorder) showShape(name, e.currentTarget);
@@ -1573,9 +1947,11 @@ export default function ChordsViewer({
           ref={themeMenuRef}
           role="dialog"
           aria-label="Nastavitve"
-          style={{ top: themeMenuPos.top, left: themeMenuPos.left }}
-          className="fixed z-10 w-56 space-y-3 rounded-xl border border-orange-400 bg-neutral-900 p-3 shadow-xl"
+          style={{ top: themeMenuPos.top, bottom: themeMenuPos.bottom, left: themeMenuPos.left, maxHeight: themeMenuPos.maxHeight }}
+          className={`fixed w-72 space-y-3 overflow-y-auto rounded-xl border border-orange-400 bg-neutral-900 p-3 font-sans shadow-xl ${samSpili ? "z-50" : "z-10"}`}
         >
+          {/* "Sam špili" prekrije urejevalnik, snemanje in samodejno pomikanje — tam jih ni. */}
+          {!samSpili && (
           <button
             type="button"
             onClick={() => {
@@ -1591,50 +1967,127 @@ export default function ChordsViewer({
             </svg>
             {editing ? "Zapri urejanje" : "Uredi besedilo in akorde"}
           </button>
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-neutral-400">Ozadje</p>
-            <div className="flex justify-between">
-              {BACKGROUNDS.map((b, i) => (
+          )}
+          {/* "Sam špili": naslov, razpirajoča "Tema", napredne na dnu. */}
+          {samSpili ? (
+            <>
+              <p className="px-1 text-[13px] font-medium text-neutral-400">Nastavitve</p>
+              <div className="border-t border-neutral-700 px-1 pt-2">
+                {pickerHeader("Tema", ssSettingsThemeOpen, () => setSsSettingsThemeOpen((v) => !v))}
+                {ssSettingsThemeOpen && <div className="space-y-3 pl-2">{themePickers}</div>}
+              </div>
+            </>
+          ) : (
+            themePickers
+          )}
+          {/* Pametni predvajalnik: v glavnih nastavitvah (ne v naprednih). */}
+          <div className="border-t border-neutral-700 px-1 pt-2">
+            <button
+              type="button"
+              onClick={() => setSmartInfoOpen((v) => !v)}
+              aria-expanded={smartInfoOpen}
+              className="flex w-full items-center justify-between text-left text-[13px] text-neutral-200 hover:text-white"
+            >
+              Pametni predvajalnik
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`h-3.5 w-3.5 text-amber-400 transition ${smartInfoOpen ? "rotate-180" : ""}`}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            {smartInfoOpen && (
+            <div className="mt-1">
+            {chordPoints.length > 0 && (
+              <span className="block text-[10px] leading-tight text-neutral-500">
+                Instrumentalni deli: {syncedChords?.sections.map((s) => s.name).join(", ")} (
+                {chordPoints.filter((p) => !("stop" in p)).length} akordov)
+              </span>
+            )}
+            <span className="block text-[10px] leading-tight text-neutral-500">
+              {sync?.manual
+                ? `Ročno posneti časi: ${sync.points.length} tapov. Zaženi z gumbom Smart play levo od ▶.`
+                : lrcError
+                ? `Napaka: ${lrcError}`
+                : !lrcCandidates
+                  ? "Iščem besedilo s časi …"
+                  : !sync
+                    ? "Za to skladbo ni besedila s časi."
+                    : `${lrc?.album || "Besedilo"}: povezanih ${sync.matched}/${sync.total} vrstic. Zaženi z gumbom Smart play levo od ▶.`}
+            </span>
+            {smartAvailable && (
+              <div className={`mt-1.5 flex items-center justify-between gap-2 ${samSpili ? "" : "lg:hidden"}`}>
+                <span className="text-[11px] text-neutral-300">
+                  Zamik besedila
+                  <span className="block text-[10px] leading-tight text-neutral-500">
+                    {playingVideo ? "za posnetek, ki igra" : "najprej zaženi predvajanje"}
+                  </span>
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => changeLrcOffset(-LRC_OFFSET_STEP)}
+                    disabled={!playingVideo}
+                    className="rounded-full border border-orange-400 px-2 text-xs text-amber-400 disabled:opacity-40"
+                  >
+                    −0,25 s
+                  </button>
+                  <span className="w-12 text-center text-[11px] tabular-nums text-neutral-300">
+                    {lrcOffset > 0 ? "+" : ""}
+                    {lrcOffset.toFixed(2).replace(".", ",")}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => changeLrcOffset(LRC_OFFSET_STEP)}
+                    disabled={!playingVideo}
+                    className="rounded-full border border-orange-400 px-2 text-xs text-amber-400 disabled:opacity-40"
+                  >
+                    +0,25 s
+                  </button>
+                </div>
+              </div>
+            )}
+            {!samSpili && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {/* Na računalniku je ta gumb v orodni vrstici. */}
                 <button
-                  key={b.label}
                   type="button"
-                  onClick={() => setBgIndex(i)}
-                  aria-pressed={bgIndex === i}
-                  title={b.label}
-                  className="flex w-12 flex-col items-center gap-1 text-[10px] leading-tight text-neutral-300"
+                  onClick={startRecorder}
+                  className="rounded-full border border-orange-400 px-2.5 py-1 text-[11px] font-medium text-amber-400 hover:bg-orange-400/15 lg:hidden"
                 >
-                  <span
-                    style={{ backgroundColor: b.bg }}
-                    className={`h-7 w-7 rounded-full border border-neutral-600 ${bgIndex === i ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-neutral-900" : ""}`}
-                  />
-                  {b.label}
+                  {syncedLines || syncedChords ? "Nadaljuj snemanje časov" : "Posnemi čase"}
                 </button>
-              ))}
+                {(syncedLines || syncedChords) && (
+                  <button
+                    type="button"
+                    onClick={deleteSyncedLines}
+                    className="rounded-full border border-neutral-600 px-2.5 py-1 text-[11px] text-neutral-300 hover:border-red-400 hover:text-red-400"
+                  >
+                    Izbriši posnete čase
+                  </button>
+                )}
+              </div>
+            )}
+            {smartAvailable && lrcOffsetError && (
+              <span className="mt-1 block text-[10px] leading-tight text-red-400">
+                Zamik je shranjen samo v tem brskalniku ({lrcOffsetError}). Poženi migracijo 0028_add_lrc_offset.sql v Supabase.
+              </span>
+            )}
             </div>
-          </div>
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-neutral-400">Barva akordov</p>
-            <div className="flex justify-between">
-              {CHORD_COLORS.map((c, i) => (
-                <button
-                  key={c.label}
-                  type="button"
-                  onClick={() => setChordColorIndex(i)}
-                  aria-pressed={chordColorIndex === i}
-                  aria-label={c.label}
-                  title={c.label}
-                  style={{ backgroundColor: c.dark }}
-                  className={`h-7 w-7 rounded-full ${chordColorIndex === i ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-neutral-900" : ""}`}
-                />
-              ))}
-            </div>
+            )}
           </div>
           <div className="border-t border-neutral-700 pt-2">
             <button
               type="button"
               onClick={() => setAdvancedOpen((v) => !v)}
               aria-expanded={advancedOpen}
-              className="flex w-full items-center justify-between rounded-lg px-1 py-1 text-left text-xs font-medium text-neutral-200 hover:text-white"
+              className="flex w-full items-center justify-between rounded-lg px-1 py-1 text-left text-[13px] font-medium text-neutral-200 hover:text-white"
             >
               Napredne nastavitve
               <svg
@@ -1650,9 +2103,11 @@ export default function ChordsViewer({
                 <path d="m6 9 6 6 6-6" />
               </svg>
             </button>
-            {/* Prostor za napredne nastavitve (dodane kasneje). */}
             {advancedOpen && (
               <div className="space-y-2 px-1 pt-2">
+                {samSpili ? (
+                  <p className="text-[10px] leading-tight text-neutral-500">Tu še ni naprednih nastavitev.</p>
+                ) : (
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-neutral-200">
                     Predvajalnik med pomikanjem
@@ -1671,84 +2126,7 @@ export default function ChordsViewer({
                     />
                   </button>
                 </div>
-                <div className="border-t border-neutral-700 pt-2">
-                  <span className="text-xs text-neutral-200">Pametni predvajalnik</span>
-                  {chordPoints.length > 0 && (
-                    <span className="block text-[10px] leading-tight text-neutral-500">
-                      Instrumentalni deli: {syncedChords?.sections.map((s) => s.name).join(", ")} (
-                      {chordPoints.filter((p) => !("stop" in p)).length} akordov)
-                    </span>
-                  )}
-                  <span className="block text-[10px] leading-tight text-neutral-500">
-                    {sync?.manual
-                      ? `Ročno posneti časi: ${sync.points.length} tapov. Zaženi z gumbom Smart play levo od ▶.`
-                      : lrcError
-                      ? `Napaka: ${lrcError}`
-                      : !lrcCandidates
-                        ? "Iščem besedilo s časi …"
-                        : !sync
-                          ? "Za to skladbo ni besedila s časi."
-                          : `${lrc?.album || "Besedilo"}: povezanih ${sync.matched}/${sync.total} vrstic. Zaženi z gumbom Smart play levo od ▶.`}
-                  </span>
-                  {smartAvailable && (
-                    <div className="mt-1.5 flex items-center justify-between gap-2 lg:hidden">
-                      <span className="text-[11px] text-neutral-300">
-                        Zamik besedila
-                        <span className="block text-[10px] leading-tight text-neutral-500">
-                          {playingVideo ? "za posnetek, ki igra" : "najprej zaženi predvajanje"}
-                        </span>
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => changeLrcOffset(-LRC_OFFSET_STEP)}
-                          disabled={!playingVideo}
-                          className="rounded-full border border-orange-400 px-2 text-xs text-amber-400 disabled:opacity-40"
-                        >
-                          −0,25 s
-                        </button>
-                        <span className="w-12 text-center text-[11px] tabular-nums text-neutral-300">
-                          {lrcOffset > 0 ? "+" : ""}
-                          {lrcOffset.toFixed(2).replace(".", ",")}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => changeLrcOffset(LRC_OFFSET_STEP)}
-                          disabled={!playingVideo}
-                          className="rounded-full border border-orange-400 px-2 text-xs text-amber-400 disabled:opacity-40"
-                        >
-                          +0,25 s
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {(
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {/* Na računalniku je ta gumb v orodni vrstici. */}
-                      <button
-                        type="button"
-                        onClick={startRecorder}
-                        className="rounded-full border border-orange-400 px-2.5 py-1 text-[11px] font-medium text-amber-400 hover:bg-orange-400/15 lg:hidden"
-                      >
-                        {syncedLines || syncedChords ? "Nadaljuj snemanje časov" : "Posnemi čase"}
-                      </button>
-                      {(syncedLines || syncedChords) && (
-                        <button
-                          type="button"
-                          onClick={deleteSyncedLines}
-                          className="rounded-full border border-neutral-600 px-2.5 py-1 text-[11px] text-neutral-300 hover:border-red-400 hover:text-red-400"
-                        >
-                          Izbriši posnete čase
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {smartAvailable && lrcOffsetError && (
-                    <span className="mt-1 block text-[10px] leading-tight text-red-400">
-                      Zamik je shranjen samo v tem brskalniku ({lrcOffsetError}). Poženi migracijo 0028_add_lrc_offset.sql v Supabase.
-                    </span>
-                  )}
-                </div>
+                )}
               </div>
             )}
           </div>
@@ -2090,35 +2468,76 @@ export default function ChordsViewer({
 
       {/* "Sam špili": prekrije pregledovalnik (predvajalnik ostane spodaj in igra). */}
       {samSpili && (
-        <div className="absolute inset-0 z-40 flex flex-col bg-(--cv-bg) text-(--cv-text)">
+        <div className="absolute inset-0 z-40 flex flex-col overflow-hidden bg-(--cv-bg) text-(--cv-text)">
           {ssShowLines ? (
             <>
-              {/* Blaga navpična črta levo od stolpca gumbov — besedilo se konča pred njo. */}
+              {/* Blaga navpična črta levo od stolpca gumbov — besedilo se konča pred njo;
+                  skrije se skupaj s stransko vrstico. */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-y-0 z-10 w-px bg-(--cv-text) opacity-15"
+                className={`pointer-events-none absolute inset-y-0 z-10 w-px bg-(--cv-text) transition-opacity duration-300 ${ssSidebarOpen ? "opacity-15" : "opacity-0"}`}
                 style={{ right: "calc(max(0.75rem, env(safe-area-inset-right)) + 2.25rem + 0.625rem)" }}
               />
-              {/* Desno zgoraj: pavza, pod njo na začetek, 5 s naprej in 5 s nazaj. */}
+              {/* Desno zgoraj: gumb Meni (vedno viden), pod njim stranska vrstica
+                  (zapri, pavza/play, na začetek, ±5 s, prevrtavanje,
+                  nastavitve), ki se skrije desno čez rob. */}
               <div
                 style={{ top: "max(0.75rem, env(safe-area-inset-top))", right: "max(0.75rem, env(safe-area-inset-right))" }}
                 className="absolute z-10 flex flex-col gap-2"
               >
               <button
                 type="button"
-                onClick={ssPause}
-                aria-label="Pavza"
-                title="Pavza"
+                onClick={toggleSsSidebar}
+                aria-label={ssSidebarOpen ? "Skrij meni" : "Pokaži meni"}
+                title={ssSidebarOpen ? "Skrij meni" : "Pokaži meni"}
+                aria-expanded={ssSidebarOpen}
+                className={`flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/70 text-orange-400 transition hover:opacity-100 active:scale-95 ${ssSidebarOpen ? "bg-orange-400/20 opacity-100" : "bg-(--cv-bg)/70 opacity-80"}`}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <path d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <div
+                aria-hidden={!ssSidebarOpen}
+                inert={!ssSidebarOpen}
+                className={`flex flex-col gap-2 transition duration-300 ease-out ${ssSidebarOpen ? "" : "pointer-events-none translate-x-[calc(100%+2rem)] opacity-0"}`}
+              >
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Zapri"
+                title="Zapri"
                 className="flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/70 bg-(--cv-bg)/70 text-orange-400 opacity-80 transition hover:opacity-100 active:scale-95"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-                  <rect x="6" y="5" width="4" height="14" rx="1" />
-                  <rect x="14" y="5" width="4" height="14" rx="1" />
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
+              </button>
+              {/* Pavza pusti pogled, kot je; isti gumb nato predvaja naprej. */}
+              <button
+                type="button"
+                onClick={ssActive ? ssPause : ssPlay}
+                disabled={!ssActive && ssRequested}
+                aria-label={ssActive ? "Pavza" : "Predvajaj"}
+                title={ssActive ? "Pavza" : "Predvajaj"}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/70 bg-(--cv-bg)/70 text-orange-400 opacity-80 transition hover:opacity-100 active:scale-95"
+              >
+                {ssActive ? (
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+                    <rect x="6" y="5" width="4" height="14" rx="1" />
+                    <rect x="14" y="5" width="4" height="14" rx="1" />
+                  </svg>
+                ) : (
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 h-4 w-4">
+                    <path d="M7 5v14l12-7z" />
+                  </svg>
+                )}
               </button>
               <button
                 type="button"
-                onClick={() => playerCtlRef.current?.seekAndPlay(0)}
+                onClick={() => {
+                  if (playerCtlRef.current?.seekAndPlay(0)) setSsActive(true);
+                }}
                 aria-label="Na začetek"
                 title="Na začetek"
                 className="flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/70 bg-(--cv-bg)/70 text-orange-400 opacity-80 transition hover:opacity-100 active:scale-95"
@@ -2162,6 +2581,22 @@ export default function ChordsViewer({
                   <path d="M3 12h4M13 12h8" /><circle cx="10" cy="12" r="3" />
                 </svg>
               </button>
+              {/* Nastavitve: isti meni ⚙ kot v pregledovalniku (brez urejanja in snemanja). */}
+              <button
+                ref={ssSettingsRef}
+                type="button"
+                onClick={toggleSsSettings}
+                aria-label="Nastavitve"
+                title="Nastavitve"
+                aria-expanded={themeMenuPos !== null}
+                className={`flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/70 text-orange-400 transition hover:opacity-100 active:scale-95 ${themeMenuPos ? "bg-orange-400/20 opacity-100" : "bg-(--cv-bg)/70 opacity-80"}`}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+              </div>
               </div>
               {/* Prevrtavanje: drsnik čez celo skladbo, kot v mini predvajalniku. */}
               {ssSeekOpen && (
@@ -2184,7 +2619,7 @@ export default function ChordsViewer({
                     onChange={(e) => {
                       const t = Number(e.target.value);
                       setSsTime(t);
-                      playerCtlRef.current?.seekAndPlay(t);
+                      if (playerCtlRef.current?.seekAndPlay(t)) setSsActive(true);
                     }}
                     disabled={!videoDuration}
                     aria-label="Položaj v skladbi"
@@ -2210,7 +2645,11 @@ export default function ChordsViewer({
                 className="min-h-0 flex-1 overflow-hidden"
                 style={{
                   paddingTop: "max(1.75rem, env(safe-area-inset-top))",
-                  paddingRight: "calc(max(0.75rem, env(safe-area-inset-right)) + 3.125rem)",
+                  // Zaprta stranska vrstica: besedilo dobi njen prostor (do gumba
+                  // Meni, ki plava v kotu); ResizeObserver pisavo prilagodi.
+                  paddingRight: ssSidebarOpen
+                    ? "calc(max(0.75rem, env(safe-area-inset-right)) + 3.125rem)"
+                    : "calc(max(0.75rem, env(safe-area-inset-right)) + 0.5rem)",
                   paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
                   paddingLeft: "max(2.5rem, calc(env(safe-area-inset-left) + 1.25rem), 3vw)",
                 }}
