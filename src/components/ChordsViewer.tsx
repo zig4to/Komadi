@@ -73,6 +73,8 @@ const INSTRUMENTAL_TEST_TITLES = ["water witch"];
 const SS_LINE_INSET = { marginLeft: "-0.45em", paddingLeft: "0.45em" } as const;
 // "Sam špili": koliko (tipičnih) vrstic nad trenutno ostane vidnih ob njenem začetku.
 const SS_SLOT_ROWS = 1.4;
+// "Sam špili": premor v petju (s), ki šteje kot instrumentalni del — poudarek se ugasne.
+const SS_GAP_MIN = 4;
 const lrcOffsetsKey = (id: string) => `komadi:chords:lrcOffsets:${id}`;
 const transposeKey = (id: string) => `komadi:chords:transpose:${id}`;
 const workingVideoKey = (id: string) => `komadi:chords:video:${id}`;
@@ -446,10 +448,17 @@ export default function ChordsViewer({
     }, 700);
   };
   const [activeLine, setActiveLine] = useState(-1);
-  // Ali posnetek trenutno igra (za "Sam špili": začetni zaslon ↔ 3 vrstice).
-  const [videoPlaying, setVideoPlaying] = useState(false);
   // "Sam špili": kliknjen Play, posnetek se še nalaga.
   const [ssRequested, setSsRequested] = useState(false);
+  // "Sam špili": uporabnik je pritisnil Play (in ne Pavze) / posnetek je že kdaj
+  // igral. Vrstice so vidne, dokler uporabnik ne da pavze — kratko nalaganje
+  // ob preskoku (±5 s, na začetek) NE vrne začetnega zaslona.
+  const [ssActive, setSsActive] = useState(false);
+  const [ssHasPlayed, setSsHasPlayed] = useState(false);
+  // "Sam špili": zapeta vrstica se je končala in sledi daljši instrumentalni
+  // del (interlude, solo …) — poudarek (ozadje) se odstrani do naslednje vrstice.
+  const [ssInGap, setSsInGap] = useState(false);
+  const ssShowLines = samSpili && ssActive && ssHasPlayed;
   // Telefon, med pavzo: tap na vrstico skoči tja in predvaja naprej.
   const playerCtlRef = useRef<PlayerController | null>(null);
   const playbackRef = useRef({ time: 0, playing: false });
@@ -682,14 +691,60 @@ export default function ChordsViewer({
       lastUserScrollRef.current = 0;
     }
   };
+  // "Sam špili": tap (prst ali miška) na vrstico skoči tja — tudi med
+  // predvajanjem. Vrstica z besedilom: njen začetek (pri ponovljenem refrenu
+  // ponovitev, časovno najbližja trenutnemu mestu). Instrumentalna vrstica
+  // (intro, interlude): začetek tega dela = konec prejšnje zapete vrstice,
+  // pred prvo zapeto vrstico začetek skladbe.
+  const ssSeekToLine = (lineIndex: number, e: React.MouseEvent) => {
+    if (!sync) return;
+    if ((e.target as HTMLElement).closest("[data-chord-name],button,a")) return;
+    const now = playbackRef.current.time - lrcOffset;
+    const nearest = (pred: (p: { time: number; end: number; lineIndex: number }) => boolean) => {
+      let best = -1;
+      sync.points.forEach((p, k) => {
+        if (!pred(p)) return;
+        if (best < 0 || Math.abs(p.time - now) < Math.abs(sync.points[best].time - now)) best = k;
+      });
+      return best;
+    };
+    let seconds: number;
+    let k = nearest((p) => p.lineIndex === lineIndex);
+    if (k >= 0) {
+      while (k > 0 && sync.points[k - 1].lineIndex === lineIndex) k--;
+      seconds = sync.points[k].time + lrcOffset - 0.3;
+    } else {
+      // Instrumentalna vrstica: zadnja zapeta vrstica pred njo (najbližja ponovitev).
+      const prevLine = Math.max(-1, ...sync.points.filter((p) => p.lineIndex < lineIndex).map((p) => p.lineIndex));
+      if (prevLine < 0) seconds = 0;
+      else {
+        let j = nearest((p) => p.lineIndex === prevLine);
+        while (j + 1 < sync.points.length && sync.points[j + 1].lineIndex === prevLine) j++;
+        seconds = sync.points[j].end + lrcOffset;
+      }
+    }
+    if (playerCtlRef.current?.seekAndPlay(Math.max(0, seconds))) setSmartOn(true);
+  };
   const onVideoTime = (seconds: number, duration: number, playing: boolean) => {
     playbackRef.current = { time: seconds, playing };
-    setVideoPlaying(playing);
-    if (playing) setSsRequested(false);
+    if (playing) {
+      setSsRequested(false);
+      setSsHasPlayed(true);
+    }
     if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
     const prog = smartActive && sync ? lineProgressAt(sync.points, seconds - lrcOffset) : { lineIndex: -1, progress: 0 };
     setActiveLine(prog.lineIndex);
     ssProgressRef.current = { line: prog.lineIndex, progress: prog.progress };
+    if (samSpili && sync) {
+      // Zadnja točka pred zdaj; instrumentalni del = do naslednje zapete
+      // vrstice ≥ SS_GAP_MIN s. Kratki vdihi med vrsticami poudarka ne ugasnejo.
+      const t = seconds - lrcOffset;
+      let k = -1;
+      for (let j = 0; j < sync.points.length && sync.points[j].time <= t; j++) k = j;
+      const cur = k >= 0 ? sync.points[k] : null;
+      const next = sync.points[k + 1];
+      setSsInGap(!!cur && t > cur.end + 0.5 && (!next || next.time - cur.end >= SS_GAP_MIN));
+    }
     // Akordi: čas posnetka brez zamika LRC (vsak del ima svoj zamik); med
     // snemanjem po osnutku, da se pregled z ▶ takoj vidi.
     const pts = recorder ? draftChordPoints : smartActive ? chordPoints : [];
@@ -838,25 +893,38 @@ export default function ChordsViewer({
     const inner = ssLinesRef.current;
     if (!samSpili || !box || !inner || !ssLines.length) return;
     const fit = () => {
+      // Razpoložljiva širina/višina = okvir BREZ odmikov (clientWidth jih
+      // vključuje — brez odštevanja so dolge vrstice na desni odrezane).
+      const cs = getComputedStyle(box);
+      const availW = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const availH = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
       inner.style.fontSize = "20px";
       const w = inner.scrollWidth;
       const rows = [...inner.children] as HTMLElement[];
       const avgH = rows.reduce((h, r) => h + r.offsetHeight, 0) / Math.max(1, rows.length);
-      if (!w || !avgH) return;
-      const k = Math.min(box.clientWidth / w, box.clientHeight / (4 * avgH));
-      inner.style.fontSize = `${Math.max(14, Math.floor(20 * k * 0.97))}px`;
+      if (!w || !avgH || availW <= 0) return;
+      const k = Math.min(availW / w, availH / (4 * avgH));
+      let size = Math.max(14, Math.floor(20 * k * 0.94));
+      inner.style.fontSize = `${size}px`;
+      // Preverjanje: če najširša vrstica (krepki akordi, zaokroževanje) še
+      // gleda čez, pisavo zmanjšuj po 1 px, dokler ne gre vse v širino.
+      while (size > 14 && inner.scrollWidth > availW) {
+        size -= 1;
+        inner.style.fontSize = `${size}px`;
+      }
     };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(box);
     return () => ro.disconnect();
-  }, [samSpili, ssLines, videoPlaying]);
+  }, [samSpili, ssLines, ssShowLines]);
   // Zanka pomikanja: cilj = trenutna vrstica v 2. vrstici + napredek proti
   // naslednji; položaj se cilju gladko približuje (vsaka sličica).
   useEffect(() => {
     const box = ssBoxRef.current;
     const inner = ssLinesRef.current;
-    if (!samSpili || !videoPlaying || !box || !inner) return;
+    // Teče tudi med kratkim nalaganjem ob preskoku, da se pogled gladko premakne.
+    if (!ssShowLines || !box || !inner) return;
     let pos = box.scrollTop;
     let last = performance.now();
     let raf = 0;
@@ -888,7 +956,7 @@ export default function ChordsViewer({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [samSpili, videoPlaying, ssLines]);
+  }, [ssShowLines, ssLines]);
   // Ob zaprtju: izhod iz celozaslonskega načina in sprostitev ležeče usmeritve.
   useEffect(() => {
     if (!samSpili) return;
@@ -904,6 +972,7 @@ export default function ChordsViewer({
   // ker requestFullscreen porabi dovoljenje klika in bi YouTube ostal ustavljen.
   const ssPlay = () => {
     setSmartOn(true);
+    setSsActive(true);
     setSsRequested(true);
     playerCtlRef.current?.play();
   };
@@ -923,9 +992,9 @@ export default function ChordsViewer({
   }, [samSpili]);
   const ssPause = () => {
     setSsRequested(false);
+    setSsActive(false);
     playerCtlRef.current?.pause();
   };
-  const ssShowLines = samSpili && videoPlaying;
 
   // Snemanje časov: vrstica, ki jo naslednji tap označi, ~ tretjino od vrha.
   const recorderCursor = recorder?.cursor ?? -1;
@@ -1935,6 +2004,12 @@ export default function ChordsViewer({
         <div className="absolute inset-0 z-40 flex flex-col bg-(--cv-bg) text-(--cv-text)">
           {ssShowLines ? (
             <>
+              {/* Blaga navpična črta levo od stolpca gumbov — besedilo se konča pred njo. */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 z-10 w-px bg-(--cv-text) opacity-15"
+                style={{ right: "calc(max(0.75rem, env(safe-area-inset-right)) + 2.25rem + 0.625rem)" }}
+              />
               {/* Desno zgoraj: pavza, pod njo na začetek, 5 s naprej in 5 s nazaj. */}
               <div
                 style={{ top: "max(0.75rem, env(safe-area-inset-top))", right: "max(0.75rem, env(safe-area-inset-right))" }}
@@ -1993,7 +2068,7 @@ export default function ChordsViewer({
                 className="min-h-0 flex-1 overflow-hidden"
                 style={{
                   paddingTop: "max(1.75rem, env(safe-area-inset-top))",
-                  paddingRight: "max(2.5rem, calc(env(safe-area-inset-right) + 1.25rem), 3vw)",
+                  paddingRight: "calc(max(0.75rem, env(safe-area-inset-right)) + 3.625rem)",
                   paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
                   paddingLeft: "max(2.5rem, calc(env(safe-area-inset-left) + 1.25rem), 3vw)",
                 }}
@@ -2006,8 +2081,9 @@ export default function ChordsViewer({
                       key={i}
                       // Večji odmik oranžne črte od besedila kot v navadnem Smart playu (v em — velika pisava).
                       style={SS_LINE_INSET}
+                      onClick={(e) => ssSeekToLine(i, e)}
                       className={
-                        i === activeLine
+                        i === activeLine && !ssInGap
                           ? "-mr-1 rounded-r-md bg-[color-mix(in_srgb,var(--cv-text)_8%,transparent)] pr-1 shadow-[inset_2px_0_0_#fb923c]"
                           : "-mr-1 pr-1"
                       }

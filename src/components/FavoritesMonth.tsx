@@ -348,9 +348,8 @@ function chunk<T>(list: T[], size: number) {
 // naslednja stran desno.
 export function FavoritesThisMonth({ songs, authorImages, ...handlers }: { songs: Song[] } & CardHandlers) {
   const key = currentMonthKey();
-  const items = favoritesSorted(songs)
-    .filter((s) => monthKey(s.favorited_at!) === key)
-    .reverse();
+  // Nazadnje označena prva.
+  const items = favoritesSorted(songs).filter((s) => monthKey(s.favorited_at!) === key);
   const renderCard = (s: Song) => (
     <FavoriteCard key={s.id} song={s} authorImage={authorImages[s.author] ?? null} {...handlers} />
   );
