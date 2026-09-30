@@ -903,12 +903,16 @@ export default function ChordsViewer({
   // Snemalnik: vrstice (TAP) + akordi, razdeljeni na instrumentalne dele.
   // Začne se z že shranjenim (intro danes, solo drugič). history = dejanja
   // tega snemanja, da ↶ razveljavi zadnje (vrstico, akord ali Konec).
+  // Vrstica v snemalniku: tap = natapkana v tem snemanju; brez nje = že
+  // shranjena (synced_lines). replaced = shranjene točke iste vrstice, ki jih
+  // je TAP nadomestil (razveljavitev jih vrne).
+  type RecLine = { t: number; line: number; end?: number; tap?: true };
   type RecAction =
-    | { kind: "line" }
+    | { kind: "line"; replaced: RecLine[] }
     | { kind: "chord"; sectionId: string }
     | { kind: "end"; sectionId: string; prev: number | null };
   const [recorder, setRecorder] = useState<{
-    lines: { t: number; line: number }[];
+    lines: RecLine[];
     cursor: number;
     sections: ChordSection[];
     activeId: string | null;
@@ -1001,15 +1005,23 @@ export default function ChordsViewer({
     setRecorderMsg(null);
     return Math.round(t * 100) / 100;
   };
+  // TAP nadomesti samo čas označene vrstice: prej shranjeno točko te vrstice
+  // (ne pa natapkane v tem snemanju — refren, zapet dvakrat, zapisan enkrat,
+  // dobi dva tapa), vrstice brez TAP-a pa obdržijo čase (shranjene ali iz
+  // LRCLIB, recordBase). Prej je en TAP + Shrani povozil celo skladbo z eno
+  // samo točko. Čas brez zamika besedila, ker ga Smart play odšteje tudi
+  // ročnim časom (lineProgressAt(points, čas − zamik)).
   const recordTap = () => {
     if (!recorder || recorder.cursor < 0) return;
     const t = recordTime();
     if (t == null) return;
+    const line = recorder.cursor;
+    const replaced = recorder.lines.filter((p) => p.line === line && !p.tap);
     setRecorder({
       ...recorder,
-      lines: [...recorder.lines, { t, line: recorder.cursor }],
-      cursor: nextLyricLine(recorder.cursor + 1),
-      history: [...recorder.history, { kind: "line" }],
+      lines: [...recorder.lines.filter((p) => !(p.line === line && !p.tap)), { t: Math.round((t - lrcOffset) * 100) / 100, line, tap: true }],
+      cursor: nextLyricLine(line + 1),
+      history: [...recorder.history, { kind: "line", replaced }],
       dirty: true,
     });
   };
@@ -1058,8 +1070,9 @@ export default function ChordsViewer({
     if (!recorder || !last) return;
     const history = recorder.history.slice(0, -1);
     if (last.kind === "line") {
+      // Zadnji TAP je vedno na koncu seznama; nadomeščene točke se vrnejo.
       const removed = recorder.lines[recorder.lines.length - 1];
-      setRecorder({ ...recorder, lines: recorder.lines.slice(0, -1), cursor: removed?.line ?? recorder.cursor, history });
+      setRecorder({ ...recorder, lines: [...recorder.lines.slice(0, -1), ...last.replaced], cursor: removed?.line ?? recorder.cursor, history });
       return;
     }
     setRecorder({
@@ -1083,9 +1096,22 @@ export default function ChordsViewer({
     const key = lineKey(body[p.line]);
     return key ? { ...p, key } : p;
   };
+  // Izhodišče snemanja, kadar skladba še nima shranjenih časov vrstic: časi iz
+  // LRCLIB. Vrstice brez TAP-a jih ob shranjevanju obdržijo.
+  const recordBase = !syncedLines?.points.length && sync && !sync.manual ? sync.points : [];
   const saveRecorder = async () => {
     if (!recorder?.dirty || !playingVideo) return;
-    const linePoints = [...recorder.lines].sort((a, b) => a.t - b.t).map(withLineKey);
+    // Časi vrstic se shranijo le, če je bil kakšen TAP ali so že bili shranjeni —
+    // samo akordi (Water Witch) pustijo vrstice iz LRCLIB pri miru.
+    const hasTaps = recorder.lines.some((p) => p.tap);
+    const own = recorder.lines.map((p) => ({ t: p.t, line: p.line, ...(p.end !== undefined ? { end: p.end } : {}) }));
+    const taken = new Set(recorder.lines.map((p) => p.line));
+    const r2 = (x: number) => Math.round(x * 100) / 100;
+    const merged =
+      hasTaps || syncedLines?.points.length
+        ? [...own, ...recordBase.filter((p) => !taken.has(p.lineIndex)).map((p) => ({ t: r2(p.time), end: r2(p.end), line: p.lineIndex }))]
+        : [];
+    const linePoints = merged.sort((a, b) => a.t - b.t).map(withLineKey);
     const sections = recorder.sections.filter((s) => s.points.length).map((s) => ({ ...s, points: s.points.map(withLineKey) }));
     // Shrani samo plasti, ki imajo točke (ali so jih imele): Water Witch s
     // samimi akordi pusti vrstice iz LRCLIB pri miru.
