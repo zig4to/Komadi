@@ -169,7 +169,8 @@ export default function YouTubeMiniPlayer({
   // Posnetek, ki je naložen v predvajalnik (za kljukico v izbirniku).
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
-  const [pickerPos, setPickerPos] = useState<{ top: number; right: number } | null>(null);
+  // full = telefon: čez celo širino zaslona (8 px robova), sicer pod gumbom desno.
+  const [pickerPos, setPickerPos] = useState<{ top: number; right: number; full: boolean } | null>(null);
   const [infos, setInfos] = useState<Record<string, VideoInfo | undefined>>({});
   const [customUrl, setCustomUrl] = useState("");
   const [customError, setCustomError] = useState<string | null>(null);
@@ -365,7 +366,7 @@ export default function YouTubeMiniPlayer({
         onClick={(e) => {
           if (pickerPos) return setPickerPos(null);
           const r = e.currentTarget.getBoundingClientRect();
-          setPickerPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+          setPickerPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right), full: window.innerWidth < 1024 });
         }}
         aria-expanded={!!pickerPos}
         aria-label="Izberi posnetek"
@@ -382,8 +383,8 @@ export default function YouTubeMiniPlayer({
           ref={pickerRef}
           role="listbox"
           aria-label="Posnetki"
-          style={{ top: pickerPos.top, right: pickerPos.right }}
-          className="fixed z-40 w-[min(22rem,calc(100vw-1rem))] rounded-xl border border-orange-400 bg-neutral-900 p-1.5 font-sans shadow-xl"
+          style={pickerPos.full ? { top: pickerPos.top, left: 8, right: 8 } : { top: pickerPos.top, right: pickerPos.right }}
+          className={`fixed z-40 ${pickerPos.full ? "" : "w-[min(22rem,calc(100vw-1rem))]"} rounded-xl border border-orange-400 bg-neutral-900 p-1.5 font-sans shadow-xl`}
         >
           <p className="px-2 pb-1 pt-0.5 text-[11px] font-medium text-neutral-400">Kateri posnetek naj se predvaja?</p>
           {saveError && <p className="px-2 pb-1 text-[10px] text-red-400">Izbira ni shranjena: {saveError}</p>}
@@ -392,6 +393,9 @@ export default function YouTubeMiniPlayer({
               const info = infos[id];
               const active = id === currentId;
               const failed = failedIds.has(id);
+              // Pred prvim predvajanjem: posnetek, ki bo zaigral ob ▶.
+              const upcoming = !currentId && id === ids.find((x) => !failedIds.has(x));
+              const preferred = id === preferredId;
               return (
                 <li key={id}>
                   <button
@@ -399,7 +403,9 @@ export default function YouTubeMiniPlayer({
                     role="option"
                     aria-selected={active}
                     onClick={() => selectVideo(id)}
-                    className={`flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-neutral-800 ${active ? "bg-orange-400/10" : ""}`}
+                    className={`flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-neutral-800 ${
+                      active ? "bg-orange-400/15 ring-1 ring-orange-400" : upcoming ? "ring-1 ring-neutral-600" : ""
+                    }`}
                   >
                     <img
                       src={`https://i.ytimg.com/vi/${id}/default.jpg`}
@@ -412,10 +418,28 @@ export default function YouTubeMiniPlayer({
                         {info === undefined ? "Nalagam …" : info ? info.title : `Posnetek ${id}`}
                       </span>
                       <span className="block truncate text-[10px] text-neutral-500">
-                        {failed
-                          ? "Ne dovoli predvajanja v aplikaciji"
-                          : [info?.channel, id === preferredId ? "izbran" : null].filter(Boolean).join(" · ")}
+                        {failed ? "Ne dovoli predvajanja v aplikaciji" : info?.channel}
                       </span>
+                      {/* Oznake: kateri igra zdaj / bo zaigral in kateri je izbran za vse naprave. */}
+                      {(active || upcoming || preferred) && (
+                        <span className="mt-1 flex flex-wrap gap-1">
+                          {active && (
+                            <span className="rounded-full bg-orange-400 px-1.5 py-px text-[10px] font-semibold text-neutral-900">
+                              {playing ? "▶ Predvaja se" : "Naložen (pavza)"}
+                            </span>
+                          )}
+                          {upcoming && (
+                            <span className="rounded-full border border-neutral-500 px-1.5 py-px text-[10px] font-medium text-neutral-300">
+                              Zaigra ob ▶
+                            </span>
+                          )}
+                          {preferred && (
+                            <span className="rounded-full border border-emerald-500/70 bg-emerald-500/15 px-1.5 py-px text-[10px] font-medium text-emerald-300">
+                              Izbran za vse naprave
+                            </span>
+                          )}
+                        </span>
+                      )}
                     </span>
                     {active && (
                       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-4 w-4 shrink-0 text-amber-400">
