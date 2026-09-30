@@ -38,7 +38,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { usePersistentBool } from "@/lib/usePersistentBool";
 import { usePersistentString } from "@/lib/usePersistentString";
-import { closeChordsViewer, enterLandscapeFullscreen, openChordsViewer, useOpenChordsMode, useOpenChordsSongId } from "@/lib/openChords";
+import { closeChordsViewer, openChordsViewer, useOpenChordsMode, useOpenChordsSongId } from "@/lib/openChords";
 import {
   SHARED_VIEW_HEARTBEAT_MS,
   SHARED_VIEW_STALE_MS,
@@ -3207,16 +3207,16 @@ export default function Dashboard({ user }: { user: User }) {
                         title={
                           song.verified_player_at
                             ? "Klik razveljavi oznako"
-                            : "Odpre Sam špili: zaženi skladbo, preveri sledenje in v ⚙ potrdi \"Predvajalnik preverjen\""
+                            : "Označi, da Smart play pri tej skladbi dela dobro (časi in posnetek se zaklenejo ob naslednjem predvajanju)"
                         }
                         onClick={() => {
                           if (song.verified_player_at) {
                             if (window.confirm("Razveljavim oznako \"Predvajalnik preverjen\"?")) handleVerify(song, "verified_player_at", null);
                             return;
                           }
-                          // Potrditev je v ⚙ Sam špili — zamrzne čase posnetka, ki igra.
-                          enterLandscapeFullscreen();
-                          openChordsViewer(song.id, "samspili");
+                          // Samo oznaka; čase in posnetek pregledovalnik zamrzne ob
+                          // naslednjem predvajanju (ChordsViewer, samodejna zamrznitev).
+                          handleVerify(song, "verified_player_at", new Date().toISOString());
                         }}
                         className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition disabled:opacity-50 ${
                           song.verified_player_at

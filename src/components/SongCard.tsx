@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import ChordsButtons from "@/components/ChordsButtons";
 import { JamTargetItems } from "@/components/JamTargetMenu";
@@ -67,9 +67,32 @@ export default function SongCard({
 
   const [actionsOpen, setActionsOpen] = useState(false);
   const [jamChoiceOpen, setJamChoiceOpen] = useState(false);
-  const [actionsMenuPos, setActionsMenuPos] = useState<{ top: number; left: number } | null>(null);
+  // top = pod gumbom; anchorTop = zgornji rob gumba (za odprtje navzgor).
+  const [actionsMenuPos, setActionsMenuPos] = useState<{ top: number; left: number; anchorTop: number } | null>(null);
   const actionsButtonRef = useRef<HTMLButtonElement>(null);
   const actionsMenuPanelRef = useRef<HTMLDivElement>(null);
+  // Meni pri dnu zaslona (kartica na dnu strani) bi segel pod rob in se ne bi
+  // videl: po izrisu (in ob vsaki spremembi višine, npr. izbira Jama) izmeri
+  // višino in ga, če spodaj ni prostora, odpre NAD gumbom; če ga ni niti
+  // zgoraj, ga poravna ob spodnji rob zaslona. Neposredno na element, pred
+  // prikazom (useLayoutEffect), da ne utripne.
+  useLayoutEffect(() => {
+    const panel = actionsMenuPanelRef.current;
+    if (!actionsOpen || !panel || !actionsMenuPos) return;
+    const place = () => {
+      const h = panel.offsetHeight;
+      let top = actionsMenuPos.top;
+      if (top + h > window.innerHeight - 8) {
+        const up = actionsMenuPos.anchorTop - 4 - h;
+        top = up >= 8 ? up : Math.max(8, window.innerHeight - 8 - h);
+      }
+      panel.style.top = `${top}px`;
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    ro.observe(panel);
+    return () => ro.disconnect();
+  }, [actionsOpen, actionsMenuPos]);
 
   // "Prijavi napako": kratek obrazec na dnu kartice, zapiše v song_reports
   // (seznam prijav je v SettingsMenu.tsx, "Popravi skladbe").
@@ -230,6 +253,34 @@ export default function SongCard({
           : "border-neutral-200 dark:border-neutral-800"
       }`}
     >
+      {/* Odobrena skladba, ročno preverjena: dve kljukici desno spodaj — rumena
+          = akordi v aplikaciji, oranžna = predvajalnik (Smart play, Sam špili). */}
+      {!song.review_pending && (song.verified_chords_at || song.verified_player_at) && (
+        <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1">
+          {song.verified_chords_at && (
+            <span
+              title={`Akordi preverjeni ${new Date(song.verified_chords_at).toLocaleDateString("sl-SI")}`}
+              aria-label="Akordi preverjeni"
+              className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-neutral-900 shadow-sm"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round" className="h-2.5 w-2.5">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </span>
+          )}
+          {song.verified_player_at && (
+            <span
+              title={`Predvajalnik preverjen ${new Date(song.verified_player_at).toLocaleDateString("sl-SI")}`}
+              aria-label="Predvajalnik preverjen"
+              className="flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-white shadow-sm"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round" className="h-2.5 w-2.5">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </span>
+          )}
+        </div>
+      )}
       {authorImage && (
         <img
           src={authorImage}
@@ -262,28 +313,6 @@ export default function SongCard({
           >
             {song.author}
           </button>
-          {/* Ročno preverjeno: akordi v aplikaciji / predvajalnik (Smart play, Sam špili). */}
-          {(song.verified_chords_at || song.verified_player_at) && (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {song.verified_chords_at && (
-                <span
-                  title={`Akordi preverjeni ${new Date(song.verified_chords_at).toLocaleDateString("sl-SI")}`}
-                  className="inline-flex items-center gap-0.5 rounded-full border border-amber-500/50 bg-amber-400/15 px-1.5 py-px text-[10px] font-medium leading-tight text-amber-700 dark:text-amber-300"
-                >
-                  ✓ Akordi
-                </span>
-              )}
-              {song.verified_player_at && (
-                <span
-                  title={`Predvajalnik preverjen ${new Date(song.verified_player_at).toLocaleDateString("sl-SI")}`}
-                  className="inline-flex items-center gap-0.5 rounded-full border border-orange-500/50 bg-orange-400/15 px-1.5 py-px text-[10px] font-medium leading-tight text-orange-700 dark:text-orange-300"
-                >
-                  ✓ Predvajalnik
-                </span>
-              )}
-            </div>
-          )}
-
           {/* Podobno — začasno onemogočeno.
           <div className="mt-0.5 flex w-full min-w-0 flex-wrap items-center gap-1.5 text-xs">
             <button
@@ -323,7 +352,7 @@ export default function SongCard({
               e.stopPropagation();
               if (!actionsOpen) {
                 const rect = e.currentTarget.getBoundingClientRect();
-                setActionsMenuPos({ top: rect.bottom + 4, left: rect.right - 192 });
+                setActionsMenuPos({ top: rect.bottom + 4, left: rect.right - 192, anchorTop: rect.top });
               }
               setActionsOpen((v) => !v);
               setJamChoiceOpen(false);
@@ -357,7 +386,7 @@ export default function SongCard({
                 role="menu"
                 data-view-portal
                 style={{ top: actionsMenuPos.top, left: actionsMenuPos.left }}
-                className="fixed z-50 w-48 space-y-0.5 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
+                className="fixed z-50 max-h-[calc(100dvh-1rem)] w-48 space-y-0.5 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
               >
                 {onImport && (
                   <button

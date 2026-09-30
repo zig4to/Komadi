@@ -841,7 +841,11 @@ export default function ChordsViewer({
   const [activeChord, setActiveChord] = useState<{ line: number; chord: number } | null>(null);
   // Na voljo, če je besedilo s časi ali posneti akordi; sledi pa samo po
   // gumbu "Smart play" (navadni ▶ samo predvaja, kot prej).
-  const smartAvailable = (!!sync && sync.points.length > 0) || chordPoints.length > 0;
+  // Časi akordov veljajo samo za posnetek, na katerem so bili posneti: na
+  // drugem (npr. daljši uvod) bi bile oznake zamaknjene, zato se ne kažejo.
+  const chordsWrongVideo = !!syncedChords?.videoId && !!playingVideo && playingVideo !== syncedChords.videoId;
+  const liveChordPoints = chordsWrongVideo ? [] : chordPoints;
+  const smartAvailable = (!!sync && sync.points.length > 0) || liveChordPoints.length > 0;
   const [smartOn, setSmartOn] = useState(false);
   const smartActive = smartAvailable && smartOn;
   const [lrcOffsets, setLrcOffsets] = useState<Record<string, number>>(() => {
@@ -1151,10 +1155,14 @@ export default function ChordsViewer({
   // "Predvajalnik preverjen": zamrzne trenutne čase vrstic (s koncem in ključem
   // vrstice), posnetek, ki igra, in s tem njegov zamik (lrc_offsets) — skladba
   // potem ne rabi več LRCLIB in je ne spremeni kasnejša logika povezovanja.
-  const confirmPlayer = async () => {
+  // markVerified = false: samodejna zamrznitev skladbe, ki je bila označena kot
+  // preverjena brez predvajanja (gumb na strani Pregled in odobritev) — oznaka
+  // ostane, zamrznejo se časi in posnetek, ki zdaj igra.
+  const freezePlayer = async (markVerified: boolean) => {
     if (!playingVideo || !sync?.points.length) return;
     if (sync.manual && syncedLines && syncedLines.videoId !== playingVideo) {
-      return setVerifyMsg("Časi so posneti za drug posnetek — izberi tistega ali posnemi čase znova.");
+      if (markVerified) setVerifyMsg("Časi so posneti za drug posnetek — izberi tistega ali posnemi čase znova.");
+      return;
     }
     const r3 = (x: number) => Math.round(x * 1000) / 1000;
     const nextLines: SyncedLines = {
@@ -1166,19 +1174,41 @@ export default function ChordsViewer({
       ? { ...syncedChords, sections: chordSections.map((s) => ({ ...s, points: s.points.map(withLineKey) })) }
       : null;
     const at = new Date().toISOString();
-    setVerifySaving(true);
+    const video = playingVideo;
     const { error } = await supabase
       .from("songs")
-      .update({ synced_lines: nextLines, preferred_video_id: playingVideo, verified_player_at: at, ...(nextChords ? { synced_chords: nextChords } : {}) })
+      .update({
+        synced_lines: nextLines,
+        preferred_video_id: video,
+        ...(markVerified ? { verified_player_at: at } : {}),
+        ...(nextChords ? { synced_chords: nextChords } : {}),
+      })
       .eq("id", song.id);
-    setVerifySaving(false);
     if (error) return verifyError(error.message);
     setSyncedLines(nextLines);
     if (nextChords) setSyncedChords(nextChords);
-    setPreferredVideo(playingVideo);
-    setVerifiedPlayerAt(at);
+    setPreferredVideo(video);
+    if (markVerified) setVerifiedPlayerAt(at);
     setVerifyMsg(null);
   };
+  const confirmPlayer = async () => {
+    setVerifySaving(true);
+    await freezePlayer(true);
+    setVerifySaving(false);
+  };
+  // Samodejna zamrznitev: skladba je označena kot preverjena, časi pa še niso
+  // zamrznjeni — ob prvem predvajanju s časi se zaklenejo (enkrat na odprtje).
+  const autoFrozeRef = useRef(false);
+  const freezeRef = useRef(freezePlayer);
+  useEffect(() => {
+    freezeRef.current = freezePlayer;
+  });
+  const needsFreeze = !!verifiedPlayerAt && !syncedLines?.frozen && !!playingVideo && !!sync?.points.length && !recorder;
+  useEffect(() => {
+    if (!needsFreeze || autoFrozeRef.current) return;
+    autoFrozeRef.current = true;
+    void freezeRef.current(false);
+  }, [needsFreeze]);
   const unverifyPlayer = async () => {
     if (!window.confirm("Razveljavim oznako \"Predvajalnik preverjen\"? Shranjeni časi ostanejo.")) return;
     setVerifySaving(true);
@@ -1222,7 +1252,9 @@ export default function ChordsViewer({
             ? "Preverjen posnetek ni na voljo — igra drug posnetek, zato Smart play ne sledi."
             : syncBroken
               ? "Časi se ne ujemajo več z besedilom — preveri ponovno."
-              : "Zaklenjeno: posnetek, časi vrstic in zamik. Klik razveljavi oznako."
+              : !syncedLines?.frozen
+                ? "Označeno; posnetek in časi vrstic se zaklenejo ob naslednjem predvajanju."
+                : "Zaklenjeno: posnetek, časi vrstic in zamik. Klik razveljavi oznako."
           : !sync?.points.length
             ? "Ni besedila s časi — najprej Posnemi čase."
             : !playingVideo
@@ -1325,7 +1357,7 @@ export default function ChordsViewer({
     if (samSpili && ssSeekOpen) setSsTime(seconds);
     // Akordi: čas posnetka brez zamika LRC (vsak del ima svoj zamik); med
     // snemanjem po osnutku, da se pregled z ▶ takoj vidi.
-    const pts = recorder ? draftChordPoints : smartActive ? chordPoints : [];
+    const pts = recorder ? draftChordPoints : smartActive ? liveChordPoints : [];
     const chord = pts.length ? chordAt(pts, seconds) : null;
     setActiveChord((prev) => (prev?.line === chord?.line && prev?.chord === chord?.chord ? prev : chord));
   };
@@ -2326,6 +2358,11 @@ export default function ChordsViewer({
               <span className="block text-[10px] leading-tight text-neutral-500">
                 Instrumentalni deli: {syncedChords?.sections.map((s) => s.name).join(", ")} (
                 {chordPoints.filter((p) => !("stop" in p)).length} akordov)
+              </span>
+            )}
+            {chordsWrongVideo && (
+              <span className="block text-[10px] leading-tight text-amber-400">
+                Časi akordov so posneti za drug posnetek — oznake akordov se ne kažejo. Izberi tisti posnetek v seznamu posnetkov.
               </span>
             )}
             <span className="block text-[10px] leading-tight text-neutral-500">

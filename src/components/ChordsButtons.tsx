@@ -6,9 +6,15 @@ import ListenButton from "@/components/ListenButton";
 import PdfViewer from "@/components/PdfViewer";
 import { enterLandscapeFullscreen, openChordsViewer } from "@/lib/openChords";
 
-// "Sam špili" (celozaslonski pogled s 3 vrsticami, ChordsViewer samSpili) —
-// zaenkrat samo za testne skladbe.
+// "Sam špili" (celozaslonski pogled s 3 vrsticami, ChordsViewer samSpili):
+// skladbe v Pregledu in odobritvi (da se tam preveri, ali dela in lepo
+// izgleda) in skladbe s preverjenim predvajalnikom — "Odobri" zahteva
+// preverjen predvajalnik, zato ga vsaka skladba, ki gre skozi pregled,
+// obdrži tudi po odobritvi. Plus prvotne testne skladbe.
 const SAM_SPILI_TEST_TITLES = ["ti si mi u krvi", "water witch", "happy xmas (war is over)"];
+const hasSamSpili = (song: Song) =>
+  !!song.chords_text &&
+  (song.review_pending || !!song.verified_player_at || SAM_SPILI_TEST_TITLES.includes(song.title.trim().toLowerCase()));
 import type { Song } from "@/types/song";
 
 // Skrajšana različica gumbov "UG Tabs"/"PDF akordi" iz SongCard.tsx (samo
@@ -134,7 +140,7 @@ export default function ChordsButtons({
               style={{ top: menuPos.top, left: menuPos.left, right: menuPos.right }}
               className="fixed z-50 w-40 space-y-0.5 rounded-xl border border-amber-400 bg-white p-1.5 shadow-xl dark:border-amber-400/70 dark:bg-neutral-900"
             >
-              {song.chords_text && SAM_SPILI_TEST_TITLES.includes(song.title.trim().toLowerCase()) && (
+              {hasSamSpili(song) && (
                 <button
                   type="button"
                   onClick={() => {
