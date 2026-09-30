@@ -125,6 +125,15 @@ export default function Dashboard({ user }: { user: User }) {
   );
   const [reviewOpen, setReviewOpen] = usePersistentBool("komadi:review:open", false);
   const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set());
+  // Pregled in odobritev: kartice z razprtimi nastavitvami pod kartico (privzeto pospravljene).
+  const [reviewExpanded, setReviewExpanded] = useState<Set<string>>(new Set());
+  const toggleReviewExpanded = (id: string) =>
+    setReviewExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const [reviewError, setReviewError] = useState<string | null>(null);
   // "Skupno": skladbe drugih uporabnikov (select na songs je odprt za vse
   // prijavljene, glej 0029_add_user_accounts.sql), naložene ob prvem vklopu.
@@ -3084,7 +3093,14 @@ export default function Dashboard({ user }: { user: User }) {
                     key={song.id}
                     className="overflow-hidden rounded-2xl border-2 border-teal-500/60 bg-teal-500/[0.06] shadow-sm dark:border-teal-400/50 dark:bg-teal-400/[0.05]"
                   >
-                    <div className="flex items-center gap-1.5 bg-teal-500/15 px-3 py-1.5 text-xs font-semibold text-teal-800 dark:bg-teal-400/15 dark:text-teal-300">
+                    {/* Glava: klik razpre/pospravi nastavitve pod kartico. */}
+                    <button
+                      type="button"
+                      onClick={() => toggleReviewExpanded(song.id)}
+                      aria-expanded={reviewExpanded.has(song.id)}
+                      title={reviewExpanded.has(song.id) ? "Pospravi nastavitve" : "Pokaži nastavitve"}
+                      className="flex w-full items-center gap-1.5 bg-teal-500/15 px-3 py-1.5 text-left text-xs font-semibold text-teal-800 transition hover:bg-teal-500/25 dark:bg-teal-400/15 dark:text-teal-300 dark:hover:bg-teal-400/25"
+                    >
                       <svg
                         aria-hidden="true"
                         viewBox="0 0 24 24"
@@ -3099,10 +3115,28 @@ export default function Dashboard({ user }: { user: User }) {
                         <path d="M12 7v5l3.5 2" />
                       </svg>
                       Čaka na odobritev
+                      {/* Stanje preverjanja tudi, ko so nastavitve pospravljene. */}
+                      <span className="ml-1 font-medium text-teal-700/80 dark:text-teal-300/80">
+                        {reviewReady(song)
+                          ? "· pripravljena"
+                          : `· ${[song.verified_chords_at ? "✓ akordi" : null, song.verified_player_at ? "✓ predvajalnik" : null].filter(Boolean).join(", ") || "ni preverjena"}`}
+                      </span>
                       <span className="ml-auto font-medium text-teal-700/80 dark:text-teal-300/80">
                         {new Date(song.created_at).toLocaleDateString("sl-SI")}
                       </span>
-                    </div>
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className={`h-3.5 w-3.5 shrink-0 transition ${reviewExpanded.has(song.id) ? "rotate-180" : ""}`}
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </button>
                     <div className="p-2">
                       <SongCard
                         song={song}
@@ -3112,6 +3146,8 @@ export default function Dashboard({ user }: { user: User }) {
                       />
                       {renderEditForm(song)}
                     </div>
+                    {reviewExpanded.has(song.id) && (
+                    <>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-dashed border-teal-500/50 px-3 pb-3 pt-2.5 text-xs text-neutral-600 dark:border-teal-400/40 dark:text-neutral-300">
                       <span>{song.genre}</span>
                       <span>{formatEraLabel(song.era)}</span>
@@ -3194,6 +3230,8 @@ export default function Dashboard({ user }: { user: User }) {
                         <span className="text-neutral-500 dark:text-neutral-400">Odobritev je mogoča po obeh potrditvah.</span>
                       )}
                     </div>
+                    </>
+                    )}
                   </div>
                 ))}
               </div>

@@ -341,7 +341,7 @@ export default function YouTubeMiniPlayer({
     armStallTimer();
   }
   function addCustomVideo() {
-    const id = youTubeVideoId(customUrl.trim()) ?? (/^[w-]{11}$/.test(customUrl.trim()) ? customUrl.trim() : null);
+    const id = youTubeVideoId(customUrl.trim()) ?? (/^[\w-]{11}$/.test(customUrl.trim()) ? customUrl.trim() : null);
     if (!id) {
       setCustomError("To ni povezava do YouTube posnetka.");
       return;
