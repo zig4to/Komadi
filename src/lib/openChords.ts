@@ -9,11 +9,13 @@ import { useCallback, useSyncExternalStore } from "react";
 // "komadi-storage" kot usePersistentBool/usePersistentString.
 const KEY = "komadi:chords:open";
 // Način odprtja: "samspili" = celozaslonski pogled s 3 vrsticami (ChordsViewer
-// prop samSpili), brez vrednosti = navaden pregledovalnik.
+// prop samSpili), "record" = navaden pregledovalnik s takoj odprtim snemalnikom
+// časov ("Posnemi čase" — gumb v naprednem urejevalniku besedila), brez
+// vrednosti = navaden pregledovalnik.
 const MODE_KEY = "komadi:chords:mode";
 const STORE_EVENT = "komadi-storage";
 
-export type ChordsViewerMode = "samspili";
+export type ChordsViewerMode = "samspili" | "record";
 
 function write(id: string | null, mode?: ChordsViewerMode) {
   try {
@@ -42,7 +44,8 @@ export function enterLandscapeFullscreen() {
 export function useOpenChordsMode(): ChordsViewerMode | null {
   const read = useCallback((): ChordsViewerMode | null => {
     try {
-      return window.localStorage.getItem(MODE_KEY) === "samspili" ? "samspili" : null;
+      const mode = window.localStorage.getItem(MODE_KEY);
+      return mode === "samspili" || mode === "record" ? mode : null;
     } catch {
       return null;
     }

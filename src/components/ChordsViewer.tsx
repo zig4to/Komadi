@@ -218,6 +218,7 @@ export default function ChordsViewer({
   onClose,
   shared,
   samSpili = false,
+  autoRecord = false,
 }: {
   song: Song;
   onClose: () => void;
@@ -225,6 +226,9 @@ export default function ChordsViewer({
   // "Sam špili": celozaslonski (ležeči) pogled, ki med Smart playem kaže samo
   // 3 vrstice — trenutno na vrhu, čez vso širino (glej overlay spodaj).
   samSpili?: boolean;
+  // Odpri s takoj zagnanim snemalnikom časov ("Posnemi čase") — iz naprednega
+  // urejevalnika besedila (ChordsTextEditor.tsx, način "record").
+  autoRecord?: boolean;
 }) {
   const follower = shared?.role === "follower" ? shared : null;
   const [followPillHidden, setFollowPillHidden] = useState(false);
@@ -910,8 +914,26 @@ export default function ChordsViewer({
     activeId: string | null;
     history: RecAction[];
     dirty: boolean;
-  } | null>(null);
-  const [recorderMsg, setRecorderMsg] = useState<string | null>(null);
+  } | null>(() => {
+    if (!autoRecord) return null;
+    // Isto kot startRecorder: nadaljuje za zadnjo že posneto vrstico.
+    const lines = [...(song.synced_lines?.points ?? [])].sort((a, b) => a.t - b.t);
+    const sections = song.synced_chords?.sections ?? [];
+    const lastLine = lines[lines.length - 1];
+    return {
+      lines,
+      cursor: (lastLine ? lyricLines.find((i) => i >= lastLine.line + 1) : lyricLines[0]) ?? -1,
+      sections,
+      activeId: sections[sections.length - 1]?.id ?? null,
+      history: [],
+      dirty: false,
+    };
+  });
+  const [recorderMsg, setRecorderMsg] = useState<string | null>(
+    autoRecord
+      ? "Zaženi ▶. TAP = začetek označene vrstice. Za instrumentalni del izberi (ali dodaj) del desno in klikaj akorde, ko zazvenijo."
+      : null,
+  );
   const [recorderSaving, setRecorderSaving] = useState(false);
   const nextLyricLine = (from: number) => lyricLines.find((i) => i >= from) ?? -1;
   const startRecorder = () => {

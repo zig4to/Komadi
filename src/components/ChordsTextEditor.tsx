@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   applyEditedText,
@@ -9,9 +9,19 @@ import {
   isTabStaffText,
   toEditableText,
   transposeEditedLine,
+  type ChordsLine,
 } from "@/lib/chords";
+import { openChordsViewer } from "@/lib/openChords";
 import { supabase } from "@/lib/supabaseClient";
-import { rebaseSyncOnEdit } from "@/lib/syncedLyrics";
+import {
+  alignLyrics,
+  fetchLrcCandidates,
+  lineProgressAt,
+  pickBestCandidate,
+  rebaseSyncOnEdit,
+  type LrcCandidate,
+} from "@/lib/syncedLyrics";
+import YouTubeMiniPlayer, { youTubeVideoId, type PlayerController } from "@/components/YouTubeMiniPlayer";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { Song } from "@/types/song";
 
@@ -22,6 +32,11 @@ import type { Song } from "@/types/song";
 // Dodatno: barvanje vrstic (akordi / razdelki / tablatura), številke vrstic,
 // način prepisovanja, premik akorda po stolpcih, stolpci tablature,
 // transponiranje, iskanje in zamenjava, razveljavi/uveljavi.
+// Vrstica "Predvajalnik" pod orodno vrstico: mini YouTube predvajalnik, preskoki
+// ±5/±15 s in Smart play — označi vrstico, ki se poje, po besedilu, KOT JE
+// TRENUTNO V UREJEVALNIKU (tudi neshranjeno), da se popravek takoj preveri.
+// "Posnemi čase" shrani besedilo in odpre obstoječi snemalnik časov v
+// pregledovalniku (ChordsViewer, način "record").
 
 const FONT_KEY = "komadi:editor:font";
 const FONT_MIN = 11;
@@ -132,11 +147,99 @@ export default function ChordsTextEditor({
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
+  // --- Smart play med urejanjem ---
+  // Besedilo s časi (LRCLIB) se poveže z vrsticami urejevalnika, kot so zdaj
+  // (z zamikom 400 ms po zadnjem tipkanju — povezovanje ni poceni).
+  const [lrcCandidates, setLrcCandidates] = useState<LrcCandidate[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchLrcCandidates(song.id, song.title, song.author)
+      .then((c) => {
+        if (!cancelled) setLrcCandidates(c);
+      })
+      .catch(() => {
+        if (!cancelled) setLrcCandidates([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [song.id, song.title, song.author]);
+  const [syncText, setSyncText] = useState(initial);
+  useEffect(() => {
+    const t = setTimeout(() => setSyncText(text), 400);
+    return () => clearTimeout(t);
+  }, [text]);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [playingVideo, setPlayingVideo] = useState<string | null>(null);
+  const [smartOn, setSmartOn] = useState(false);
+  const [activeLine, setActiveLine] = useState(-1);
+  const playerCtl = useRef<PlayerController | null>(null);
+  // Čas zadnjega tipkanja/klika v besedilo: takrat Smart play ne premika pogleda.
+  const lastInputRef = useRef(0);
+  // Isti kandidati posnetkov kot v pregledovalniku (ChordsViewer.tsx).
+  const [videoIds] = useState(() => {
+    let remembered: string | null = null;
+    try {
+      remembered = window.localStorage.getItem(`komadi:chords:video:${song.id}`);
+    } catch {}
+    const locked = song.verified_player_at ? (song.synced_lines?.videoId ?? null) : null;
+    return [
+      ...new Set([
+        locked,
+        song.preferred_video_id,
+        locked ? null : remembered,
+        youTubeVideoId(song.youtube_url),
+        youTubeVideoId(song.youtube_music_url),
+        ...(song.youtube_embed_ids ?? []),
+      ]),
+    ].filter((id): id is string => Boolean(id));
+  });
+  const sync = useMemo(() => {
+    if (!lrcCandidates?.length) return null;
+    const src = syncText.split("\n");
+    const kinds = src.map(lineKind);
+    // Kot v pregledovalniku: vse pred prvim razdelkom/vrstico akordov je opis.
+    const first = kinds.findIndex((k) => k === "section" || k === "chords");
+    // Ena vrstica urejevalnika = ena vrstica "telesa" (indeksi se ujemajo).
+    const body: ChordsLine[] = src.map((l, i) =>
+      kinds[i] === "text" && l.trim() && i > first ? { kind: "text", segments: [{ text: l }] } : { kind: "section", label: "" },
+    );
+    const lrc = pickBestCandidate(lrcCandidates, videoDuration, body);
+    if (!lrc) return null;
+    const aligned = alignLyrics(lrc.lines, body);
+    const covered = new Set(aligned.points.map((x) => x.lineIndex));
+    return {
+      points: [...aligned.points].sort((x, y) => x.time - y.time),
+      matched: aligned.matched,
+      total: lrc.lines.filter((l) => l.text).length,
+      // Vrstice besedila, ki jih Smart play ne bi nikoli označil.
+      uncovered: new Set(body.flatMap((l, i) => (l.kind === "text" && !covered.has(i) ? [i] : []))),
+    };
+  }, [lrcCandidates, syncText, videoDuration]);
+  const lrcOffset = playingVideo ? (song.lrc_offsets?.[playingVideo] ?? 0) : 0;
+  const onVideoTime = (seconds: number, duration: number) => {
+    if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
+    const line = smartOn && sync ? lineProgressAt(sync.points, seconds - lrcOffset).lineIndex : -1;
+    setActiveLine((prev) => (prev === line ? prev : line));
+  };
+
   const taRef = useRef<HTMLTextAreaElement>(null);
   const hlRef = useRef<HTMLDivElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
   const history = useRef<{ undo: Snapshot[]; redo: Snapshot[]; last: number }>({ undo: [], redo: [], last: 0 });
   const dirty = text !== initial;
+
+  // Označena vrstica ostane vidna (približno tretjina od vrha), razen tik po
+  // tipkanju/kliku v besedilo (3 s) — med urejanjem pogled ne sme uhajati.
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta || activeLine < 0 || Date.now() - lastInputRef.current < 3000) return;
+    const h = fontSize * LINE_HEIGHT;
+    const top = 12 + activeLine * h;
+    if (top < ta.scrollTop + h * 2 || top > ta.scrollTop + ta.clientHeight - h * 4) {
+      ta.scrollTop = Math.max(0, top - ta.clientHeight / 3);
+    }
+  }, [activeLine, fontSize]);
 
   useEffect(() => {
     try {
@@ -348,8 +451,9 @@ export default function ChordsTextEditor({
 
   // --- Shrani / zapri ---
 
-  async function save() {
-    if (!dirty) return onClose();
+  // Shrani besedilo (če je spremenjeno); vrne false ob napaki.
+  async function persist(): Promise<boolean> {
+    if (!dirty) return true;
     setSaving(true);
     setError(null);
     const next = applyEditedText(original, text);
@@ -360,9 +464,26 @@ export default function ChordsTextEditor({
       .update({ chords_text: next, ...rebaseSyncOnEdit(song, next) })
       .eq("id", song.id);
     setSaving(false);
-    if (dbError) return setError(`Shranjevanje ni uspelo: ${dbError.message}`);
+    if (dbError) {
+      setError(`Shranjevanje ni uspelo: ${dbError.message}`);
+      return false;
+    }
     onSaved(next);
+    return true;
+  }
+
+  async function save() {
+    if (await persist()) onClose();
+  }
+
+  // "Posnemi čase": obstoječi snemalnik časov iz pregledovalnika (TAP za
+  // vrstice, klik na akorde za instrumentalne dele). Besedilo se prej shrani,
+  // ker snemalnik dela na shranjenem besedilu.
+  async function openRecorder() {
+    if (dirty && !window.confirm("Besedilo se bo najprej shranilo, nato se odpre snemanje časov. Nadaljujem?")) return;
+    if (!(await persist())) return;
     onClose();
+    openChordsViewer(song.id, "record");
   }
 
   function requestClose() {
@@ -373,6 +494,7 @@ export default function ChordsTextEditor({
   useBackableOpen(true, requestClose);
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    lastInputRef.current = Date.now();
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
     if (mod && k === "s") return e.preventDefault(), void save();
@@ -473,6 +595,61 @@ export default function ChordsTextEditor({
         </Group>
       </div>
 
+      {/* Predvajalnik: Smart play po trenutnem besedilu + preskoki (temna vrstica,
+          ker je mini predvajalnik narejen za temno ozadje). */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 text-neutral-200">
+        <div className="flex min-w-[16rem] flex-1 items-center">
+          <YouTubeMiniPlayer
+            videoIds={videoIds}
+            watchUrl={
+              song.youtube_url ??
+              (videoIds[0]
+                ? `https://www.youtube.com/watch?v=${videoIds[0]}`
+                : `https://www.youtube.com/results?search_query=${encodeURIComponent(`${song.author} ${song.title}`)}`)
+            }
+            onTime={onVideoTime}
+            onPlaying={setPlayingVideo}
+            smartAvailable={!!sync?.points.length}
+            smartOn={smartOn}
+            onSmartToggle={setSmartOn}
+            controllerRef={playerCtl}
+          />
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {([-15, -5, 5, 15] as const).map((d) => (
+            <button
+              key={d}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()} // obdrži fokus v urejevalniku
+              onClick={() => playerCtl.current?.seekBy(d)}
+              title={`${Math.abs(d)} s ${d < 0 ? "nazaj" : "naprej"}`}
+              aria-label={`${Math.abs(d)} s ${d < 0 ? "nazaj" : "naprej"}`}
+              className="inline-flex h-8 min-w-11 items-center justify-center rounded-full border border-orange-400 px-2 text-xs font-medium tabular-nums text-amber-400 transition hover:bg-orange-400/15 active:scale-95"
+            >
+              {d < 0 ? `−${-d}` : `+${d}`} s
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => void openRecorder()}
+          disabled={saving}
+          title="Shrani besedilo in odpri snemanje časov (TAP za vrstice, klik na akorde za instrumentalne dele)"
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-orange-400 px-3 text-xs font-medium text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-50 active:scale-95"
+        >
+          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-500" />
+          {song.synced_lines || song.synced_chords ? "Nadaljuj snemanje časov" : "Posnemi čase"}
+        </button>
+        <span className="text-[11px] leading-tight text-neutral-400">
+          {lrcCandidates === null
+            ? "Iščem besedilo s časi …"
+            : !sync
+              ? "Za to skladbo ni besedila s časi — Smart play tu ni na voljo."
+              : `Smart play: povezanih ${sync.matched}/${sync.total} zapetih vrstic${sync.uncovered.size ? `, ${sync.uncovered.size} vrstic besedila brez časa (rdeče številke)` : ""}`}
+          {song.synced_lines?.points.length ? " · Skladba ima shranjene čase; ti veljajo v pregledovalniku, tu je predogled po trenutnem besedilu." : ""}
+        </span>
+      </div>
+
       {/* Iskanje in zamenjava */}
       {findOpen && (
         <div className="flex flex-wrap items-center gap-2 border-b border-neutral-200 px-3 py-2 text-xs dark:border-neutral-800">
@@ -507,7 +684,15 @@ export default function ChordsTextEditor({
               <div
                 key={i}
                 style={{ height: lineH }}
-                className={i + 1 === caret.line ? "font-semibold text-orange-500" : ""}
+                className={
+                  i === activeLine
+                    ? "bg-orange-400 font-semibold text-neutral-900"
+                    : i + 1 === caret.line
+                      ? "font-semibold text-orange-500"
+                      : sync?.uncovered.has(i)
+                        ? "text-red-500"
+                        : ""
+                }
               >
                 {i + 1}
               </div>
@@ -522,7 +707,9 @@ export default function ChordsTextEditor({
                 <div
                   key={i}
                   style={{ height: lineH }}
-                  className={`${KIND_CLASS[lineKind(l)]} ${i + 1 === caret.line ? "bg-orange-400/10" : ""}`}
+                  className={`${KIND_CLASS[lineKind(l)]} ${
+                    i === activeLine ? "bg-orange-400/25 shadow-[inset_3px_0_0_#fb923c]" : i + 1 === caret.line ? "bg-orange-400/10" : ""
+                  }`}
                 >
                   {l || " "}
                 </div>
@@ -532,7 +719,16 @@ export default function ChordsTextEditor({
           <textarea
             ref={taRef}
             value={text}
-            onChange={(e) => commit(e.target.value, e.target.selectionStart, e.target.selectionEnd, true, false)}
+            onChange={(e) => {
+              lastInputRef.current = Date.now();
+              commit(e.target.value, e.target.selectionStart, e.target.selectionEnd, true, false);
+            }}
+            onPointerDown={() => {
+              lastInputRef.current = Date.now();
+            }}
+            onWheel={() => {
+              lastInputRef.current = Date.now();
+            }}
             onKeyDown={onKeyDown}
             onSelect={updateCaret}
             onClick={updateCaret}

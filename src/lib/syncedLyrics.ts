@@ -138,88 +138,151 @@ function lineLyric(line: ChordsLine): string | null {
 // time = začetek vrstice LRC, end = začetek naslednje (tudi prazne) vrstice LRC.
 export type SyncPoint = { time: number; end: number; lineIndex: number };
 
-// Vsaki vrstici LRC poišče vrstico pesmi (indeks v body): najprej od
-// pravkar povezane naprej (do 20 vrstic — ista vrstica je dovoljena, ker je v
-// akordih več kratkih vrstic LRC pogosto v eni), sicer kjerkoli (refren, ki je
-// v akordih napisan enkrat, se v LRC ponovi). Brez dobrega ujemanja LRC
-// vrstica ne premakne.
+// Vsaki vrstici LRC poišče vrstico pesmi (indeks v body). PRAVILO: samo
+// naprej — vrstica, ki je že odpeta, se nikoli ne ponovi in nazaj se ne skače.
+//
+// Razporeditev se izbere za celo skladbo naenkrat (dinamično programiranje:
+// največja vsota ujemanj ob pogoju, da gre vrstni red samo naprej), ne sproti
+// vrstico za vrstico. Sprotna izbira je zgrešila v obe smeri: ista vrstica,
+// zapisana večkrat zapored ("Where is my mind?" ×3), je obstala na prvi
+// ponovitvi; uvodni vzklik ali refren, ki je tu zapet, zapisan pa samo nižje,
+// je potegnil oznako daleč naprej in preskočil celo kitico ("Come on Eileen").
+//
+// Na isti vrstici sme ostati le naslednja vrstica LRC, ki se ujema z njenimi
+// še NEPORABLJENIMI besedami (več kratkih vrstic LRC v eni dolgi vrstici
+// akordov: "Killer Queen, gunpowder, gelatine"); enaka vrstica gre na naslednjo.
+// Zapeta vrstica, ki je v tablaturi na tem mestu ni (refren, zapisan enkrat),
+// ostane nepovezana — oznaka počaka. Tablatura mora zato imeti vsako zapeto
+// vrstico zapisano tolikokrat, kot se poje.
+const ALIGN_MIN = 0.4;
+// Vsaka preskočena vrstica tablature malo stane (bližnja vrstica ima prednost).
+const ALIGN_SKIP = 0.02;
 export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncPoint[]; matched: number } {
   const lyricLines = body
     .map((l, i) => ({ index: i, words: words(lineLyric(l) ?? "") }))
     .filter((l) => l.words.length > 0);
-  const points: SyncPoint[] = [];
-  let pos = 0;
-  let matched = 0;
-  const lrcWords = lrc.map((l) => words(l.text));
-  // Skok drugam (npr. nazaj na refren) velja le, če se naslednja vrstica LRC
-  // ujema z eno od naslednjih vrstic za tem mestom — sicer bi npr. zadnji
-  // "Wanna try?" (ki ga v zadnjem refrenu akordov ni) ob koncu skladbe pomaknil
-  // nazaj na prvi refren.
-  const confirmed = (k: number, j: number) => {
-    const next = lrcWords.slice(k + 1).find((w) => w.length);
-    if (!next) return false;
-    return lyricLines.slice(j + 1, j + 4).some((l) => similarity(next, l.words) >= 0.5);
-  };
-  for (let k = 0; k < lrc.length; k++) {
-    const line = lrc[k];
-    const w = lrcWords[k];
-    if (!w.length) continue;
-    let best = -1;
-    let bestScore = 0;
-    // Tudi do 6 vrstic nazaj: refren, ki ga pevec ponovi, v akordih pa je na
-    // tem mestu zapisan enkrat ("Rekla je nemorem" ×2 v Sam prjatla), naj ostane
-    // tu — ne skoči na isto besedilo v naslednjem refrenu nižje in ne preskoči
-    // kitice. Dlje ko je vrstica (naprej ali nazaj), manj je verjetna.
-    for (let j = Math.max(0, pos - 6); j < Math.min(lyricLines.length, pos + 20); j++) {
-      const distance = j >= pos ? (j - pos) * 0.02 : (pos - j) * 0.03;
-      const score = similarity(w, lyricLines[j].words) - distance;
-      if (score > bestScore) {
-        bestScore = score;
-        best = j;
-      }
-    }
-    if (bestScore < 0.4) {
-      for (let j = 0; j < lyricLines.length; j++) {
-        const score = similarity(w, lyricLines[j].words);
-        if (score > bestScore + 0.1 && score >= 0.6 && confirmed(k, j)) {
-          bestScore = score;
-          best = j;
-        }
-      }
-    }
-    if (best < 0 || bestScore < 0.4) continue;
-    // Polnilo iz ene ponovljene besede ("Run, run, run, run", "la la la"): delno
-    // ujemanje (skupen "run" z "You'd better run, better run") ni dovolj —
-    // sicer povleče pos nazaj in naslednji refren se vrne na prejšnjega.
-    if (w.length >= 3 && new Set(w).size === 1 && bestScore < 0.8) continue;
-    matched++;
-    const end = lrc[k + 1]?.time ?? line.time + 5;
-    points.push({ time: line.time, end, lineIndex: lyricLines[best].index });
-    // Ena vrstica LRC čez več vrstic akordov ("You'd better run, better run, outrun
-    // my gun" = "You'd better run, better run" + "Outrun my gun" v Pumped Up
-    // Kicks): naslednje vrstice, katerih besede so v preostanku vrstice LRC, se
-    // porabijo (oznaka gre nanje ob sorazmernem času). Sicer je pos obstal na
-    // prvi in ponovljen refren se je vračal na začetni par namesto naprej.
-    const rest = [...w];
-    for (const x of lyricLines[best].words) {
+  const m = lyricLines.length;
+  // Vrstice LRC z besedilom (k = indeks v lrc).
+  const sung = lrc.map((l, k) => ({ k, w: words(l.text) })).filter((x) => x.w.length > 0);
+  const n = sung.length;
+  if (!m || !n) return { points: [], matched: 0 };
+  // Besede b brez tistih, ki jih je porabila prejšnja vrstica LRC na isti vrstici.
+  const minus = (b: string[], used: string[]) => {
+    const rest = [...b];
+    for (const x of used) {
       const i = rest.findIndex((r) => sameWord(r, x));
       if (i >= 0) rest.splice(i, 1);
     }
-    let last = best;
+    return rest;
+  };
+  // Polnilo iz ene ponovljene besede ("Run, run, run, run", "la la la"): delno
+  // ujemanje (skupen "run" z "You'd better run, better run") ni dovolj.
+  const minScore = sung.map(({ w }) => (w.length >= 3 && new Set(w).size === 1 ? 0.8 : ALIGN_MIN));
+  // f[i][j + 1] = najboljša vsota po prvih i vrsticah LRC, ko je zadnja povezana
+  // vrstica tablature j (j = -1: še nobena). lastI = katera vrstica LRC je bila
+  // zadnja povezana v tem stanju; from = prejšnja vrstica tablature, če je bila
+  // i-ta vrstica LRC povezana (sicer -2).
+  const NONE = -1e9;
+  const f: Float64Array[] = [new Float64Array(m + 1).fill(NONE)];
+  f[0][0] = 0;
+  const lastI: Int32Array[] = [new Int32Array(m + 1).fill(-1)];
+  const from: Int32Array[] = [new Int32Array(m + 1).fill(-2)];
+  for (let i = 1; i <= n; i++) {
+    const w = sung[i - 1].w;
+    const prev = f[i - 1];
+    const cur = Float64Array.from(prev);
+    const curLast = Int32Array.from(lastI[i - 1]);
+    const curFrom = new Int32Array(m + 1).fill(-2);
+    for (let j = 0; j < m; j++) {
+      let best = NONE;
+      let bestFrom = -2;
+      // Nova vrstica (od prejšnje j2 < j naprej).
+      const fresh = similarity(w, lyricLines[j].words);
+      if (fresh >= minScore[i - 1]) {
+        for (let j2 = -1; j2 < j; j2++) {
+          if (prev[j2 + 1] === NONE) continue;
+          const v = prev[j2 + 1] + fresh - (j - j2 - 1) * ALIGN_SKIP;
+          if (v > best) {
+            best = v;
+            bestFrom = j2;
+          }
+        }
+      }
+      // Ista vrstica kot prejšnja povezana vrstica LRC: samo z neporabljenimi besedami.
+      if (prev[j + 1] !== NONE && lastI[i - 1][j + 1] >= 0) {
+        const stay = similarity(w, minus(lyricLines[j].words, sung[lastI[i - 1][j + 1]].w));
+        if (stay >= minScore[i - 1] && prev[j + 1] + stay > best) {
+          best = prev[j + 1] + stay;
+          bestFrom = j;
+        }
+      }
+      if (best > cur[j + 1]) {
+        cur[j + 1] = best;
+        curLast[j + 1] = i - 1;
+        curFrom[j + 1] = bestFrom;
+      }
+    }
+    f.push(cur);
+    lastI.push(curLast);
+    from.push(curFrom);
+  }
+  // Najboljši konec in pot nazaj: assigned[i] = vrstica tablature za i-to vrstico LRC (ali -1).
+  let j = -1;
+  for (let x = 0; x < m; x++) if (f[n][x + 1] > f[n][j + 1]) j = x;
+  const assigned = new Int32Array(n).fill(-1);
+  for (let i = n; i >= 1 && j >= 0; i--) {
+    if (from[i][j + 1] === -2) continue;
+    assigned[i - 1] = j;
+    j = from[i][j + 1];
+  }
+  const points: SyncPoint[] = [];
+  let matched = 0;
+  for (let i = 0; i < n; i++) {
+    const at = assigned[i];
+    if (at < 0) continue;
+    matched++;
+    const { k, w } = sung[i];
+    const line = lrc[k];
+    const end = lrc[k + 1]?.time ?? line.time + 5;
+    points.push({ time: line.time, end, lineIndex: lyricLines[at].index });
+    // Ena vrstica LRC čez več vrstic akordov ("You'd better run, better run, outrun
+    // my gun" = "You'd better run, better run" + "Outrun my gun" v Pumped Up
+    // Kicks): naslednje vrstice, katerih besede so v preostanku vrstice LRC, se
+    // porabijo (oznaka gre nanje ob sorazmernem času) — do vrstice, ki jo ima
+    // naslednja povezana vrstica LRC.
+    // Vrstica tablature, razdeljena med to in naslednjo vrstico LRC ("Except the
+    // little fish, bumped into me" + "I swear he was trying to talk to me" proti
+    // "Except the little fish" / "Bumped into me, I swear he was" / "Tryin' to
+    // talk to me" v Where Is My Mind?): srednje nima v celoti nobena vrstica
+    // LRC, zato šteje, če so njene besede v preostanku te IN v naslednji vrstici
+    // LRC (vsaj ena v tej) — sicer ostane brez oznake.
+    let limit = m;
+    let nextSung: string[] = [];
+    for (let i2 = i + 1; i2 < n; i2++) {
+      if (assigned[i2] >= 0) {
+        limit = assigned[i2];
+        if (i2 === i + 1) nextSung = sung[i2].w;
+        break;
+      }
+    }
+    const rest = minus(w, lyricLines[at].words);
+    let last = at;
     let before = w.length - rest.length;
-    while (last + 1 < lyricLines.length && rest.length) {
-      const next = lyricLines[last + 1].words;
-      const hits = next.filter((x) => rest.some((r) => sameWord(r, x)));
-      if (hits.length / next.length < 0.8) break;
+    while (last + 1 < limit && rest.length) {
+      const nextWords = lyricLines[last + 1].words;
+      const hits = nextWords.filter((x) => rest.some((r) => sameWord(r, x)));
+      if (hits.length / nextWords.length < 0.8) {
+        const shared = nextWords.filter((x) => rest.some((r) => sameWord(r, x)) || nextSung.some((r) => sameWord(r, x)));
+        if (!hits.length || shared.length / nextWords.length < 0.8) break;
+      }
       for (const x of hits) {
-        const i = rest.findIndex((r) => sameWord(r, x));
-        if (i >= 0) rest.splice(i, 1);
+        const q = rest.findIndex((r) => sameWord(r, x));
+        if (q >= 0) rest.splice(q, 1);
       }
       last++;
       points.push({ time: line.time + ((end - line.time) * before) / w.length, end, lineIndex: lyricLines[last].index });
       before += hits.length;
     }
-    pos = last;
   }
   return { points, matched };
 }

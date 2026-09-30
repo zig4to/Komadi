@@ -1515,7 +1515,7 @@ export default function Dashboard({ user }: { user: User }) {
       const late = (Date.now() - lastViewAtRef.current) / 1000;
       ss = { ...ss, p: Math.min(1, ss.p + ss.rate * late) };
     }
-    sendView({ type: "view", leaderId: user.id, leaderName: myDisplayName ?? "", songId: me.songId, since: me.since, mode: openChordsModeRef.current, ...view, ...(ss ? { ss } : {}) });
+    sendView({ type: "view", leaderId: user.id, leaderName: myDisplayName ?? "", songId: me.songId, since: me.since, mode: openChordsModeRef.current === "samspili" ? "samspili" : null, ...view, ...(ss ? { ss } : {}) });
   };
   // Pogled vodje (ChordsViewer onLocalView): pošlji največ ~10× na sekundo, zadnjega vedno.
   const sendTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -4308,6 +4308,7 @@ export default function Dashboard({ user }: { user: User }) {
             onClose={closeChordsViewer}
             shared={viewerShared}
             samSpili={openChordsMode === "samspili"}
+            autoRecord={openChordsMode === "record"}
           />
         ) : null;
       })()}
