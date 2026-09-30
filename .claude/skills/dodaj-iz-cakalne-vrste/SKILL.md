@@ -299,6 +299,16 @@ node --env-file=.env.local scripts/fill-youtube-embed-ids.mjs --id <song_id>
 - `fill-chords-text.mjs` zapiše `songs.chords_text` (surov UG markup
   `[ch]`/`[tab]`). Skladbe brez UG povezave ga nimajo — vrstica "Akordi v
   aplikaciji" se zanje ne prikaže, to ni napaka.
+- **Capo vedno pod avtorja, vse ostalo v opis.** V pregledovalniku so nad
+  pesmijo samo naslov, avtor in capo; vse ostalo pred prvim razdelkom/akordom
+  (album, leto, povezave, opombe) je v zloženem "Opis skladbe". Capo se
+  prikaže pod avtorjem le, če je v tem opisu — UG pa ga pogosto pošlje samo
+  kot podatek (`tab_view.meta.capo`) ali kot opombo na koncu tablature
+  ("Capo II"). Skripta zato v tem primeru na vrh doda vrstico `Capo: N`
+  (tudi iz rimske številke). Po zagonu preveri: če skladba na UG ima capo
+  (glej stran), mora `chords_text` na vrhu imeti `Capo: N` ali capo v opisu.
+  Ročno ga ne dopisuj drugam (npr. med besedilo), sicer ga pregledovalnik ne
+  najde. Skladba brez capota vrstice ne dobi.
 - `fill-youtube-embed-ids.mjs` zapiše `songs.youtube_embed_ids` (do 8
   zadetkov iskanja "avtor naslov", brez `youtube_url`/`youtube_music_url`).
   Predvajalnik jih preizkuša po vrsti, ker založbe vgradnjo pogosto

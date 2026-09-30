@@ -25,7 +25,7 @@ import VoiceQuickAdd from "@/components/VoiceQuickAdd";
 import AddChoiceIcons from "@/components/AddChoiceIcons";
 import ChordsTextEditor from "@/components/ChordsTextEditor";
 import { ImportHistory, ImportReports } from "@/components/ImportTabs";
-import { FavoritesArchive, FavoritesThisMonth, favoriteArchiveMonths } from "@/components/FavoritesMonth";
+import { FavoritesArchive, FavoritesThisMonth, VerifiedSongs, favoriteArchiveMonths } from "@/components/FavoritesMonth";
 import { authorAccentHex } from "@/lib/authorColor";
 import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
 import { pickDailyFeatured } from "@/lib/dailyRandom";
@@ -158,6 +158,9 @@ export default function Dashboard({ user }: { user: User }) {
   const [confirmResolveId, setConfirmResolveId] = useState<string | null>(null);
   // Napredni urejevalnik besedila z akordi ("Uredi besedilo" na strani Popravi skladbe).
   const [chordsEditSong, setChordsEditSong] = useState<Song | null>(null);
+  // Urejevalnik odprt iz pregledovalnika akordov (gumb "Urejevalnik"): ob
+  // zaprtju se pregledovalnik spet odpre, z novim besedilom.
+  const [editorFromViewer, setEditorFromViewer] = useState(false);
   // "Čakalna vrsta" (tabela queued_songs, gumb "Hitro" ob "Dodaj skladbo"):
   // hiter pregled v SettingsMenu.tsx + celostranski pogled (queueOpen).
   const [queuedSongs, setQueuedSongs] = useState<QueuedSong[]>([]);
@@ -255,6 +258,30 @@ export default function Dashboard({ user }: { user: User }) {
   const [jamShared, setJamShared] = usePersistentBool("komadi:jam:shared", false);
   const [sharedJamItems, setSharedJamItems] = useState<SharedJamItem[]>([]);
   const [sharedJamSongs, setSharedJamSongs] = useState<Record<string, Song>>({});
+  // "Preverjeno špila" (domača stran) je za vse enak: preverjene, odobrene
+  // skladbe vseh uporabnikov (select na songs je odprt vsem prijavljenim),
+  // naložene ob odprtju; lastne pridejo iz songs (sproti), tuje brez podvojitev.
+  const [verifiedAll, setVerifiedAll] = useState<Song[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from("songs")
+      .select("*")
+      .not("verified_player_at", "is", null)
+      .eq("review_pending", false)
+      .then(({ data }) => {
+        if (!cancelled && data) setVerifiedAll(data as Song[]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const verifiedSongs = useMemo(() => {
+    const own = songs.filter((s) => s.verified_player_at);
+    const ownKeys = new Set(own.map((s) => songMatchKey(s)));
+    const foreign = dedupeShared(verifiedAll.filter((s) => s.user_id !== user.id && !ownKeys.has(songMatchKey(s))));
+    return [...own, ...foreign];
+  }, [songs, verifiedAll, user.id]);
   const [sharedJamError, setSharedJamError] = useState<string | null>(null);
   // "Mojih 20 skladb": osebni seznam za naučit do konca leta — isti vzorec
   // kot Jam (persist odprtost, iskalni izbirnik, "Skladbe ni" hitri vnos),
@@ -2520,7 +2547,13 @@ export default function Dashboard({ user }: { user: User }) {
       {chordsEditSong && (
         <ChordsTextEditor
           song={chordsEditSong}
-          onClose={() => setChordsEditSong(null)}
+          onClose={() => {
+            setChordsEditSong(null);
+            if (editorFromViewer) {
+              setEditorFromViewer(false);
+              openChordsViewer(chordsEditSong.id);
+            }
+          }}
           onSaved={(chordsText) =>
             setSongs((prev) =>
               prev.map((x) => (x.id === chordsEditSong.id ? { ...x, chords_text: chordsText } : x)),
@@ -4026,6 +4059,15 @@ export default function Dashboard({ user }: { user: User }) {
                   onAddToJam={handleAddToJam}
                   onAddToSharedJam={handleAddToSharedJam}
                 />
+                <VerifiedSongs
+                  songs={verifiedSongs}
+                  isOwn={(s) => s.user_id === user.id}
+                  authorImages={authorImages}
+                  onFilterAuthor={handleFilterByAuthor}
+                  onChordsClick={handleChordsClick}
+                  onAddToJam={handleAddToJam}
+                  onAddToSharedJam={handleAddToSharedJam}
+                />
                 <HomeHighlights
                   eras={eraHighlights}
                   genres={genreHighlights}
@@ -4337,7 +4379,7 @@ export default function Dashboard({ user }: { user: User }) {
 
       {(() => {
         const chordsSong = openChordsId
-          ? [...allSongs, ...(sharedSongs ?? []), ...Object.values(sharedJamSongs)].find((s) => s.id === openChordsId && s.chords_text)
+          ? [...allSongs, ...(sharedSongs ?? []), ...Object.values(sharedJamSongs), ...verifiedAll].find((s) => s.id === openChordsId && s.chords_text)
           : undefined;
         return chordsSong ? (
           <ChordsViewer
@@ -4347,6 +4389,15 @@ export default function Dashboard({ user }: { user: User }) {
             shared={viewerShared}
             samSpili={openChordsMode === "samspili"}
             autoRecord={openChordsMode === "record"}
+            onOpenEditor={
+              chordsSong.user_id === user.id
+                ? () => {
+                    setEditorFromViewer(true);
+                    setChordsEditSong(chordsSong);
+                    closeChordsViewer();
+                  }
+                : undefined
+            }
           />
         ) : null;
       })()}

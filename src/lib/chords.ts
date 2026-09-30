@@ -211,6 +211,8 @@ export function splitDescription(lines: ChordsLine[]): { description: ChordsLine
 }
 
 // Capo iz opisa: "Capo: 2", "Capo 3", "capo on 1st fret", "put on a capo 3rd fret".
+const ROMAN: Record<string, number> = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10, XI: 11, XII: 12 };
+
 export function findCapo(lines: ChordsLine[]): number | null {
   for (const l of lines) {
     if (l.kind !== "text") continue;
@@ -218,6 +220,10 @@ export function findCapo(lines: ChordsLine[]): number | null {
     if (/no capo/i.test(text)) continue;
     const m = text.match(/capo\D{0,15}?(\d{1,2})/i);
     if (m) return Number(m[1]);
+    // Rimska številka ("Capo II *" — Waterloo, Fast Car, večina CCR): samo z
+    // velikimi črkami, da "capo in/it …" ne šteje.
+    const r = text.match(/[Cc][Aa][Pp][Oo]\s*[:\-]?\s*(XII|XI|X|IX|VIII|VII|VI|V|IV|III|II|I)\b/);
+    if (r) return ROMAN[r[1]];
   }
   return null;
 }

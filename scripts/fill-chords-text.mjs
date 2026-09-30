@@ -53,7 +53,36 @@ async function fetchUgContent(url) {
   const content = store?.store?.page?.data?.tab_view?.wiki_tab?.content;
   if (typeof content !== "string" || !content.trim()) throw new Error("ni wiki_tab.content");
   // Vsebina je po JSON.parse še lahko z entitetami (&nbsp; ipd.).
-  return decodeHtml(content).replace(/\r\n/g, "\n");
+  const text = decodeHtml(content).replace(/\r\n/g, "\n");
+  return withCapoLine(text, store?.store?.page?.data?.tab_view?.meta?.capo);
+}
+
+// Capo pod avtorja: pregledovalnik (findCapo v src/lib/chords.ts) ga pokaže pod
+// avtorjem, kadar je v opisu (pred prvim razdelkom/akordom). UG ga pogosto
+// pošlje samo kot podatek (tab_view.meta.capo) ali kot opombo na koncu
+// tablature ("Capo II" — Knowing Me Knowing You) — takrat na vrh doda
+// vrstico "Capo: N". Vse ostalo (album, leto, opombe) ostane v opisu.
+const ROMAN = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10, XI: 11, XII: 12 };
+function withCapoLine(text, metaCapo) {
+  let capo = Number(metaCapo) > 0 ? Number(metaCapo) : null;
+  if (!capo) {
+    for (const line of text.split("\n")) {
+      if (/no capo/i.test(line)) continue;
+      const d = line.match(/capo\D{0,15}?(\d{1,2})/i);
+      const r = line.match(/[Cc][Aa][Pp][Oo]\s*[:\-]?\s*(XII|XI|X|IX|VIII|VII|VI|V|IV|III|II|I)\b/);
+      if (d || r) {
+        capo = d ? Number(d[1]) : ROMAN[r[1]];
+        break;
+      }
+    }
+  }
+  if (!capo) return text;
+  // Opis = vse pred prvim razdelkom ([Verse]) ali vrstico z akordi ([ch]).
+  const lines = text.split("\n");
+  const first = lines.findIndex((l) => /\[ch\]|^\s*\[[^\]/]+\]\s*$/.test(l));
+  const head = (first < 0 ? lines : lines.slice(0, first)).join("\n");
+  if (/capo/i.test(head) && !/no capo/i.test(head)) return text;
+  return `Capo: ${capo}\n${text}`;
 }
 
 async function getSongs() {

@@ -219,6 +219,7 @@ export default function ChordsViewer({
   shared,
   samSpili = false,
   autoRecord = false,
+  onOpenEditor,
 }: {
   song: Song;
   onClose: () => void;
@@ -229,6 +230,10 @@ export default function ChordsViewer({
   // Odpri s takoj zagnanim snemalnikom časov ("Posnemi čase") — iz naprednega
   // urejevalnika besedila (ChordsTextEditor.tsx, način "record").
   autoRecord?: boolean;
+  // Računalnik: gumb "Napredni urejevalnik" v orodni vrstici (samo za lastne
+  // skladbe) — Dashboard zapre pregledovalnik, odpre ChordsTextEditor in ga
+  // po zaprtju urejevalnika spet odpre.
+  onOpenEditor?: () => void;
 }) {
   const follower = shared?.role === "follower" ? shared : null;
   const [followPillHidden, setFollowPillHidden] = useState(false);
@@ -2216,6 +2221,23 @@ export default function ChordsViewer({
               </>
             )}
           </div>
+        )}
+        {/* Računalnik: napredni urejevalnik besedila (isti kot na straneh Pregled
+            in odobritev / Popravi skladbe). */}
+        {onOpenEditor && (
+          <button
+            type="button"
+            onClick={onOpenEditor}
+            disabled={!!recorder}
+            title="Napredni urejevalnik besedila z akordi in tablatur"
+            className="hidden h-8 items-center gap-1.5 rounded-full border border-orange-400 px-3 text-xs text-neutral-200 transition hover:text-white disabled:opacity-40 active:scale-95 lg:flex"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-amber-400">
+              <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
+            </svg>
+            Urejevalnik
+          </button>
         )}
         {/* Računalnik: "Posnemi čase" v vrstici (na telefonu v ⚙ → Napredne nastavitve). */}
         <button

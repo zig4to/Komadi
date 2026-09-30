@@ -7,8 +7,9 @@ import { authorAccentHex } from "@/lib/authorColor";
 import { PORTRAIT_FOCUS_Y } from "@/lib/constants";
 import type { Song } from "@/types/song";
 
-// "Priljubljeno ta mesec" (domača stran, nad "Obdobja") in "Arhiv
-// priljubljenih" (celostranski pogled iz menija ⋮). Mesec določa
+// "Priljubljeno ta mesec" (domača stran, nad "Obdobja"), "Preverjeno špila"
+// (domača stran, pod njim — skladbe s preverjenim predvajalnikom, ista
+// postavitev) in "Arhiv priljubljenih" (celostranski pogled iz menija ⋮). Mesec določa
 // song.favorited_at — ob preklopu na nov mesec se lanske priljubljene same
 // "preselijo" v arhiv, ničesar ni treba premikati v bazi.
 
@@ -44,6 +45,16 @@ function favoritesSorted(songs: Song[]) {
     .sort((a, b) => b.favorited_at!.localeCompare(a.favorited_at!));
 }
 
+// Kljukica v krogu ("Preverjeno špila").
+function CheckIcon({ className, strokeWidth = 1.8 }: { className: string; strokeWidth?: number }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8 12.5 2.7 2.7L16.5 9.5" />
+    </svg>
+  );
+}
+
 function StarIcon({ filled, className, strokeWidth = 1.8 }: { filled: boolean; className: string; strokeWidth?: number }) {
   return (
     <svg
@@ -71,7 +82,11 @@ export function FavoriteCard({
   onChordsClick,
   onAddToJam,
   onAddToSharedJam,
+  variant = "favorite",
 }: {
+  // "verified": kartica v "Preverjeno špila" — datum preverjanja in okrasna
+  // kljukica namesto zvezde.
+  variant?: "favorite" | "verified";
   song: Song;
   authorImage: string | null;
   onFilterAuthor?: (author: string) => void;
@@ -81,7 +96,8 @@ export function FavoriteCard({
 }) {
   const accent = authorAccentHex(song.author);
   const [portraitSrc, setPortraitSrc] = useState<string | null>(null);
-  const date = song.favorited_at ? new Date(song.favorited_at).toLocaleDateString("sl-SI", { day: "numeric", month: "short" }) : null;
+  const dateIso = variant === "verified" ? song.verified_player_at : song.favorited_at;
+  const date = dateIso ? new Date(dateIso).toLocaleDateString("sl-SI", { day: "numeric", month: "short" }) : null;
 
   // Kratek vizualni znak (kljukica namesto strele), da je jasno, da je klik
   // na "Dodaj v Jam" nekaj naredil — enak vzorec kot na SongCard.tsx.
@@ -204,9 +220,15 @@ export function FavoriteCard({
           skladba odstrani samo v meniju SongCard (Priljubljena). */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute -right-5 top-1/2 -z-10 -translate-y-1/2 text-amber-500 opacity-20 dark:text-amber-400"
+        className={`pointer-events-none absolute -right-5 top-1/2 -z-10 -translate-y-1/2 opacity-20 ${
+          variant === "verified" ? "text-orange-500 dark:text-orange-400" : "text-amber-500 dark:text-amber-400"
+        }`}
       >
-        <StarIcon filled={false} strokeWidth={1} className="h-14 w-14" />
+        {variant === "verified" ? (
+          <CheckIcon strokeWidth={1} className="h-14 w-14" />
+        ) : (
+          <StarIcon filled={false} strokeWidth={1} className="h-14 w-14" />
+        )}
       </span>
     </div>
   );
@@ -369,6 +391,69 @@ export function FavoritesThisMonth({ songs, authorImages, ...handlers }: { songs
           <p>
             Ta mesec še ni priljubljenih. Skladbo dodaš v meniju kartice (☰) z gumbom{" "}
             <span className="font-medium">Priljubljena</span>.
+          </p>
+        </div>
+      ) : (
+        <>
+          <Swiper
+            className="lg:hidden"
+            groups={chunk(items, COLUMN_SIZE)}
+            groupClassName="flex w-[86%] flex-col gap-2 sm:w-[calc(50%-6px)]"
+            renderCard={renderCard}
+          />
+          <Swiper
+            className="hidden lg:block"
+            groups={chunk(items, DESKTOP_PAGE_SIZE)}
+            groupClassName="grid w-full grid-cols-3 content-start gap-x-3 gap-y-2"
+            renderCard={renderCard}
+          />
+        </>
+      )}
+    </section>
+  );
+}
+
+// "Preverjeno špila": skladbe s preverjenim predvajalnikom (Smart play /
+// Sam špili dela) — vseh uporabnikov, nazadnje preverjena prva. Ista
+// postavitev kot priljubljene: telefon stolpci po 3 (swipe), računalnik strani
+// 3 × 3. Tujim skladbam (isOwn = false) ni mogoče dodati v privat Jam in klik
+// na akorde jim ne šteje popularnosti.
+export function VerifiedSongs({
+  songs,
+  authorImages,
+  isOwn,
+  ...handlers
+}: { songs: Song[]; isOwn: (song: Song) => boolean } & CardHandlers) {
+  const items = songs
+    .filter((s) => s.verified_player_at && s.chords_text)
+    .sort((a, b) => b.verified_player_at!.localeCompare(a.verified_player_at!));
+  const renderCard = (s: Song) => (
+    <FavoriteCard
+      key={s.id}
+      variant="verified"
+      song={s}
+      authorImage={authorImages[s.author] ?? null}
+      {...handlers}
+      {...(isOwn(s) ? {} : { onAddToJam: undefined, onChordsClick: undefined })}
+    />
+  );
+
+  return (
+    <section className="mb-5">
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <h2 className="flex items-center gap-1.5 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
+          <CheckIcon className="h-[18px] w-[18px] text-orange-500 dark:text-orange-400" />
+          Preverjeno špila
+        </h2>
+        {items.length > 0 && <span className="text-xs text-neutral-500 dark:text-neutral-400">{items.length}</span>}
+      </div>
+
+      {items.length === 0 ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-dashed border-orange-500/40 bg-orange-500/[0.04] px-4 py-3.5 text-sm text-neutral-600 dark:text-neutral-300">
+          <CheckIcon className="h-5 w-5 shrink-0 text-orange-500" />
+          <p>
+            Še ni preverjenih skladb. Skladbo preveriš na strani <span className="font-medium">Pregled in odobritev</span> ali v ⚙
+            Akordov v aplikaciji (<span className="font-medium">Predvajalnik preverjen</span>).
           </p>
         </div>
       ) : (
