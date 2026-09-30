@@ -1753,11 +1753,11 @@ export default function ChordsViewer({
     if (!recording) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest("input,textarea")) return;
-      // Fokusiran gumb (npr. TAP po kliku) preslednico sproži sam kot klik.
-      if (e.code === "Space" && (e.target as HTMLElement).closest("button")) return;
+      // Preslednica je med snemanjem vedno TAP ob PRITISKU tipke — tudi ko ima
+      // kakšen gumb fokus (ta bi jo sicer sprožil šele ob spustu, prepozno).
       if (e.code === "Space") {
         e.preventDefault();
-        recordTapRef.current();
+        if (!e.repeat) recordTapRef.current();
       } else if (e.key === "Backspace") {
         e.preventDefault();
         undoTapRef.current();
@@ -1857,9 +1857,16 @@ export default function ChordsViewer({
         onPointerLeave={(e) => {
           if (e.pointerType === "mouse") scheduleHide();
         }}
+        // Snemanje: čas ob PRITISKU (onClick pride šele ob spustu, 0,1–0,2 s
+        // prepozno); klik s tipkovnico (detail 0) še vedno prek onClick.
+        onPointerDown={(e) => {
+          if (!recorder || !at || e.button !== 0) return;
+          e.preventDefault();
+          recordChord(at.line, at.chord);
+        }}
         onClick={(e) => {
           if (recorder) {
-            if (at) recordChord(at.line, at.chord);
+            if (at && e.detail === 0) recordChord(at.line, at.chord);
             return;
           }
           if ((e.nativeEvent as PointerEvent).pointerType === "mouse") return;
@@ -2622,7 +2629,16 @@ export default function ChordsViewer({
             <div className="flex items-stretch gap-2">
               <button
                 type="button"
-                onClick={recordTap}
+                // Čas ob PRITISKU (miška/prst), ne ob spustu kot onClick — sicer je
+                // vsak TAP 0,1–0,2 s prepozen. Tipkovnica (detail 0) prek onClick.
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  e.preventDefault();
+                  recordTap();
+                }}
+                onClick={(e) => {
+                  if (e.detail === 0) recordTap();
+                }}
                 disabled={recorder.cursor < 0}
                 className="w-2/5 shrink-0 rounded-xl bg-orange-500 py-4 text-lg font-bold tracking-wide text-white active:scale-[0.98] disabled:opacity-40"
               >
