@@ -11,6 +11,7 @@ import {
   transposeEditedLine,
 } from "@/lib/chords";
 import { supabase } from "@/lib/supabaseClient";
+import { rebaseSyncOnEdit } from "@/lib/syncedLyrics";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { Song } from "@/types/song";
 
@@ -352,7 +353,12 @@ export default function ChordsTextEditor({
     setSaving(true);
     setError(null);
     const next = applyEditedText(original, text);
-    const { error: dbError } = await supabase.from("songs").update({ chords_text: next }).eq("id", song.id);
+    // Shranjeni časi Smart playa dobijo nove številke vrstic; če katere vrstice
+    // ni več, se oznaka "Predvajalnik preverjen" umakne (rebaseSyncOnEdit).
+    const { error: dbError } = await supabase
+      .from("songs")
+      .update({ chords_text: next, ...rebaseSyncOnEdit(song, next) })
+      .eq("id", song.id);
     setSaving(false);
     if (dbError) return setError(`Shranjevanje ni uspelo: ${dbError.message}`);
     onSaved(next);

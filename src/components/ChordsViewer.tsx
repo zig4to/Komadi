@@ -26,22 +26,26 @@ import {
   lineProgressAt,
   instrumentalPoints,
   recordableLineIndexes,
+  lineKey,
   manualSyncPoints,
   pickBestCandidate,
+  rebaseSyncOnEdit,
+  remapLines,
   type LrcCandidate,
   type SyncPoint,
 } from "@/lib/syncedLyrics";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
-import type { ChordSection, Song } from "@/types/song";
-import { anchorScrollTop, computeAnchor, type LocalView, type SamSpiliView } from "@/lib/sharedChordsView";
+import type { ChordSection, Song, SyncedChords, SyncedLines } from "@/types/song";
+import { anchorScrollTop, computeAnchor, getRemoteView, subscribeRemoteView, type LocalView, type RemoteViewEntry, type SamSpiliView } from "@/lib/sharedChordsView";
 
 // Skupni pogled v Skupnem Jamu (Dashboard.tsx, src/lib/sharedChordsView.ts):
 // vodja sporoča, kar vidi; sledilec prikaže vodjev pogled; "paused" = sledilec,
 // ki je sledenje ustavil.
 export type SharedViewProp =
   | { role: "leader"; onLocalView: (view: LocalView) => void }
-  | { role: "follower"; leaderName: string; remote: LocalView | null; onStopFollowing: () => void }
+  // Vodjev pogled pride mimo propov (subscribeRemoteView v sharedChordsView.ts).
+  | { role: "follower"; leaderName: string; onStopFollowing: () => void }
   | { role: "paused"; leaderName: string; onFollow: () => void };
 
 // Vgrajen pregledovalnik akordov (v slogu UG Tabs app): songs.chords_text
@@ -232,7 +236,13 @@ export default function ChordsViewer({
   }, [isFollowing]);
   // Po skritju napisa ✕ pomeni "Ne sledi" (zapre akorde, sledenje se ustavi).
   const closeAsUnfollow = isFollowing && followPillHidden;
-  const remote = follower?.remote ?? null;
+  // Vodjev pogled (samo sledilec): v stanju le, kar se izriše (Smart play
+  // vrstica/akord, celozaslonsko, ali Sam špili že igra); položaj gre v refe.
+  const [remoteState, setRemoteState] = useState<LocalView | null>(() => {
+    const e = getRemoteView();
+    return e && e.songId === song.id ? e.view : null;
+  });
+  const remote = follower ? remoteState : null;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [semitones, setSemitones] = useState(() => readNumber(transposeKey(song.id), 0));
   const [fontSize, setFontSize] = useState(() => readNumber(FONT_KEY, 15));
@@ -258,11 +268,15 @@ export default function ChordsViewer({
     try {
       remembered = window.localStorage.getItem(workingVideoKey(song.id));
     } catch {}
+    // Preverjen predvajalnik: zaklenjen posnetek (tisti, za katerega so
+    // zamrznjeni časi) je prvi; posnetek, zapomnjen na tej napravi, ne šteje.
+    const locked = song.verified_player_at ? (song.synced_lines?.videoId ?? null) : null;
     return [
       ...new Set([
+        locked,
         // Izbran v izbirniku posnetka (shranjen v bazi, velja na vseh napravah).
         song.preferred_video_id,
-        remembered,
+        locked ? null : remembered,
         youTubeVideoId(song.youtube_url),
         youTubeVideoId(song.youtube_music_url),
         ...(song.youtube_embed_ids ?? []),
@@ -647,15 +661,23 @@ export default function ChordsViewer({
     if (draft !== null && draft !== toEditableText(chordsText) && !window.confirm("Zavržem spremembe?")) return;
     setDraft(null);
   };
+  // Zadnje stanje shranjenih časov za saveEdit (branje prek ref-a).
+  const syncStateRef = useRef<Pick<Song, "synced_lines" | "synced_chords" | "verified_player_at">>({});
   const saveEdit = async () => {
     if (draft === null) return;
     if (draft === toEditableText(chordsText)) return setDraft(null);
     const next = applyEditedText(chordsText, draft);
+    // Shranjeni časi dobijo nove številke vrstic; če katere vrstice ni več,
+    // se oznaka "Predvajalnik preverjen" umakne.
+    const rebase = rebaseSyncOnEdit(syncStateRef.current, next);
     setSaving(true);
     setEditError(null);
-    const { error } = await supabase.from("songs").update({ chords_text: next }).eq("id", song.id);
+    const { error } = await supabase.from("songs").update({ chords_text: next, ...rebase }).eq("id", song.id);
     setSaving(false);
     if (error) return setEditError(`Shranjevanje ni uspelo: ${error.message}`);
+    if (rebase.synced_lines) setSyncedLines(rebase.synced_lines);
+    if (rebase.synced_chords) setSyncedChords(rebase.synced_chords);
+    if ("verified_player_at" in rebase) setVerifiedPlayerAt(null);
     setChordsText(next);
     setDraft(null);
   };
@@ -769,11 +791,27 @@ export default function ChordsViewer({
     () => (lrcCandidates ? pickBestCandidate(lrcCandidates, videoDuration, body) : null),
     [lrcCandidates, videoDuration, body],
   );
-  // Ročno posneti časi (songs.synced_lines) imajo prednost pred LRCLIB.
-  const [syncedLines, setSyncedLines] = useState(song.synced_lines ?? null);
+  // Ročno posneti ali zamrznjeni časi (songs.synced_lines) imajo prednost pred LRCLIB.
+  const [syncedLines, setSyncedLines] = useState<SyncedLines | null>(song.synced_lines ?? null);
+  // Ročno preverjeno (0035): akordi pregledani / predvajalnik usklajen.
+  const [verifiedChordsAt, setVerifiedChordsAt] = useState(song.verified_chords_at ?? null);
+  const [verifiedPlayerAt, setVerifiedPlayerAt] = useState(song.verified_player_at ?? null);
+  // Posnetek, ki trenutno igra (onPlaying) — zamik velja zanj.
+  const [playingVideo, setPlayingVideo] = useState<string | null>(null);
+  // Preverjen predvajalnik velja samo za posnetek, na katerem je bil potrjen.
+  const lockedVideo = verifiedPlayerAt ? (syncedLines?.videoId ?? null) : null;
+  const wrongVideo = !!lockedVideo && !!playingVideo && playingVideo !== lockedVideo;
+  // Shranjeni časi so vezani na številko vrstice: če se je premaknila (urejeno
+  // besedilo, drugačno razčlenjevanje), jih ključ vrstice (key) prestavi.
+  const syncedRemap = useMemo(
+    () => (syncedLines?.points.length ? remapLines(syncedLines.points, body) : null),
+    [syncedLines, body],
+  );
+  const syncBroken = !!syncedRemap && !syncedRemap.ok;
   const sync = useMemo(() => {
-    if (syncedLines?.points.length) {
-      const points = manualSyncPoints(syncedLines.points);
+    if (wrongVideo) return null;
+    if (syncedRemap?.ok) {
+      const points = manualSyncPoints(syncedRemap.points);
       return { points, matched: points.length, total: points.length, manual: true };
     }
     if (!lrc) return null;
@@ -782,20 +820,26 @@ export default function ChordsViewer({
       ? [...aligned.points, ...instrumentalPoints(aligned.points, lrc.lines, body)].sort((a, b) => a.time - b.time)
       : aligned.points;
     return { points, matched: aligned.matched, total: lrc.lines.filter((l) => l.text).length, manual: false };
-  }, [syncedLines, lrc, body, song.title]);
+  }, [wrongVideo, syncedRemap, lrc, body, song.title]);
   // Ročno posneti časi posameznih akordov (songs.synced_chords) — dodatna
   // plast: ob času se obarva prav ta akord (intro, solo …).
   // Razdeljeno na instrumentalne dele (Intro, Instrumental 1 …), vsak s svojim zamikom.
-  const [syncedChords, setSyncedChords] = useState(song.synced_chords?.sections ? song.synced_chords : null);
-  const chordPoints = useMemo(() => flattenChordSections(syncedChords?.sections ?? []), [syncedChords]);
+  const [syncedChords, setSyncedChords] = useState<SyncedChords | null>(song.synced_chords?.sections ? song.synced_chords : null);
+  // Deli z vrsticami, prestavljenimi po ključu (kot pri synced_lines).
+  const chordSections = useMemo(
+    () => (syncedChords?.sections ?? []).map((s) => ({ ...s, points: remapLines(s.points, body).points })),
+    [syncedChords, body],
+  );
+  const chordPoints = useMemo(() => flattenChordSections(chordSections), [chordSections]);
+  useEffect(() => {
+    syncStateRef.current = { synced_lines: syncedLines, synced_chords: syncedChords, verified_player_at: verifiedPlayerAt };
+  });
   const [activeChord, setActiveChord] = useState<{ line: number; chord: number } | null>(null);
   // Na voljo, če je besedilo s časi ali posneti akordi; sledi pa samo po
   // gumbu "Smart play" (navadni ▶ samo predvaja, kot prej).
   const smartAvailable = (!!sync && sync.points.length > 0) || chordPoints.length > 0;
   const [smartOn, setSmartOn] = useState(false);
   const smartActive = smartAvailable && smartOn;
-  // Posnetek, ki trenutno igra (onPlaying) — zamik velja zanj.
-  const [playingVideo, setPlayingVideo] = useState<string | null>(null);
   const [lrcOffsets, setLrcOffsets] = useState<Record<string, number>>(() => {
     let local: Record<string, number> = {};
     try {
@@ -1012,10 +1056,15 @@ export default function ChordsViewer({
     const active = recorder?.sections.find((s) => s.id === recorder.activeId);
     return new Set(active?.points.map((p) => `${p.line}:${p.chord}`) ?? []);
   }, [recorder]);
+  // Ključ vrstice ob shranjevanju časa — po njem se čas kasneje prestavi.
+  const withLineKey = <T extends { line: number }>(p: T): T & { key?: string } => {
+    const key = lineKey(body[p.line]);
+    return key ? { ...p, key } : p;
+  };
   const saveRecorder = async () => {
     if (!recorder?.dirty || !playingVideo) return;
-    const linePoints = [...recorder.lines].sort((a, b) => a.t - b.t);
-    const sections = recorder.sections.filter((s) => s.points.length);
+    const linePoints = [...recorder.lines].sort((a, b) => a.t - b.t).map(withLineKey);
+    const sections = recorder.sections.filter((s) => s.points.length).map((s) => ({ ...s, points: s.points.map(withLineKey) }));
     // Shrani samo plasti, ki imajo točke (ali so jih imele): Water Witch s
     // samimi akordi pusti vrstice iz LRCLIB pri miru.
     const nextLines = linePoints.length ? { videoId: syncedLines?.videoId ?? playingVideo, points: linePoints } : null;
@@ -1036,6 +1085,105 @@ export default function ChordsViewer({
     setRecorderMsg(null);
     setSmartOn(true);
   };
+
+  // --- Ročno preverjanje (oznaki na kartici, pogoj za "Odobri") ---
+  const [verifySaving, setVerifySaving] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
+  const verifyError = (message: string) =>
+    setVerifyMsg(`Shranjevanje ni uspelo: ${message}${/verified_/.test(message) ? " — poženi migracijo 0035_add_verification.sql v Supabase." : ""}`);
+  const toggleVerifyChords = async () => {
+    const next = verifiedChordsAt ? null : new Date().toISOString();
+    setVerifySaving(true);
+    const { error } = await supabase.from("songs").update({ verified_chords_at: next }).eq("id", song.id);
+    setVerifySaving(false);
+    if (error) return verifyError(error.message);
+    setVerifiedChordsAt(next);
+    setVerifyMsg(null);
+  };
+  // "Predvajalnik preverjen": zamrzne trenutne čase vrstic (s koncem in ključem
+  // vrstice), posnetek, ki igra, in s tem njegov zamik (lrc_offsets) — skladba
+  // potem ne rabi več LRCLIB in je ne spremeni kasnejša logika povezovanja.
+  const confirmPlayer = async () => {
+    if (!playingVideo || !sync?.points.length) return;
+    if (sync.manual && syncedLines && syncedLines.videoId !== playingVideo) {
+      return setVerifyMsg("Časi so posneti za drug posnetek — izberi tistega ali posnemi čase znova.");
+    }
+    const r3 = (x: number) => Math.round(x * 1000) / 1000;
+    const nextLines: SyncedLines = {
+      videoId: playingVideo,
+      frozen: true,
+      points: sync.points.map((p) => withLineKey({ t: r3(p.time), end: r3(p.end), line: p.lineIndex })),
+    };
+    const nextChords: SyncedChords | null = syncedChords
+      ? { ...syncedChords, sections: chordSections.map((s) => ({ ...s, points: s.points.map(withLineKey) })) }
+      : null;
+    const at = new Date().toISOString();
+    setVerifySaving(true);
+    const { error } = await supabase
+      .from("songs")
+      .update({ synced_lines: nextLines, preferred_video_id: playingVideo, verified_player_at: at, ...(nextChords ? { synced_chords: nextChords } : {}) })
+      .eq("id", song.id);
+    setVerifySaving(false);
+    if (error) return verifyError(error.message);
+    setSyncedLines(nextLines);
+    if (nextChords) setSyncedChords(nextChords);
+    setPreferredVideo(playingVideo);
+    setVerifiedPlayerAt(at);
+    setVerifyMsg(null);
+  };
+  const unverifyPlayer = async () => {
+    if (!window.confirm("Razveljavim oznako \"Predvajalnik preverjen\"? Shranjeni časi ostanejo.")) return;
+    setVerifySaving(true);
+    const { error } = await supabase.from("songs").update({ verified_player_at: null }).eq("id", song.id);
+    setVerifySaving(false);
+    if (error) return verifyError(error.message);
+    setVerifiedPlayerAt(null);
+    setVerifyMsg(null);
+  };
+  const verifyDate = (iso: string) => new Date(iso).toLocaleDateString("sl-SI");
+  const verifyCheck = (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+  const verifyRowCls = (on: boolean) =>
+    `flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-xs font-medium disabled:opacity-50 ${
+      on ? "border-emerald-500/70 bg-emerald-500/10 text-emerald-300" : "border-neutral-700 text-neutral-200 hover:border-orange-400 hover:text-white"
+    }`;
+  const verifyChordsRow = (
+    <button type="button" onClick={toggleVerifyChords} disabled={verifySaving} aria-pressed={!!verifiedChordsAt} className={verifyRowCls(!!verifiedChordsAt)}>
+      {verifyCheck}
+      {verifiedChordsAt ? `Akordi preverjeni (${verifyDate(verifiedChordsAt)})` : "Označi: akordi preverjeni"}
+    </button>
+  );
+  const verifyPlayerRow = (
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={verifiedPlayerAt ? unverifyPlayer : confirmPlayer}
+        disabled={verifySaving || (!verifiedPlayerAt && (!playingVideo || !sync?.points.length))}
+        aria-pressed={!!verifiedPlayerAt}
+        className={verifyRowCls(!!verifiedPlayerAt)}
+      >
+        {verifyCheck}
+        {verifiedPlayerAt ? `Predvajalnik preverjen (${verifyDate(verifiedPlayerAt)})` : "Označi: predvajalnik preverjen"}
+      </button>
+      <p className="px-1 text-[10px] leading-tight text-neutral-500">
+        {verifiedPlayerAt
+          ? wrongVideo
+            ? "Preverjen posnetek ni na voljo — igra drug posnetek, zato Smart play ne sledi."
+            : syncBroken
+              ? "Časi se ne ujemajo več z besedilom — preveri ponovno."
+              : "Zaklenjeno: posnetek, časi vrstic in zamik. Klik razveljavi oznako."
+          : !sync?.points.length
+            ? "Ni besedila s časi — najprej Posnemi čase."
+            : !playingVideo
+              ? "Najprej zaženi predvajanje in preveri, da vrstice sledijo petju."
+              : "Zaklene ta posnetek, čase vrstic in zamik — skladba bo vedno delala enako."}
+      </p>
+      {verifyMsg && <p className="px-1 text-[10px] leading-tight text-red-400">{verifyMsg}</p>}
+    </div>
+  );
   const deleteSyncedLines = async () => {
     if (!window.confirm("Izbrišem ročno posnete čase (vrstice in akorde) za to skladbo?")) return;
     const { error } = await supabase.from("songs").update({ synced_lines: null, synced_chords: null }).eq("id", song.id);
@@ -1163,14 +1311,28 @@ export default function ChordsViewer({
   // Sledilec: na vrhu ista vrstica kot pri vodji. Sporočilo da samo cilj;
   // pomik proti njemu je gladek (vsaka sličica, eksponentno približevanje),
   // namesto skoka ob vsakem sporočilu (~10/s), ki je bil sunkovit.
-  const remoteAnchorKey = remote ? `${remote.anchor.line}:${remote.anchor.frac}` : "";
-  const followTargetRef = useRef<number | null>(null);
-  useEffect(() => {
+  // Cilj = zadnji vodjev položaj + njegova hitrost (px/s), da sledilec med
+  // sporočili drsi naprej kot vodja, namesto da skače od cilja do cilja.
+  const followTargetRef = useRef<{ base: number; v: number; at: number } | null>(null);
+  const lastAnchorRef = useRef<LocalView["anchor"] | null>(null);
+  const setFollowAnchor = useCallback((anchor: LocalView["anchor"], at: number, keepSpeed: boolean) => {
     const el = scrollRef.current;
-    if (!el || !remote) return;
-    followTargetRef.current = anchorScrollTop(el, remote.anchor);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remoteAnchorKey, fontSize]);
+    if (!el) return;
+    const base = anchorScrollTop(el, anchor);
+    lastAnchorRef.current = anchor;
+    if (base == null) return;
+    const prev = followTargetRef.current;
+    let v = 0;
+    if (keepSpeed && prev) {
+      const dt = (at - prev.at) / 1000;
+      if (dt > 0.02 && dt < 1.5 && Math.abs(base - prev.base) < el.clientHeight) v = prev.v * 0.4 + ((base - prev.base) / dt) * 0.6;
+    }
+    followTargetRef.current = { base, v, at };
+  }, []);
+  // Druga velikost pisave: isto sidro, nov položaj v px.
+  useEffect(() => {
+    if (lastAnchorRef.current) setFollowAnchor(lastAnchorRef.current, performance.now(), false);
+  }, [fontSize, setFollowAnchor]);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !isFollowing) return;
@@ -1186,7 +1348,8 @@ export default function ChordsViewer({
     let last = performance.now();
     let raf = 0;
     const tick = (now: number) => {
-      const target = followTargetRef.current;
+      const ft = followTargetRef.current;
+      const target = ft ? ft.base + ft.v * Math.min(0.3, (now - ft.at) / 1000) : null;
       const dt = Math.min(100, now - last);
       last = now;
       if (target != null && now >= userUntil) {
@@ -1281,10 +1444,32 @@ export default function ChordsViewer({
   // ssRemoteRef (+ trenutek prejema) namesto lastnega časa posnetka.
   const ssLastRef = useRef<SamSpiliView | null>(null);
   const ssRemoteRef = useRef<{ view: SamSpiliView; at: number } | null>(null);
-  const remoteSs = follower && samSpili ? (remote?.ss ?? null) : null;
+  // Sledilec: vsako sporočilo vodje gre v refe (položaj, Sam špili); stanje se
+  // spremeni samo, ko se spremeni kaj, kar se izriše.
+  const isFollower = !!follower;
   useEffect(() => {
-    ssRemoteRef.current = remoteSs ? { view: remoteSs, at: performance.now() } : null;
-  }, [remoteSs]);
+    if (!isFollower) return;
+    const onEntry = (entry: RemoteViewEntry | null) => {
+      const v = entry && entry.songId === song.id ? entry.view : null;
+      ssRemoteRef.current = v?.ss ? { view: v.ss, at: entry!.at } : null;
+      if (v) setFollowAnchor(v.anchor, entry!.at, true);
+      setRemoteState((prev) => {
+        if (!prev || !v) return v;
+        const same =
+          prev.fullscreen === v.fullscreen &&
+          !!prev.ss === !!v.ss &&
+          (prev.smart?.line ?? -2) === (v.smart?.line ?? -2) &&
+          (prev.smart?.chord?.line ?? -2) === (v.smart?.chord?.line ?? -2) &&
+          (prev.smart?.chord?.chord ?? -2) === (v.smart?.chord?.chord ?? -2);
+        return same ? prev : v;
+      });
+    };
+    // Ob (ponovnem) sledenju takoj zadnji znani pogled, ne šele ob naslednjem sporočilu.
+    const unsubscribe = subscribeRemoteView(onEntry);
+    const initial = getRemoteView();
+    if (initial) queueMicrotask(() => onEntry(initial));
+    return unsubscribe;
+  }, [isFollower, song.id, setFollowAnchor]);
   // Velikost pisave (enkrat za skladbo in ob spremembi velikosti zaslona):
   // najdaljša vrstica zapolni širino (do črte), po višini pa gredo ~3 vrstice. Merjeno
   // pri 20 px in linearno povečano; nastavljeno neposredno na element. Nobena
@@ -1360,10 +1545,7 @@ export default function ChordsViewer({
     let hl = -2;
     let last = performance.now();
     let raf = 0;
-    // Vodja: ocena hitrosti (vrstic/s) in zadnje poslano stanje.
-    let prevRow = NaN;
-    let prevAt = 0;
-    let speed = 0;
+    // Vodja: zadnje poslano stanje.
     let sentAt = 0;
     let sent: SamSpiliView | null = null;
     const rowTarget = (rowPos: number) => {
@@ -1384,11 +1566,13 @@ export default function ChordsViewer({
     const tick = (now: number) => {
       const dt = Math.min(100, now - last);
       last = now;
-      // Sledilec: vodjev položaj, med sporočili ocenjen s hitrostjo (največ 0,6 s).
+      // Sledilec: vodjev položaj — napredek v vrstici raste linearno kot pri
+      // vodji (p + rate × čas od prejema), zato drsi enako gladko. Največ 3 s
+      // naprej brez novega sporočila (vodji se je posnetek zataknil).
       const rem = ssRemoteRef.current;
       if (rem) {
         const v = rem.view;
-        const rowPos = v.row < 0 ? -1 : v.row + (v.playing ? v.speed * Math.min(0.6, (now - rem.at) / 1000) : 0);
+        const rowPos = v.row < 0 ? -1 : v.row + Math.min(1, v.p + (v.playing ? v.rate * Math.min(3, (now - rem.at) / 1000) : 0));
         if (v.hl !== hl) {
           hl = v.hl;
           setSsHlLine(v.hl);
@@ -1407,10 +1591,11 @@ export default function ChordsViewer({
       const { points, offset } = ssSyncRef.current;
       let line = -1;
       let progress = 0;
+      let span = 0;
       let gap = false;
       if (points) {
         const lt = t - offset;
-        ({ lineIndex: line, progress } = lineProgressAt(points, lt));
+        ({ lineIndex: line, progress, span } = lineProgressAt(points, lt));
         // Instrumentalni del: zapeta vrstica končana, naslednja ≥ SS_GAP_MIN s.
         let k = -1;
         for (let j = 0; j < points.length && points[j].time <= lt; j++) k = j;
@@ -1426,17 +1611,20 @@ export default function ChordsViewer({
       const k = rowFor(line);
       const rowPos = k >= 0 ? k + progress : -1;
       ease(rowTarget(rowPos), dt);
-      // Vodja v Skupnem Jamu: položaj ~10× na sekundo (ob spremembi), sicer 1× na sekundo.
+      // Vodja v Skupnem Jamu: sporočilo ob novi vrstici, pavzi/predvajanju,
+      // preskoku (napredek ni tam, kjer ga sledilec pričakuje) in 1× na sekundo.
       if (leaderReportRef.current) {
-        if (!Number.isNaN(prevRow) && rowPos >= 0 && prevRow >= 0 && Math.abs(rowPos - prevRow) < 1.5 && now > prevAt) {
-          const inst = ((rowPos - prevRow) * 1000) / (now - prevAt);
-          speed += (Math.max(0, inst) - speed) * 0.1;
-        } else if (Math.abs(rowPos - prevRow) >= 1.5) speed = 0;
-        prevRow = rowPos;
-        prevAt = now;
-        const view: SamSpiliView = { row: Math.round(rowPos * 1000) / 1000, speed: clock.playing ? Math.round(speed * 1000) / 1000 : 0, hl: want, playing: clock.playing };
-        const changed = !sent || sent.hl !== view.hl || sent.playing !== view.playing || Math.abs(sent.row - view.row) > 0.002;
-        if ((changed && now - sentAt >= 100) || now - sentAt >= 1000) {
+        const view: SamSpiliView = {
+          row: k,
+          p: Math.round(progress * 1000) / 1000,
+          rate: clock.playing && k >= 0 && span > 0 ? Math.round((1 / span) * 10000) / 10000 : 0,
+          hl: want,
+          playing: clock.playing,
+        };
+        const expected = sent ? Math.min(1, sent.p + sent.rate * ((now - sentAt) / 1000)) : 0;
+        const changed =
+          !sent || sent.row !== view.row || sent.hl !== view.hl || sent.playing !== view.playing || Math.abs(expected - view.p) > 0.03;
+        if ((changed && now - sentAt >= 50) || now - sentAt >= 1000) {
           sent = view;
           sentAt = now;
           ssLastRef.current = view;
@@ -1806,10 +1994,19 @@ export default function ChordsViewer({
             controllerRef={playerCtlRef}
             preferredId={preferredVideo}
             onSelect={async (id) => {
+              // Preverjen predvajalnik je vezan na svoj posnetek: drug posnetek ga razveljavi.
+              const unlock = !!lockedVideo && id !== lockedVideo;
+              if (unlock && !window.confirm("Ta skladba ima preverjen predvajalnik za drug posnetek. Izbira tega posnetka razveljavi preverjanje. Nadaljujem?")) {
+                return "Izbira preklicana — preverjen posnetek ostane.";
+              }
               const prev = preferredVideo;
               setPreferredVideo(id);
-              const { error } = await supabase.from("songs").update({ preferred_video_id: id }).eq("id", song.id);
+              const { error } = await supabase
+                .from("songs")
+                .update({ preferred_video_id: id, ...(unlock ? { verified_player_at: null } : {}) })
+                .eq("id", song.id);
               if (error) setPreferredVideo(prev);
+              else if (unlock) setVerifiedPlayerAt(null);
               return error ? error.message : null;
             }}
             onPlaying={(id) => {
@@ -2032,6 +2229,7 @@ export default function ChordsViewer({
             {editing ? "Zapri urejanje" : "Uredi besedilo in akorde"}
           </button>
           )}
+          {!samSpili && verifyChordsRow}
           {/* "Sam špili": naslov, razpirajoča "Tema", napredne na dnu. */}
           {samSpili ? (
             <>
@@ -2044,6 +2242,7 @@ export default function ChordsViewer({
           ) : (
             themePickers
           )}
+          {verifyPlayerRow}
           {/* Pametni predvajalnik: v glavnih nastavitvah (ne v naprednih). */}
           <div className="border-t border-neutral-700 px-1 pt-2">
             <button
@@ -2076,7 +2275,9 @@ export default function ChordsViewer({
             )}
             <span className="block text-[10px] leading-tight text-neutral-500">
               {sync?.manual
-                ? `Ročno posneti časi: ${sync.points.length} tapov. Zaženi z gumbom Smart play levo od ▶.`
+                ? syncedLines?.frozen
+                  ? `Zamrznjeni časi: ${sync.points.length} vrstic (neodvisno od LRCLIB).`
+                  : `Ročno posneti časi: ${sync.points.length} tapov. Zaženi z gumbom Smart play levo od ▶.`
                 : lrcError
                 ? `Napaka: ${lrcError}`
                 : !lrcCandidates

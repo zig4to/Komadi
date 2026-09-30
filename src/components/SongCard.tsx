@@ -262,6 +262,27 @@ export default function SongCard({
           >
             {song.author}
           </button>
+          {/* Ročno preverjeno: akordi v aplikaciji / predvajalnik (Smart play, Sam špili). */}
+          {(song.verified_chords_at || song.verified_player_at) && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {song.verified_chords_at && (
+                <span
+                  title={`Akordi preverjeni ${new Date(song.verified_chords_at).toLocaleDateString("sl-SI")}`}
+                  className="inline-flex items-center gap-0.5 rounded-full border border-amber-500/50 bg-amber-400/15 px-1.5 py-px text-[10px] font-medium leading-tight text-amber-700 dark:text-amber-300"
+                >
+                  ✓ Akordi
+                </span>
+              )}
+              {song.verified_player_at && (
+                <span
+                  title={`Predvajalnik preverjen ${new Date(song.verified_player_at).toLocaleDateString("sl-SI")}`}
+                  className="inline-flex items-center gap-0.5 rounded-full border border-orange-500/50 bg-orange-400/15 px-1.5 py-px text-[10px] font-medium leading-tight text-orange-700 dark:text-orange-300"
+                >
+                  ✓ Predvajalnik
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Podobno — začasno onemogočeno.
           <div className="mt-0.5 flex w-full min-w-0 flex-wrap items-center gap-1.5 text-xs">

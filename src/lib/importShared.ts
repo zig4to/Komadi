@@ -57,6 +57,10 @@ export async function importSharedSongs(sources: Song[]): Promise<Song[]> {
     youtube_music_url: s.youtube_music_url,
     youtube_embed_ids: s.youtube_embed_ids,
     lrc_offsets: s.lrc_offsets ?? {},
+    // Oznaki preverjanja sta vsebina skladbe (zamrznjeni časi in posnetek se
+    // kopirajo spodaj). Samo kadar sta nastavljeni — stolpca sta iz 0035.
+    ...(s.verified_chords_at ? { verified_chords_at: s.verified_chords_at } : {}),
+    ...(s.verified_player_at ? { verified_player_at: s.verified_player_at } : {}),
     synced_lines: s.synced_lines ?? null,
     preferred_video_id: s.preferred_video_id ?? null,
     synced_chords: s.synced_chords ?? null,

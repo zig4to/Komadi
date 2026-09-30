@@ -60,11 +60,18 @@ export interface Song {
   preferred_video_id?: string | null;
   // Ročno posneti časi posameznih akordov (0033_add_synced_chords.sql).
   synced_chords?: SyncedChords | null;
+  // Ročno preverjeno (0035_add_verification.sql): "Akordi v aplikaciji" so
+  // pregledani; Smart play / Sam špili je usklajen — ob tej potrditvi se časi
+  // zamrznejo v synced_lines (frozen) in posnetek v preferred_video_id.
+  verified_chords_at?: string | null;
+  verified_player_at?: string | null;
 }
 
 // Posnet akord: t = čas v posnetku, line = vrstica v telesu pesmi, chord =
 // zaporedni akord v tej vrstici.
-export type ChordTap = { t: number; line: number; chord: number };
+// key = besedilo/oblika vrstice ob shranjevanju (lineKey) — po njem se čas
+// prestavi, če se številke vrstic premaknejo (urejanje, drugačno razčlenjevanje).
+export type ChordTap = { t: number; line: number; chord: number; key?: string };
 // En instrumentalni del (Intro, Instrumental 1 …): lasten zamik (s) in
 // konec ("Konec"; brez njega 4 s po zadnjem akordu).
 export interface ChordSection {
@@ -79,14 +86,18 @@ export interface SyncedChords {
   sections: ChordSection[];
 }
 
+// frozen = zamrznjeni izračunani časi (ob "Predvajalnik preverjen"), ne ročni
+// tapi. end = konec vrstice (začetek naslednje vrstice LRC; brez njega začetek
+// naslednje točke), key kot pri ChordTap.
 export interface SyncedLines {
   videoId: string;
-  points: { t: number; line: number }[];
+  frozen?: boolean;
+  points: { t: number; line: number; end?: number; key?: string }[];
 }
 
 export type NewSong = Omit<
   Song,
-  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids" | "lrc_offsets" | "user_id" | "imported_from" | "review_pending" | "synced_lines" | "preferred_video_id" | "synced_chords"
+  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids" | "lrc_offsets" | "user_id" | "imported_from" | "review_pending" | "synced_lines" | "preferred_video_id" | "synced_chords" | "verified_chords_at" | "verified_player_at"
 >;
 
 export interface SimilarSong {

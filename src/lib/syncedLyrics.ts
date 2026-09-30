@@ -3,7 +3,8 @@
 // njegovih vrstic z vrsticami v songs.chords_text, da akordi med predvajanjem
 // YouTube videa sledijo petju.
 
-import type { ChordsLine } from "@/lib/chords";
+import { parseChords, splitDescription, type ChordsLine } from "@/lib/chords";
+import type { Song, SyncedChords, SyncedLines } from "@/types/song";
 
 export type LrcLine = { time: number; text: string };
 // Ena različica posnetka iz LRCLIB (album, dolžina v sekundah, vrstice).
@@ -289,9 +290,85 @@ export function instrumentalPoints(points: SyncPoint[], lrc: LrcLine[], body: Ch
 }
 
 // Ročno posneti časi (songs.synced_lines) v isto obliko kot alignLyrics.
-export function manualSyncPoints(points: { t: number; line: number }[]): SyncPoint[] {
+// end: shranjen (zamrznjene točke iz LRCLIB — pravi konec vrstice, zato
+// premori/instrumentalni deli ostanejo) ali začetek naslednje točke (ročni tapi).
+export function manualSyncPoints(points: { t: number; line: number; end?: number }[]): SyncPoint[] {
   const sorted = [...points].sort((a, b) => a.t - b.t);
-  return sorted.map((p, k) => ({ time: p.t, end: sorted[k + 1]?.t ?? p.t + 5, lineIndex: p.line }));
+  return sorted.map((p, k) => ({ time: p.t, end: p.end ?? sorted[k + 1]?.t ?? p.t + 5, lineIndex: p.line }));
+}
+
+// "Prstni odtis" vrstice telesa pesmi: normalizirano besedilo; za vrstice
+// samih akordov število akordov (imena se smejo popraviti). Prazno = vrstice
+// ni mogoče prepoznati (razdelek, tablatura).
+export function lineKey(line: ChordsLine | undefined): string {
+  if (!line) return "";
+  const lyric = lineLyric(line);
+  if (lyric) return words(lyric).join(" ");
+  if (line.kind === "chords") return `ch:${line.chords.length}`;
+  if (line.kind === "text") {
+    const n = line.segments.filter((s) => "chord" in s).length;
+    return n ? `ch:${n}` : "";
+  }
+  return "";
+}
+
+// Shranjene točke (vezane na številko vrstice) prestavi na vrstico z istim
+// ključem, če se je številka premaknila — po urejanju besedila ali spremembi
+// razčlenjevanja (chords.ts). Najprej ista smer premika kot pri prejšnji
+// točki, nato najbližja vrstica z istim ključem (±50). Točke brez ključa
+// (starejši zapisi) ostanejo. ok = false: kakšne vrstice ni več (spremenjeno
+// besedilo) — časi niso več zanesljivi.
+export function remapLines<T extends { line: number; key?: string }>(points: T[], body: ChordsLine[]): { points: T[]; ok: boolean; changed: boolean } {
+  const keys = body.map((l) => lineKey(l));
+  let shift = 0;
+  let ok = true;
+  let changed = false;
+  const out = points.map((p) => {
+    if (!p.key) return p;
+    const guess = p.line + shift;
+    for (let d = 0; d <= 50; d++) {
+      for (const j of d ? [guess + d, guess - d] : [guess]) {
+        if (keys[j] === p.key) {
+          shift = j - p.line;
+          if (j === p.line) return p;
+          changed = true;
+          return { ...p, line: j };
+        }
+      }
+    }
+    ok = false;
+    return p;
+  });
+  return { points: out, ok, changed };
+}
+
+// Ob shranjevanju urejenega besedila/akordov: shranjeni časi vrstic in akordov
+// z novimi številkami vrstic; če katere vrstice ni več, se oznaka "Predvajalnik
+// preverjen" umakne. Vrne dodatna polja za update (poleg chords_text).
+export function rebaseSyncOnEdit(
+  song: Pick<Song, "synced_lines" | "synced_chords" | "verified_player_at">,
+  newText: string,
+): { synced_lines?: SyncedLines; synced_chords?: SyncedChords; verified_player_at?: null } {
+  const body = splitDescription(parseChords(newText)).body;
+  const update: { synced_lines?: SyncedLines; synced_chords?: SyncedChords; verified_player_at?: null } = {};
+  let ok = true;
+  if (song.synced_lines?.points.length) {
+    const r = remapLines(song.synced_lines.points, body);
+    if (r.changed) update.synced_lines = { ...song.synced_lines, points: r.points };
+    ok = ok && r.ok;
+  }
+  if (song.synced_chords?.sections?.length) {
+    let changed = false;
+    const sections = song.synced_chords.sections.map((s) => {
+      const r = remapLines(s.points, body);
+      changed = changed || r.changed;
+      ok = ok && r.ok;
+      return r.changed ? { ...s, points: r.points } : s;
+    });
+    if (changed) update.synced_chords = { ...song.synced_chords, sections };
+  }
+  if (!ok && song.verified_player_at) update.verified_player_at = null;
+  return update;
 }
 
 // Deli z akordi (synced_chords.sections) v en časovno urejen seznam točk:
@@ -334,7 +411,8 @@ export function chordAt(
 // Vrstica pesmi za dani čas (zadnja točka, ki se je že začela; pred prvo -1)
 // in koliko je je že odpetega (0 … 1) — za črto pod vrstico. Več zaporednih
 // vrstic LRC v isti vrstici pesmi je en razpon: od prve do konca zadnje.
-export function lineProgressAt(points: SyncPoint[], time: number): { lineIndex: number; progress: number } {
+// span = trajanje vrstice (s) — napredek raste linearno s časom (1/span na sekundo).
+export function lineProgressAt(points: SyncPoint[], time: number): { lineIndex: number; progress: number; span: number } {
   let lo = 0;
   let hi = points.length - 1;
   let idx = -1;
@@ -345,7 +423,7 @@ export function lineProgressAt(points: SyncPoint[], time: number): { lineIndex: 
       lo = mid + 1;
     } else hi = mid - 1;
   }
-  if (idx < 0) return { lineIndex: -1, progress: 0 };
+  if (idx < 0) return { lineIndex: -1, progress: 0, span: 0 };
   const lineIndex = points[idx].lineIndex;
   let first = idx;
   while (first > 0 && points[first - 1].lineIndex === lineIndex) first--;
@@ -353,5 +431,5 @@ export function lineProgressAt(points: SyncPoint[], time: number): { lineIndex: 
   while (last + 1 < points.length && points[last + 1].lineIndex === lineIndex) last++;
   const start = points[first].time;
   const span = Math.max(0.1, points[last].end - start);
-  return { lineIndex, progress: Math.min(1, Math.max(0, (time - start) / span)) };
+  return { lineIndex, progress: Math.min(1, Math.max(0, (time - start) / span)), span };
 }

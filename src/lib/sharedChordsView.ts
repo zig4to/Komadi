@@ -13,13 +13,35 @@ export type LocalView = {
   anchor: ViewAnchor;
   smart: { line: number; chord: { line: number; chord: number } | null } | null;
   fullscreen: boolean;
-  // "Sam špili": položaj v vrsticah (indeks v ssLines + napredek, -1 = pred
-  // prvo), hitrost (vrstic/s, za gladko ocenjevanje med sporočili), poudarjena
-  // vrstica telesa in ali igra. Samo ko ima vodja odprt Sam špili in že igra.
+  // "Sam špili": samo ko ima vodja odprt Sam špili in že igra.
   ss?: SamSpiliView;
 };
 
-export type SamSpiliView = { row: number; speed: number; hl: number; playing: boolean };
+// "Sam špili": vrstica (indeks v ssLines, -1 = pred prvo), napredek v njej ob
+// pošiljanju (p, 0–1) in koliko napredka na sekundo (rate = 1/trajanje vrstice,
+// 0 med pavzo) — napredek v vrstici je linearen s časom, zato sledilec med
+// sporočili izračuna natanko isti položaj kot vodja. hl = poudarjena vrstica telesa.
+export type SamSpiliView = { row: number; p: number; rate: number; hl: number; playing: boolean };
+
+// Zadnji pogled vodje — mimo React stanja: sporočila (~10/s) bi sicer vsakič
+// na novo izrisala Dashboard in pregledovalnik, kar na telefonu zatika drsenje.
+// Dashboard objavi, ChordsViewer (sledilec) posluša. at = performance.now() ob prejemu.
+export type RemoteViewEntry = { songId: string; view: LocalView; at: number };
+let remoteEntry: RemoteViewEntry | null = null;
+const remoteListeners = new Set<(entry: RemoteViewEntry | null) => void>();
+export function publishRemoteView(songId: string | null, view?: LocalView) {
+  remoteEntry = songId && view ? { songId, view, at: performance.now() } : null;
+  remoteListeners.forEach((cb) => cb(remoteEntry));
+}
+export function getRemoteView() {
+  return remoteEntry;
+}
+export function subscribeRemoteView(cb: (entry: RemoteViewEntry | null) => void) {
+  remoteListeners.add(cb);
+  return () => {
+    remoteListeners.delete(cb);
+  };
+}
 
 export type SharedViewMessage =
   // since = kdaj je vodja začel voditi — ob sočasnem odprtju vodi tisti, ki je začel prej.

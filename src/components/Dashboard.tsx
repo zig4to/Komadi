@@ -38,10 +38,11 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { usePersistentBool } from "@/lib/usePersistentBool";
 import { usePersistentString } from "@/lib/usePersistentString";
-import { closeChordsViewer, openChordsViewer, useOpenChordsMode, useOpenChordsSongId } from "@/lib/openChords";
+import { closeChordsViewer, enterLandscapeFullscreen, openChordsViewer, useOpenChordsMode, useOpenChordsSongId } from "@/lib/openChords";
 import {
   SHARED_VIEW_HEARTBEAT_MS,
   SHARED_VIEW_STALE_MS,
+  publishRemoteView,
   type LocalView,
   type SharedViewMessage,
 } from "@/lib/sharedChordsView";
@@ -1112,6 +1113,25 @@ export default function Dashboard({ user }: { user: User }) {
     setSongs((prev) => prev.map((s) => (ids.includes(s.id) ? { ...s, review_pending: false } : s)));
   }
 
+  // "Akordi preverjeni" / razveljavitev "Predvajalnik preverjen" na strani
+  // Pregled in odobritev (potrditev predvajalnika je v Sam špili ⚙, ker
+  // zamrzne čase posnetka, ki igra). Optimistično z vrnitvijo ob napaki.
+  async function handleVerify(song: Song, field: "verified_chords_at" | "verified_player_at", value: string | null) {
+    const prev = song[field] ?? null;
+    const apply = (v: string | null) => setSongs((list) => list.map((x) => (x.id === song.id ? { ...x, [field]: v } : x)));
+    setReviewError(null);
+    apply(value);
+    const { error } = await supabase.from("songs").update({ [field]: value }).eq("id", song.id);
+    if (error) {
+      apply(prev);
+      setReviewError(
+        `Shranjevanje ni uspelo: ${error.message}${/verified_/.test(error.message) ? " — poženi migracijo 0035_add_verification.sql v Supabase." : ""}`,
+      );
+    }
+  }
+  // Skladba je pripravljena za odobritev šele z obema oznakama.
+  const reviewReady = (s: Song) => !!s.verified_chords_at && !!s.verified_player_at;
+
   function openFix(songId?: string) {
     setJamOpen(false);
     setGoalOpen(false);
@@ -1488,12 +1508,21 @@ export default function Dashboard({ user }: { user: User }) {
   const sendLeaderView = (view: LocalView | null) => {
     const me = sharedLeaderRef.current;
     if (!me || me.id !== user.id || !view) return;
-    sendView({ type: "view", leaderId: user.id, leaderName: myDisplayName ?? "", songId: me.songId, since: me.since, mode: openChordsModeRef.current, ...view });
+    // Sam špili: napredek v vrstici posodobljen na trenutek pošiljanja (zamik
+    // omejevanja pošiljanja in srčni utrip bi ga sicer poslali zastarelega).
+    let ss = view.ss;
+    if (ss?.playing && ss.rate > 0) {
+      const late = (Date.now() - lastViewAtRef.current) / 1000;
+      ss = { ...ss, p: Math.min(1, ss.p + ss.rate * late) };
+    }
+    sendView({ type: "view", leaderId: user.id, leaderName: myDisplayName ?? "", songId: me.songId, since: me.since, mode: openChordsModeRef.current, ...view, ...(ss ? { ss } : {}) });
   };
   // Pogled vodje (ChordsViewer onLocalView): pošlji največ ~10× na sekundo, zadnjega vedno.
   const sendTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastViewAtRef = useRef(0);
   const onLeaderView = (view: LocalView) => {
     lastViewRef.current = view;
+    lastViewAtRef.current = Date.now();
     const wait = 90 - (Date.now() - lastSentRef.current);
     clearTimeout(sendTimerRef.current);
     const flush = () => {
@@ -1512,6 +1541,7 @@ export default function Dashboard({ user }: { user: User }) {
         const current = sharedLeaderRef.current;
         if (msg.type === "close") {
           if (current?.id !== msg.leaderId) return;
+          publishRemoteView(null);
           setSharedLeader(null);
           if (followingRef.current) {
             expectedOpenRef.current = null;
@@ -1523,13 +1553,24 @@ export default function Dashboard({ user }: { user: User }) {
         const stale = !current || Date.now() - current.seen > SHARED_VIEW_STALE_MS;
         const earlier = current && (msg.since < current.since || (msg.since === current.since && msg.leaderId < current.id));
         if (!(stale || current.id === msg.leaderId || earlier)) return;
-        setSharedLeader({ id: msg.leaderId, name: msg.leaderName, songId: msg.songId, since: msg.since, view: msg, seen: Date.now(), mode: msg.mode ?? null });
+        // Pogled gre mimo React stanja (publishRemoteView); stanje vodje se
+        // spremeni samo, ko je drug vodja, skladba ali način — sicer bi vsako
+        // sporočilo na novo izrisalo celo stran in zatikalo drsenje sledilca.
+        publishRemoteView(msg.songId, msg);
+        const mode = msg.mode ?? null;
+        if (current && !stale && current.id === msg.leaderId && current.name === msg.leaderName && current.songId === msg.songId && current.since === msg.since && (current.mode ?? null) === mode) {
+          current.seen = Date.now();
+          current.view = msg;
+        } else {
+          setSharedLeader({ id: msg.leaderId, name: msg.leaderName, songId: msg.songId, since: msg.since, view: msg, seen: Date.now(), mode });
+        }
         if (followingRef.current) openLikeLeader(msg.songId, msg.mode);
       })
       .subscribe((status) => {
         // Ob (ponovnem) vstopu v Skupni Jam: privzeto sledim, brez starega vodje.
         if (status !== "SUBSCRIBED") return;
         setFollowingLeader(true);
+        publishRemoteView(null);
         setSharedLeader(null);
       });
     viewChannelRef.current = channel;
@@ -1537,7 +1578,10 @@ export default function Dashboard({ user }: { user: User }) {
     const beat = setInterval(() => {
       const me = sharedLeaderRef.current;
       if (me?.id === user.id) sendLeaderView(lastViewRef.current);
-      else if (me && Date.now() - me.seen > SHARED_VIEW_STALE_MS) setSharedLeader(null);
+      else if (me && Date.now() - me.seen > SHARED_VIEW_STALE_MS) {
+        publishRemoteView(null);
+        setSharedLeader(null);
+      }
     }, SHARED_VIEW_HEARTBEAT_MS);
     return () => {
       clearInterval(beat);
@@ -1627,7 +1671,6 @@ export default function Dashboard({ user }: { user: User }) {
         ? {
             role: "follower",
             leaderName: sharedLeader.name,
-            remote: sharedLeader.songId === openChordsId ? sharedLeader.view : null,
             onStopFollowing: () => setFollowingLeader(false),
           }
         : sharedLeader
@@ -3023,13 +3066,15 @@ export default function Dashboard({ user }: { user: User }) {
                 {reviewSongs.length > 1 && (
                   <button
                     type="button"
-                    disabled={approvingIds.size > 0}
+                    disabled={approvingIds.size > 0 || !reviewSongs.some(reviewReady)}
+                    title="Odobri vse skladbe, ki imajo preverjene akorde in predvajalnik"
                     onClick={() => {
-                      if (window.confirm(`Odobrim vseh ${reviewSongs.length} skladb?`)) handleApprove(reviewSongs);
+                      const ready = reviewSongs.filter(reviewReady);
+                      if (window.confirm(`Odobrim ${ready.length} preverjenih skladb?`)) handleApprove(ready);
                     }}
                     className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-teal-500/60 px-4 py-2 text-sm font-medium text-teal-700 transition hover:bg-teal-500/10 disabled:opacity-50 dark:text-teal-400"
                   >
-                    Odobri vse ({reviewSongs.length})
+                    Odobri vse preverjene ({reviewSongs.filter(reviewReady).length}/{reviewSongs.length})
                   </button>
                 )}
               </div>
@@ -3085,7 +3130,8 @@ export default function Dashboard({ user }: { user: User }) {
                       </button>
                       <button
                         type="button"
-                        disabled={approvingIds.has(song.id)}
+                        disabled={approvingIds.has(song.id) || !reviewReady(song)}
+                        title={reviewReady(song) ? "Odobri" : "Najprej potrdi: akordi preverjeni in predvajalnik preverjen"}
                         onClick={() => handleApprove([song])}
                         className="inline-flex items-center gap-1.5 rounded-full bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-50"
                       >
@@ -3103,6 +3149,50 @@ export default function Dashboard({ user }: { user: User }) {
                         </svg>
                         {approvingIds.has(song.id) ? "Odobravam…" : "Odobri"}
                       </button>
+                    </div>
+                    {/* Oboje mora biti potrjeno, preden se skladba lahko odobri. */}
+                    <div className="flex flex-wrap items-center gap-2 px-3 pb-3 text-xs">
+                      <button
+                        type="button"
+                        aria-pressed={!!song.verified_chords_at}
+                        onClick={() => handleVerify(song, "verified_chords_at", song.verified_chords_at ? null : new Date().toISOString())}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                          song.verified_chords_at
+                            ? "border-emerald-500/70 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                            : "border-neutral-400/60 text-neutral-600 hover:border-emerald-500/70 dark:text-neutral-300"
+                        }`}
+                      >
+                        {song.verified_chords_at ? "✓ Akordi preverjeni" : "Akordi preverjeni?"}
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={!!song.verified_player_at}
+                        disabled={!song.chords_text}
+                        title={
+                          song.verified_player_at
+                            ? "Klik razveljavi oznako"
+                            : "Odpre Sam špili: zaženi skladbo, preveri sledenje in v ⚙ potrdi \"Predvajalnik preverjen\""
+                        }
+                        onClick={() => {
+                          if (song.verified_player_at) {
+                            if (window.confirm("Razveljavim oznako \"Predvajalnik preverjen\"?")) handleVerify(song, "verified_player_at", null);
+                            return;
+                          }
+                          // Potrditev je v ⚙ Sam špili — zamrzne čase posnetka, ki igra.
+                          enterLandscapeFullscreen();
+                          openChordsViewer(song.id, "samspili");
+                        }}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition disabled:opacity-50 ${
+                          song.verified_player_at
+                            ? "border-emerald-500/70 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                            : "border-neutral-400/60 text-neutral-600 hover:border-emerald-500/70 dark:text-neutral-300"
+                        }`}
+                      >
+                        {song.verified_player_at ? "✓ Predvajalnik preverjen" : "Predvajalnik preverjen?"}
+                      </button>
+                      {!reviewReady(song) && (
+                        <span className="text-neutral-500 dark:text-neutral-400">Odobritev je mogoča po obeh potrditvah.</span>
+                      )}
                     </div>
                   </div>
                 ))}
