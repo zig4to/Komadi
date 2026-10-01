@@ -993,6 +993,13 @@ export default function ChordsViewer({
     );
     closeThemeMenu();
   };
+  // Prekliči snemanje (gumb v snemalniku ali "Prekliči snemanje" namesto "Posnemi čase").
+  const cancelRecorder = () => {
+    if (!recorder?.dirty || window.confirm("Zavržem spremembe?")) {
+      setRecorder(null);
+      setRecorderMsg(null);
+    }
+  };
   // Privzeto ime: prvi del "Intro", nato "Instrumental 1", "Instrumental 2" …
   const defaultSectionName = (sections: ChordSection[]) =>
     sections.length === 0 ? "Intro" : `Instrumental ${sections.filter((s) => s.name !== "Intro").length + 1}`;
@@ -1005,10 +1012,13 @@ export default function ChordsViewer({
     if (!recorder) return;
     setRecorder({ ...recorder, sections: recorder.sections.map((s) => (s.id === id ? change(s) : s)), dirty: true });
   };
-  const renameSection = (id: string) => {
-    const current = recorder?.sections.find((s) => s.id === id);
-    const name = current && window.prompt("Ime dela", current.name)?.trim();
-    if (name) updateSection(id, (s) => ({ ...s, name }));
+  // Preimenovanje dela na mestu: klik na ime (ali ✎) ga spremeni v polje z
+  // označenim besedilom — takoj tipkaš novo ime; Enter/klik drugam shrani, Esc prekliče.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const commitRename = (id: string, value: string) => {
+    setRenamingId(null);
+    const name = value.trim();
+    if (name && name !== recorder?.sections.find((s) => s.id === id)?.name) updateSection(id, (s) => ({ ...s, name }));
   };
   const deleteSection = (id: string) => {
     if (!recorder) return;
@@ -2336,16 +2346,15 @@ export default function ChordsViewer({
         {/* Računalnik: "Posnemi čase" v vrstici (na telefonu v ⚙ → Napredne nastavitve). */}
         <button
           type="button"
-          onClick={startRecorder}
-          disabled={!!recorder}
+          onClick={recorder ? cancelRecorder : startRecorder}
           aria-pressed={!!recorder}
-          title="Posnemi čase vrstic in akordov za Smart play"
+          title={recorder ? "Prekliči snemanje časov" : "Posnemi čase vrstic in akordov za Smart play"}
           className={`hidden h-8 items-center gap-1.5 rounded-full border border-orange-400 px-3 text-xs transition active:scale-95 lg:flex ${
             recorder ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
           }`}
         >
           <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-500" />
-          {syncedLines || syncedChords ? "Nadaljuj snemanje" : "Posnemi čase"}
+          {recorder ? "Prekliči snemanje" : syncedLines || syncedChords ? "Nadaljuj snemanje" : "Posnemi čase"}
         </button>
         <button
           ref={themeButtonRef}
@@ -2535,10 +2544,10 @@ export default function ChordsViewer({
                 {/* Na računalniku je ta gumb v orodni vrstici. */}
                 <button
                   type="button"
-                  onClick={startRecorder}
+                  onClick={recorder ? cancelRecorder : startRecorder}
                   className="rounded-full border border-orange-400 px-2.5 py-1 text-[11px] font-medium text-amber-400 hover:bg-orange-400/15 lg:hidden"
                 >
-                  {syncedLines || syncedChords ? "Nadaljuj snemanje časov" : "Posnemi čase"}
+                  {recorder ? "Prekliči snemanje" : syncedLines || syncedChords ? "Nadaljuj snemanje časov" : "Posnemi čase"}
                 </button>
                 {(syncedLines || syncedChords) && (
                   <button
@@ -2648,58 +2657,285 @@ export default function ChordsViewer({
         </div>
       )}
 
-      <div ref={scrollRef} className={`min-h-0 flex-1 overflow-auto px-4 pb-32 pt-4 [scrollbar-width:none] lg:px-16 [&::-webkit-scrollbar]:hidden ${editing ? "hidden" : ""}`}>
-        <div className="font-mono leading-snug text-(--cv-text)" style={{ fontSize }}>
-          <div className="mb-4 font-sans">
-            <h2 className="text-xl font-semibold text-(--cv-title)">{song.title}</h2>
-            <p className="text-sm text-(--cv-muted)">{song.author}</p>
-            {capo !== null && (
-              <p className="mt-1 text-sm font-medium text-(--cv-chord)">Capo: {capo}. prag</p>
-            )}
-            {description.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setDescriptionOpen((v) => !v)}
-                aria-expanded={descriptionOpen}
-                className="mt-2 inline-flex items-center gap-1 rounded-full border border-(--cv-border) px-3 py-1 text-xs font-medium text-(--cv-text) hover:border-amber-400"
-              >
-                Opis skladbe
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={`h-3.5 w-3.5 transition ${descriptionOpen ? "rotate-180" : ""}`}
+      {/* Besedilo in (računalnik) snemalnik časov kot stolpec desno. */}
+      <div className={`flex min-h-0 flex-1 flex-col lg:flex-row ${editing ? "hidden" : ""}`}>
+        <div ref={scrollRef} className={`min-h-0 flex-1 overflow-auto px-4 pb-32 pt-4 [scrollbar-width:none] lg:px-16 [&::-webkit-scrollbar]:hidden ${editing ? "hidden" : ""}`}>
+          <div className="font-mono leading-snug text-(--cv-text)" style={{ fontSize }}>
+            <div className="mb-4 font-sans">
+              <h2 className="text-xl font-semibold text-(--cv-title)">{song.title}</h2>
+              <p className="text-sm text-(--cv-muted)">{song.author}</p>
+              {capo !== null && (
+                <p className="mt-1 text-sm font-medium text-(--cv-chord)">Capo: {capo}. prag</p>
+              )}
+              {description.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setDescriptionOpen((v) => !v)}
+                  aria-expanded={descriptionOpen}
+                  className="mt-2 inline-flex items-center gap-1 rounded-full border border-(--cv-border) px-3 py-1 text-xs font-medium text-(--cv-text) hover:border-amber-400"
                 >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </button>
+                  Opis skladbe
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`h-3.5 w-3.5 transition ${descriptionOpen ? "rotate-180" : ""}`}
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {descriptionOpen && (
+              <div className="mb-4 rounded-lg border border-(--cv-border) bg-(--cv-panel) p-3 text-[0.85em] text-(--cv-text)">
+                {description.map((l, i) => renderLine(l, i, false))}
+              </div>
             )}
+            {body.map((l, i) => (
+              // data-line: cilj "Pametnega predvajalnika"; trenutna vrstica poudarjena.
+              <div
+                key={i}
+                data-line={i}
+                onClick={(e) => seekToLine(i, e)}
+                className={
+                  i === shownLine || i === recorderCursor
+                    ? "-ml-2 -mr-1 rounded-r-md bg-[color-mix(in_srgb,var(--cv-text)_8%,transparent)] pl-2 pr-1 shadow-[inset_1.5px_0_0_#fb923c] lg:w-fit lg:shadow-[inset_2px_0_0_#fb923c]"
+                    : "-ml-2 -mr-1 pl-2 pr-1 lg:w-fit"
+                }
+              >
+                {renderLine(l, i, true)}
+              </div>
+            ))}
           </div>
-          {descriptionOpen && (
-            <div className="mb-4 rounded-lg border border-(--cv-border) bg-(--cv-panel) p-3 text-[0.85em] text-(--cv-text)">
-              {description.map((l, i) => renderLine(l, i, false))}
-            </div>
-          )}
-          {body.map((l, i) => (
-            // data-line: cilj "Pametnega predvajalnika"; trenutna vrstica poudarjena.
-            <div
-              key={i}
-              data-line={i}
-              onClick={(e) => seekToLine(i, e)}
-              className={
-                i === shownLine || i === recorderCursor
-                  ? "-ml-2 -mr-1 rounded-r-md bg-[color-mix(in_srgb,var(--cv-text)_8%,transparent)] pl-2 pr-1 shadow-[inset_1.5px_0_0_#fb923c] lg:w-fit lg:shadow-[inset_2px_0_0_#fb923c]"
-                  : "-ml-2 -mr-1 pl-2 pr-1 lg:w-fit"
-              }
-            >
-              {renderLine(l, i, true)}
-            </div>
-          ))}
         </div>
+        {/* Telefon: pod pesmijo (vodoravno). Računalnik: navpičen stolpec ob desnem
+            robu pod zgornjima vrsticama — TAP, ↶ ↷ Preskoči Konec, deli z akordi
+            (se drsijo), spodaj Prekliči / Shrani. */}
+        {recorder && (
+          <div
+            className="relative z-30 shrink-0 border-t border-orange-400 bg-neutral-950/95 px-3 pt-2 font-sans text-neutral-100 backdrop-blur lg:flex lg:w-[22rem] lg:flex-col lg:overflow-hidden lg:border-l lg:border-t-0 lg:pt-3"
+            style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+          >
+            <div className="mx-auto max-w-2xl lg:mx-0 lg:flex lg:min-h-0 lg:max-w-none lg:flex-1 lg:flex-col">
+              <div className="mb-2 flex items-center justify-between gap-2 text-xs text-neutral-300">
+                <span>
+                  Posnemi čase ·{" "}
+                  {recorder.cursor >= 0
+                    ? `vrstica ${lyricLines.indexOf(recorder.cursor) + 1}/${lyricLines.length}`
+                    : "konec besedila"}
+                </span>
+              </div>
+              <p className="hidden text-[11px] leading-snug text-neutral-500 lg:order-5 lg:mt-2 lg:block">
+                Preslednica = TAP · Backspace = nazaj · Shift+Backspace = ponovi · klik na akord = v izbrani del
+              </p>
+              {recorderMsg && <p className="mb-2 text-xs text-amber-400">{recorderMsg}</p>}
+              <div className="mb-2 flex items-stretch gap-1.5 text-sm lg:order-2 lg:grid lg:grid-cols-4">
+                <button
+                  type="button"
+                  onClick={cancelRecorder}
+                  className="rounded-xl border border-neutral-600 px-3 py-2 text-neutral-300 active:scale-95 lg:hidden"
+                >
+                  Prekliči
+                </button>
+                <button
+                  type="button"
+                  onClick={undoTap}
+                  disabled={!recorder.history.length}
+                  aria-label="Razveljavi zadnji zapis"
+                  className="rounded-xl border border-neutral-600 px-3 text-lg text-neutral-300 active:scale-95 disabled:opacity-40 lg:py-2"
+                >
+                  ↶
+                </button>
+                <button
+                  type="button"
+                  onClick={redoTap}
+                  disabled={!recorder.future.length}
+                  aria-label="Ponovi razveljavljeno"
+                  title="Ponovi razveljavljeno (Shift+Backspace)"
+                  className="rounded-xl border border-neutral-600 px-3 text-lg text-neutral-300 active:scale-95 disabled:opacity-40 lg:py-2"
+                >
+                  ↷
+                </button>
+                <button
+                  type="button"
+                  onClick={skipLine}
+                  disabled={recorder.cursor < 0}
+                  className="rounded-xl border border-neutral-600 px-3 text-neutral-300 active:scale-95 disabled:opacity-40 lg:px-1 lg:py-2"
+                >
+                  Preskoči
+                </button>
+                <button
+                  type="button"
+                  onClick={recordStop}
+                  disabled={!recorder.activeId}
+                  title="Konec izbranega dela: od tu ni obarvan noben akord"
+                  className="rounded-xl border border-neutral-600 px-3 text-neutral-300 active:scale-95 disabled:opacity-40 lg:px-1 lg:py-2"
+                >
+                  Konec
+                </button>
+                <button
+                  type="button"
+                  onClick={saveRecorder}
+                  disabled={!recorder.dirty || !playingVideo || recorderSaving}
+                  className="ml-auto rounded-xl border border-orange-400 px-3 font-semibold text-amber-400 active:scale-95 disabled:opacity-40 lg:hidden"
+                >
+                  {recorderSaving ? "…" : "Shrani"}
+                </button>
+              </div>
+              <div className="flex items-stretch gap-2 lg:contents">
+                <button
+                  type="button"
+                  // Čas ob PRITISKU (miška/prst), ne ob spustu kot onClick — sicer je
+                  // vsak TAP 0,1–0,2 s prepozen. Tipkovnica (detail 0) prek onClick.
+                  onPointerDown={(e) => {
+                    if (e.button !== 0) return;
+                    e.preventDefault();
+                    recordTap();
+                  }}
+                  onClick={(e) => {
+                    if (e.detail === 0) recordTap();
+                  }}
+                  disabled={recorder.cursor < 0}
+                  className="w-2/5 shrink-0 rounded-xl bg-orange-500 py-4 text-lg font-bold tracking-wide text-white active:scale-[0.98] disabled:opacity-40 lg:order-1 lg:mb-2 lg:w-full lg:py-8 lg:text-2xl"
+                >
+                  TAP
+                  <span className="block text-[10px] font-medium tracking-normal opacity-80">vrstica</span>
+                </button>
+                {/* Instrumentalni deli: izbrani prejme klike na akorde. */}
+                <div className="min-w-0 flex-1 rounded-xl border border-neutral-700 p-1 lg:order-3 lg:flex lg:min-h-0 lg:flex-col">
+                  <p className="hidden px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 lg:block">Deli z akordi</p>
+                  <div className="max-h-36 space-y-1 overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
+                    {recorder.sections.map((section) => {
+                      const active = section.id === recorder.activeId;
+                      const times = section.points.map((p) => p.t + section.offset);
+                      const from = times.length ? Math.min(...times) : null;
+                      const to = times.length
+                        ? (section.end != null ? section.end + section.offset : Math.max(...times) + 4)
+                        : null;
+                      return (
+                        <div
+                          key={section.id}
+                          className={`flex items-center gap-1 rounded-lg border px-1.5 py-1 text-[11px] ${
+                            active ? "border-orange-400 bg-orange-400/10" : "border-transparent bg-neutral-900"
+                          }`}
+                        >
+                          {/* Prazen prostor desno od imena in vrstica pod njim del samo izbereta. */}
+                          <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setRecorder({ ...recorder, activeId: section.id })}>
+                            {renamingId === section.id ? (
+                              <input
+                                autoFocus
+                                defaultValue={section.name}
+                                onFocus={(e) => e.currentTarget.select()}
+                                onBlur={(e) => commitRename(section.id, e.currentTarget.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") e.currentTarget.blur();
+                                  else if (e.key === "Escape") setRenamingId(null);
+                                }}
+                                aria-label="Ime dela"
+                                className="block w-full min-w-0 rounded border border-orange-400 bg-neutral-950 px-1 font-semibold text-amber-400 outline-none"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRecorder({ ...recorder, activeId: section.id });
+                                  setRenamingId(section.id);
+                                }}
+                                title="Klikni za preimenovanje"
+                                className={`block max-w-full truncate text-left font-semibold hover:underline ${active ? "text-amber-400" : "text-neutral-100"}`}
+                              >
+                                {section.name}
+                              </button>
+                            )}
+                            <span className="block truncate text-[10px] text-neutral-500">
+                              {from != null && to != null ? `${formatSec(from)}–${formatSec(to)} · ` : ""}
+                              {section.points.length} akordov
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setRenamingId(section.id)}
+                            aria-label={`Preimenuj ${section.name}`}
+                            className="px-0.5 text-neutral-400 hover:text-white"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => previewSection(section)}
+                            disabled={!section.points.length}
+                            aria-label={`Predvajaj ${section.name}`}
+                            className="px-0.5 text-amber-400 disabled:opacity-30"
+                          >
+                            ▶
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateSection(section.id, (s) => ({ ...s, offset: Math.round((s.offset - LRC_OFFSET_STEP) * 4) / 4 }))}
+                            aria-label="Zamik −0,25 s"
+                            className="rounded border border-neutral-600 px-1 text-neutral-300"
+                          >
+                            −
+                          </button>
+                          <span className="w-9 text-center tabular-nums text-neutral-300">
+                            {section.offset > 0 ? "+" : ""}
+                            {section.offset.toFixed(2).replace(".", ",")}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => updateSection(section.id, (s) => ({ ...s, offset: Math.round((s.offset + LRC_OFFSET_STEP) * 4) / 4 }))}
+                            aria-label="Zamik +0,25 s"
+                            className="rounded border border-neutral-600 px-1 text-neutral-300"
+                          >
+                            +
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteSection(section.id)}
+                            aria-label={`Izbriši ${section.name}`}
+                            className="px-0.5 text-neutral-500 hover:text-red-400"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addSection}
+                    className="mt-1 w-full rounded-lg border border-dashed border-orange-400/60 py-1 text-[11px] font-medium text-amber-400 hover:bg-orange-400/10"
+                  >
+                    + Nov del
+                  </button>
+                </div>
+              </div>
+              {/* Računalnik: Prekliči / Shrani na dnu stolpca. */}
+              <div className="hidden gap-1.5 pt-2 text-sm lg:order-4 lg:flex">
+                <button
+                  type="button"
+                  onClick={cancelRecorder}
+                  className="flex-1 rounded-xl border border-neutral-600 py-2 text-neutral-300 active:scale-95"
+                >
+                  Prekliči
+                </button>
+                <button
+                  type="button"
+                  onClick={saveRecorder}
+                  disabled={!recorder.dirty || !playingVideo || recorderSaving}
+                  className="flex-1 rounded-xl border border-orange-400 py-2 font-semibold text-amber-400 active:scale-95 disabled:opacity-40"
+                >
+                  {recorderSaving ? "…" : "Shrani"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {shapeTip && (
@@ -2743,193 +2979,6 @@ export default function ChordsViewer({
         </div>
       )}
 
-      {/* Telefon: pod pesmijo (v stolpcu, ne čez konec). Računalnik: plavajoče
-          čez desno polovico — besedilo je poravnano levo in ostane vidno. */}
-      {recorder && (
-        <div
-          className="relative z-30 shrink-0 border-t border-orange-400 bg-neutral-950/95 px-3 pt-2 font-sans text-neutral-100 backdrop-blur lg:fixed lg:bottom-0 lg:right-0 lg:w-1/2 lg:rounded-tl-xl lg:border-l"
-          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-        >
-          <div className="mx-auto max-w-2xl">
-            <div className="mb-2 flex items-center justify-between gap-2 text-xs text-neutral-300">
-              <span>
-                Posnemi čase ·{" "}
-                {recorder.cursor >= 0
-                  ? `vrstica ${lyricLines.indexOf(recorder.cursor) + 1}/${lyricLines.length}`
-                  : "konec besedila"}
-              </span>
-              <span className="hidden text-neutral-500 lg:inline">Preslednica = TAP · Backspace = nazaj · klik na akord = v izbrani del</span>
-            </div>
-            {recorderMsg && <p className="mb-2 text-xs text-amber-400">{recorderMsg}</p>}
-            <div className="mb-2 flex items-stretch gap-1.5 text-sm">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!recorder.dirty || window.confirm("Zavržem spremembe?")) {
-                    setRecorder(null);
-                    setRecorderMsg(null);
-                  }
-                }}
-                className="rounded-xl border border-neutral-600 px-3 py-2 text-neutral-300 active:scale-95"
-              >
-                Prekliči
-              </button>
-              <button
-                type="button"
-                onClick={undoTap}
-                disabled={!recorder.history.length}
-                aria-label="Razveljavi zadnji zapis"
-                className="rounded-xl border border-neutral-600 px-3 text-lg text-neutral-300 active:scale-95 disabled:opacity-40"
-              >
-                ↶
-              </button>
-              <button
-                type="button"
-                onClick={redoTap}
-                disabled={!recorder.future.length}
-                aria-label="Ponovi razveljavljeno"
-                title="Ponovi razveljavljeno (Shift+Backspace)"
-                className="rounded-xl border border-neutral-600 px-3 text-lg text-neutral-300 active:scale-95 disabled:opacity-40"
-              >
-                ↷
-              </button>
-              <button
-                type="button"
-                onClick={skipLine}
-                disabled={recorder.cursor < 0}
-                className="rounded-xl border border-neutral-600 px-3 text-neutral-300 active:scale-95 disabled:opacity-40"
-              >
-                Preskoči
-              </button>
-              <button
-                type="button"
-                onClick={recordStop}
-                disabled={!recorder.activeId}
-                title="Konec izbranega dela: od tu ni obarvan noben akord"
-                className="rounded-xl border border-neutral-600 px-3 text-neutral-300 active:scale-95 disabled:opacity-40"
-              >
-                Konec
-              </button>
-              <button
-                type="button"
-                onClick={saveRecorder}
-                disabled={!recorder.dirty || !playingVideo || recorderSaving}
-                className="ml-auto rounded-xl border border-orange-400 px-3 font-semibold text-amber-400 active:scale-95 disabled:opacity-40"
-              >
-                {recorderSaving ? "…" : "Shrani"}
-              </button>
-            </div>
-            <div className="flex items-stretch gap-2">
-              <button
-                type="button"
-                // Čas ob PRITISKU (miška/prst), ne ob spustu kot onClick — sicer je
-                // vsak TAP 0,1–0,2 s prepozen. Tipkovnica (detail 0) prek onClick.
-                onPointerDown={(e) => {
-                  if (e.button !== 0) return;
-                  e.preventDefault();
-                  recordTap();
-                }}
-                onClick={(e) => {
-                  if (e.detail === 0) recordTap();
-                }}
-                disabled={recorder.cursor < 0}
-                className="w-2/5 shrink-0 rounded-xl bg-orange-500 py-4 text-lg font-bold tracking-wide text-white active:scale-[0.98] disabled:opacity-40"
-              >
-                TAP
-                <span className="block text-[10px] font-medium tracking-normal opacity-80">vrstica</span>
-              </button>
-              {/* Instrumentalni deli: izbrani prejme klike na akorde. */}
-              <div className="min-w-0 flex-1 rounded-xl border border-neutral-700 p-1">
-                <div className="max-h-36 space-y-1 overflow-y-auto">
-                  {recorder.sections.map((section) => {
-                    const active = section.id === recorder.activeId;
-                    const times = section.points.map((p) => p.t + section.offset);
-                    const from = times.length ? Math.min(...times) : null;
-                    const to = times.length
-                      ? (section.end != null ? section.end + section.offset : Math.max(...times) + 4)
-                      : null;
-                    return (
-                      <div
-                        key={section.id}
-                        className={`flex items-center gap-1 rounded-lg border px-1.5 py-1 text-[11px] ${
-                          active ? "border-orange-400 bg-orange-400/10" : "border-transparent bg-neutral-900"
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setRecorder({ ...recorder, activeId: section.id })}
-                          onDoubleClick={() => renameSection(section.id)}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <span className={`block truncate font-semibold ${active ? "text-amber-400" : "text-neutral-100"}`}>
-                            {section.name}
-                          </span>
-                          <span className="block truncate text-[10px] text-neutral-500">
-                            {from != null && to != null ? `${formatSec(from)}–${formatSec(to)} · ` : ""}
-                            {section.points.length} akordov
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => renameSection(section.id)}
-                          aria-label={`Preimenuj ${section.name}`}
-                          className="px-0.5 text-neutral-400 hover:text-white"
-                        >
-                          ✎
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => previewSection(section)}
-                          disabled={!section.points.length}
-                          aria-label={`Predvajaj ${section.name}`}
-                          className="px-0.5 text-amber-400 disabled:opacity-30"
-                        >
-                          ▶
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => updateSection(section.id, (s) => ({ ...s, offset: Math.round((s.offset - LRC_OFFSET_STEP) * 4) / 4 }))}
-                          aria-label="Zamik −0,25 s"
-                          className="rounded border border-neutral-600 px-1 text-neutral-300"
-                        >
-                          −
-                        </button>
-                        <span className="w-9 text-center tabular-nums text-neutral-300">
-                          {section.offset > 0 ? "+" : ""}
-                          {section.offset.toFixed(2).replace(".", ",")}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => updateSection(section.id, (s) => ({ ...s, offset: Math.round((s.offset + LRC_OFFSET_STEP) * 4) / 4 }))}
-                          aria-label="Zamik +0,25 s"
-                          className="rounded border border-neutral-600 px-1 text-neutral-300"
-                        >
-                          +
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteSection(section.id)}
-                          aria-label={`Izbriši ${section.name}`}
-                          className="px-0.5 text-neutral-500 hover:text-red-400"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-                <button
-                  type="button"
-                  onClick={addSection}
-                  className="mt-1 w-full rounded-lg border border-dashed border-orange-400/60 py-1 text-[11px] font-medium text-amber-400 hover:bg-orange-400/10"
-                >
-                  + Nov del
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {shared && shared.role !== "leader" && !(shared.role === "follower" && followPillHidden) && (
         <div

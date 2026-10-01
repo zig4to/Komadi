@@ -91,9 +91,9 @@ function words(text: string): string[] {
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
     .replace(/\([^)]*\)/g, " ")
-    // Zlogi z vezajem v akordih ("Guaran-teed", "Extra-ordinarily") in
-    // opuščaj ("She's", "don't") = ena beseda.
-    .replace(/(\p{L})[-'’](\p{L})/gu, "$1$2")
+    // Zlogi z vezajem v akordih ("Guaran-teed", "Extra-ordinarily", tudi
+    // raztegnjeni "pr--vi", "kr----vi") in opuščaj ("She's", "don't") = ena beseda.
+    .replace(/(\p{L})[-'’]+(\p{L})/gu, "$1$2")
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim()
     .split(" ")
@@ -101,9 +101,22 @@ function words(text: string): string[] {
     .filter((w) => w.length > 1);
 }
 
-// Ista beseda tudi ob drugačni končnici ("gelatin" / "gelatine").
+// Ena črka več/manj v daljši besedi (tipkarska napaka v akordih:
+// "posljedni" ↔ "posljednji"); zamenjava črke ne šteje (where ↔ there).
+function oneInsertion(x: string, y: string) {
+  if (x.length > y.length) [x, y] = [y, x];
+  if (y.length - x.length !== 1) return false;
+  let i = 0;
+  while (i < x.length && x[i] === y[i]) i++;
+  return x.slice(i) === y.slice(i + 1);
+}
+
+// Ista beseda tudi ob drugačni končnici ("gelatin" / "gelatine") ali eni
+// manjkajoči črki ("posljedni" / "posljednji").
 const sameWord = (x: string, y: string) =>
-  x === y || (Math.min(x.length, y.length) >= 5 && (x.startsWith(y) || y.startsWith(x)));
+  x === y ||
+  (Math.min(x.length, y.length) >= 5 && (x.startsWith(y) || y.startsWith(x))) ||
+  (Math.min(x.length, y.length) >= 6 && oneInsertion(x, y));
 
 // Podobnost vrstice LRC (a) in vrstice pesmi (b), 0 … 1: delež skupnih besed
 // (Dice), ali — ker je v akordih več kratkih vrstic LRC pogosto v eni daljši
