@@ -39,6 +39,7 @@ import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { ChordSection, Song, SyncedChords, SyncedLines } from "@/types/song";
 import { anchorScrollTop, computeAnchor, getRemoteView, subscribeRemoteView, type LocalView, type RemoteViewEntry, type SamSpiliView } from "@/lib/sharedChordsView";
 import { BACKGROUNDS, BACKGROUND_ORDER } from "@/lib/backgrounds";
+import { readFollowerLead } from "@/lib/followerLead";
 
 // Skupni pogled v Skupnem Jamu (Dashboard.tsx, src/lib/sharedChordsView.ts):
 // vodja sporoča, kar vidi; sledilec prikaže vodjev pogled; "paused" = sledilec,
@@ -1428,7 +1429,9 @@ export default function ChordsViewer({
     let raf = 0;
     const tick = (now: number) => {
       const ft = followTargetRef.current;
-      const target = ft ? ft.base + ft.v * Math.min(0.3, (now - ft.at) / 1000) : null;
+      // + zakasnitev sledilcev (Nastavitve Jama): prehiti vodjo za zamik sporočil.
+      const lead = readFollowerLead();
+      const target = ft ? ft.base + ft.v * (Math.min(0.3, (now - ft.at) / 1000) + lead) : null;
       const dt = Math.min(100, now - last);
       last = now;
       if (target != null && now >= userUntil) {
@@ -1651,7 +1654,9 @@ export default function ChordsViewer({
       const rem = ssRemoteRef.current;
       if (rem) {
         const v = rem.view;
-        const rowPos = v.row < 0 ? -1 : v.row + Math.min(1, v.p + (v.playing ? v.rate * Math.min(3, (now - rem.at) / 1000) : 0));
+        // + zakasnitev sledilcev (Nastavitve Jama), da sledilec ne zaostaja za zamikom sporočil.
+        const lead = readFollowerLead();
+        const rowPos = v.row < 0 ? -1 : v.row + Math.min(1, v.p + (v.playing ? v.rate * (Math.min(3, (now - rem.at) / 1000) + lead) : 0));
         if (v.hl !== hl) {
           hl = v.hl;
           setSsHlLine(v.hl);

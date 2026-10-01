@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import ChordsButtons from "@/components/ChordsButtons";
 import JamBoard, { type JamBoardItem } from "@/components/JamBoard";
+import JamSettingsMenu from "@/components/JamSettingsMenu";
 import { fullNameFor, initialsOf } from "@/lib/userName";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { dedupeShared, importSharedSongs, songMatchKey } from "@/lib/importShared";
@@ -232,6 +233,7 @@ export default function Dashboard({ user }: { user: User }) {
   // Telefon: med iskanjem (fokus ali vpisano besedilo) se iskalno polje
   // razširi čez prosti prostor, gumba Jam/Playliste pa skrčita v ikoni.
   const [searchFocused, setSearchFocused] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   // Naslovna vrstica seznama "Vsi Komadi" — cilj gumba "Vrni se na vrh".
   const listHeadingRef = useRef<HTMLDivElement>(null);
   const searchWide = searchFocused || filters.search !== "";
@@ -1900,10 +1902,20 @@ export default function Dashboard({ user }: { user: User }) {
   // Sistemski gumb "Nazaj" (Android) naj se za te poglede obnaša enako kot
   // klik na njihov obstoječi gumb za zapiranje/nazaj (glej
   // src/lib/useBackableOpen.ts).
+  // Iskanje: prvi Nazaj zapre tipkovnico (sistem, polje ostane v fokusu), drugi
+  // zapre iskanje — z vpisanim besedilom ga počisti filter spodaj (in izgubi
+  // fokus), prazno polje v fokusu pa ima svoj vnos, sicer bi Nazaj zaprl PWA.
   useBackableOpen(
     hasActiveFilters(filters) || Boolean(authorFilter),
-    handleBackFromFilter,
+    () => {
+      handleBackFromFilter();
+      searchInputRef.current?.blur();
+    },
   );
+  useBackableOpen(searchFocused && !hasActiveFilters(filters) && !authorFilter, () => {
+    searchInputRef.current?.blur();
+    setSearchFocused(false);
+  });
   useBackableOpen(activeView !== "list", () => setActiveView("list"));
   useBackableOpen(showForm || editing !== null, closeForm);
   useBackableOpen(addChoiceOpen, () => setAddChoiceOpen(false));
@@ -1913,9 +1925,10 @@ export default function Dashboard({ user }: { user: User }) {
   useBackableOpen(jamOpen && jamArchiveOpen, () => setJamArchiveOpen(false));
   // Skupni Jam: Nazaj vrne na osebni Jam.
   useBackableOpen(jamOpen && jamShared && !jamArchiveOpen, () => setJamShared(false));
-  function toggleJamShared() {
+  // Privat Jam / Skupni Jam (JamModeToggle): vedno je izbran eden; izbira zapre arhiv.
+  function selectJamMode(shared: boolean) {
     setJamArchiveOpen(false);
-    setJamShared(!jamShared || jamArchiveOpen);
+    setJamShared(shared);
   }
   useBackableOpen(goalOpen, () => setGoalOpen(false));
   useBackableOpen(fixOpen, () => setFixOpen(false));
@@ -2100,38 +2113,11 @@ export default function Dashboard({ user }: { user: User }) {
                 <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
               </svg>
               <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
-                {jamShared && !jamArchiveOpen ? "Skupni Jam" : "Bitne Jam!"}
+                {jamShared && !jamArchiveOpen ? "Bitne Jam!" : "Privat Jam!"}
               </span>
             </h1>
             <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-2 lg:flex">
-            <button
-              type="button"
-              onClick={toggleJamShared}
-              aria-pressed={jamShared && !jamArchiveOpen}
-              title={jamShared ? "Nazaj na moj Jam" : "Skupni Jam — vidijo in dodajajo vsi uporabniki"}
-              className={`inline-flex items-center gap-1.5 rounded-full border border-fuchsia-500/40 px-4 py-1.5 text-sm font-medium transition ${
-                jamShared && !jamArchiveOpen
-                  ? "bg-fuchsia-600 text-white"
-                  : "text-neutral-600 hover:bg-fuchsia-500/10 hover:text-fuchsia-600 dark:text-neutral-300 dark:hover:text-fuchsia-400"
-              }`}
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4 shrink-0"
-              >
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-              Skupni Jam
-            </button>
+            <JamModeToggle shared={jamShared && !jamArchiveOpen} onSelect={selectJamMode} />
             <button
               type="button"
               onClick={() => (jamArchiveOpen ? setJamArchiveOpen(false) : openJamArchive())}
@@ -2167,28 +2153,32 @@ export default function Dashboard({ user }: { user: User }) {
               </div>
             )}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setJamOpen(false);
-                setJamArchiveOpen(false);
-              }}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-fuchsia-600 dark:text-neutral-300 dark:hover:text-fuchsia-400"
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4 shrink-0"
+            {/* Desno: Nazaj in zobnik z nastavitvami Jama. */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setJamOpen(false);
+                  setJamArchiveOpen(false);
+                }}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-fuchsia-600 dark:text-neutral-300 dark:hover:text-fuchsia-400"
               >
-                <path d="m15 18-6-6 6-6" />
-              </svg>
-              Nazaj
-            </button>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4 shrink-0"
+                >
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
+                Nazaj
+              </button>
+              <JamSettingsMenu />
+            </div>
           </>
         ) : goalOpen ? (
           <>
@@ -2614,31 +2604,7 @@ export default function Dashboard({ user }: { user: User }) {
       {jamOpen ? (
         <div className="mt-3! space-y-4">
           <div className="flex items-center gap-2 lg:hidden">
-            <button
-              type="button"
-              onClick={toggleJamShared}
-              aria-pressed={jamShared}
-              className={`inline-flex items-center gap-1.5 rounded-full border border-fuchsia-500/40 px-4 py-1.5 text-sm font-medium transition ${
-                jamShared ? "bg-fuchsia-600 text-white" : "text-neutral-600 dark:text-neutral-300"
-              }`}
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4 shrink-0"
-              >
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-              {jamShared ? "Skupni Jam · nazaj na moj Jam" : "Skupni Jam"}
-            </button>
+            <JamModeToggle shared={jamShared && !jamArchiveOpen} onSelect={selectJamMode} />
             {presenceDots}
           </div>
           <hr className="border-t border-neutral-200 dark:border-neutral-800" />
@@ -3847,6 +3813,7 @@ export default function Dashboard({ user }: { user: User }) {
                   <path d="m21 21-4.3-4.3" />
                 </svg>
                 <input
+                  ref={searchInputRef}
                   value={filters.search}
                   onChange={(e) =>
                     handleFiltersChange({ ...filters, search: e.target.value })
@@ -3877,15 +3844,21 @@ export default function Dashboard({ user }: { user: User }) {
                     </span>
                   </span>
                 )}
-                {filters.search && (
+                {/* ✕ znotraj polja, čisto desno: viden že ob kliku v polje (fokus) ali z
+                    vpisanim besedilom; počisti iskanje in ga zapre (izgubi fokus). onPointerDown
+                    prepreči, da bi polje izgubilo fokus (in se ✕ skril), preden se klik zgodi. */}
+                {searchWide && (
                   <button
                     type="button"
-                    onClick={() =>
-                      handleFiltersChange({ ...filters, search: "" })
-                    }
-                    aria-label="Počisti iskanje"
-                    title="Počisti iskanje"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300"
+                    onPointerDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      handleFiltersChange({ ...filters, search: "" });
+                      searchInputRef.current?.blur();
+                      setSearchFocused(false);
+                    }}
+                    aria-label="Zapri iskanje"
+                    title="Zapri iskanje"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300"
                   >
                     <svg
                       aria-hidden="true"
@@ -4290,7 +4263,9 @@ export default function Dashboard({ user }: { user: User }) {
                     {(sharedOn || songsVisible || hasActiveFilters(filters) || authorFilter) && (
                       <SortMenu value={songSort} onChange={setSongSort} />
                     )}
-                    {/* "Pojdi na dno": telefon samo z odprtim seznamom, računalnik vedno. */}
+                    {/* "Pojdi na dno": telefon samo z odprtim seznamom, računalnik vedno;
+                        med iskanjem (vpisano besedilo) ga ni. */}
+                    {filters.search === "" && (
                     <button
                       type="button"
                       onClick={scrollToListBottom}
@@ -4312,6 +4287,7 @@ export default function Dashboard({ user }: { user: User }) {
                       </svg>
                       Pojdi na dno
                     </button>
+                    )}
                   </div>
                   {sharedOn || hasActiveFilters(filters) || authorFilter ? (
                     <button
@@ -4548,6 +4524,44 @@ export default function Dashboard({ user }: { user: User }) {
 
 // Konec prikazanega dela seznama zadetkov: ko pride blizu zaslona, naloži
 // naslednjo stran (gumb za primer, da IntersectionObserver ne sproži).
+// Preklop Privat Jam | Skupni Jam (glava Jama na računalniku, vrstica pod glavo
+// na telefonu) — dva gumba, izbrani je obarvan, vedno je izbran eden.
+function JamModeToggle({ shared, onSelect }: { shared: boolean; onSelect: (shared: boolean) => void }) {
+  const opt = (active: boolean) =>
+    `inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-sm font-medium transition ${
+      active ? "bg-fuchsia-600 text-white" : "text-neutral-600 hover:text-fuchsia-600 dark:text-neutral-300 dark:hover:text-fuchsia-400"
+    }`;
+  const icon = (paths: React.ReactNode) => (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
+      {paths}
+    </svg>
+  );
+  return (
+    <div role="group" aria-label="Izbira Jama" className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-fuchsia-500/40 p-0.5">
+      <button type="button" onClick={() => onSelect(false)} aria-pressed={!shared} className={opt(!shared)}>
+        {icon(
+          <>
+            <circle cx="12" cy="8" r="4" />
+            <path d="M20 21a8 8 0 0 0-16 0" />
+          </>,
+        )}
+        Privat Jam
+      </button>
+      <button type="button" onClick={() => onSelect(true)} aria-pressed={shared} className={opt(shared)}>
+        {icon(
+          <>
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </>,
+        )}
+        Skupni Jam
+      </button>
+    </div>
+  );
+}
+
 function LoadMoreSentinel({ onVisible }: { onVisible: () => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const onVisibleRef = useRef(onVisible);

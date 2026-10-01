@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useFlipUpMenu } from "@/lib/useFlipUpMenu";
 
 export type JamTarget = "private" | "shared";
 
@@ -18,6 +19,8 @@ export default function JamTargetMenu({
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Blizu dna zaslona se odpre nad gumbom.
+  useFlipUpMenu(ref, anchor);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;

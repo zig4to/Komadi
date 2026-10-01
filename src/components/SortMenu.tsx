@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useFlipUpMenu } from "@/lib/useFlipUpMenu";
 
 export const SONG_SORTS = ["az", "newest", "za", "oldest", "author", "popular", "era-old", "era-new"] as const;
 export type SongSort = (typeof SONG_SORTS)[number];
@@ -29,9 +30,11 @@ export default function SortMenu({
   onChange: (value: SongSort) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; bottom: number; left: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // Blizu dna zaslona se odpre nad gumbom.
+  useFlipUpMenu(panelRef, open ? pos : null);
 
   useEffect(() => {
     if (!open) return;
@@ -58,7 +61,7 @@ export default function SortMenu({
         onClick={(e) => {
           if (!open) {
             const rect = e.currentTarget.getBoundingClientRect();
-            setPos({ top: rect.bottom + 4, left: rect.left });
+            setPos({ top: rect.top, bottom: rect.bottom, left: rect.left });
           }
           setOpen((v) => !v);
         }}
@@ -92,7 +95,7 @@ export default function SortMenu({
             ref={panelRef}
             role="menu"
             data-view-portal
-            style={{ top: pos.top, left: pos.left }}
+            style={{ top: pos.bottom + 4, left: pos.left }}
             className="fixed z-50 w-40 space-y-0.5 rounded-xl border border-amber-400 bg-white p-1.5 shadow-xl dark:border-amber-400/70 dark:bg-neutral-900"
           >
             {OPTIONS.map((o, i) => (

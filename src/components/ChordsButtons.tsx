@@ -1,5 +1,6 @@
 "use client";
 
+import { useFlipUpMenu } from "@/lib/useFlipUpMenu";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import ListenButton from "@/components/ListenButton";
@@ -50,9 +51,11 @@ export default function ChordsButtons({
 }) {
   const [pdfOpen, setPdfOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; left?: number; right?: number } | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; bottom: number; left?: number; right?: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
+  // Blizu dna zaslona se meni odpre nad gumbom (useFlipUpMenu).
+  useFlipUpMenu(menuPanelRef, menuOpen ? menuPos : null);
   const isChordsPdf = song.chords_url?.toLowerCase().split("?")[0].endsWith(".pdf") ?? false;
   const hasPdfButton = Boolean(song.chords_url && isChordsPdf);
   const sourceCount = [song.chords_source_url, hasPdfButton, song.zabrenkaj_url, song.other_chords_url].filter(Boolean).length;
@@ -98,8 +101,8 @@ export default function ChordsButtons({
               const rect = e.currentTarget.getBoundingClientRect();
               setMenuPos(
                 menuAlign === "right"
-                  ? { top: rect.bottom + 4, right: window.innerWidth - rect.right }
-                  : { top: rect.bottom + 4, left: rect.left },
+                  ? { top: rect.top, bottom: rect.bottom, right: window.innerWidth - rect.right }
+                  : { top: rect.top, bottom: rect.bottom, left: rect.left },
               );
             }
             setMenuOpen((v) => !v);
@@ -137,7 +140,7 @@ export default function ChordsButtons({
               ref={menuPanelRef}
               role="menu"
               data-view-portal
-              style={{ top: menuPos.top, left: menuPos.left, right: menuPos.right }}
+              style={{ top: menuPos.bottom + 4, left: menuPos.left, right: menuPos.right }}
               className="fixed z-50 w-40 space-y-0.5 rounded-xl border border-amber-400 bg-white p-1.5 shadow-xl dark:border-amber-400/70 dark:bg-neutral-900"
             >
               {hasSamSpili(song) && (

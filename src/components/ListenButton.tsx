@@ -1,5 +1,6 @@
 "use client";
 
+import { useFlipUpMenu } from "@/lib/useFlipUpMenu";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Song } from "@/types/song";
@@ -19,9 +20,11 @@ export default function ListenButton({
   menuAlign?: "left" | "right";
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; left?: number; right?: number } | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; bottom: number; left?: number; right?: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
+  // Blizu dna zaslona se meni odpre nad gumbom (useFlipUpMenu).
+  useFlipUpMenu(menuPanelRef, menuOpen ? menuPos : null);
   // Shranjena točna skladba (spotify_url), sicer Spotify iskanje "avtor naslov".
   const spotifyUrl =
     song.spotify_url ??
@@ -70,8 +73,8 @@ export default function ListenButton({
             const rect = e.currentTarget.getBoundingClientRect();
             setMenuPos(
               menuAlign === "right"
-                ? { top: rect.bottom + 4, right: window.innerWidth - rect.right }
-                : { top: rect.bottom + 4, left: rect.left },
+                ? { top: rect.top, bottom: rect.bottom, right: window.innerWidth - rect.right }
+                : { top: rect.top, bottom: rect.bottom, left: rect.left },
             );
           }
           setMenuOpen((v) => !v);
@@ -106,7 +109,7 @@ export default function ListenButton({
             ref={menuPanelRef}
             role="menu"
             data-view-portal
-            style={{ top: menuPos.top, left: menuPos.left, right: menuPos.right }}
+            style={{ top: menuPos.bottom + 4, left: menuPos.left, right: menuPos.right }}
             className="fixed z-50 w-36 space-y-0.5 rounded-xl border border-emerald-500 bg-white p-1.5 shadow-xl dark:border-emerald-400/70 dark:bg-neutral-900"
           >
             <a

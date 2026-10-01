@@ -8,16 +8,14 @@ export type Theme = "system" | "light" | "dark";
 const KEY = "komadi:theme";
 const EVENT = "komadi-theme";
 // Ozadje aplikacije (⋮ → Nastavitve → Tema → Ozadje): indeks v BACKGROUNDS
-// (ista ozadja kot v pregledovalniku akordov / Sam Špili), brez vrednosti =
-// privzeto ozadje teme.
+// (ista ozadja kot v pregledovalniku akordov / Sam Špili); "none" = osnovno
+// ozadje teme (izbira "Osnovna"). Brez shranjene vrednosti velja Antracit —
+// a samo pri temni temi (pri svetli bi bilo temno besedilo na temnem ozadju).
 const BG_KEY = "komadi:appBg";
+const DEFAULT_APP_BG = BACKGROUNDS.findIndex((b) => b.label === "Antracit");
 
 function applyTheme(theme: Theme) {
-  const dark =
-    theme === "dark" ||
-    (theme === "system" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.classList.toggle("dark", dark);
+  document.documentElement.classList.toggle("dark", isDark(theme));
 }
 
 function applyAppBg(index: number | null) {
@@ -33,10 +31,16 @@ function readTheme(): Theme {
   }
 }
 
+function isDark(theme: Theme) {
+  return theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+}
+
 function readAppBg(): number | null {
   try {
     const v = localStorage.getItem(BG_KEY);
-    const n = v === null ? NaN : Number(v);
+    if (v === "none") return null;
+    if (v === null) return isDark(readTheme()) && DEFAULT_APP_BG >= 0 ? DEFAULT_APP_BG : null;
+    const n = Number(v);
     return Number.isInteger(n) && BACKGROUNDS[n] ? n : null;
   } catch {
     return null;
@@ -74,25 +78,27 @@ export function useTheme() {
     applyAppBg(appBg);
   }, [appBg]);
 
-  const store = (theme: Theme, bg: number | null) => {
+  // bg: indeks, null = "Osnovna" (ozadje teme), "default" = brez izbire
+  // (pri temni temi Antracit, pri svetli ozadje teme).
+  const store = (theme: Theme, bg: number | null | "default") => {
     try {
       localStorage.setItem(KEY, theme);
-      if (bg === null) localStorage.removeItem(BG_KEY);
-      else localStorage.setItem(BG_KEY, String(bg));
+      if (bg === "default") localStorage.removeItem(BG_KEY);
+      else localStorage.setItem(BG_KEY, bg === null ? "none" : String(bg));
     } catch {
       // localStorage ni na voljo — izbira se ne bo ohranila
     }
     applyTheme(theme);
-    applyAppBg(bg);
+    applyAppBg(readAppBg());
     window.dispatchEvent(new Event(EVENT));
   };
 
-  // Ročna izbira teme vrne privzeto ozadje (svetlo ozadje pri temni temi bi
-  // dalo svetlo besedilo na svetlem).
-  const setTheme = useCallback((next: Theme) => store(next, null), []);
+  // Ročna izbira teme vrne privzeto ozadje (Antracit pri temni, ozadje teme pri
+  // svetli) — svetlo ozadje pri temni temi bi dalo svetlo besedilo na svetlem.
+  const setTheme = useCallback((next: Theme) => store(next, "default"), []);
 
   // Ozadje določi tudi temo: svetla ozadja (Bela, Siva) → svetla, ostala → temna.
-  // null = privzeto ozadje, tema ostane.
+  // null = osnovno ozadje teme, tema ostane.
   const setAppBg = useCallback((index: number | null) => {
     if (index === null) store(readTheme(), null);
     else store(BACKGROUNDS[index].light ? "light" : "dark", index);

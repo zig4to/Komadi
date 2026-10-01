@@ -373,9 +373,9 @@ export default function SettingsMenu({
                         key={opt.value}
                         type="button"
                         onClick={() => setTheme(opt.value)}
-                        aria-pressed={theme === opt.value && appBg === null}
+                        aria-pressed={theme === opt.value}
                         className={`flex-1 rounded-md px-2 py-1 text-xs transition ${
-                          theme === opt.value && appBg === null
+                          theme === opt.value
                             ? "bg-emerald-600 font-medium text-white"
                             : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
                         }`}
@@ -386,14 +386,14 @@ export default function SettingsMenu({
                   </div>
 
                   {/* Ozadje aplikacije — ista ozadja kot v Sam Špili (⚙ → Tema).
-                      Izbira nastavi tudi svetlo/temno temo; "Privzeto" vrne ozadje teme. */}
+                      Izbira nastavi tudi svetlo/temno temo; "Osnovna" = ozadje teme (privzeto je Antracit). */}
                   <p className="mb-1.5 mt-2.5 text-xs font-medium text-neutral-500">Ozadje</p>
                   <div className="grid grid-cols-4 justify-items-center gap-y-2">
                     <button
                       type="button"
                       onClick={() => setAppBg(null)}
                       aria-pressed={appBg === null}
-                      title="Privzeto"
+                      title="Osnovna (ozadje teme)"
                       className="flex w-full flex-col items-center gap-1 text-[10px] leading-tight text-neutral-600 dark:text-neutral-300"
                     >
                       <span
@@ -401,7 +401,7 @@ export default function SettingsMenu({
                           appBg === null ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900" : ""
                         }`}
                       />
-                      Privzeto
+                      Osnovna
                     </button>
                     {BACKGROUND_ORDER.map((i) => {
                       const b = BACKGROUNDS[i];
