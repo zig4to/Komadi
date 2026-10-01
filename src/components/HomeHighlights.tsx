@@ -273,7 +273,8 @@ export function HighlightRow({
   }
 
   return (
-    <div>
+    // data-home-section: cilj gumba "Vrni se na vrh" pod seznamom (Obdobja).
+    <div data-home-section={title} className="scroll-mt-4">
       <HomeSectionHeading title={title} open={open} onToggle={() => setOpen((v) => !v)} />
       <div className={homeSectionBodyClass(open)}>
       <div

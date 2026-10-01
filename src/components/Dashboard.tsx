@@ -4479,12 +4479,18 @@ export default function Dashboard({ user }: { user: User }) {
                         onVisible={() => setResultsPage({ key: filtersKey, count: visibleResults + RESULTS_PAGE })}
                       />
                     )}
-                    {/* Konec seznama (vse strani naložene): na sredini "Vrni se na vrh" — do naslova "Vsi Komadi". */}
+                    {/* Konec seznama (vse strani naložene): na sredini "Vrni se na vrh" — do naslova "Obdobja"
+                        (domača stran); z iskanjem/filtrom ga ni, takrat do naslova seznama. */}
                     {displaySongs.length > 0 && displaySongs.length <= visibleResults && (
                       <div className="flex justify-center pt-2 pb-4">
                         <button
                           type="button"
-                          onClick={() => listHeadingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                          onClick={() =>
+                            (document.querySelector('[data-home-section="Obdobja"]') ?? listHeadingRef.current)?.scrollIntoView({
+                              behavior: "smooth",
+                              block: "start",
+                            })
+                          }
                           className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
                         >
                           <svg
