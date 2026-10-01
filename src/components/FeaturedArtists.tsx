@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import ChordsButtons from "@/components/ChordsButtons";
+import HomeSectionHeading, { homeSectionBodyClass, useHomeSectionOpen } from "@/components/HomeSectionHeading";
 import { authorAccentHex } from "@/lib/authorColor";
 import type { FeaturedGroup } from "@/lib/dailyRandom";
 import type { Song } from "@/types/song";
@@ -82,6 +83,8 @@ export default function FeaturedArtists({
   onChordsClick?: (song: Song) => void;
 }) {
   const [activeDot, setActiveDot] = useState(0);
+  // Na telefonu zložljivo (HomeSectionHeading).
+  const [open, setOpen] = useHomeSectionOpen("predstavljeno");
 
   if (items.length === 0) return null;
 
@@ -94,9 +97,8 @@ export default function FeaturedArtists({
 
   return (
     <div className="relative z-10 pb-1.5">
-      <h2 className="mb-2 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
-        Predstavljeno
-      </h2>
+      <HomeSectionHeading title="Predstavljeno" open={open} onToggle={() => setOpen((v) => !v)} />
+      <div className={homeSectionBodyClass(open)}>
 
       {/* Namizje: vsi avtorji v eni vrstici. */}
       <div className="hidden gap-3 lg:grid lg:grid-cols-4">
@@ -149,6 +151,7 @@ export default function FeaturedArtists({
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

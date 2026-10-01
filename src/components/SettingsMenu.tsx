@@ -275,7 +275,8 @@ export default function SettingsMenu({
 
   return (
     // Odprt meni: koren dobi z-30 (nad zameglitvijo), ostalo aplikacijo
-    // zamegli prosojna plast v portalu (z-25) — klik nanjo je klik zunaj
+    // zamegli prosojna plast v portalu (z-25; samo telefon, na računalniku je
+    // prozorna) — klik nanjo je klik zunaj
     // menija (rootRef), zato ga zapre obstoječi poslušalec.
     <div ref={rootRef} className={`relative ${menuOpen ? "z-30" : ""}`}>
       {menuOpen &&
@@ -283,7 +284,7 @@ export default function SettingsMenu({
           <div
             aria-hidden="true"
             data-view-portal
-            className="fixed inset-0 z-[25] bg-neutral-950/20 backdrop-blur-sm dark:bg-black/30"
+            className="fixed inset-0 z-[25] bg-neutral-950/20 backdrop-blur-sm dark:bg-black/30 lg:bg-transparent lg:backdrop-blur-none dark:lg:bg-transparent"
           />,
           document.body,
         )}

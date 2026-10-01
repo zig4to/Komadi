@@ -3942,7 +3942,13 @@ export default function Dashboard({ user }: { user: User }) {
               </button>
             </div>
 
-            <div className="flex flex-nowrap items-center gap-2 overflow-x-auto lg:contents">
+            {/* Telefon: med iskanjem (polje v fokusu) se vrstica Naključno/Delno/Novo/Popularno/Filtri
+                pomakne gor in izgine, ob zaprtju iskanja se vrne. Na računalniku (lg:contents) brez učinka. */}
+            <div
+              className={`flex flex-nowrap items-center gap-2 overflow-x-auto transition-all duration-300 ease-out lg:contents ${
+                searchFocused ? "pointer-events-none mb-0! max-h-0 -translate-y-2 opacity-0 lg:pointer-events-auto" : "max-h-16 opacity-100"
+              }`}
+            >
               <button
                 type="button"
                 onClick={pickRandom}
@@ -3994,7 +4000,11 @@ export default function Dashboard({ user }: { user: User }) {
               </button>
             </div>
 
-            <div className="flex flex-nowrap items-center gap-2 overflow-x-auto lg:contents">
+            <div
+              className={`flex flex-nowrap items-center gap-2 overflow-x-auto transition-all duration-300 ease-out lg:contents ${
+                searchFocused ? "pointer-events-none mb-0! max-h-0 -translate-y-2 opacity-0 lg:pointer-events-auto" : "max-h-16 opacity-100"
+              }`}
+            >
               <button
                 type="button"
                 data-view-toggle
@@ -4075,7 +4085,7 @@ export default function Dashboard({ user }: { user: User }) {
             activeView === "list" &&
             !sharedOn &&
             !hasActiveFilters(filters) && (
-              <div className="mt-3! space-y-0">
+              <div className={`mt-3! space-y-0 ${searchFocused ? "hidden lg:block" : ""}`}>
                 <FavoritesThisMonth
                   songs={songs}
                   othersSongs={othersFavorites}
@@ -4129,7 +4139,12 @@ export default function Dashboard({ user }: { user: User }) {
             </div>
           )}
 
-          <section data-view-section className="mt-3! space-y-4">
+          {/* Telefon: med iskanjem (polje v fokusu) je stran prazna — domači razdelki
+              zgoraj se skrijejo, seznam pa se pokaže šele, ko je kaj vpisano (rezultati). */}
+          <section
+            data-view-section
+            className={`mt-3! space-y-4 ${searchFocused && filters.search === "" ? "hidden lg:block" : ""}`}
+          >
             {loading && (
               <p className="text-sm text-neutral-500">Nalagam skladbe…</p>
             )}
@@ -4227,10 +4242,26 @@ export default function Dashboard({ user }: { user: User }) {
               <>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2">
+                    {/* Brez filtra je naslov (in prazen prostor desno do puščice) zložljiv —
+                        isti vzorec kot ostali razdelki domače strani; z filtrom je desno "Nazaj". */}
                     <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100">
-                      {sharedOn ? "Skupno" : songsHeading}
+                      {sharedOn || hasActiveFilters(filters) || authorFilter ? (
+                        sharedOn ? "Skupno" : songsHeading
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setStoredSongsVisible(songsVisible ? "0" : "1")}
+                          aria-expanded={songsVisible}
+                          className="text-left"
+                        >
+                          {songsHeading}
+                        </button>
+                      )}
                     </h2>
-                    <SortMenu value={songSort} onChange={setSongSort} />
+                    {/* Razvrščanje ("Filter") samo, ko je seznam odprt. */}
+                    {(sharedOn || songsVisible || hasActiveFilters(filters) || authorFilter) && (
+                      <SortMenu value={songSort} onChange={setSongSort} />
+                    )}
                   </div>
                   {sharedOn || hasActiveFilters(filters) || authorFilter ? (
                     <button
@@ -4261,7 +4292,9 @@ export default function Dashboard({ user }: { user: User }) {
                       type="button"
                       onClick={() => setStoredSongsVisible(songsVisible ? "0" : "1")}
                       aria-expanded={songsVisible}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                      aria-label={songsVisible ? "Skrij komade" : "Prikaži komade"}
+                      title={songsVisible ? "Skrij komade" : "Prikaži komade"}
+                      className="flex min-h-9 flex-1 items-center justify-end self-stretch"
                     >
                       <svg
                         aria-hidden="true"
@@ -4271,11 +4304,10 @@ export default function Dashboard({ user }: { user: User }) {
                         strokeWidth={1.8}
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        className={`h-4 w-4 shrink-0 transition-transform ${songsVisible ? "" : "-rotate-90"}`}
+                        className={`h-5 w-5 shrink-0 text-neutral-400 transition-transform ${songsVisible ? "" : "-rotate-90"}`}
                       >
                         <path d="m6 9 6 6 6-6" />
                       </svg>
-                      {songsVisible ? "Skrij komade" : "Prikaži"}
                     </button>
                   )}
                 </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { JSX } from "react";
+import HomeSectionHeading, { homeSectionBodyClass, useHomeSectionOpen } from "@/components/HomeSectionHeading";
 import { ERA_IMAGES, PORTRAIT_FOCUS_Y } from "@/lib/constants";
 
 // Ena preprosta, polnobarvna (solid) ikona na žanr — črne barve, prikazana
@@ -208,6 +209,8 @@ export function HighlightRow({
   // kartico po vlečenju ne sproži izbire. (Hook mora biti pred zgodnjim
   // "return null", da vrstni red klicanja hookov ostane enak.)
   const drag = useRef({ down: false, startX: 0, startScroll: 0, moved: false });
+  // Na telefonu zložljivo (ključ = naslov: Obdobja/Žanri/Avtorji).
+  const [open, setOpen] = useHomeSectionOpen(title);
 
   // Slika se uporabi le, če se je dejansko uspešno naložila — dokler
   // manjka (uporabnik je še ni naložil v public/images/eras/), kartica
@@ -271,9 +274,8 @@ export function HighlightRow({
 
   return (
     <div>
-      <h2 className="mb-2 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
-        {title}
-      </h2>
+      <HomeSectionHeading title={title} open={open} onToggle={() => setOpen((v) => !v)} />
+      <div className={homeSectionBodyClass(open)}>
       <div
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -351,6 +353,7 @@ export function HighlightRow({
             </button>
           );
         })}
+      </div>
       </div>
     </div>
   );
