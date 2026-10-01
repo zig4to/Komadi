@@ -28,7 +28,8 @@
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* zasebni način */ } }
 
   function isStandalone() {
-    return window.matchMedia("(display-mode: standalone)").matches ||
+    return window.matchMedia("(display-mode: fullscreen)").matches ||
+           window.matchMedia("(display-mode: standalone)").matches ||
            window.matchMedia("(display-mode: minimal-ui)").matches ||
            window.navigator.standalone === true;
   }

@@ -44,3 +44,14 @@ select,
 @theme {
   --animate-menu-open: menu-open 300ms ease-out;
 }
+
+/* Nameščena aplikacija čez cel zaslon (manifest "display": "fullscreen"): ni
+   statusne vrstice, zato vsebina ne sme pod izrez kamere / zaobljene robove.
+   Pregledovalnik akordov (position: fixed) ima svoje odmike. */
+@media (display-mode: fullscreen) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}

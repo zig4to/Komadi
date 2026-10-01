@@ -33,8 +33,24 @@ export const closeChordsViewer = () => write(null);
 // Celozaslonsko + ležeče za "Sam Špili". Klicati neposredno iz uporabnikovega
 // klika: requestFullscreen porabi dovoljenje tega klika, zato NE sme biti v
 // istem kliku kot zagon YouTuba (ta bi potem ostal utišan/ustavljen).
+// Nameščena aplikacija teče že čez cel zaslon (manifest "display": "fullscreen")
+// — takrat se celozaslonski način brskalnika ne kliče (in brskalnik ne pokaže
+// obvestila "povlecite z vrha …"); v navadnem zavihku ostane kot prej.
+export function isAppFullscreen() {
+  return typeof window !== "undefined" && window.matchMedia("(display-mode: fullscreen)").matches;
+}
+
+// Ali je smiselno klicati requestFullscreen (brskalnik ga podpira in aplikacija ni že čez cel zaslon).
+export function canBrowserFullscreen() {
+  return typeof document !== "undefined" && document.fullscreenEnabled && !isAppFullscreen();
+}
+
 export function enterLandscapeFullscreen() {
   const el = document.documentElement;
+  if (isAppFullscreen()) {
+    (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape").catch(() => {});
+    return;
+  }
   if (document.fullscreenElement || !el.requestFullscreen) return;
   el.requestFullscreen()
     .then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape"))

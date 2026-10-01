@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import AutoScrollControl from "@/components/AutoScrollControl";
 import ChordDiagram from "@/components/ChordDiagram";
 import YouTubeMiniPlayer, { youTubeVideoId, type PlayerController } from "@/components/YouTubeMiniPlayer";
-import { enterLandscapeFullscreen } from "@/lib/openChords";
+import { enterLandscapeFullscreen, canBrowserFullscreen, isAppFullscreen } from "@/lib/openChords";
 import {
   applyEditedText,
   findCapo,
@@ -732,7 +732,7 @@ export default function ChordsViewer({
     setIsFullscreen(true);
     // Cela stran, ne samo koren pregledovalnika: Android brskalniki (npr. Brave)
     // pri delu strani ne prilagodijo vedno vidnega območja.
-    if (document.fullscreenEnabled) document.documentElement.requestFullscreen().catch(() => {});
+    if (canBrowserFullscreen()) document.documentElement.requestFullscreen().catch(() => {});
   };
   const exitFullscreen = () => {
     setIsFullscreen(false);
@@ -1797,17 +1797,17 @@ export default function ChordsViewer({
     const t = setTimeout(() => setSsRequested(false), 6000);
     return () => clearTimeout(t);
   }, [ssRequested]);
-  const [ssIsFullscreen, setSsIsFullscreen] = useState(() => typeof document !== "undefined" && !!document.fullscreenElement);
+  const [ssIsFullscreen, setSsIsFullscreen] = useState(() => typeof document !== "undefined" && (!!document.fullscreenElement || isAppFullscreen()));
   // Sledilec (Skupni Jam): celozaslonsko pokončno (brez zaklepanja v ležeče).
   // Brskalnik zahteva dotik na tej napravi, zato ga sproži prvi dotik v Sam
   // špili ali gumb na čakalnem zaslonu — samodejno ob odprtju ne gre.
   const ssFollowerFullscreen = () => {
-    if (document.fullscreenElement || !document.fullscreenEnabled) return;
+    if (document.fullscreenElement || !canBrowserFullscreen()) return;
     document.documentElement.requestFullscreen().catch(() => {});
   };
   useEffect(() => {
     if (!samSpili) return;
-    const onChange = () => setSsIsFullscreen(!!document.fullscreenElement);
+    const onChange = () => setSsIsFullscreen(!!document.fullscreenElement || isAppFullscreen());
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, [samSpili]);
@@ -2865,7 +2865,7 @@ export default function ChordsViewer({
             {shared.role === "follower" ? "Slediš: " : "Vodi: "}
             <span className="font-semibold text-fuchsia-300">{shared.leaderName}</span>
           </span>
-          {shared.role === "follower" && remoteFullscreen && !isFullscreen && typeof document !== "undefined" && document.fullscreenEnabled && (
+          {shared.role === "follower" && remoteFullscreen && !isFullscreen && canBrowserFullscreen() && (
             <button
               type="button"
               onClick={() => document.documentElement.requestFullscreen().catch(() => {})}
@@ -3027,8 +3027,9 @@ export default function ChordsViewer({
               </button>
               </div>
               </div>
-              {/* Velikost besedila: + nad − spodaj desno (fino nastavljanje med predvajanjem). */}
-              {ssShowLines && !ssSeekOpen && (
+              {/* Velikost besedila: + nad − spodaj desno (fino nastavljanje med predvajanjem);
+                  skrita, ko je odprt meni (njegov ⚙ je na istem mestu) ali drsnik. */}
+              {ssShowLines && !ssSeekOpen && !ssSidebarOpen && (
                 <div
                   className="absolute z-20 flex flex-col items-center gap-2 font-sans"
                   style={{
@@ -3174,7 +3175,7 @@ export default function ChordsViewer({
               {follower ? (
                 <div className="flex flex-col items-center gap-4">
                   <p className="text-base text-(--cv-muted)">Čakaš, da {follower.leaderName} zažene skladbo …</p>
-                  {!ssIsFullscreen && typeof document !== "undefined" && document.fullscreenEnabled && (
+                  {!ssIsFullscreen && canBrowserFullscreen() && (
                     <button
                       type="button"
                       onClick={ssFollowerFullscreen}
