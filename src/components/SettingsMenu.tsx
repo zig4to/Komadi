@@ -3,6 +3,7 @@
 import type { User } from "@supabase/supabase-js";
 import UserMenuSection from "@/components/UserAvatar";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { runBackup, shareBackup } from "@/lib/backup";
 import { parseImportJson, parseImportText, type ParsedImport } from "@/lib/importSongs";
 import { supabase } from "@/lib/supabaseClient";
@@ -10,6 +11,58 @@ import { useBackableOpen } from "@/lib/useBackableOpen";
 import { BACKGROUNDS, BACKGROUND_ORDER } from "@/lib/backgrounds";
 import { useTheme, type Theme } from "@/lib/useTheme";
 import type { QueuedSong, Song, SongReport } from "@/types/song";
+
+// Oddelek menija ⋮: rahlo obarvano ozadje in barvni naslov (Delavnica,
+// Arhivi, Ostalo); prvi (Uporabnik + Nastavitve) je brez naslova. Barve so
+// celi Tailwind razredi, da jih Tailwind najde v izvorni kodi.
+// rgb = barva oddelka za osvetlitev postavk ob prehodu/kliku (--menu-hover/--menu-active).
+const MENU_TONES = {
+  emerald: { rgb: "16 185 129", box: "bg-emerald-500/[0.06] dark:bg-emerald-400/[0.06]", label: "text-emerald-700 dark:text-emerald-400" },
+  sky: { rgb: "14 165 233", box: "bg-sky-500/[0.07] dark:bg-sky-400/[0.07]", label: "text-sky-700 dark:text-sky-400" },
+  amber: { rgb: "245 158 11", box: "bg-amber-500/[0.08] dark:bg-amber-400/[0.07]", label: "text-amber-700 dark:text-amber-400" },
+  violet: { rgb: "139 92 246", box: "bg-violet-500/[0.07] dark:bg-violet-400/[0.07]", label: "text-violet-700 dark:text-violet-400" },
+} as const;
+
+function MenuSection({ tone, label, children }: { tone: keyof typeof MENU_TONES; label?: string; children: React.ReactNode }) {
+  const t = MENU_TONES[tone];
+  return (
+    <div
+      style={{ "--menu-hover": `rgb(${t.rgb} / 0.18)`, "--menu-active": `rgb(${t.rgb} / 0.3)` } as React.CSSProperties}
+      className={`rounded-lg p-0.5 [&+&]:mt-1.5 ${t.box}`}
+    >
+      {label && (
+        <p className={`px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider ${t.label}`}>{label}</p>
+      )}
+      {children}
+    </div>
+  );
+}
+
+// Zložljiv podrazdelek v Nastavitvah (Tema, Backup, Uvoz skladb).
+function SectionToggle({ label, open, onToggle, className = "" }: { label: string; open: boolean; onToggle: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      className={`flex w-full items-center justify-between gap-2 text-xs font-medium text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 ${className}`}
+    >
+      {label}
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "" : "-rotate-90"}`}
+      >
+        <path d="m6 9 6 6 6-6" />
+      </svg>
+    </button>
+  );
+}
 
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: "system", label: "Sistemska" },
@@ -63,6 +116,8 @@ export default function SettingsMenu({
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Nastavitve → Tema (zložljivo): svetla/temna/sistemska + ozadje aplikacije.
   const [themeOpen, setThemeOpen] = useState(false);
+  const [backupOpen, setBackupOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const { theme, setTheme, appBg, setAppBg } = useTheme();
 
@@ -219,7 +274,19 @@ export default function SettingsMenu({
   }, [menuOpen]);
 
   return (
-    <div ref={rootRef} className="relative">
+    // Odprt meni: koren dobi z-30 (nad zameglitvijo), ostalo aplikacijo
+    // zamegli prosojna plast v portalu (z-25) — klik nanjo je klik zunaj
+    // menija (rootRef), zato ga zapre obstoječi poslušalec.
+    <div ref={rootRef} className={`relative ${menuOpen ? "z-30" : ""}`}>
+      {menuOpen &&
+        createPortal(
+          <div
+            aria-hidden="true"
+            data-view-portal
+            className="fixed inset-0 z-[25] bg-neutral-950/20 backdrop-blur-sm dark:bg-black/30"
+          />,
+          document.body,
+        )}
       <button
         type="button"
         onClick={() => setMenuOpen((v) => !v)}
@@ -227,9 +294,9 @@ export default function SettingsMenu({
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         title="Meni"
-        className={`inline-flex items-center justify-center rounded-full border border-current/40 p-2.5 transition ${
+        className={`inline-flex items-center justify-center rounded-full border border-current/40 p-2.5 transition-all duration-300 ${
           menuOpen
-            ? "bg-[linear-gradient(115deg,#475569_15%,#94a3b8_100%)] text-white"
+            ? "animate-menu-open bg-slate-400/25 text-slate-800 ring-2 ring-slate-400/35 dark:bg-slate-400/20 dark:text-slate-100 dark:ring-slate-400/30"
             : "bg-[linear-gradient(115deg,rgba(100,116,139,0.14)_15%,rgba(100,116,139,0.03)_95%)] text-slate-600 hover:bg-[linear-gradient(115deg,rgba(100,116,139,0.24)_15%,rgba(100,116,139,0.06)_95%)] dark:text-slate-400 dark:hover:bg-[linear-gradient(115deg,rgba(100,116,139,0.32)_15%,rgba(100,116,139,0.1)_95%)]"
         }`}
       >
@@ -254,12 +321,13 @@ export default function SettingsMenu({
           role="menu"
           className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-neutral-200 bg-white p-1.5 text-sm shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
         >
+          <MenuSection tone="emerald">
           {user && <UserMenuSection user={user} />}
           <button
             type="button"
             onClick={() => setSettingsOpen((v) => !v)}
             aria-expanded={settingsOpen}
-            className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+            className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 dark:text-neutral-200 transition-colors hover:bg-(--menu-hover) active:bg-(--menu-active) aria-expanded:bg-(--menu-hover)"
           >
             <span className="flex items-center gap-2">
               <svg
@@ -295,26 +363,7 @@ export default function SettingsMenu({
 
           {settingsOpen && (
             <div className="mt-1 px-3 pb-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setThemeOpen((v) => !v)}
-                aria-expanded={themeOpen}
-                className="flex w-full items-center justify-between gap-2 text-xs font-medium text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
-              >
-                Tema
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={`h-3.5 w-3.5 shrink-0 transition-transform ${themeOpen ? "" : "-rotate-90"}`}
-                >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </button>
+              <SectionToggle label="Tema" open={themeOpen} onToggle={() => setThemeOpen((v) => !v)} />
               {themeOpen && (
                 <div className="mt-1.5">
                   <div className="flex gap-1 rounded-lg border border-neutral-200 p-1 dark:border-neutral-800">
@@ -378,7 +427,9 @@ export default function SettingsMenu({
                 </div>
               )}
 
-              <p className="mb-1.5 mt-3 text-xs font-medium text-neutral-500">Backup</p>
+              <SectionToggle label="Backup" open={backupOpen} onToggle={() => setBackupOpen((v) => !v)} className="mt-3" />
+              {backupOpen && (
+              <div className="mt-1.5">
               <div className="flex gap-1.5">
                 <button
                   type="button"
@@ -440,8 +491,12 @@ export default function SettingsMenu({
                   {backupMessage.text}
                 </p>
               )}
+              </div>
+              )}
 
-              <p className="mb-1.5 mt-3 text-xs font-medium text-neutral-500">Uvoz skladb</p>
+              <SectionToggle label="Uvoz skladb" open={importOpen} onToggle={() => setImportOpen((v) => !v)} className="mt-3" />
+              {importOpen && (
+              <div className="mt-1.5">
               <input
                 ref={importFileRef}
                 type="file"
@@ -519,14 +574,18 @@ export default function SettingsMenu({
                   {importMessage.text}
                 </p>
               )}
+              </div>
+              )}
             </div>
           )}
 
+          </MenuSection>
+          <MenuSection tone="sky" label="Delavnica">
           <button
             type="button"
             onClick={() => setQueuedOpen((v) => !v)}
             aria-expanded={queuedOpen}
-            className="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+            className="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 dark:text-neutral-200 transition-colors hover:bg-(--menu-hover) active:bg-(--menu-active) aria-expanded:bg-(--menu-hover)"
           >
             <span className="flex items-center gap-2">
               <svg
@@ -546,12 +605,13 @@ export default function SettingsMenu({
                 <path d="M12 18H3" />
               </svg>
               Čakalna vrsta
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
               {queuedSongs.length > 0 && (
                 <span className="rounded-full bg-fuchsia-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
                   {queuedSongs.length}
                 </span>
               )}
-            </span>
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
@@ -564,6 +624,7 @@ export default function SettingsMenu({
             >
               <path d="m6 9 6 6 6-6" />
             </svg>
+            </span>
           </button>
 
           {queuedOpen && (
@@ -645,7 +706,8 @@ export default function SettingsMenu({
               setMenuOpen(false);
               onOpenReview?.();
             }}
-            className="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+            title="Pregled in odobritev"
+            className="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium whitespace-nowrap text-neutral-700 dark:text-neutral-200 transition-colors hover:bg-(--menu-hover) active:bg-(--menu-active) aria-expanded:bg-(--menu-hover)"
           >
             <span className="flex items-center gap-2">
               <svg
@@ -661,13 +723,14 @@ export default function SettingsMenu({
                 <path d="M21.8 10A10 10 0 1 1 17 3.34" />
                 <path d="m9 11 3 3L22 4" />
               </svg>
-              Pregled in odobritev
+              Pregled
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
               {reviewCount > 0 && (
                 <span className="rounded-full bg-teal-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
                   {reviewCount}
                 </span>
               )}
-            </span>
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
@@ -680,13 +743,14 @@ export default function SettingsMenu({
             >
               <path d="m9 18 6-6-6-6" />
             </svg>
+            </span>
           </button>
 
           <button
             type="button"
             onClick={() => setReportsOpen((v) => !v)}
             aria-expanded={reportsOpen}
-            className="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+            className="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 dark:text-neutral-200 transition-colors hover:bg-(--menu-hover) active:bg-(--menu-active) aria-expanded:bg-(--menu-hover)"
           >
             <span className="flex items-center gap-2">
               <svg
@@ -702,12 +766,13 @@ export default function SettingsMenu({
                 <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
               </svg>
               Popravi skladbe
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
               {reports.length > 0 && (
                 <span className="rounded-full bg-yellow-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-900">
                   {reports.length}
                 </span>
               )}
-            </span>
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
@@ -720,6 +785,7 @@ export default function SettingsMenu({
             >
               <path d="m6 9 6 6 6-6" />
             </svg>
+            </span>
           </button>
 
           {reportsOpen && (
@@ -833,13 +899,15 @@ export default function SettingsMenu({
             </div>
           )}
 
+          </MenuSection>
+          <MenuSection tone="amber" label="Arhivi">
           <button
             type="button"
             onClick={() => {
               setMenuOpen(false);
               onOpenFavArchive?.();
             }}
-            className="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+            className="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 dark:text-neutral-200 transition-colors hover:bg-(--menu-hover) active:bg-(--menu-active) aria-expanded:bg-(--menu-hover)"
           >
             <span className="flex items-center gap-2">
               <svg
@@ -856,11 +924,14 @@ export default function SettingsMenu({
               </svg>
               Arhiv priljubljenih
             </span>
-            {favArchiveMonthCount > 0 && (
-              <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-900">
-                {favArchiveMonthCount}
-              </span>
-            )}
+            <span className="flex shrink-0 items-center gap-2">
+              {favArchiveMonthCount > 0 && (
+                <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-900">
+                  {favArchiveMonthCount}
+                </span>
+              )}
+              <span aria-hidden="true" className="w-4" />
+            </span>
           </button>
 
           <button
@@ -869,7 +940,7 @@ export default function SettingsMenu({
               setMenuOpen(false);
               onOpenJamArchive?.();
             }}
-            className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+            className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 dark:text-neutral-200 transition-colors hover:bg-(--menu-hover) active:bg-(--menu-active) aria-expanded:bg-(--menu-hover)"
           >
             <svg
               aria-hidden="true"
@@ -888,13 +959,15 @@ export default function SettingsMenu({
             Arhiv Jam-a
           </button>
 
+          </MenuSection>
+          <MenuSection tone="violet" label="Ostalo">
           <button
             type="button"
             onClick={() => {
               setMenuOpen(false);
               onOpenGoal?.();
             }}
-            className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+            className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 dark:text-neutral-200 transition-colors hover:bg-(--menu-hover) active:bg-(--menu-active) aria-expanded:bg-(--menu-hover)"
           >
             <svg
               aria-hidden="true"
@@ -912,6 +985,7 @@ export default function SettingsMenu({
             </svg>
             Mojih 20 skladb
           </button>
+          </MenuSection>
         </div>
       )}
     </div>

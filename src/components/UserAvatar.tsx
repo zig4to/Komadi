@@ -39,7 +39,7 @@ export default function UserMenuSection({ user: initialUser }: { user: User }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+        className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 dark:text-neutral-200 transition-colors hover:bg-(--menu-hover) active:bg-(--menu-active) aria-expanded:bg-(--menu-hover)"
       >
         <span className="flex min-w-0 items-center gap-2">
           <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#10b981,#0891b2)] text-[9px] font-semibold tracking-wide text-white">

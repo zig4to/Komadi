@@ -14,6 +14,9 @@ export const BACKGROUNDS = [
   { label: "Temno rjava", light: false, bg: "#18110c", text: "#f2e9e1", title: "#ffffff", muted: "#a89684", panel: "#0f0a07", border: "#4a3b30" },
   { label: "Temno modra", light: false, bg: "#0b1422", text: "#eef3fa", title: "#ffffff", muted: "#94a3b8", panel: "#070d18", border: "#334155" },
   { label: "Temno zelena", light: false, bg: "#0a1711", text: "#eef7f1", title: "#ffffff", muted: "#94ab9f", panel: "#06100b", border: "#2f4a3d" },
+  { label: "Svinčena", light: false, bg: "#303030", text: "#f5f5f5", title: "#ffffff", muted: "#adadad", panel: "#1f1f1f", border: "#585858" },
+  { label: "Oglje", light: false, bg: "#1f1f1f", text: "#f5f5f5", title: "#ffffff", muted: "#a3a3a3", panel: "#121212", border: "#4d4d4d" },
 ];
-// Od svetlega do temnega, rjava na koncu.
-export const BACKGROUND_ORDER = [0, 1, 4, 2, 5, 3, 6, 7, 8, 9];
+// Od svetlega do temnega (sive: Grafit, Svinčena, Temno siva, Oglje,
+// Antracit, Črna), rjava na koncu.
+export const BACKGROUND_ORDER = [0, 1, 4, 10, 2, 11, 5, 3, 6, 7, 8, 9];
