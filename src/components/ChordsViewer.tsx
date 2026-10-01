@@ -3027,18 +3027,18 @@ export default function ChordsViewer({
               </button>
               </div>
               </div>
-              {/* Velikost besedila: − / + spodaj desno (fino nastavljanje med predvajanjem). */}
+              {/* Velikost besedila: + nad − spodaj desno (fino nastavljanje med predvajanjem). */}
               {ssShowLines && !ssSeekOpen && (
                 <div
-                  className="absolute z-20 flex items-center gap-2 font-sans"
+                  className="absolute z-20 flex flex-col items-center gap-2 font-sans"
                   style={{
                     bottom: "max(0.75rem, env(safe-area-inset-bottom))",
                     right: "max(0.75rem, env(safe-area-inset-right))",
                   }}
                 >
                   {([
-                    [-SS_SCALE_STEP, "−", "Manjše besedilo", ssScale <= SS_SCALE_MIN],
                     [SS_SCALE_STEP, "+", "Večje besedilo", ssScale >= SS_SCALE_MAX],
+                    [-SS_SCALE_STEP, "−", "Manjše besedilo", ssScale <= SS_SCALE_MIN],
                   ] as const).map(([delta, sign, label, off]) => (
                     <button
                       key={sign}
