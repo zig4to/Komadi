@@ -32,7 +32,7 @@ import {
   rebaseSyncOnEdit,
   remapLines,
   type LrcCandidate,
-  type SyncPoint, inInstrumentalGap } from "@/lib/syncedLyrics";
+  type SyncPoint, inInstrumentalGap, sectionOffset } from "@/lib/syncedLyrics";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { ChordSection, Song, SyncedChords, SyncedLines } from "@/types/song";
@@ -851,7 +851,9 @@ export default function ChordsViewer({
     () => (syncedChords?.sections ?? []).map((s) => ({ ...s, points: remapLines(s.points, body).points })),
     [syncedChords, body],
   );
-  const chordPoints = useMemo(() => flattenChordSections(chordSections), [chordSections]);
+  // Telefon (zaslon < 1024 px): deli z akordi uporabljajo svoj zamik (offsetPhone).
+  const [isPhone] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches);
+  const chordPoints = useMemo(() => flattenChordSections(chordSections, isPhone), [chordSections, isPhone]);
   useEffect(() => {
     syncStateRef.current = { synced_lines: syncedLines, synced_chords: syncedChords, verified_player_at: verifiedPlayerAt };
   });
@@ -1007,6 +1009,12 @@ export default function ChordsViewer({
     const section: ChordSection = { id: newSectionId(), name: defaultSectionName(recorder.sections), offset: 0, end: null, points: [] };
     setRecorder({ ...recorder, sections: [...recorder.sections, section], activeId: section.id, dirty: true });
   };
+  // −/+ zamik dela: na telefonu se spremeni offsetPhone (začne od trenutnega), na
+  // računalniku offset — en zamik za računalnik, en za telefon, oba v bazi.
+  const shiftSectionOffset = (s: ChordSection, delta: number): ChordSection => {
+    const next = Math.round((sectionOffset(s, isPhone) + delta) * 4) / 4;
+    return isPhone ? { ...s, offsetPhone: next } : { ...s, offset: next };
+  };
   const updateSection = (id: string, change: (s: ChordSection) => ChordSection) => {
     if (!recorder) return;
     setRecorder({ ...recorder, sections: recorder.sections.map((s) => (s.id === id ? change(s) : s)), dirty: true });
@@ -1036,7 +1044,7 @@ export default function ChordsViewer({
   // Pregled dela: predvajaj od 2 s pred njegovim prvim akordom.
   const previewSection = (section: ChordSection) => {
     if (!section.points.length) return;
-    const start = Math.min(...section.points.map((p) => p.t)) + section.offset;
+    const start = Math.min(...section.points.map((p) => p.t)) + sectionOffset(section, isPhone);
     if (!playerCtlRef.current?.seekAndPlay(Math.max(0, start - 2)))
       setRecorderMsg("Najprej enkrat zaženi posnetek z ▶.");
   };
@@ -1087,7 +1095,7 @@ export default function ChordsViewer({
     const id = activeId;
     setRecorder({
       ...recorder,
-      sections: sections.map((s) => (s.id === id ? { ...s, points: [...s.points, { t: t - s.offset, line, chord }] } : s)),
+      sections: sections.map((s) => (s.id === id ? { ...s, points: [...s.points, { t: t - sectionOffset(s, isPhone), line, chord }] } : s)),
       activeId: id,
       history: [...recorder.history, { kind: "chord", sectionId: id }],
       future: [],
@@ -1102,7 +1110,7 @@ export default function ChordsViewer({
     if (t == null) return;
     setRecorder({
       ...recorder,
-      sections: recorder.sections.map((s) => (s.id === section.id ? { ...s, end: t - s.offset } : s)),
+      sections: recorder.sections.map((s) => (s.id === section.id ? { ...s, end: t - sectionOffset(s, isPhone) } : s)),
       history: [...recorder.history, { kind: "end", sectionId: section.id, prev: section.end }],
       future: [],
       dirty: true,
@@ -1180,7 +1188,7 @@ export default function ChordsViewer({
   };
   // Osnutek med snemanjem: obarvanje po vseh delih (za pregled z ▶) in
   // podčrtani akordi aktivnega dela.
-  const draftChordPoints = useMemo(() => flattenChordSections(recorder?.sections ?? []), [recorder]);
+  const draftChordPoints = useMemo(() => flattenChordSections(recorder?.sections ?? [], isPhone), [recorder, isPhone]);
   const recordedChords = useMemo(() => {
     const active = recorder?.sections.find((s) => s.id === recorder.activeId);
     return new Set(active?.points.map((p) => `${p.line}:${p.chord}`) ?? []);
@@ -2862,10 +2870,11 @@ export default function ChordsViewer({
                   <div className="max-h-36 space-y-1 overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
                     {recorder.sections.map((section) => {
                       const active = section.id === recorder.activeId;
-                      const times = section.points.map((p) => p.t + section.offset);
+                      const off = sectionOffset(section, isPhone);
+                      const times = section.points.map((p) => p.t + off);
                       const from = times.length ? Math.min(...times) : null;
                       const to = times.length
-                        ? (section.end != null ? section.end + section.offset : Math.max(...times) + 4)
+                        ? (section.end != null ? section.end + off : Math.max(...times) + 4)
                         : null;
                       return (
                         <div
@@ -2927,19 +2936,19 @@ export default function ChordsViewer({
                           </button>
                           <button
                             type="button"
-                            onClick={() => updateSection(section.id, (s) => ({ ...s, offset: Math.round((s.offset - LRC_OFFSET_STEP) * 4) / 4 }))}
+                            onClick={() => updateSection(section.id, (s) => shiftSectionOffset(s, -LRC_OFFSET_STEP))}
                             aria-label="Zamik −0,25 s"
                             className="rounded border border-neutral-600 px-1 text-neutral-300"
                           >
                             −
                           </button>
                           <span className="w-9 text-center tabular-nums text-neutral-300">
-                            {section.offset > 0 ? "+" : ""}
-                            {section.offset.toFixed(2).replace(".", ",")}
+                            {off > 0 ? "+" : ""}
+                            {off.toFixed(2).replace(".", ",")}
                           </span>
                           <button
                             type="button"
-                            onClick={() => updateSection(section.id, (s) => ({ ...s, offset: Math.round((s.offset + LRC_OFFSET_STEP) * 4) / 4 }))}
+                            onClick={() => updateSection(section.id, (s) => shiftSectionOffset(s, LRC_OFFSET_STEP))}
                             aria-label="Zamik +0,25 s"
                             className="rounded border border-neutral-600 px-1 text-neutral-300"
                           >

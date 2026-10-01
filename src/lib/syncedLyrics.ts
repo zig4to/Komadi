@@ -486,16 +486,23 @@ export function rebaseSyncOnEdit(
 // Deli z akordi (synced_chords.sections) v en časovno urejen seznam točk:
 // vsak čas + zamik dela, na koncu dela "stop" (Konec ali 4 s po zadnjem).
 const SECTION_TAIL = 4;
+// Zamik dela za to vrsto naprave: telefon ima svojega (offsetPhone), sicer velja offset.
+export function sectionOffset(s: { offset: number; offsetPhone?: number }, phone: boolean): number {
+  return phone ? (s.offsetPhone ?? s.offset) : s.offset;
+}
+
 export function flattenChordSections(
-  sections: { offset: number; end: number | null; points: { t: number; line: number; chord: number }[] }[],
+  sections: { offset: number; offsetPhone?: number; end: number | null; points: { t: number; line: number; chord: number }[] }[],
+  phone = false,
 ): ({ t: number; line: number; chord: number } | { t: number; stop: true })[] {
   const out: ({ t: number; line: number; chord: number } | { t: number; stop: true })[] = [];
   for (const s of sections) {
     if (!s.points.length) continue;
+    const off = sectionOffset(s, phone);
     const pts = [...s.points].sort((a, b) => a.t - b.t);
-    for (const p of pts) out.push({ ...p, t: p.t + s.offset });
+    for (const p of pts) out.push({ ...p, t: p.t + off });
     const last = pts[pts.length - 1].t;
-    out.push({ t: (s.end != null && s.end > last ? s.end : last + SECTION_TAIL) + s.offset, stop: true });
+    out.push({ t: (s.end != null && s.end > last ? s.end : last + SECTION_TAIL) + off, stop: true });
   }
   return out.sort((a, b) => a.t - b.t);
 }

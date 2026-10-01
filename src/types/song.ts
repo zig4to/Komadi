@@ -77,7 +77,11 @@ export type ChordTap = { t: number; line: number; chord: number; key?: string };
 export interface ChordSection {
   id: string;
   name: string;
+  // Zamik dela (s) na računalniku; offsetPhone = na telefonu (zaslon < 1024 px),
+  // če ni nastavljen, velja offset — isti posnetek se na telefonu lahko začne
+  // za del sekunde drugače.
   offset: number;
+  offsetPhone?: number;
   end: number | null;
   points: ChordTap[];
 }
