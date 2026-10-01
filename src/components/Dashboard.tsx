@@ -2095,7 +2095,7 @@ export default function Dashboard({ user }: { user: User }) {
   }, [activeView]);
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 space-y-6 lg:max-w-6xl">
+    <div className="mx-auto w-full max-w-3xl px-4 pt-3 pb-8 space-y-6 lg:max-w-6xl lg:pt-5">
       <header className="relative flex items-center justify-between">
         {jamOpen ? (
           <>
