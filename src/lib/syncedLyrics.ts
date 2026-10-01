@@ -172,6 +172,9 @@ const ALIGN_MIN = 0.4;
 const ALIGN_SKIP = 0.02;
 // Največ toliko sekund na besedo pri delitvi ene vrstice LRC na več vrstic akordov.
 const WORD_SEC_MAX = 1.2;
+// Najdaljše trajanje zapete vrstice brez naslednje vrstice LRC (glej `end`).
+const LINE_SEC_PER_WORD = 0.9;
+const LINE_SEC_MIN = 5;
 
 export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncPoint[]; matched: number } {
   const lyricLines = body
@@ -261,7 +264,11 @@ export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncP
     matched++;
     const { k, w } = sung[i];
     const line = lrc[k];
-    const end = lrc[k + 1]?.time ?? line.time + 5;
+    // Konec vrstice: začetek naslednje vrstice LRC, a največ LINE_SEC_PER_WORD na
+    // besedo (vsaj LINE_SEC_MIN) — pred solom ali outrom LRC pogosto nima prazne
+    // vrstice ("This kind of dance can never last" → 30 s do bridgea), in vrstica
+    // bi ostala označena čez ves instrumentalni del.
+    const end = Math.min(lrc[k + 1]?.time ?? line.time + 5, line.time + Math.max(LINE_SEC_MIN, w.length * LINE_SEC_PER_WORD));
     // Čas za delitev vrstice LRC po besedah: največ WORD_SEC_MAX na besedo — do
     // naslednje vrstice LRC je lahko dolg premor ("War is over, now" + 10 s do
     // "Happy Christmas"), ki bi sicer zadnjo vrstico ("Now") zamaknil predaleč.
@@ -517,6 +524,16 @@ export function chordAt(
 // in koliko je je že odpetega (0 … 1) — za črto pod vrstico. Več zaporednih
 // vrstic LRC v isti vrstici pesmi je en razpon: od prve do konca zadnje.
 // span = trajanje vrstice (s) — napredek raste linearno s časom (1/span na sekundo).
+// Instrumentalni del (solo, outro, vmesni del): zapeta vrstica je končana
+// (+0,5 s) in naslednja se začne šele čez ≥ minGap s — takrat ni označene vrstice.
+export function inInstrumentalGap(points: SyncPoint[], time: number, minGap: number): boolean {
+  let k = -1;
+  for (let j = 0; j < points.length && points[j].time <= time; j++) k = j;
+  const cur = k >= 0 ? points[k] : null;
+  const next = points[k + 1];
+  return !!cur && time > cur.end + 0.5 && (!next || next.time - cur.end >= minGap);
+}
+
 export function lineProgressAt(points: SyncPoint[], time: number): { lineIndex: number; progress: number; span: number } {
   let lo = 0;
   let hi = points.length - 1;

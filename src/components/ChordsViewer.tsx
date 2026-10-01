@@ -32,8 +32,7 @@ import {
   rebaseSyncOnEdit,
   remapLines,
   type LrcCandidate,
-  type SyncPoint,
-} from "@/lib/syncedLyrics";
+  type SyncPoint, inInstrumentalGap } from "@/lib/syncedLyrics";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { ChordSection, Song, SyncedChords, SyncedLines } from "@/types/song";
@@ -1439,7 +1438,8 @@ export default function ChordsViewer({
     }
     if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
     const prog = smartActive && sync ? lineProgressAt(sync.points, seconds - lrcOffset) : { lineIndex: -1, progress: 0 };
-    setActiveLine(prog.lineIndex);
+    // Med instrumentalnim delom (solo, outro) ni označene vrstice — kot v Sam Špili.
+    setActiveLine(smartActive && sync && inInstrumentalGap(sync.points, seconds - lrcOffset, SS_GAP_MIN) ? -1 : prog.lineIndex);
     // "Sam Špili": zadnji čas + trenutek prejema; zanka pomikanja iz tega
     // sproti izračuna čas med 250-ms osvežitvami (gladko, brez stopnic).
     ssClockRef.current = { t: seconds, at: performance.now(), playing };
@@ -1774,11 +1774,7 @@ export default function ChordsViewer({
         const lt = t - offset;
         ({ lineIndex: line, progress, span } = lineProgressAt(points, lt));
         // Instrumentalni del: zapeta vrstica končana, naslednja ≥ SS_GAP_MIN s.
-        let k = -1;
-        for (let j = 0; j < points.length && points[j].time <= lt; j++) k = j;
-        const cur = k >= 0 ? points[k] : null;
-        const next = points[k + 1];
-        gap = !!cur && lt > cur.end + 0.5 && (!next || next.time - cur.end >= SS_GAP_MIN);
+        gap = inInstrumentalGap(points, lt, SS_GAP_MIN);
       }
       const want = gap ? -1 : line;
       if (want !== hl) {
