@@ -937,12 +937,19 @@ export default function ChordsViewer({
     | { kind: "line"; replaced: RecLine[] }
     | { kind: "chord"; sectionId: string }
     | { kind: "end"; sectionId: string; prev: number | null };
+  // ↷ (ponovi): razveljavljeno dejanje + kar je ↶ odstranil, da ga lahko vrne.
+  // Vsako novo dejanje (TAP, akord, Konec) seznam izprazni.
+  type RedoAction =
+    | { kind: "line"; tap: RecLine; replaced: RecLine[] }
+    | { kind: "chord"; sectionId: string; point: ChordSection["points"][number] }
+    | { kind: "end"; sectionId: string; prev: number | null; end: number | null };
   const [recorder, setRecorder] = useState<{
     lines: RecLine[];
     cursor: number;
     sections: ChordSection[];
     activeId: string | null;
     history: RecAction[];
+    future: RedoAction[];
     dirty: boolean;
   } | null>(() => {
     if (!autoRecord) return null;
@@ -956,6 +963,7 @@ export default function ChordsViewer({
       sections,
       activeId: sections[sections.length - 1]?.id ?? null,
       history: [],
+      future: [],
       dirty: false,
     };
   });
@@ -976,6 +984,7 @@ export default function ChordsViewer({
       sections,
       activeId: sections[sections.length - 1]?.id ?? null,
       history: [],
+      future: [],
       dirty: false,
     });
     setSmartOn(false);
@@ -1011,6 +1020,7 @@ export default function ChordsViewer({
       sections,
       activeId: recorder.activeId === id ? (sections[sections.length - 1]?.id ?? null) : recorder.activeId,
       history: recorder.history.filter((a) => a.kind === "line" || a.sectionId !== id),
+      future: recorder.future.filter((a) => a.kind === "line" || a.sectionId !== id),
       dirty: true,
     });
   };
@@ -1048,6 +1058,7 @@ export default function ChordsViewer({
       lines: [...recorder.lines.filter((p) => !(p.line === line && !p.tap)), { t: Math.round((t - lrcOffset) * 100) / 100, line, tap: true }],
       cursor: nextLyricLine(line + 1),
       history: [...recorder.history, { kind: "line", replaced }],
+      future: [],
       dirty: true,
     });
   };
@@ -1070,6 +1081,7 @@ export default function ChordsViewer({
       sections: sections.map((s) => (s.id === id ? { ...s, points: [...s.points, { t: t - s.offset, line, chord }] } : s)),
       activeId: id,
       history: [...recorder.history, { kind: "chord", sectionId: id }],
+      future: [],
       dirty: true,
     });
   };
@@ -1083,6 +1095,7 @@ export default function ChordsViewer({
       ...recorder,
       sections: recorder.sections.map((s) => (s.id === section.id ? { ...s, end: t - s.offset } : s)),
       history: [...recorder.history, { kind: "end", sectionId: section.id, prev: section.end }],
+      future: [],
       dirty: true,
     });
   };
@@ -1098,9 +1111,23 @@ export default function ChordsViewer({
     if (last.kind === "line") {
       // Zadnji TAP je vedno na koncu seznama; nadomeščene točke se vrnejo.
       const removed = recorder.lines[recorder.lines.length - 1];
-      setRecorder({ ...recorder, lines: [...recorder.lines.slice(0, -1), ...last.replaced], cursor: removed?.line ?? recorder.cursor, history });
+      setRecorder({
+        ...recorder,
+        lines: [...recorder.lines.slice(0, -1), ...last.replaced],
+        cursor: removed?.line ?? recorder.cursor,
+        history,
+        future: removed ? [...recorder.future, { kind: "line", tap: removed, replaced: last.replaced }] : recorder.future,
+      });
       return;
     }
+    const section = recorder.sections.find((s) => s.id === last.sectionId);
+    const point = section?.points[section.points.length - 1];
+    const redo: RedoAction | null =
+      last.kind === "chord"
+        ? point
+          ? { kind: "chord", sectionId: last.sectionId, point }
+          : null
+        : { kind: "end", sectionId: last.sectionId, prev: last.prev, end: section?.end ?? null };
     setRecorder({
       ...recorder,
       sections: recorder.sections.map((s) =>
@@ -1108,6 +1135,38 @@ export default function ChordsViewer({
       ),
       activeId: last.sectionId,
       history,
+      future: redo ? [...recorder.future, redo] : recorder.future,
+    });
+  };
+  // ↷: ponovi zadnje razveljavljeno dejanje (obratno od undoTap).
+  const redoTap = () => {
+    const next = recorder?.future[recorder.future.length - 1];
+    if (!recorder || !next) return;
+    const future = recorder.future.slice(0, -1);
+    if (next.kind === "line") {
+      const line = next.tap.line;
+      setRecorder({
+        ...recorder,
+        lines: [...recorder.lines.filter((p) => !(p.line === line && !p.tap)), next.tap],
+        cursor: nextLyricLine(line + 1),
+        history: [...recorder.history, { kind: "line", replaced: next.replaced }],
+        future,
+        dirty: true,
+      });
+      return;
+    }
+    setRecorder({
+      ...recorder,
+      sections: recorder.sections.map((s) =>
+        s.id !== next.sectionId ? s : next.kind === "chord" ? { ...s, points: [...s.points, next.point] } : { ...s, end: next.end },
+      ),
+      activeId: next.sectionId,
+      history: [
+        ...recorder.history,
+        next.kind === "chord" ? { kind: "chord", sectionId: next.sectionId } : { kind: "end", sectionId: next.sectionId, prev: next.prev },
+      ],
+      future,
+      dirty: true,
     });
   };
   // Osnutek med snemanjem: obarvanje po vseh delih (za pregled z ▶) in
@@ -1827,12 +1886,15 @@ export default function ChordsViewer({
     const top = el.scrollTop + line.getBoundingClientRect().top - el.getBoundingClientRect().top - el.clientHeight / 3;
     el.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
   }, [recorderCursor]);
-  // Računalnik: preslednica = TAP, Backspace = razveljavi zadnji tap.
+  // Računalnik: preslednica = TAP, Backspace = razveljavi zadnji tap,
+  // Shift+Backspace / Ctrl+Y / Ctrl+Shift+Z = ponovi.
   const recordTapRef = useRef(recordTap);
   const undoTapRef = useRef(undoTap);
+  const redoTapRef = useRef(redoTap);
   useEffect(() => {
     recordTapRef.current = recordTap;
     undoTapRef.current = undoTap;
+    redoTapRef.current = redoTap;
   });
   const recording = !!recorder;
   useEffect(() => {
@@ -1844,7 +1906,10 @@ export default function ChordsViewer({
       if (e.code === "Space") {
         e.preventDefault();
         if (!e.repeat) recordTapRef.current();
-      } else if (e.key === "Backspace") {
+      } else if ((e.key === "Backspace" && e.shiftKey) || ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "y" || (e.shiftKey && e.key.toLowerCase() === "z")))) {
+        e.preventDefault();
+        redoTapRef.current();
+      } else if (e.key === "Backspace" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z")) {
         e.preventDefault();
         undoTapRef.current();
       }
@@ -2717,6 +2782,16 @@ export default function ChordsViewer({
                 className="rounded-xl border border-neutral-600 px-3 text-lg text-neutral-300 active:scale-95 disabled:opacity-40"
               >
                 ↶
+              </button>
+              <button
+                type="button"
+                onClick={redoTap}
+                disabled={!recorder.future.length}
+                aria-label="Ponovi razveljavljeno"
+                title="Ponovi razveljavljeno (Shift+Backspace)"
+                className="rounded-xl border border-neutral-600 px-3 text-lg text-neutral-300 active:scale-95 disabled:opacity-40"
+              >
+                ↷
               </button>
               <button
                 type="button"
