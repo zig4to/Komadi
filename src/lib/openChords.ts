@@ -30,7 +30,7 @@ function write(id: string | null, mode?: ChordsViewerMode) {
 export const openChordsViewer = (songId: string, mode?: ChordsViewerMode) => write(songId, mode);
 export const closeChordsViewer = () => write(null);
 
-// Celozaslonsko + ležeče za "Sam špili". Klicati neposredno iz uporabnikovega
+// Celozaslonsko + ležeče za "Sam Špili". Klicati neposredno iz uporabnikovega
 // klika: requestFullscreen porabi dovoljenje tega klika, zato NE sme biti v
 // istem kliku kot zagon YouTuba (ta bi potem ostal utišan/ustavljen).
 export function enterLandscapeFullscreen() {

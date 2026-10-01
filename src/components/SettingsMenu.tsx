@@ -7,6 +7,7 @@ import { runBackup, shareBackup } from "@/lib/backup";
 import { parseImportJson, parseImportText, type ParsedImport } from "@/lib/importSongs";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
+import { BACKGROUNDS, BACKGROUND_ORDER } from "@/lib/backgrounds";
 import { useTheme, type Theme } from "@/lib/useTheme";
 import type { QueuedSong, Song, SongReport } from "@/types/song";
 
@@ -60,8 +61,10 @@ export default function SettingsMenu({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Nastavitve → Tema (zložljivo): svetla/temna/sistemska + ozadje aplikacije.
+  const [themeOpen, setThemeOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, appBg, setAppBg } = useTheme();
 
   // Sistemski gumb "Nazaj" (Android) naj meni zapre enako kot klik zunaj njega ali Escape.
   useBackableOpen(menuOpen, () => setMenuOpen(false));
@@ -240,9 +243,9 @@ export default function SettingsMenu({
           strokeLinejoin="round"
           className="h-[18px] w-[18px] shrink-0"
         >
-          <circle cx="12" cy="5" r="1" />
-          <circle cx="12" cy="12" r="1" />
-          <circle cx="12" cy="19" r="1" />
+          <path d="M4 6h16" />
+          <path d="M4 12h16" />
+          <path d="M4 18h16" />
         </svg>
       </button>
 
@@ -292,24 +295,88 @@ export default function SettingsMenu({
 
           {settingsOpen && (
             <div className="mt-1 px-3 pb-2 pt-1">
-              <p className="mb-1.5 text-xs font-medium text-neutral-500">Tema</p>
-              <div className="flex gap-1 rounded-lg border border-neutral-200 p-1 dark:border-neutral-800">
-                {THEME_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setTheme(opt.value)}
-                    aria-pressed={theme === opt.value}
-                    className={`flex-1 rounded-md px-2 py-1 text-xs transition ${
-                      theme === opt.value
-                        ? "bg-emerald-600 font-medium text-white"
-                        : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+              <button
+                type="button"
+                onClick={() => setThemeOpen((v) => !v)}
+                aria-expanded={themeOpen}
+                className="flex w-full items-center justify-between gap-2 text-xs font-medium text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+              >
+                Tema
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`h-3.5 w-3.5 shrink-0 transition-transform ${themeOpen ? "" : "-rotate-90"}`}
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              {themeOpen && (
+                <div className="mt-1.5">
+                  <div className="flex gap-1 rounded-lg border border-neutral-200 p-1 dark:border-neutral-800">
+                    {THEME_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setTheme(opt.value)}
+                        aria-pressed={theme === opt.value && appBg === null}
+                        className={`flex-1 rounded-md px-2 py-1 text-xs transition ${
+                          theme === opt.value && appBg === null
+                            ? "bg-emerald-600 font-medium text-white"
+                            : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Ozadje aplikacije — ista ozadja kot v Sam Špili (⚙ → Tema).
+                      Izbira nastavi tudi svetlo/temno temo; "Privzeto" vrne ozadje teme. */}
+                  <p className="mb-1.5 mt-2.5 text-xs font-medium text-neutral-500">Ozadje</p>
+                  <div className="grid grid-cols-4 justify-items-center gap-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setAppBg(null)}
+                      aria-pressed={appBg === null}
+                      title="Privzeto"
+                      className="flex w-full flex-col items-center gap-1 text-[10px] leading-tight text-neutral-600 dark:text-neutral-300"
+                    >
+                      <span
+                        className={`h-6 w-6 rounded-full border border-neutral-400 bg-[linear-gradient(135deg,#fafafa_50%,#171717_50%)] dark:border-neutral-600 ${
+                          appBg === null ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900" : ""
+                        }`}
+                      />
+                      Privzeto
+                    </button>
+                    {BACKGROUND_ORDER.map((i) => {
+                      const b = BACKGROUNDS[i];
+                      return (
+                        <button
+                          key={b.label}
+                          type="button"
+                          onClick={() => setAppBg(i)}
+                          aria-pressed={appBg === i}
+                          title={b.label}
+                          className="flex w-full flex-col items-center gap-1 text-center text-[10px] leading-tight text-neutral-600 dark:text-neutral-300"
+                        >
+                          <span
+                            style={{ backgroundColor: b.bg }}
+                            className={`h-6 w-6 rounded-full border border-neutral-400 dark:border-neutral-600 ${
+                              appBg === i ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900" : ""
+                            }`}
+                          />
+                          {b.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <p className="mb-1.5 mt-3 text-xs font-medium text-neutral-500">Backup</p>
               <div className="flex gap-1.5">

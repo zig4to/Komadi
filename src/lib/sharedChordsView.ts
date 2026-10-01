@@ -13,11 +13,11 @@ export type LocalView = {
   anchor: ViewAnchor;
   smart: { line: number; chord: { line: number; chord: number } | null } | null;
   fullscreen: boolean;
-  // "Sam špili": samo ko ima vodja odprt Sam špili in že igra.
+  // "Sam Špili": samo ko ima vodja odprt Sam Špili in že igra.
   ss?: SamSpiliView;
 };
 
-// "Sam špili": vrstica (indeks v ssLines, -1 = pred prvo), napredek v njej ob
+// "Sam Špili": vrstica (indeks v ssLines, -1 = pred prvo), napredek v njej ob
 // pošiljanju (p, 0–1) in koliko napredka na sekundo (rate = 1/trajanje vrstice,
 // 0 med pavzo) — napredek v vrstici je linearen s časom, zato sledilec med
 // sporočili izračuna natanko isti položaj kot vodja. hl = poudarjena vrstica telesa.

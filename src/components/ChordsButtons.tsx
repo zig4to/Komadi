@@ -6,7 +6,7 @@ import ListenButton from "@/components/ListenButton";
 import PdfViewer from "@/components/PdfViewer";
 import { enterLandscapeFullscreen, openChordsViewer } from "@/lib/openChords";
 
-// "Sam špili" (celozaslonski pogled s 3 vrsticami, ChordsViewer samSpili):
+// "Sam Špili" (celozaslonski pogled s 3 vrsticami, ChordsViewer samSpili):
 // skladbe v Pregledu in odobritvi (da se tam preveri, ali dela in lepo
 // izgleda) in skladbe s preverjenim predvajalnikom — "Odobri" zahteva
 // preverjen predvajalnik, zato ga vsaka skladba, ki gre skozi pregled,
@@ -164,7 +164,7 @@ export default function ChordsButtons({
                     <circle cx="12" cy="12" r="10" />
                     <path d="M10 8.5v7l5.5-3.5z" />
                   </svg>
-                  Sam špili
+                  Sam Špili
                 </button>
               )}
               {song.chords_text && (

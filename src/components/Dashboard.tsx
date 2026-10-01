@@ -236,7 +236,7 @@ export default function Dashboard({ user }: { user: User }) {
   // "Akordi v aplikaciji": odprta skladba je v localStorage (src/lib/openChords.ts),
   // da po osvežitvi ostane odprta; pregledovalnik se izriše samo tu.
   const openChordsId = useOpenChordsSongId();
-  // "samspili" = pregledovalnik se odpre v pogledu "Sam špili" (3 vrstice).
+  // "samspili" = pregledovalnik se odpre v pogledu "Sam Špili" (3 vrstice).
   const openChordsMode = useOpenChordsMode();
   // Seznam skladb se riše po RESULTS_PAGE kartic, naslednje ob pomiku do dna
   // (LoadMoreSentinel). Brez tega je vsaka od prvih črk v iskanju (ujema se
@@ -276,6 +276,31 @@ export default function Dashboard({ user }: { user: User }) {
       cancelled = true;
     };
   }, []);
+  // "Priljubljeno <mesec>" → "Drugi": priljubljene (odobrene) skladbe drugih
+  // uporabnikov + njihova imena (RPC song_owner_names, 0036), naložene ob odprtju.
+  const [othersFavorites, setOthersFavorites] = useState<Song[]>([]);
+  const [ownerNames, setOwnerNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from("songs")
+      .select("*")
+      .eq("favorite", true)
+      .eq("review_pending", false)
+      .neq("user_id", user.id)
+      .then(({ data }) => {
+        if (!cancelled && data) setOthersFavorites(data as Song[]);
+      });
+    supabase.rpc("song_owner_names").then(({ data }) => {
+      if (cancelled || !data) return;
+      const map: Record<string, string> = {};
+      for (const row of data as { user_id: string; name: string | null }[]) if (row.name) map[row.user_id] = row.name;
+      setOwnerNames(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id]);
   const verifiedSongs = useMemo(() => {
     const own = songs.filter((s) => s.verified_player_at);
     const ownKeys = new Set(own.map((s) => songMatchKey(s)));
@@ -1150,7 +1175,7 @@ export default function Dashboard({ user }: { user: User }) {
   }
 
   // "Akordi preverjeni" / razveljavitev "Predvajalnik preverjen" na strani
-  // Pregled in odobritev (potrditev predvajalnika je v Sam špili ⚙, ker
+  // Pregled in odobritev (potrditev predvajalnika je v Sam Špili ⚙, ker
   // zamrzne čase posnetka, ki igra). Optimistično z vrnitvijo ob napaki.
   async function handleVerify(song: Song, field: "verified_chords_at" | "verified_player_at", value: string | null) {
     const prev = song[field] ?? null;
@@ -1508,7 +1533,7 @@ export default function Dashboard({ user }: { user: User }) {
   // Kdor prvi v Skupnem Jamu odpre akorde, vodi; ostali (ki sledijo) vidijo
   // isto skladbo na isti višini, njegov Smart play in celozaslonski način.
   // Supabase Realtime Broadcast, nič v bazi (src/lib/sharedChordsView.ts).
-  // mode = način pregledovalnika pri vodji ("samspili" = Sam špili, null = navaden).
+  // mode = način pregledovalnika pri vodji ("samspili" = Sam Špili, null = navaden).
   type SharedLeader = { id: string; name: string; songId: string; since: number; view: LocalView | null; seen: number; mode?: "samspili" | null };
   const [sharedLeader, setSharedLeader] = useState<SharedLeader | null>(null);
   const [followingLeader, setFollowingLeader] = useState(true);
@@ -1526,7 +1551,7 @@ export default function Dashboard({ user }: { user: User }) {
     followingRef.current = followingLeader;
     openChordsModeRef.current = openChordsMode;
   });
-  // Odpri akorde kot vodja (isti način — Sam špili ali navaden), če še niso tako odprti.
+  // Odpri akorde kot vodja (isti način — Sam Špili ali navaden), če še niso tako odprti.
   const openLikeLeader = (songId: string, mode: "samspili" | null | undefined) => {
     let open: string | null = null;
     let openMode: string | null = null;
@@ -1544,7 +1569,7 @@ export default function Dashboard({ user }: { user: User }) {
   const sendLeaderView = (view: LocalView | null) => {
     const me = sharedLeaderRef.current;
     if (!me || me.id !== user.id || !view) return;
-    // Sam špili: napredek v vrstici posodobljen na trenutek pošiljanja (zamik
+    // Sam Špili: napredek v vrstici posodobljen na trenutek pošiljanja (zamik
     // omejevanja pošiljanja in srčni utrip bi ga sicer poslali zastarelega).
     let ss = view.ss;
     if (ss?.playing && ss.rate > 0) {
@@ -4053,6 +4078,8 @@ export default function Dashboard({ user }: { user: User }) {
               <div className="mt-3! space-y-0">
                 <FavoritesThisMonth
                   songs={songs}
+                  othersSongs={othersFavorites}
+                  ownerNames={ownerNames}
                   authorImages={authorImages}
                   onFilterAuthor={handleFilterByAuthor}
                   onChordsClick={handleChordsClick}
@@ -4379,7 +4406,7 @@ export default function Dashboard({ user }: { user: User }) {
 
       {(() => {
         const chordsSong = openChordsId
-          ? [...allSongs, ...(sharedSongs ?? []), ...Object.values(sharedJamSongs), ...verifiedAll].find((s) => s.id === openChordsId && s.chords_text)
+          ? [...allSongs, ...(sharedSongs ?? []), ...Object.values(sharedJamSongs), ...verifiedAll, ...othersFavorites].find((s) => s.id === openChordsId && s.chords_text)
           : undefined;
         return chordsSong ? (
           <ChordsViewer

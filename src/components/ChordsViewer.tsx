@@ -38,6 +38,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { ChordSection, Song, SyncedChords, SyncedLines } from "@/types/song";
 import { anchorScrollTop, computeAnchor, getRemoteView, subscribeRemoteView, type LocalView, type RemoteViewEntry, type SamSpiliView } from "@/lib/sharedChordsView";
+import { BACKGROUNDS, BACKGROUND_ORDER } from "@/lib/backgrounds";
 
 // Skupni pogled v Skupnem Jamu (Dashboard.tsx, src/lib/sharedChordsView.ts):
 // vodja sporoča, kar vidi; sledilec prikaže vodjev pogled; "paused" = sledilec,
@@ -80,11 +81,11 @@ const newSectionId = () =>
 // Smart play označi tudi instrumentalne dele (intro, solo …) med premori v
 // petju — test samo na teh skladbah.
 const INSTRUMENTAL_TEST_TITLES = ["water witch"];
-// "Sam špili": odmik besedila od oranžne črte (poudarek vrstice).
+// "Sam Špili": odmik besedila od oranžne črte (poudarek vrstice).
 const SS_LINE_INSET = { marginLeft: "-0.45em", paddingLeft: "0.45em" } as const;
-// "Sam špili": koliko (tipičnih) vrstic nad trenutno ostane vidnih ob njenem začetku.
+// "Sam Špili": koliko (tipičnih) vrstic nad trenutno ostane vidnih ob njenem začetku.
 const SS_SLOT_ROWS = 1.4;
-// "Sam špili": premor v petju (s), ki šteje kot instrumentalni del — poudarek se ugasne.
+// "Sam Špili": premor v petju (s), ki šteje kot instrumentalni del — poudarek se ugasne.
 const SS_GAP_MIN = 4;
 function fmtClock(s: number) {
   const t = Math.max(0, Math.floor(s));
@@ -99,23 +100,8 @@ const FONT_STEP = 0.5;
 // Skrivanje/prikaz zgornjih vrstic ob samodejnem pomikanju: mehak ease-in-out.
 const BARS_TRANSITION = "550ms cubic-bezier(0.65, 0, 0.35, 1)";
 
-// Ozadja vsebine pregledovalnika (gumb "Tema"). Zgornji vrstici ostaneta temni.
-const BACKGROUNDS = [
-  { label: "Bela", light: true, bg: "#ffffff", text: "#171717", title: "#0a0a0a", muted: "#737373", panel: "#f5f5f5", border: "#d4d4d4" },
-  { label: "Siva", light: true, bg: "#e5e5e5", text: "#171717", title: "#0a0a0a", muted: "#525252", panel: "#d4d4d4", border: "#a3a3a3" },
-  { label: "Temno siva", light: false, bg: "#262626", text: "#f5f5f5", title: "#ffffff", muted: "#a3a3a3", panel: "#171717", border: "#525252" },
-  { label: "Črna", light: false, bg: "#0a0a0a", text: "#f5f5f5", title: "#ffffff", muted: "#a3a3a3", panel: "#171717", border: "#525252" },
-  // Nova ozadja so dodana na konec (izbira je v localStorage shranjena kot
-  // indeks); vrstni red v izbirniku določa BACKGROUND_ORDER.
-  { label: "Grafit", light: false, bg: "#3a3a3a", text: "#f5f5f5", title: "#ffffff", muted: "#b4b4b4", panel: "#262626", border: "#5e5e5e" },
-  { label: "Antracit", light: false, bg: "#181818", text: "#f5f5f5", title: "#ffffff", muted: "#a3a3a3", panel: "#0f0f0f", border: "#4a4a4a" },
-  { label: "Rjava", light: false, bg: "#2a2019", text: "#f5ede6", title: "#ffffff", muted: "#b8a897", panel: "#1e1711", border: "#5a4a3d" },
-  { label: "Temno rjava", light: false, bg: "#18110c", text: "#f2e9e1", title: "#ffffff", muted: "#a89684", panel: "#0f0a07", border: "#4a3b30" },
-  { label: "Temno modra", light: false, bg: "#0b1422", text: "#eef3fa", title: "#ffffff", muted: "#94a3b8", panel: "#070d18", border: "#334155" },
-  { label: "Temno zelena", light: false, bg: "#0a1711", text: "#eef7f1", title: "#ffffff", muted: "#94ab9f", panel: "#06100b", border: "#2f4a3d" },
-];
-// Od svetlega do temnega, rjava na koncu.
-const BACKGROUND_ORDER = [0, 1, 4, 2, 5, 3, 6, 7, 8, 9];
+// Ozadja (BACKGROUNDS, BACKGROUND_ORDER) so v src/lib/backgrounds.ts — ista
+// izbira je tudi ozadje aplikacije (⋮ → Nastavitve → Tema).
 const DEFAULT_BG = 3;
 // Barve besedila: "Samodejna" = barva, ki pripada ozadju (BACKGROUNDS.text);
 // ostale imajo svetlo različico za temna ozadja in temno za svetla.
@@ -224,7 +210,7 @@ export default function ChordsViewer({
   song: Song;
   onClose: () => void;
   shared?: SharedViewProp;
-  // "Sam špili": celozaslonski (ležeči) pogled, ki med Smart playem kaže samo
+  // "Sam Špili": celozaslonski (ležeči) pogled, ki med Smart playem kaže samo
   // 3 vrstice — trenutno na vrhu, čez vso širino (glej overlay spodaj).
   samSpili?: boolean;
   // Odpri s takoj zagnanim snemalnikom časov ("Posnemi čase") — iz naprednega
@@ -246,7 +232,7 @@ export default function ChordsViewer({
   // Po skritju napisa ✕ pomeni "Ne sledi" (zapre akorde, sledenje se ustavi).
   const closeAsUnfollow = isFollowing && followPillHidden;
   // Vodjev pogled (samo sledilec): v stanju le, kar se izriše (Smart play
-  // vrstica/akord, celozaslonsko, ali Sam špili že igra); položaj gre v refe.
+  // vrstica/akord, celozaslonsko, ali Sam Špili že igra); položaj gre v refe.
   const [remoteState, setRemoteState] = useState<LocalView | null>(() => {
     const e = getRemoteView();
     return e && e.songId === song.id ? e.view : null;
@@ -363,7 +349,7 @@ export default function ChordsViewer({
     "--cv-mark-radius": markRadius,
     "--cv-mark-width": markWidth,
   } as CSSProperties;
-  // Izbira barv (ozadje, besedilo, akordi, pripisi) — v meniju ⚙ (v "Sam špili" pod "Tema").
+  // Izbira barv (ozadje, besedilo, akordi, pripisi) — v meniju ⚙ (v "Sam Špili" pod "Tema").
   // Oba razdelka sta ob odprtju menija strnjena.
   const [bgPickerOpen, setBgPickerOpen] = useState(false);
   const [chordPickerOpen, setChordPickerOpen] = useState(false);
@@ -394,7 +380,7 @@ export default function ChordsViewer({
       {label}
     </button>
   );
-  // "Sam špili" ⚙: razdelek "Tema" (izbirniki barv).
+  // "Sam Špili" ⚙: razdelek "Tema" (izbirniki barv).
   const [ssSettingsThemeOpen, setSsSettingsThemeOpen] = useState(false);
   const pickerHeader = (label: string, open: boolean, toggle: () => void) => (
     <button
@@ -608,11 +594,11 @@ export default function ChordsViewer({
       </div>
     </>
   );
-  // "Sam špili": stranska vrstica z gumbi (skrita desno, odpre jo gumb Meni).
+  // "Sam Špili": stranska vrstica z gumbi (skrita desno, odpre jo gumb Meni).
   const [ssSidebarOpen, setSsSidebarOpen] = useState(false);
 
   // Izbirnik teme: fixed pod gumbom (vrstica z gumbi ima overflow-hidden).
-  // V "Sam špili" (ssSettingsRef) se odpre levo od gumba in navzgor od njegovega dna.
+  // V "Sam Špili" (ssSettingsRef) se odpre levo od gumba in navzgor od njegovega dna.
   const [themeMenuPos, setThemeMenuPos] = useState<{ top?: number; bottom?: number; left: number; maxHeight?: number } | null>(null);
   // Razdelek "Napredne nastavitve" na dnu menija ⚙ (razprt/strnjen).
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -881,24 +867,24 @@ export default function ChordsViewer({
     }, 700);
   };
   const [activeLine, setActiveLine] = useState(-1);
-  // "Sam špili": kliknjen Play, posnetek se še nalaga.
+  // "Sam Špili": kliknjen Play, posnetek se še nalaga.
   const [ssRequested, setSsRequested] = useState(false);
-  // "Sam špili": uporabnik je pritisnil Play (in ne Pavze) / posnetek je že kdaj
+  // "Sam Špili": uporabnik je pritisnil Play (in ne Pavze) / posnetek je že kdaj
   // igral. Ko je posnetek enkrat igral, vrstice ostanejo vidne — tudi med
   // pavzo (pogled obstane, gumb Pavza postane Play) in med kratkim nalaganjem
   // ob preskoku (±5 s, na začetek).
   const [ssActive, setSsActive] = useState(false);
   const [ssHasPlayed, setSsHasPlayed] = useState(false);
-  // "Sam špili": zapeta vrstica se je končala in sledi daljši instrumentalni
+  // "Sam Špili": zapeta vrstica se je končala in sledi daljši instrumentalni
   // del (interlude, solo …) — poudarek (ozadje) se odstrani do naslednje vrstice.
-  // Poudarjena vrstica v "Sam špili" (-1 = nobena, npr. med instrumentalnim
+  // Poudarjena vrstica v "Sam Špili" (-1 = nobena, npr. med instrumentalnim
   // delom) — računa jo zanka pomikanja vsako sličico, stanje se nastavi le ob
   // spremembi, zato poudarek ne zaostaja za 250-ms onTime.
   const [ssHlLine, setSsHlLine] = useState(-1);
-  // "Sam špili": drsnik čez celo skladbo (spodaj), odpre ga gumb v stolpcu.
+  // "Sam Špili": drsnik čez celo skladbo (spodaj), odpre ga gumb v stolpcu.
   const [ssSeekOpen, setSsSeekOpen] = useState(false);
   const [ssTime, setSsTime] = useState(0);
-  // Sledilec (Skupni Jam) vidi vrstice, ko vodja v Sam špili že igra.
+  // Sledilec (Skupni Jam) vidi vrstice, ko vodja v Sam Špili že igra.
   const ssShowLines = samSpili && (follower ? !!remote?.ss : ssHasPlayed);
   // Telefon, med pavzo: tap na vrstico skoči tja in predvaja naprej.
   const playerCtlRef = useRef<PlayerController | null>(null);
@@ -1308,7 +1294,7 @@ export default function ChordsViewer({
       lastUserScrollRef.current = 0;
     }
   };
-  // "Sam špili": tap (prst ali miška) na vrstico skoči tja — tudi med
+  // "Sam Špili": tap (prst ali miška) na vrstico skoči tja — tudi med
   // predvajanjem. Vrstica z besedilom: njen začetek (pri ponovljenem refrenu
   // ponovitev, časovno najbližja trenutnemu mestu). Instrumentalna vrstica
   // (intro, interlude): začetek tega dela = konec prejšnje zapete vrstice,
@@ -1354,7 +1340,7 @@ export default function ChordsViewer({
     if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
     const prog = smartActive && sync ? lineProgressAt(sync.points, seconds - lrcOffset) : { lineIndex: -1, progress: 0 };
     setActiveLine(prog.lineIndex);
-    // "Sam špili": zadnji čas + trenutek prejema; zanka pomikanja iz tega
+    // "Sam Špili": zadnji čas + trenutek prejema; zanka pomikanja iz tega
     // sproti izračuna čas med 250-ms osvežitvami (gladko, brez stopnic).
     ssClockRef.current = { t: seconds, at: performance.now(), playing };
     // Drsnik prevrtavanja: ponovni izris le, ko je odprt (sicer vsakih 250 ms
@@ -1490,7 +1476,7 @@ export default function ChordsViewer({
     el.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
   }, [scrollLine]);
 
-  // --- "Sam špili": 3 vrstice čez cel zaslon ---
+  // --- "Sam Špili": 3 vrstice čez cel zaslon ---
   // Prikazljive vrstice pesmi: brez razdelkov, praznih vrstic in tablatur brez
   // vrstice akordov (te so v pesmi skrite). Instrumentalne vrstice (samo akordi)
   // ostanejo, da se tudi intro/interlude kaže po 3 vrstice.
@@ -1524,12 +1510,12 @@ export default function ChordsViewer({
   useEffect(() => {
     ssSyncRef.current = { points: smartActive && sync ? sync.points : null, offset: lrcOffset };
   });
-  // Skupni Jam: vodja v Sam špili pošilja položaj iz zanke pomikanja (zadnji je
+  // Skupni Jam: vodja v Sam Špili pošilja položaj iz zanke pomikanja (zadnji je
   // v ssLastRef, da ga pošlje tudi reportView); sledilec ga bere iz
   // ssRemoteRef (+ trenutek prejema) namesto lastnega časa posnetka.
   const ssLastRef = useRef<SamSpiliView | null>(null);
   const ssRemoteRef = useRef<{ view: SamSpiliView; at: number } | null>(null);
-  // Sledilec: vsako sporočilo vodje gre v refe (položaj, Sam špili); stanje se
+  // Sledilec: vsako sporočilo vodje gre v refe (položaj, Sam Špili); stanje se
   // spremeni samo, ko se spremeni kaj, kar se izriše.
   const isFollower = !!follower;
   useEffect(() => {
@@ -1725,7 +1711,7 @@ export default function ChordsViewer({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ssShowLines, ssLines]);
-  // Med predvajanjem "Sam špili" se zaslon ne sme temniti/zakleniti (Screen
+  // Med predvajanjem "Sam Špili" se zaslon ne sme temniti/zakleniti (Screen
   // Wake Lock). Brskalnik ključavnico sprosti, ko je zavihek skrit, zato jo ob
   // vrnitvi (visibilitychange) zahtevamo znova. Brez podpore se ne zgodi nič.
   useEffect(() => {
@@ -1759,7 +1745,7 @@ export default function ChordsViewer({
     };
   }, [samSpili]);
   // Play: samo predvajanje. Celozaslonsko/ležeče se vklopi že ob kliku na
-  // "Sam špili" v meniju (enterLandscapeFullscreen) ali z gumbom ⛶ — ne tukaj,
+  // "Sam Špili" v meniju (enterLandscapeFullscreen) ali z gumbom ⛶ — ne tukaj,
   // ker requestFullscreen porabi dovoljenje klika in bi YouTube ostal ustavljen.
   const ssPlay = () => {
     setSmartOn(true);
@@ -2320,7 +2306,7 @@ export default function ChordsViewer({
           style={{ top: themeMenuPos.top, bottom: themeMenuPos.bottom, left: themeMenuPos.left, maxHeight: themeMenuPos.maxHeight }}
           className={`fixed w-72 space-y-3 overflow-y-auto rounded-xl border border-orange-400 bg-neutral-900 p-3 font-sans shadow-xl ${samSpili ? "z-50" : "z-10"}`}
         >
-          {/* "Sam špili" prekrije urejevalnik, snemanje in samodejno pomikanje — tam jih ni. */}
+          {/* "Sam Špili" prekrije urejevalnik, snemanje in samodejno pomikanje — tam jih ni. */}
           {!samSpili && (
           <button
             type="button"
@@ -2339,7 +2325,7 @@ export default function ChordsViewer({
           </button>
           )}
           {!samSpili && verifyChordsRow}
-          {/* "Sam špili": naslov, razpirajoča "Tema", napredne na dnu. */}
+          {/* "Sam Špili": naslov, razpirajoča "Tema", napredne na dnu. */}
           {samSpili ? (
             <>
               <p className="px-1 text-[13px] font-medium text-neutral-400">Nastavitve</p>
@@ -2854,7 +2840,7 @@ export default function ChordsViewer({
       {/* Med pametnim sledenjem ni ročnega autoscrolla — ne bi se smela tepsti. */}
       {!editing && !smartActive && !recorder && !follower && !samSpili && <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} onPlayingChange={setFullscreen} />}
 
-      {/* "Sam špili": prekrije pregledovalnik (predvajalnik ostane spodaj in igra). */}
+      {/* "Sam Špili": prekrije pregledovalnik (predvajalnik ostane spodaj in igra). */}
       {samSpili && (
         <div
           className="absolute inset-0 z-40 flex flex-col overflow-hidden bg-(--cv-bg) text-(--cv-text)"

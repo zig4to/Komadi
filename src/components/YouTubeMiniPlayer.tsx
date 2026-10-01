@@ -101,11 +101,11 @@ function formatTime(s: number) {
 export type PlayerController = {
   seekAndPlay: (seconds: number) => boolean;
   currentTime: () => number | null;
-  // "Sam špili" (ChordsViewer): predvajaj — ob prvem klicu ustvari predvajalnik
+  // "Sam Špili" (ChordsViewer): predvajaj — ob prvem klicu ustvari predvajalnik
   // (klic mora priti iz uporabnikovega dotika) — in pavza.
   play: () => void;
   pause: () => void;
-  // Preskok za delta sekund (npr. ±5 v "Sam špili").
+  // Preskok za delta sekund (npr. ±5 v "Sam Špili").
   seekBy: (delta: number) => void;
 };
 

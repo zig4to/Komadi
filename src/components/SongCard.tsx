@@ -254,7 +254,7 @@ export default function SongCard({
       }`}
     >
       {/* Odobrena skladba, ročno preverjena: dve kljukici desno spodaj — rumena
-          = akordi v aplikaciji, oranžna = predvajalnik (Smart play, Sam špili). */}
+          = akordi v aplikaciji, oranžna = predvajalnik (Smart play, Sam Špili). */}
       {!song.review_pending && (song.verified_chords_at || song.verified_player_at) && (
         <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1">
           {song.verified_chords_at && (

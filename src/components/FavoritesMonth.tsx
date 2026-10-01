@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import ChordsButtons from "@/components/ChordsButtons";
 import { authorAccentHex } from "@/lib/authorColor";
 import { PORTRAIT_FOCUS_Y } from "@/lib/constants";
+import { usePersistentBool } from "@/lib/usePersistentBool";
+import { initialsOf } from "@/lib/userName";
 import type { Song } from "@/types/song";
 
 // "Priljubljeno ta mesec" (domača stran, nad "Obdobja"), "Preverjeno špila"
@@ -14,7 +16,7 @@ import type { Song } from "@/types/song";
 // "preselijo" v arhiv, ničesar ni treba premikati v bazi.
 
 // Kartic na stolpec v "swipe" pogledu na domači strani.
-const COLUMN_SIZE = 3;
+const COLUMN_SIZE = 2;
 // Kartic na stran na računalniku (3 vrste × 3), polnijo se po vrstah.
 const DESKTOP_PAGE_SIZE = 9;
 const COLUMN_GAP_PX = 12; // gap-3
@@ -45,7 +47,17 @@ function favoritesSorted(songs: Song[]) {
     .sort((a, b) => b.favorited_at!.localeCompare(a.favorited_at!));
 }
 
-// Kljukica v krogu ("Preverjeno špila").
+// Play v krogu — ista ikona kot "Sam Špili" v meniju Akordi (naslov "Preverjeno špila").
+function PlayCircleIcon({ className }: { className: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M10 8.5v7l5.5-3.5z" />
+    </svg>
+  );
+}
+
+// Kljukica v krogu (kartice "Preverjeno špila").
 function CheckIcon({ className, strokeWidth = 1.8 }: { className: string; strokeWidth?: number }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -364,28 +376,174 @@ function chunk<T>(list: T[], size: number) {
   return out;
 }
 
+function UsersIcon({ className }: { className: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+// "Drugi": priljubljene drugih uporabnikov, en stolpec na osebo (glava z
+// začetnicama in imenom, pod njo seznam, ki se drsi navzdol); stolpci se
+// drsijo vodoravno. Tujim skladbam ni privat Jama in ne štejejo popularnosti.
+function OthersColumns({
+  people,
+  authorImages,
+  ...handlers
+}: { people: { userId: string; name: string; songs: Song[] }[] } & CardHandlers) {
+  return (
+    <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:mx-0 lg:scroll-px-0 lg:px-0">
+      {people.map((p) => (
+        <div
+          key={p.userId}
+          className="flex w-[86%] shrink-0 snap-start flex-col rounded-2xl border border-amber-500/25 bg-amber-500/[0.03] p-2 sm:w-[calc(50%-6px)] lg:w-[calc((100%-24px)/3)]"
+        >
+          <div className="mb-2 flex items-center gap-2 px-1">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-[11px] font-bold text-amber-700 dark:text-amber-300">
+              {initialsOf(p.name)}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-neutral-800 dark:text-neutral-100">{p.name}</span>
+            <span className="shrink-0 text-xs text-neutral-500 dark:text-neutral-400">{p.songs.length}</span>
+          </div>
+          <VisibleCardsList>
+            {p.songs.map((s) => (
+              <div key={s.id} className="shrink-0">
+                <FavoriteCard
+                  song={s}
+                  authorImage={authorImages[s.author] ?? null}
+                  {...handlers}
+                  onAddToJam={undefined}
+                  onChordsClick={undefined}
+                />
+              </div>
+            ))}
+          </VisibleCardsList>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Namig nad stolpci "Drugi" (ko nimaš svojih priljubljenih): po 10 s se
+// zloži navzgor (grid 1fr → 0fr + bledenje), prostor pod njim se zapre.
+const HINT_MS = 10_000;
+function OthersHint() {
+  const [shown, setShown] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setShown(false), HINT_MS);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div
+      aria-hidden={!shown}
+      className={`grid transition-[grid-template-rows,opacity,transform] duration-500 ease-in-out ${
+        shown ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] -translate-y-2 opacity-0"
+      }`}
+    >
+      <div className="overflow-hidden">
+        <p className="pb-2 text-xs text-neutral-500 dark:text-neutral-400">
+          Ta mesec še nimaš priljubljenih — tu so priljubljene drugih. Svojo dodaš v meniju kartice (☰) z gumbom{" "}
+          <span className="font-medium">Priljubljena</span>.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const LIST_GAP_PX = 8; // gap-2
+const VISIBLE_CARDS = 2;
+
+// Navpični seznam, ki pokaže točno VISIBLE_CARDS kartic (višina izmerjena iz prve,
+// ResizeObserver ob spremembi), ostale se drsijo navzdol v istem oknu.
+function VisibleCardsList({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [maxHeight, setMaxHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    const first = el?.firstElementChild as HTMLElement | null;
+    if (!el || !first) return;
+    const measure = () => setMaxHeight(first.offsetHeight * VISIBLE_CARDS + LIST_GAP_PX * (VISIBLE_CARDS - 1));
+    const ro = new ResizeObserver(measure);
+    ro.observe(first);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div
+      ref={ref}
+      style={maxHeight ? { maxHeight } : undefined}
+      className="flex flex-col gap-2 overflow-y-auto overscroll-contain"
+    >
+      {children}
+    </div>
+  );
+}
+
 // Priljubljene tekočega meseca, od najstarejše do najnovejše. Telefon:
 // stolpci po 3 (swipe levo/desno, viden rob naslednjega stolpca). Računalnik:
 // strani 3 × 3, ki se polnijo po vrstah (prva vrsta, druga, tretja), nato
-// naslednja stran desno.
-export function FavoritesThisMonth({ songs, authorImages, ...handlers }: { songs: Song[] } & CardHandlers) {
+// naslednja stran desno. Brez lastnih priljubljenih ta mesec se pokažejo
+// priljubljene drugih (po osebah); z njimi gumb "Drugi" preklaplja med obojim.
+export function FavoritesThisMonth({
+  songs,
+  othersSongs = [],
+  ownerNames = {},
+  authorImages,
+  ...handlers
+}: { songs: Song[]; othersSongs?: Song[]; ownerNames?: Record<string, string> } & CardHandlers) {
   const key = currentMonthKey();
+  const [othersToggled, setOthersToggled] = usePersistentBool("komadi:favorites:others", false);
   // Nazadnje označena prva.
   const items = favoritesSorted(songs).filter((s) => monthKey(s.favorited_at!) === key);
+  const othersItems = favoritesSorted(othersSongs).filter((s) => monthKey(s.favorited_at!) === key);
+  // Osebe po zadnji označitvi (najbolj sveža prva).
+  const people: { userId: string; name: string; songs: Song[] }[] = [];
+  for (const s of othersItems) {
+    if (!s.user_id) continue;
+    let p = people.find((x) => x.userId === s.user_id);
+    if (!p) people.push((p = { userId: s.user_id, name: ownerNames[s.user_id] ?? "Uporabnik", songs: [] }));
+    p.songs.push(s);
+  }
+  const showOthers = people.length > 0 && (items.length === 0 || othersToggled);
   const renderCard = (s: Song) => (
     <FavoriteCard key={s.id} song={s} authorImage={authorImages[s.author] ?? null} {...handlers} />
   );
 
   return (
     <section className="mb-5">
-      <div className="mb-2 flex items-baseline justify-between gap-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-1.5 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
           <StarIcon filled={false} className="h-[18px] w-[18px] text-amber-500 dark:text-amber-400" />
           Priljubljeno {MONTH_GENITIVE[Number(key.slice(5)) - 1]}
         </h2>
+        {items.length > 0 && people.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setOthersToggled((v) => !v)}
+            aria-pressed={othersToggled}
+            title={othersToggled ? "Prikaži moje priljubljene" : "Prikaži priljubljene drugih"}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+              othersToggled
+                ? "border-amber-500 bg-amber-500 text-white dark:text-neutral-950"
+                : "border-amber-500/50 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300"
+            }`}
+          >
+            <UsersIcon className="h-[15px] w-[15px]" />
+            <span className="lg:hidden">Drugi</span>
+            <span className="hidden lg:inline">Priljubljeno drugih</span>
+          </button>
+        )}
       </div>
 
-      {items.length === 0 ? (
+      {showOthers ? (
+        <>
+          {items.length === 0 && <OthersHint />}
+          <OthersColumns people={people} authorImages={authorImages} {...handlers} />
+        </>
+      ) : items.length === 0 ? (
         <div className="flex items-center gap-3 rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/[0.04] px-4 py-3.5 text-sm text-neutral-600 dark:text-neutral-300">
           <StarIcon filled={false} className="h-5 w-5 shrink-0 text-amber-500" />
           <p>
@@ -414,7 +572,7 @@ export function FavoritesThisMonth({ songs, authorImages, ...handlers }: { songs
 }
 
 // "Preverjeno špila": skladbe s preverjenim predvajalnikom (Smart play /
-// Sam špili dela) — vseh uporabnikov, nazadnje preverjena prva. Ista
+// Sam Špili dela) — vseh uporabnikov, nazadnje preverjena prva. Ista
 // postavitev kot priljubljene: telefon stolpci po 3 (swipe), računalnik strani
 // 3 × 3. Tujim skladbam (isOwn = false) ni mogoče dodati v privat Jam in klik
 // na akorde jim ne šteje popularnosti.
@@ -442,7 +600,7 @@ export function VerifiedSongs({
     <section className="mb-5">
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <h2 className="flex items-center gap-1.5 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
-          <CheckIcon className="h-[18px] w-[18px] text-orange-500 dark:text-orange-400" />
+          <PlayCircleIcon className="h-[18px] w-[18px] text-orange-500 dark:text-orange-400" />
           Preverjeno špila
         </h2>
         {items.length > 0 && <span className="text-xs text-neutral-500 dark:text-neutral-400">{items.length}</span>}

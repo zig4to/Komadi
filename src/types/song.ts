@@ -61,7 +61,7 @@ export interface Song {
   // Ročno posneti časi posameznih akordov (0033_add_synced_chords.sql).
   synced_chords?: SyncedChords | null;
   // Ročno preverjeno (0035_add_verification.sql): "Akordi v aplikaciji" so
-  // pregledani; Smart play / Sam špili je usklajen — ob tej potrditvi se časi
+  // pregledani; Smart play / Sam Špili je usklajen — ob tej potrditvi se časi
   // zamrznejo v synced_lines (frozen) in posnetek v preferred_video_id.
   verified_chords_at?: string | null;
   verified_player_at?: string | null;
