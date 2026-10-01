@@ -32,7 +32,7 @@ import {
   rebaseSyncOnEdit,
   remapLines,
   type LrcCandidate,
-  type SyncPoint, inInstrumentalGap, sectionOffset } from "@/lib/syncedLyrics";
+  type SyncPoint, sectionOffset, instrumentalGapAt } from "@/lib/syncedLyrics";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { ChordSection, Song, SyncedChords, SyncedLines } from "@/types/song";
@@ -87,6 +87,12 @@ const SS_LINE_INSET = { marginLeft: "-0.45em", paddingLeft: "0.45em" } as const;
 const SS_SLOT_ROWS = 1.4;
 // "Sam Špili": premor v petju (s), ki šteje kot instrumentalni del — poudarek se ugasne.
 const SS_GAP_MIN = 4;
+// "Sam Špili": ročni pomik (prst/kolešček) ustavi sledenje; po toliko ms brez
+// dotika se pogled vrne k skladbi.
+const SS_USER_HOLD = 3000;
+// Ojačanje ročnega pomika (prst ×, kolešček ×) — velika pisava, malo prostora.
+const SS_DRAG_GAIN = 1;
+const SS_WHEEL_GAIN = 1;
 function fmtClock(s: number) {
   const t = Math.max(0, Math.floor(s));
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
@@ -615,13 +621,21 @@ export default function ChordsViewer({
       return 1;
     }
   });
-  const changeSsScale = (delta: number) => {
-    const next = Math.min(SS_SCALE_MAX, Math.max(SS_SCALE_MIN, Math.round((ssScale + delta) * 100) / 100));
+  const setSsScaleTo = (value: number) => {
+    const next = Math.min(SS_SCALE_MAX, Math.max(SS_SCALE_MIN, Math.round(value * 100) / 100));
     setSsScale(next);
     try {
       window.localStorage.setItem(ssScaleKey(song.id), String(next));
     } catch {}
   };
+  const changeSsScale = (delta: number) => setSsScaleTo(ssScale + delta);
+  // Pinch z dvema prstoma (zanka pomikanja) bere in nastavlja velikost prek refov.
+  const ssScaleRef = useRef(ssScale);
+  const setSsScaleToRef = useRef(setSsScaleTo);
+  useEffect(() => {
+    ssScaleRef.current = ssScale;
+    setSsScaleToRef.current = setSsScaleTo;
+  });
 
   // Izbirnik teme: fixed pod gumbom (vrstica z gumbi ima overflow-hidden).
   // V "Sam Špili" (ssSettingsRef) se odpre levo od gumba in navzgor od njegovega dna.
@@ -899,6 +913,7 @@ export default function ChordsViewer({
     }, 700);
   };
   const [activeLine, setActiveLine] = useState(-1);
+  const [gapNextLine, setGapNextLine] = useState(-1);
   // "Sam Špili": kliknjen Play, posnetek se še nalaga.
   const [ssRequested, setSsRequested] = useState(false);
   // "Sam Špili": uporabnik je pritisnil Play (in ne Pavze) / posnetek je že kdaj
@@ -1479,8 +1494,11 @@ export default function ChordsViewer({
   });
   const applyTiming = (t: number) => {
     const { points, offset, chordPts } = timingRef.current;
-    const line = points ? (inInstrumentalGap(points, t - offset, SS_GAP_MIN) ? -1 : lineProgressAt(points, t - offset).lineIndex) : -1;
+    const gapInfo = points ? instrumentalGapAt(points, t - offset, SS_GAP_MIN) : null;
+    const line = points ? (gapInfo ? -1 : lineProgressAt(points, t - offset).lineIndex) : -1;
     setActiveLine((prev) => (prev === line ? prev : line));
+    const ahead = gapInfo && gapInfo.progress >= 0.5 ? gapInfo.nextLine : -1;
+    setGapNextLine((prev) => (prev === ahead ? prev : ahead));
     const chord = chordPts.length ? chordAt(chordPts, t) : null;
     setActiveChord((prev) => (prev?.line === chord?.line && prev?.chord === chord?.chord ? prev : chord));
   };
@@ -1579,7 +1597,9 @@ export default function ChordsViewer({
   useEffect(() => {
     if (!remoteFullscreen && follower && document.fullscreenElement) document.exitFullscreen().catch(() => {});
   }, [remoteFullscreen, follower]);
-  const scrollLine = follower ? -1 : activeChord ? activeChord.line : activeLine;
+  // Med instrumentalnim delom (brez natapkanih akordov): od polovice premora se
+  // pogled že pomakne na vrstico za njim (gapNextLine), da ni treba čakati konca sola.
+  const scrollLine = follower ? -1 : activeChord ? activeChord.line : activeLine >= 0 ? activeLine : gapNextLine;
   // Kar je označeno: pri sledilcu vodjev Smart play, sicer lasten.
   const shownLine = follower ? (remote?.smart?.line ?? -1) : smartActive ? activeLine : -1;
   const shownChord = follower ? (remote?.smart?.chord ?? null) : activeChord;
@@ -1787,11 +1807,133 @@ export default function ChordsViewer({
       const step = tops[k + 1] !== undefined ? tops[k + 1] - tops[k] : 0;
       return Math.max(0, tops[k] - slot + step * (rowPos - k));
     };
+    // Ročno pomikanje (prst ali kolešček), tudi med predvajanjem: ko začneš
+    // pomikati, samodejno sledenje obstane (pogled ostane, kamor ga postaviš);
+    // SS_USER_HOLD ms po zadnjem dotiku se gladko vrne k mestu, ki se poje.
+    // Vlečenje ni tap (ne skoči na vrstico).
+    let userPos: number | null = null;
+    let returning = false;
+    let lastUserAt = -Infinity;
+    let drag: { id: number; y: number; start: number; moved: boolean; lastY: number; lastAt: number; v: number } | null = null;
+    // Zalet po spustu (px/ms), pojema.
+    let fling = 0;
+    let suppressClick = false;
+    const maxPos = () => Math.max(0, (tops[tops.length - 1] ?? 0) + slot);
+    const clampPos = (x: number) => Math.min(maxPos(), Math.max(0, x));
+    // Pinch: dva prsta = povečava besedila (velikost kot gumba + / −), ne pomikanje.
+    const touches = new Map<number, number[]>();
+    let pinch: { d0: number; scale0: number } | null = null;
+    const touchDist = () => {
+      const [a, b] = [...touches.values()];
+      return a && b ? Math.hypot(a[0] - b[0], a[1] - b[1]) : 0;
+    };
+    const onTouchDown = (e: PointerEvent) => {
+      if (e.pointerType !== "touch") return;
+      touches.set(e.pointerId, [e.clientX, e.clientY]);
+      if (touches.size === 2) {
+        pinch = { d0: Math.max(1, touchDist()), scale0: ssScaleRef.current };
+        drag = null;
+        fling = 0;
+        suppressClick = true;
+      }
+    };
+    const onTouchMove = (e: PointerEvent) => {
+      if (!touches.has(e.pointerId)) return;
+      touches.set(e.pointerId, [e.clientX, e.clientY]);
+      if (pinch && touches.size >= 2) {
+        const next = pinch.scale0 * (touchDist() / pinch.d0);
+        if (Math.abs(next - ssScaleRef.current) >= 0.02) setSsScaleToRef.current(next);
+      }
+    };
+    const onTouchUp = (e: PointerEvent) => {
+      touches.delete(e.pointerId);
+      if (touches.size < 2) pinch = null;
+    };
+    box.addEventListener("pointerdown", onTouchDown);
+    window.addEventListener("pointermove", onTouchMove);
+    window.addEventListener("pointerup", onTouchUp);
+    window.addEventListener("pointercancel", onTouchUp);
+    const onDown = (e: PointerEvent) => {
+      if (pinch || touches.size > 1) return;
+      fling = 0;
+      // Po vlečenju telefon klika ne sproži — zastavica ne sme pojesti naslednjega tapa.
+      suppressClick = false;
+      drag = { id: e.pointerId, y: e.clientY, start: Number.isNaN(pos) ? 0 : pos, moved: false, lastY: e.clientY, lastAt: performance.now(), v: 0 };
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id || pinch) return;
+      const dy = e.clientY - drag.y;
+      if (!drag.moved && Math.abs(dy) < 8) return;
+      drag.moved = true;
+      returning = false;
+      userPos = clampPos(drag.start - dy * SS_DRAG_GAIN);
+      const now = performance.now();
+      const dt = Math.max(1, now - drag.lastAt);
+      drag.v = 0.8 * drag.v + 0.2 * ((-(e.clientY - drag.lastY) * SS_DRAG_GAIN) / dt);
+      drag.lastY = e.clientY;
+      drag.lastAt = now;
+      lastUserAt = now;
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      if (drag.moved) {
+        suppressClick = true;
+        lastUserAt = performance.now();
+        // Hiter potek prsta ob spustu = zalet (le, če se je prst še premikal).
+        if (performance.now() - drag.lastAt < 80) fling = drag.v;
+      } else if (userPos !== null) {
+        // Tap (skok na vrstico) med ustavljenim sledenjem: takoj nazaj k skladbi.
+        userPos = null;
+        returning = true;
+      }
+      drag = null;
+    };
+    const onWheel = (e: WheelEvent) => {
+      returning = false;
+      userPos = clampPos((userPos ?? (Number.isNaN(pos) ? 0 : pos)) + e.deltaY * SS_WHEEL_GAIN);
+      lastUserAt = performance.now();
+    };
+    const onClickCapture = (e: MouseEvent) => {
+      if (!suppressClick) return;
+      suppressClick = false;
+      e.stopPropagation();
+      e.preventDefault();
+    };
+    box.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    box.addEventListener("wheel", onWheel, { passive: true });
+    box.addEventListener("click", onClickCapture, true);
     const ease = (target: number, dt: number) => {
+      const now = performance.now();
+      // Zalet po spustu prsta: nadaljuje v isti smeri in pojema (~0,3 s).
+      if (!drag && fling !== 0 && userPos !== null) {
+        const next = clampPos(userPos + fling * dt);
+        if (next === userPos) fling = 0;
+        userPos = next;
+        fling *= Math.exp(-dt / 300);
+        if (Math.abs(fling) < 0.02) fling = 0;
+        lastUserAt = now;
+      }
+      // Med ročnim pomikanjem pogled stoji, kjer ga je pustil uporabnik.
+      if (userPos !== null) {
+        if (drag || now - lastUserAt <= SS_USER_HOLD) {
+          pos = userPos;
+          inner.style.transform = `translate3d(0, ${-pos}px, 0)`;
+          return;
+        }
+        // Po SS_USER_HOLD ms brez dotika: gladek povratek k skladbi.
+        userPos = null;
+        returning = true;
+      }
       const diff = target - pos;
-      // Prvi izris ali velik skok (previjanje): takoj; sicer kratko glajenje
-      // (cilj se zdaj premika zvezno, zato majhna zamuda).
-      if (Number.isNaN(pos) || Math.abs(diff) > boxH * 1.5 || Math.abs(diff) < 0.05) pos = target;
+      if (returning) {
+        // Povratek (~0,4 s), tudi čez velike razdalje; nato običajno sledenje.
+        pos += diff * (1 - Math.exp(-dt / 400));
+        if (Math.abs(diff) < 1) returning = false;
+      } else if (Number.isNaN(pos) || Math.abs(diff) > boxH * 1.5 || Math.abs(diff) < 0.05) pos = target;
+      // Kratko glajenje (cilj se premika zvezno, zato majhna zamuda).
       else pos += diff * (1 - Math.exp(-dt / 110));
       inner.style.transform = `translate3d(0, ${-pos}px, 0)`;
     };
@@ -1827,27 +1969,42 @@ export default function ChordsViewer({
       let progress = 0;
       let span = 0;
       let gap = false;
+      let gapInfo: ReturnType<typeof instrumentalGapAt> = null;
       if (points) {
         const lt = t - offset;
         ({ lineIndex: line, progress, span } = lineProgressAt(points, lt));
         // Instrumentalni del: zapeta vrstica končana, naslednja ≥ SS_GAP_MIN s.
-        gap = inInstrumentalGap(points, lt, SS_GAP_MIN);
+        gapInfo = instrumentalGapAt(points, lt, SS_GAP_MIN);
+        gap = !!gapInfo;
       }
       const want = gap ? -1 : line;
       if (want !== hl) {
         hl = want;
         setSsHlLine(want);
       }
-      const k = rowFor(line);
-      const rowPos = k >= 0 ? k + progress : -1;
+      let k = rowFor(line);
+      let rowPos = k >= 0 ? k + progress : -1;
+      // Solo/vmesni del čez več vrstic akordov: od polovice premora pogled počasi
+      // drsi proti vrstici za njim, da je ob koncu sola že vidna (Bad Moon Rising).
+      let rate = clock.playing && k >= 0 && span > 0 ? 1 / span : 0;
+      if (gapInfo && gapInfo.nextLine >= 0 && k >= 0) {
+        const from = k + 1;
+        const to = rowFor(gapInfo.nextLine);
+        if (to > from) {
+          const q = Math.min(1, Math.max(0, (gapInfo.progress - 0.5) / 0.5));
+          rowPos = from + (to - from) * q;
+          k = Math.floor(rowPos);
+          rate = clock.playing && q > 0 && q < 1 ? (to - from) / (gapInfo.length / 2) : 0;
+        }
+      }
       ease(rowTarget(rowPos), dt);
       // Vodja v Skupnem Jamu: sporočilo ob novi vrstici, pavzi/predvajanju,
       // preskoku (napredek ni tam, kjer ga sledilec pričakuje) in 1× na sekundo.
       if (leaderReportRef.current) {
         const view: SamSpiliView = {
           row: k,
-          p: Math.round(progress * 1000) / 1000,
-          rate: clock.playing && k >= 0 && span > 0 ? Math.round((1 / span) * 10000) / 10000 : 0,
+          p: Math.round((k >= 0 ? rowPos - k : progress) * 1000) / 1000,
+          rate: Math.round(rate * 10000) / 10000,
           hl: want,
           playing: clock.playing,
         };
@@ -1867,6 +2024,16 @@ export default function ChordsViewer({
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      box.removeEventListener("pointerdown", onTouchDown);
+      window.removeEventListener("pointermove", onTouchMove);
+      window.removeEventListener("pointerup", onTouchUp);
+      window.removeEventListener("pointercancel", onTouchUp);
+      box.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      box.removeEventListener("wheel", onWheel);
+      box.removeEventListener("click", onClickCapture, true);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ssShowLines, ssLines]);
@@ -3286,7 +3453,7 @@ export default function ChordsViewer({
               {/* Odmik od robov (tudi izrez/zaobljeni robovi telefona v ležečem načinu). */}
               <div
                 ref={ssBoxRef}
-                className="min-h-0 flex-1 overflow-hidden"
+                className="min-h-0 flex-1 touch-none overflow-hidden"
                 style={{
                   paddingTop: "max(1.75rem, env(safe-area-inset-top))",
                   // Zaprta stranska vrstica: besedilo dobi njen prostor (do gumba
@@ -3304,7 +3471,7 @@ export default function ChordsViewer({
                   {ssLines.map(({ l, i, label }) => (
                     <div key={i}>
                     {label && (
-                      <div className="font-sans font-semibold text-(--cv-section)" style={{ fontSize: "0.6em", marginTop: "0.5em" }}>
+                      <div className="font-sans font-semibold text-(--cv-section)" style={{ fontSize: "0.75em", marginTop: "0.9em" }}>
                         {label}
                       </div>
                     )}

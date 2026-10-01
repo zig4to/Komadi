@@ -541,6 +541,24 @@ export function inInstrumentalGap(points: SyncPoint[], time: number, minGap: num
   return !!cur && time > cur.end + 0.5 && (!next || next.time - cur.end >= minGap);
 }
 
+// Med instrumentalnim delom: vrstica pred njim, prva zapeta za njim in napredek
+// skozi premor (0 = konec petja, 1 = začetek naslednje vrstice). Pogled se tako
+// lahko že med solom premika proti vrstici, ki pride za njim. null = ni premora.
+export function instrumentalGapAt(
+  points: SyncPoint[],
+  time: number,
+  minGap: number,
+): { lineIndex: number; nextLine: number; progress: number; length: number } | null {
+  let k = -1;
+  for (let j = 0; j < points.length && points[j].time <= time; j++) k = j;
+  const cur = k >= 0 ? points[k] : null;
+  const next = points[k + 1];
+  if (!cur || time <= cur.end + 0.5 || (next && next.time - cur.end < minGap)) return null;
+  if (!next) return { lineIndex: cur.lineIndex, nextLine: -1, progress: 0, length: 0 };
+  const length = next.time - cur.end;
+  return { lineIndex: cur.lineIndex, nextLine: next.lineIndex, progress: Math.min(1, Math.max(0, (time - cur.end) / length)), length };
+}
+
 export function lineProgressAt(points: SyncPoint[], time: number): { lineIndex: number; progress: number; span: number } {
   let lo = 0;
   let hi = points.length - 1;
