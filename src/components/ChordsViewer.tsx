@@ -1193,8 +1193,11 @@ export default function ChordsViewer({
   // Izhodišče snemanja, kadar skladba še nima shranjenih časov vrstic: časi iz
   // LRCLIB. Vrstice brez TAP-a jih ob shranjevanju obdržijo.
   const recordBase = !syncedLines?.points.length && sync && !sync.manual ? sync.points : [];
+  // Posnetek, za katerega se shranijo časi: ta, ki igra, sicer tisti, za katerega
+  // so časi že shranjeni (na telefonu "playingVideo" ob vrnitvi ni vedno znan).
+  const recordVideoId = playingVideo ?? syncedLines?.videoId ?? syncedChords?.videoId ?? null;
   const saveRecorder = async () => {
-    if (!recorder?.dirty || !playingVideo) return;
+    if (!recorder?.dirty || !recordVideoId) return;
     // Časi vrstic se shranijo le, če je bil kakšen TAP ali so že bili shranjeni —
     // samo akordi (Water Witch) pustijo vrstice iz LRCLIB pri miru.
     const hasTaps = recorder.lines.some((p) => p.tap);
@@ -1209,8 +1212,8 @@ export default function ChordsViewer({
     const sections = recorder.sections.filter((s) => s.points.length).map((s) => ({ ...s, points: s.points.map(withLineKey) }));
     // Shrani samo plasti, ki imajo točke (ali so jih imele): Water Witch s
     // samimi akordi pusti vrstice iz LRCLIB pri miru.
-    const nextLines = linePoints.length ? { videoId: syncedLines?.videoId ?? playingVideo, points: linePoints } : null;
-    const nextChords = sections.length ? { videoId: syncedChords?.videoId ?? playingVideo, sections } : null;
+    const nextLines = linePoints.length ? { videoId: syncedLines?.videoId ?? recordVideoId, points: linePoints } : null;
+    const nextChords = sections.length ? { videoId: syncedChords?.videoId ?? recordVideoId, sections } : null;
     const update: Record<string, unknown> = {};
     if (nextLines || syncedLines) update.synced_lines = nextLines;
     if (nextChords || syncedChords) update.synced_chords = nextChords;
@@ -1371,8 +1374,11 @@ export default function ChordsViewer({
       if (line >= 0 && line <= lineIndex + 3) setRecorder({ ...recorder, cursor: line });
       return;
     }
-    if ((e.nativeEvent as PointerEvent).pointerType === "mouse") return;
-    if (!sync || playbackRef.current.playing) return;
+    // Klik ali tap na vrstico z besedilom skoči tja — tudi med predvajanjem in z
+    // miško. Sledilec (Skupni Jam) nima svojega zvoka; označevanje besedila
+    // (izbira z miško) ne skače.
+    if (!sync || follower) return;
+    if (window.getSelection()?.toString()) return;
     // Tap na akord (shema), gumb ali povezavo ne premika predvajanja.
     if ((e.target as HTMLElement).closest("[data-chord-name],button,a")) return;
     // Vrstica brez besedila (akordi, naslov razdelka): prva naslednja z besedilom.
@@ -1437,19 +1443,37 @@ export default function ChordsViewer({
       setSsHasPlayed(true);
     }
     if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
-    const prog = smartActive && sync ? lineProgressAt(sync.points, seconds - lrcOffset) : { lineIndex: -1, progress: 0 };
-    // Med instrumentalnim delom (solo, outro) ni označene vrstice — kot v Sam Špili.
-    setActiveLine(smartActive && sync && inInstrumentalGap(sync.points, seconds - lrcOffset, SS_GAP_MIN) ? -1 : prog.lineIndex);
     // "Sam Špili": zadnji čas + trenutek prejema; zanka pomikanja iz tega
     // sproti izračuna čas med 250-ms osvežitvami (gladko, brez stopnic).
     ssClockRef.current = { t: seconds, at: performance.now(), playing };
     // Drsnik prevrtavanja: ponovni izris le, ko je odprt (sicer vsakih 250 ms
     // ves pregledovalnik — zatikanje pomikanja).
     if (samSpili && ssSeekOpen) setSsTime(seconds);
-    // Akordi: čas posnetka brez zamika LRC (vsak del ima svoj zamik); med
-    // snemanjem po osnutku, da se pregled z ▶ takoj vidi.
-    const pts = recorder ? draftChordPoints : smartActive ? liveChordPoints : [];
-    const chord = pts.length ? chordAt(pts, seconds) : null;
+    // Med predvajanjem oznake računa zanka spodaj (vsako sličico, interpoliran
+    // čas); tu le ob pavzi/preskoku, ko zanka ne teče.
+    if (!playing) applyTimingRef.current(seconds);
+  };
+  // Oznaka vrstice in akorda za čas posnetka t (sekunde, brez zamika LRC).
+  // Akordi: čas brez zamika LRC (vsak del ima svoj zamik); med snemanjem po
+  // osnutku, da se pregled z ▶ takoj vidi. Med instrumentalnim delom (solo,
+  // outro) ni označene vrstice — kot v Sam Špili.
+  const timingRef = useRef({
+    points: null as SyncPoint[] | null,
+    offset: 0,
+    chordPts: [] as ReturnType<typeof flattenChordSections>,
+  });
+  useEffect(() => {
+    timingRef.current = {
+      points: smartActive && sync ? sync.points : null,
+      offset: lrcOffset,
+      chordPts: recorder ? draftChordPoints : smartActive ? liveChordPoints : [],
+    };
+  });
+  const applyTiming = (t: number) => {
+    const { points, offset, chordPts } = timingRef.current;
+    const line = points ? (inInstrumentalGap(points, t - offset, SS_GAP_MIN) ? -1 : lineProgressAt(points, t - offset).lineIndex) : -1;
+    setActiveLine((prev) => (prev === line ? prev : line));
+    const chord = chordPts.length ? chordAt(chordPts, t) : null;
     setActiveChord((prev) => (prev?.line === chord?.line && prev?.chord === chord?.chord ? prev : chord));
   };
   // Pomik: aktivni akord (intro, solo …) ima prednost pred vrstico.
@@ -1608,6 +1632,31 @@ export default function ChordsViewer({
   // Napredek znotraj trenutne vrstice (0–1) iz lineProgressAt, osvežen ob
   // vsakem času posnetka; zanka pomikanja ga bere vsako sličico.
   const ssClockRef = useRef({ t: 0, at: 0, playing: false });
+  // Oznake vrstice/akorda med predvajanjem: čas, interpoliran od zadnje osvežitve
+  // predvajalnika (vsakih ~250 ms, na telefonu lahko redkeje), vsako sličico —
+  // sicer je oznaka akorda zamujala do pol sekunde (outro One Step Forward).
+  const applyTimingRef = useRef<(t: number) => void>(() => {});
+  useEffect(() => {
+    applyTimingRef.current = applyTiming;
+  });
+  useEffect(() => {
+    let raf = 0;
+    let shownT = -1;
+    const tick = (now: number) => {
+      const clock = ssClockRef.current;
+      if (clock.playing) {
+        // Največ 0,6 s naprej brez nove osvežitve (zastoj); nova osvežitev,
+        // malo za oceno, ne vrne nazaj za drobce — večji skok (previjanje) velja.
+        let t = clock.t + Math.min(0.6, (now - clock.at) / 1000);
+        if (t < shownT && shownT - t < 0.3) t = shownT;
+        shownT = t;
+        applyTimingRef.current(t);
+      } else shownT = -1;
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
   const ssSyncRef = useRef<{ points: SyncPoint[] | null; offset: number }>({ points: null, offset: 0 });
   useEffect(() => {
     ssSyncRef.current = { points: smartActive && sync ? sync.points : null, offset: lrcOffset };
@@ -2729,7 +2778,13 @@ export default function ChordsViewer({
                 Preslednica = TAP · Backspace = nazaj · Shift+Backspace = ponovi · klik na akord = v izbrani del
               </p>
               {recorderMsg && <p className="mb-2 text-xs text-amber-400">{recorderMsg}</p>}
-              <div className="mb-2 flex items-stretch gap-1.5 text-sm lg:order-2 lg:grid lg:grid-cols-4">
+              {/* Zakaj je Shrani (še) onemogočen. */}
+              {!recorderMsg && (!recorder.dirty || !recordVideoId) && (
+                <p className="mb-2 text-[11px] text-neutral-500">
+                  {!recorder.dirty ? "Shrani bo na voljo, ko kaj natapkaš ali spremeniš." : "Za shranjevanje enkrat zaženi posnetek z ▶."}
+                </p>
+              )}
+              <div className="mb-2 flex flex-wrap items-stretch gap-1.5 text-sm lg:order-2 lg:grid lg:grid-cols-4">
                 <button
                   type="button"
                   onClick={cancelRecorder}
@@ -2776,8 +2831,8 @@ export default function ChordsViewer({
                 <button
                   type="button"
                   onClick={saveRecorder}
-                  disabled={!recorder.dirty || !playingVideo || recorderSaving}
-                  className="ml-auto rounded-xl border border-orange-400 px-3 font-semibold text-amber-400 active:scale-95 disabled:opacity-40 lg:hidden"
+                  disabled={!recorder.dirty || !recordVideoId || recorderSaving}
+                  className="ml-auto rounded-xl border border-orange-400 px-3 py-2 font-semibold text-amber-400 active:scale-95 disabled:opacity-40 lg:hidden"
                 >
                   {recorderSaving ? "…" : "Shrani"}
                 </button>
@@ -2923,7 +2978,7 @@ export default function ChordsViewer({
                 <button
                   type="button"
                   onClick={saveRecorder}
-                  disabled={!recorder.dirty || !playingVideo || recorderSaving}
+                  disabled={!recorder.dirty || !recordVideoId || recorderSaving}
                   className="flex-1 rounded-xl border border-orange-400 py-2 font-semibold text-amber-400 active:scale-95 disabled:opacity-40"
                 >
                   {recorderSaving ? "…" : "Shrani"}
