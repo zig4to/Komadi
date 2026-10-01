@@ -4263,14 +4263,14 @@ export default function Dashboard({ user }: { user: User }) {
                     {(sharedOn || songsVisible || hasActiveFilters(filters) || authorFilter) && (
                       <SortMenu value={songSort} onChange={setSongSort} />
                     )}
-                    {/* "Pojdi na dno": telefon samo z odprtim seznamom, računalnik vedno;
+                    {/* "Pojdi na dno": samo z odprtim seznamom (telefon in računalnik);
                         med iskanjem (vpisano besedilo) ga ni. */}
                     {filters.search === "" && (
                     <button
                       type="button"
                       onClick={scrollToListBottom}
                       className={`shrink-0 items-center gap-1 rounded-full border border-neutral-400/40 bg-white/70 px-2 py-1 text-xs font-medium leading-none text-neutral-600 transition hover:border-neutral-500 hover:text-neutral-800 dark:border-neutral-500/40 dark:bg-neutral-900/70 dark:text-neutral-300 dark:hover:text-white ${
-                        sharedOn || songsVisible || hasActiveFilters(filters) || authorFilter ? "inline-flex" : "hidden lg:inline-flex"
+                        sharedOn || songsVisible || hasActiveFilters(filters) || authorFilter ? "inline-flex" : "hidden"
                       }`}
                     >
                       <svg

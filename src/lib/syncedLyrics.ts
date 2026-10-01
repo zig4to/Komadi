@@ -157,6 +157,9 @@ export type SyncPoint = { time: number; end: number; lineIndex: number };
 const ALIGN_MIN = 0.4;
 // Vsaka preskočena vrstica tablature malo stane (bližnja vrstica ima prednost).
 const ALIGN_SKIP = 0.02;
+// Največ toliko sekund na besedo pri delitvi ene vrstice LRC na več vrstic akordov.
+const WORD_SEC_MAX = 1.2;
+
 export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncPoint[]; matched: number } {
   const lyricLines = body
     .map((l, i) => ({ index: i, words: words(lineLyric(l) ?? "") }))
@@ -237,6 +240,8 @@ export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncP
   }
   const points: SyncPoint[] = [];
   let matched = 0;
+  // Zadnja vrstica tablature, ki že ima oznako (povezana ali porabljena).
+  let owned = -1;
   for (let i = 0; i < n; i++) {
     const at = assigned[i];
     if (at < 0) continue;
@@ -244,7 +249,31 @@ export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncP
     const { k, w } = sung[i];
     const line = lrc[k];
     const end = lrc[k + 1]?.time ?? line.time + 5;
-    points.push({ time: line.time, end, lineIndex: lyricLines[at].index });
+    // Čas za delitev vrstice LRC po besedah: največ WORD_SEC_MAX na besedo — do
+    // naslednje vrstice LRC je lahko dolg premor ("War is over, now" + 10 s do
+    // "Happy Christmas"), ki bi sicer zadnjo vrstico ("Now") zamaknil predaleč.
+    const span = Math.min(end - line.time, w.length * WORD_SEC_MAX);
+    const timeAt = (wordsBefore: number) => line.time + (span * wordsBefore) / w.length;
+    // Vrstice PRED povezano, ki jih pokriva začetek te vrstice LRC ("War is over,
+    // if you want it" = "War is over" + "If you want it" v Happy Xmas — povezana
+    // je druga, ker se bolje ujema): dobijo začetek vrstice LRC, povezana pa
+    // sorazmerni čas. Samo vrstice brez oznake (za `owned`), največ 2 nazaj.
+    let rest = minus(w, lyricLines[at].words);
+    const lead: number[] = [];
+    for (let b = at - 1; b > owned && b >= at - 2; b--) {
+      const bw = lyricLines[b].words;
+      const hits = bw.filter((x) => rest.some((r) => sameWord(r, x)));
+      if (!bw.length || hits.length / bw.length < 0.8) break;
+      rest = minus(rest, hits);
+      lead.unshift(b);
+    }
+    let before = 0;
+    for (const b of lead) {
+      points.push({ time: timeAt(before), end, lineIndex: lyricLines[b].index });
+      before += lyricLines[b].words.length;
+    }
+    points.push({ time: timeAt(before), end, lineIndex: lyricLines[at].index });
+    owned = at;
     // Ena vrstica LRC čez več vrstic akordov ("You'd better run, better run, outrun
     // my gun" = "You'd better run, better run" + "Outrun my gun" v Pumped Up
     // Kicks): naslednje vrstice, katerih besede so v preostanku vrstice LRC, se
@@ -265,9 +294,8 @@ export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncP
         break;
       }
     }
-    const rest = minus(w, lyricLines[at].words);
     let last = at;
-    let before = w.length - rest.length;
+    before = w.length - rest.length;
     while (last + 1 < limit && rest.length) {
       const nextWords = lyricLines[last + 1].words;
       const hits = nextWords.filter((x) => rest.some((r) => sameWord(r, x)));
@@ -280,9 +308,10 @@ export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncP
         if (q >= 0) rest.splice(q, 1);
       }
       last++;
-      points.push({ time: line.time + ((end - line.time) * before) / w.length, end, lineIndex: lyricLines[last].index });
+      points.push({ time: timeAt(before), end, lineIndex: lyricLines[last].index });
       before += hits.length;
     }
+    owned = last;
   }
   return { points, matched };
 }
