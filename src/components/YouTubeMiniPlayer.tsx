@@ -122,8 +122,12 @@ export default function YouTubeMiniPlayer({
   controllerRef,
   preferredId = null,
   onSelect,
+  lockedNote,
 }: {
   videoIds: string[];
+  // Preverjena skladba: seznam ima samo zaklenjen posnetek, polja za dodajanje
+  // ni — namesto njega ta opomba (ChordsViewer).
+  lockedNote?: string;
   watchUrl: string;
   // Video, ki se je res začel predvajati — ChordsViewer si ga zapomni za naslednjič.
   onPlaying?: (videoId: string) => void;
@@ -451,6 +455,9 @@ export default function YouTubeMiniPlayer({
               );
             })}
           </ul>
+          {lockedNote ? (
+            <p className="mt-1 border-t border-neutral-800 px-2 pt-1.5 text-[10px] leading-snug text-neutral-400">{lockedNote}</p>
+          ) : (
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -469,6 +476,7 @@ export default function YouTubeMiniPlayer({
               Predvajaj
             </button>
           </form>
+          )}
           {customError && <p className="px-2 pt-1 text-[10px] text-red-400">{customError}</p>}
         </div>
       )}

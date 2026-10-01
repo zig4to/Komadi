@@ -320,7 +320,7 @@ export default function SettingsMenu({
       {menuOpen && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-neutral-200 bg-white p-1.5 text-sm shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
+          className="absolute right-0 top-full z-20 mt-2 w-72 rounded-xl border border-neutral-200 bg-white p-1.5 text-sm shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
         >
           <MenuSection tone="emerald">
           {user && <UserMenuSection user={user} />}
@@ -908,7 +908,7 @@ export default function SettingsMenu({
               setMenuOpen(false);
               onOpenFavArchive?.();
             }}
-            className="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 dark:text-neutral-200 transition-colors hover:bg-(--menu-hover) active:bg-(--menu-active) aria-expanded:bg-(--menu-hover)"
+            className="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-medium whitespace-nowrap text-neutral-700 dark:text-neutral-200 transition-colors hover:bg-(--menu-hover) active:bg-(--menu-active) aria-expanded:bg-(--menu-hover)"
           >
             <span className="flex items-center gap-2">
               <svg

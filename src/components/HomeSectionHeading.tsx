@@ -2,16 +2,16 @@
 
 import { usePersistentBool } from "@/lib/usePersistentBool";
 
-// Razdelki domače strani (Obdobja, Žanri, Avtorji, Predstavljeno) so na
-// telefonu zložljivi — klik na naslov skrije/pokaže vsebino, izbira ostane v
-// localStorage (komadi:home:<ključ>). Na računalniku so vedno odprti.
+// Razdelki domače strani (Obdobja, Žanri, Avtorji, Predstavljeno) so
+// zložljivi (telefon in računalnik) — klik na naslov skrije/pokaže vsebino,
+// izbira ostane v localStorage (komadi:home:<ključ>).
 export function useHomeSectionOpen(key: string) {
   return usePersistentBool(`komadi:home:${key}`, true);
 }
 
-// Razred za vsebino razdelka: zaprta skrita samo na telefonu.
+// Razred za vsebino razdelka: zaprta je skrita.
 export function homeSectionBodyClass(open: boolean) {
-  return open ? "" : "hidden lg:block";
+  return open ? "" : "hidden";
 }
 
 export default function HomeSectionHeading({
@@ -29,7 +29,7 @@ export default function HomeSectionHeading({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-1.5 text-left lg:pointer-events-none"
+        className="flex w-full items-center justify-between gap-1.5 text-left"
       >
         {title}
         <svg
@@ -40,7 +40,7 @@ export default function HomeSectionHeading({
           strokeWidth={1.8}
           strokeLinecap="round"
           strokeLinejoin="round"
-          className={`h-5 w-5 shrink-0 text-neutral-400 transition-transform lg:hidden ${open ? "" : "-rotate-90"}`}
+          className={`h-5 w-5 shrink-0 text-neutral-400 transition-transform ${open ? "" : "-rotate-90"}`}
         >
           <path d="m6 9 6 6 6-6" />
         </svg>

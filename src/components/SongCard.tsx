@@ -26,6 +26,7 @@ export default function SongCard({
   onAddToSharedJam,
   onChordsClick,
   onReported,
+  onSendToReview,
   onToggleFavorite,
   onImport,
   inLibrary = false,
@@ -42,6 +43,8 @@ export default function SongCard({
   // Z njim "Dodaj v Jam" v meniju razpre izbiro: privat ali Skupni Jam.
   onAddToSharedJam?: (song: Song) => void;
   onReported?: (report: SongReport) => void;
+  // "Pregled in odobritev" v meniju: pošlje skladbo nazaj v pregled (review_pending).
+  onSendToReview?: (song: Song) => void;
   onToggleFavorite?: (song: Song) => void;
   // Način "Skupno" (skladba drugega uporabnika): v meniju je samo "Uvozi v
   // mojo knjižnico" — urejanje, playliste in prijave so za tujo skladbo
@@ -570,6 +573,32 @@ export default function SongCard({
                   </svg>
                   Prijavi napako
                 </button>
+                )}
+
+                {!onImport && onSendToReview && !song.review_pending && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActionsOpen(false);
+                      onSendToReview(song);
+                    }}
+                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-[13px] w-[13px] shrink-0 text-teal-500 dark:text-teal-400"
+                    >
+                      <path d="M21.8 10A10 10 0 1 1 17 3.34" />
+                      <path d="m9 11 3 3L22 4" />
+                    </svg>
+                    Pregled in odobritev
+                  </button>
                 )}
 
                 {onDelete && (

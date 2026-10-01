@@ -232,6 +232,8 @@ export default function Dashboard({ user }: { user: User }) {
   // Telefon: med iskanjem (fokus ali vpisano besedilo) se iskalno polje
   // razširi čez prosti prostor, gumba Jam/Playliste pa skrčita v ikoni.
   const [searchFocused, setSearchFocused] = useState(false);
+  // Naslovna vrstica seznama "Vsi Komadi" — cilj gumba "Vrni se na vrh".
+  const listHeadingRef = useRef<HTMLDivElement>(null);
   const searchWide = searchFocused || filters.search !== "";
   // "Akordi v aplikaciji": odprta skladba je v localStorage (src/lib/openChords.ts),
   // da po osvežitvi ostane odprta; pregledovalnik se izriše samo tu.
@@ -1156,6 +1158,28 @@ export default function Dashboard({ user }: { user: User }) {
 
   // "Odobri": skladba gre iz pregleda v knjižnico (review_pending = false),
   // optimistično z vrnitvijo ob napaki.
+  // Meni kartice → "Pregled in odobritev": skladbo vrne v pregled (skrije se iz
+  // knjižnice, pokaže na strani Pregled in odobritev). Optimistično z vrnitvijo.
+  async function handleSendToReview(song: Song) {
+    if (!window.confirm(`Pošljem "${song.title}" v Pregled in odobritev? Do odobritve bo skrita iz knjižnice.`)) return;
+    setSongs((prev) => prev.map((s) => (s.id === song.id ? { ...s, review_pending: true } : s)));
+    const { error } = await supabase.from("songs").update({ review_pending: true }).eq("id", song.id);
+    if (error) {
+      setSongs((prev) => prev.map((s) => (s.id === song.id ? { ...s, review_pending: false } : s)));
+      window.alert(`Pošiljanje v pregled ni uspelo: ${error.message}`);
+    }
+  }
+
+  // "Pojdi na dno" (desno od razvrščanja nad seznamom): odpre seznam, naloži
+  // vse strani (sicer je "dno" le konec prvih 40) in gladko odpelje na konec.
+  function scrollToListBottom() {
+    if (!sharedOn && !hasActiveFilters(filters) && !authorFilter && !songsVisible) setStoredSongsVisible("1");
+    setResultsPage({ key: filtersKey, count: Infinity });
+    setTimeout(() => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+    }, 80);
+  }
+
   async function handleApprove(list: Song[]) {
     if (!list.length) return;
     const ids = list.map((s) => s.id);
@@ -2639,6 +2663,7 @@ export default function Dashboard({ user }: { user: User }) {
                     onAddToSharedJam={handleAddToSharedJam}
                     onChordsClick={handleChordsClick}
                     onReported={handleReported}
+                    onSendToReview={handleSendToReview}
                     onToggleFavorite={handleToggleFavorite}
                   />
                   {renderEditForm(song)}
@@ -2838,7 +2863,7 @@ export default function Dashboard({ user }: { user: User }) {
                   {goalItems.map((item, i) => (
                     <div
                       key={item.key}
-                      className="flex items-center gap-3 rounded-full border border-neutral-200 bg-white px-4 py-2 dark:border-neutral-800 dark:bg-neutral-900"
+                      className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-2.5 dark:border-neutral-800 dark:bg-neutral-900"
                     >
                       <span
                         className={`w-6 shrink-0 text-right text-lg font-semibold ${
@@ -2872,14 +2897,13 @@ export default function Dashboard({ user }: { user: User }) {
                         <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">
                           {item.author}
                         </p>
+                        {/* Naslov in avtor zgoraj, Akordi + Poslušaj pod njima. */}
+                        {item.kind === "song" && (
+                          <div className="mt-1.5">
+                            <ChordsButtons song={item.song} onChordsClick={handleChordsClick} merged />
+                          </div>
+                        )}
                       </div>
-                      {item.kind === "song" && (
-                        <ChordsButtons
-                          song={item.song}
-                          onChordsClick={handleChordsClick}
-                          stacked
-                        />
-                      )}
                       <button
                         type="button"
                         onClick={() =>
@@ -2930,6 +2954,7 @@ export default function Dashboard({ user }: { user: User }) {
                   onAddToSharedJam={handleAddToSharedJam}
                   onChordsClick={handleChordsClick}
                   onReported={handleReported}
+                  onSendToReview={handleSendToReview}
                   onToggleFavorite={handleToggleFavorite}
                 />
                 {renderEditForm(song)}
@@ -3353,6 +3378,7 @@ export default function Dashboard({ user }: { user: User }) {
                       onAddToSharedJam={handleAddToSharedJam}
                       onChordsClick={handleChordsClick}
                       onReported={handleReported}
+                      onSendToReview={handleSendToReview}
                       onToggleFavorite={handleToggleFavorite}
                     />
                   </div>
@@ -3643,6 +3669,7 @@ export default function Dashboard({ user }: { user: User }) {
                 onAddToSharedJam={handleAddToSharedJam}
                 onChordsClick={handleChordsClick}
                 onReported={handleReported}
+                onSendToReview={handleSendToReview}
                 onToggleFavorite={handleToggleFavorite}
                 highlighted
               />
@@ -3684,6 +3711,7 @@ export default function Dashboard({ user }: { user: User }) {
                             onAddToSharedJam={handleAddToSharedJam}
                             onChordsClick={handleChordsClick}
                             onReported={handleReported}
+                            onSendToReview={handleSendToReview}
                             onToggleFavorite={handleToggleFavorite}
                           />
                           {randomPick?.id !== song.id && renderEditForm(song)}
@@ -4240,7 +4268,7 @@ export default function Dashboard({ user }: { user: User }) {
 
             {!loading && !loadError && activeView === "list" && (
               <>
-                <div className="flex items-center justify-between gap-3">
+                <div ref={listHeadingRef} className="flex scroll-mt-4 items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-2">
                     {/* Brez filtra je naslov (in prazen prostor desno do puščice) zložljiv —
                         isti vzorec kot ostali razdelki domače strani; z filtrom je desno "Nazaj". */}
@@ -4262,6 +4290,28 @@ export default function Dashboard({ user }: { user: User }) {
                     {(sharedOn || songsVisible || hasActiveFilters(filters) || authorFilter) && (
                       <SortMenu value={songSort} onChange={setSongSort} />
                     )}
+                    {/* "Pojdi na dno": telefon samo z odprtim seznamom, računalnik vedno. */}
+                    <button
+                      type="button"
+                      onClick={scrollToListBottom}
+                      className={`shrink-0 items-center gap-1 rounded-full border border-neutral-400/40 bg-white/70 px-2 py-1 text-xs font-medium leading-none text-neutral-600 transition hover:border-neutral-500 hover:text-neutral-800 dark:border-neutral-500/40 dark:bg-neutral-900/70 dark:text-neutral-300 dark:hover:text-white ${
+                        sharedOn || songsVisible || hasActiveFilters(filters) || authorFilter ? "inline-flex" : "hidden lg:inline-flex"
+                      }`}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.8}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-[13px] w-[13px] shrink-0"
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                      Pojdi na dno
+                    </button>
                   </div>
                   {sharedOn || hasActiveFilters(filters) || authorFilter ? (
                     <button
@@ -4414,6 +4464,7 @@ export default function Dashboard({ user }: { user: User }) {
                             onAddToSharedJam={handleAddToSharedJam}
                             onChordsClick={handleChordsClick}
                             onReported={handleReported}
+                            onSendToReview={handleSendToReview}
                             onToggleFavorite={handleToggleFavorite}
                           />
                           {randomPick?.id !== song.id && renderEditForm(song)}
@@ -4427,6 +4478,30 @@ export default function Dashboard({ user }: { user: User }) {
                         key={visibleResults}
                         onVisible={() => setResultsPage({ key: filtersKey, count: visibleResults + RESULTS_PAGE })}
                       />
+                    )}
+                    {/* Konec seznama (vse strani naložene): na sredini "Vrni se na vrh" — do naslova "Vsi Komadi". */}
+                    {displaySongs.length > 0 && displaySongs.length <= visibleResults && (
+                      <div className="flex justify-center pt-2 pb-4">
+                        <button
+                          type="button"
+                          onClick={() => listHeadingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.8}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="h-4 w-4 shrink-0"
+                          >
+                            <path d="m18 15-6-6-6 6" />
+                          </svg>
+                          Vrni se na vrh
+                        </button>
+                      </div>
                     )}
                   </>
                 )}
@@ -4448,6 +4523,7 @@ export default function Dashboard({ user }: { user: User }) {
             shared={viewerShared}
             samSpili={openChordsMode === "samspili"}
             autoRecord={openChordsMode === "record"}
+            inFix={reportedSongIds.has(chordsSong.id)}
             onOpenEditor={
               chordsSong.user_id === user.id
                 ? () => {

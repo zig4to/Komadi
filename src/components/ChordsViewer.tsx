@@ -206,6 +206,7 @@ export default function ChordsViewer({
   samSpili = false,
   autoRecord = false,
   onOpenEditor,
+  inFix = false,
 }: {
   song: Song;
   onClose: () => void;
@@ -220,6 +221,9 @@ export default function ChordsViewer({
   // skladbe) — Dashboard zapre pregledovalnik, odpre ChordsTextEditor in ga
   // po zaprtju urejevalnika spet odpre.
   onOpenEditor?: () => void;
+  // Skladba ima odprto prijavo (stran "Popravi skladbe") — takrat se zamik
+  // besedila preverjene skladbe spet da nastavljati.
+  inFix?: boolean;
 }) {
   const follower = shared?.role === "follower" ? shared : null;
   const [followPillHidden, setFollowPillHidden] = useState(false);
@@ -853,8 +857,12 @@ export default function ChordsViewer({
   const saveOffsetTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(saveOffsetTimerRef.current), []);
   // Vsak klik takoj velja; v bazo gre 0,7 s po zadnjem (več klikov = en zapis).
+  // Preverjena skladba (Predvajalnik preverjen): zamik in seznam posnetkov sta
+  // zaklenjena, dokler je ne prijaviš v "Popravi skladbe" (inFix) ali je še v
+  // "Pregled in odobritev" (review_pending).
+  const offsetLocked = !!verifiedPlayerAt && !inFix && !song.review_pending;
   const changeLrcOffset = (delta: number) => {
-    if (!playingVideo) return;
+    if (!playingVideo || offsetLocked) return;
     const next = { ...lrcOffsets, [playingVideo]: Math.round((lrcOffset + delta) * 4) / 4 };
     setLrcOffsets(next);
     try {
@@ -2056,7 +2064,12 @@ export default function ChordsViewer({
       <div className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 lg:px-16">
         {/* Tudi brez kandidatov: v izbirniku posnetka lahko prilepiš povezavo. */}
         <YouTubeMiniPlayer
-            videoIds={videoIds}
+            videoIds={offsetLocked && lockedVideo ? [lockedVideo] : videoIds}
+            lockedNote={
+              offsetLocked && lockedVideo
+                ? "Skladba je preverjena — posnetek je zaklenjen. Drugega izbereš, ko jo prijaviš v Popravi skladbe."
+                : undefined
+            }
             watchUrl={
               watchUrl ??
               (videoIds[0]
@@ -2182,6 +2195,7 @@ export default function ChordsViewer({
               type="button"
               onClick={() => setOffsetOpen((v) => !v)}
               aria-expanded={offsetOpen}
+              title={offsetLocked ? "Zamik je zaklenjen — skladba je preverjena (spremeniš ga prek Popravi skladbe)" : undefined}
               className={`mr-0.5 flex h-7 items-center text-xs ${offsetOpen ? "text-neutral-400" : "pr-2 text-neutral-200 hover:text-white"}`}
             >
               Zamik
@@ -2194,14 +2208,14 @@ export default function ChordsViewer({
             </button>
             {offsetOpen && (
               <>
-                <button type="button" onClick={() => changeLrcOffset(-LRC_OFFSET_STEP)} disabled={!playingVideo} aria-label="Besedilo 0,25 s prej" title="Besedilo 0,25 s prej" className={toneButton}>
+                <button type="button" onClick={() => changeLrcOffset(-LRC_OFFSET_STEP)} disabled={!playingVideo || offsetLocked} aria-label="Besedilo 0,25 s prej" title="Besedilo 0,25 s prej" className={toneButton}>
                   −
                 </button>
                 <span className="w-11 text-center text-xs tabular-nums text-neutral-200">
                   {lrcOffset > 0 ? "+" : ""}
                   {lrcOffset.toFixed(2).replace(".", ",")}
                 </span>
-                <button type="button" onClick={() => changeLrcOffset(LRC_OFFSET_STEP)} disabled={!playingVideo} aria-label="Besedilo 0,25 s pozneje" title="Besedilo 0,25 s pozneje" className={toneButton}>
+                <button type="button" onClick={() => changeLrcOffset(LRC_OFFSET_STEP)} disabled={!playingVideo || offsetLocked} aria-label="Besedilo 0,25 s pozneje" title="Besedilo 0,25 s pozneje" className={toneButton}>
                   +
                 </button>
               </>
@@ -2391,14 +2405,18 @@ export default function ChordsViewer({
                 <span className="text-[11px] text-neutral-300">
                   Zamik besedila
                   <span className="block text-[10px] leading-tight text-neutral-500">
-                    {playingVideo ? "za posnetek, ki igra" : "najprej zaženi predvajanje"}
+                    {offsetLocked
+                      ? "zaklenjeno — preverjena skladba (spremeniš ga prek Popravi skladbe)"
+                      : playingVideo
+                        ? "za posnetek, ki igra"
+                        : "najprej zaženi predvajanje"}
                   </span>
                 </span>
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => changeLrcOffset(-LRC_OFFSET_STEP)}
-                    disabled={!playingVideo}
+                    disabled={!playingVideo || offsetLocked}
                     className="rounded-full border border-orange-400 px-2 text-xs text-amber-400 disabled:opacity-40"
                   >
                     −0,25 s
@@ -2410,7 +2428,7 @@ export default function ChordsViewer({
                   <button
                     type="button"
                     onClick={() => changeLrcOffset(LRC_OFFSET_STEP)}
-                    disabled={!playingVideo}
+                    disabled={!playingVideo || offsetLocked}
                     className="rounded-full border border-orange-400 px-2 text-xs text-amber-400 disabled:opacity-40"
                   >
                     +0,25 s
