@@ -93,6 +93,11 @@ function fmtClock(s: number) {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 }
 const lrcOffsetsKey = (id: string) => `komadi:chords:lrcOffsets:${id}`;
+// "Sam Špili": popravek velikosti besedila (množitelj), korak 5 %.
+const ssScaleKey = (id: string) => `komadi:chords:ssScale:${id}`;
+const SS_SCALE_STEP = 0.05;
+const SS_SCALE_MIN = 0.6;
+const SS_SCALE_MAX = 1.4;
 const transposeKey = (id: string) => `komadi:chords:transpose:${id}`;
 const workingVideoKey = (id: string) => `komadi:chords:video:${id}`;
 const MIN_FONT = 10;
@@ -601,6 +606,23 @@ export default function ChordsViewer({
   );
   // "Sam Špili": stranska vrstica z gumbi (skrita desno, odpre jo gumb Meni).
   const [ssSidebarOpen, setSsSidebarOpen] = useState(false);
+  // "Sam Špili": ročni popravek velikosti besedila (gumba − / + spodaj desno) —
+  // množitelj na samodejno velikost, za vsako skladbo posebej na tej napravi.
+  const [ssScale, setSsScale] = useState(() => {
+    try {
+      const n = Number(window.localStorage.getItem(ssScaleKey(song.id)));
+      return n >= SS_SCALE_MIN && n <= SS_SCALE_MAX ? n : 1;
+    } catch {
+      return 1;
+    }
+  });
+  const changeSsScale = (delta: number) => {
+    const next = Math.min(SS_SCALE_MAX, Math.max(SS_SCALE_MIN, Math.round((ssScale + delta) * 100) / 100));
+    setSsScale(next);
+    try {
+      window.localStorage.setItem(ssScaleKey(song.id), String(next));
+    } catch {}
+  };
 
   // Izbirnik teme: fixed pod gumbom (vrstica z gumbi ima overflow-hidden).
   // V "Sam Špili" (ssSettingsRef) se odpre levo od gumba in navzgor od njegovega dna.
@@ -1580,12 +1602,14 @@ export default function ChordsViewer({
         size -= 1;
         inner.style.fontSize = `${size}px`;
       }
+      // Ročni popravek (gumba − / +): nad 100 % lahko najdaljša vrstica gleda čez.
+      if (ssScale !== 1) inner.style.fontSize = `${Math.round(size * ssScale)}px`;
     };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(box);
     return () => ro.disconnect();
-  }, [samSpili, ssLines, ssShowLines]);
+  }, [samSpili, ssLines, ssShowLines, ssScale]);
   // Zanka pomikanja: cilj = trenutna vrstica v 2. vrstici + napredek proti
   // naslednji. Vsako sličico: čas posnetka interpoliran od zadnjega onTime,
   // vrstica/napredek izračunana sproti, premik s transform (podpiksli, brez
@@ -3003,6 +3027,36 @@ export default function ChordsViewer({
               </button>
               </div>
               </div>
+              {/* Velikost besedila: − / + spodaj desno (fino nastavljanje med predvajanjem). */}
+              {ssShowLines && !ssSeekOpen && (
+                <div
+                  className="absolute z-20 flex items-center gap-2 font-sans"
+                  style={{
+                    bottom: "max(0.75rem, env(safe-area-inset-bottom))",
+                    right: "max(0.75rem, env(safe-area-inset-right))",
+                  }}
+                >
+                  {([
+                    [-SS_SCALE_STEP, "−", "Manjše besedilo", ssScale <= SS_SCALE_MIN],
+                    [SS_SCALE_STEP, "+", "Večje besedilo", ssScale >= SS_SCALE_MAX],
+                  ] as const).map(([delta, sign, label, off]) => (
+                    <button
+                      key={sign}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        changeSsScale(delta);
+                      }}
+                      disabled={off}
+                      aria-label={label}
+                      title={`${label} (${Math.round(ssScale * 100)} %)`}
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-orange-400/70 bg-(--cv-bg)/70 text-lg leading-none text-orange-400 opacity-80 transition hover:opacity-100 active:scale-95 disabled:opacity-30"
+                    >
+                      {sign}
+                    </button>
+                  ))}
+                </div>
+              )}
               {/* Prevrtavanje: drsnik čez celo skladbo, kot v mini predvajalniku. */}
               {ssSeekOpen && (
                 <div
