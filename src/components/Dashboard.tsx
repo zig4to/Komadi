@@ -111,6 +111,10 @@ function groupByRecent(
     .map(({ label, songs }) => ({ label, songs }));
 }
 
+// Gumbi pod kartico na strani Pregled in odobritev: vsi enako visoki, v mreži 2 × n.
+const REVIEW_BTN =
+  "inline-flex h-8 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-medium leading-none transition disabled:opacity-50";
+
 export default function Dashboard({ user }: { user: User }) {
   // allSongs = vse moje vrstice; `songs` (knjižnica, vsi ostali pogledi) brez
   // tistih, ki še čakajo na "Pregled in odobritev" (review_pending, dodal jih
@@ -125,7 +129,8 @@ export default function Dashboard({ user }: { user: User }) {
     [allSongs],
   );
   const [reviewOpen, setReviewOpen] = usePersistentBool("komadi:review:open", false);
-  const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set());
+  // Skladbe, ki se ravno odobrijo ali vrnejo v knjižnico (id → kaj).
+  const [approvingIds, setApprovingIds] = useState<Map<string, "approve" | "return">>(new Map());
   // Pregled in odobritev: kartice z razprtimi nastavitvami pod kartico (privzeto pospravljene).
   const [reviewExpanded, setReviewExpanded] = useState<Set<string>>(new Set());
   const toggleReviewExpanded = (id: string) =>
@@ -1158,8 +1163,6 @@ export default function Dashboard({ user }: { user: User }) {
     window.scrollTo({ top: 0 });
   }
 
-  // "Odobri": skladba gre iz pregleda v knjižnico (review_pending = false),
-  // optimistično z vrnitvijo ob napaki.
   // Meni kartice → "Pregled in odobritev": skladbo vrne v pregled (skrije se iz
   // knjižnice, pokaže na strani Pregled in odobritev). Optimistično z vrnitvijo.
   async function handleSendToReview(song: Song) {
@@ -1182,19 +1185,23 @@ export default function Dashboard({ user }: { user: User }) {
     }, 80);
   }
 
-  async function handleApprove(list: Song[]) {
+  // "Odobri" (kind "approve") in "Vrni brez odobritve" ("return"): skladba gre iz
+  // pregleda nazaj v knjižnico (review_pending = false). Vrnitev ne zahteva oznak
+  // preverjanja in jih ne spreminja — za skladbe, ki so bile poslane v pregled,
+  // a jih (še) ne preverjaš.
+  async function handleApprove(list: Song[], kind: "approve" | "return" = "approve") {
     if (!list.length) return;
     const ids = list.map((s) => s.id);
     setReviewError(null);
-    setApprovingIds((prev) => new Set([...prev, ...ids]));
+    setApprovingIds((prev) => new Map([...prev, ...ids.map((id) => [id, kind] as const)]));
     const { error } = await supabase.from("songs").update({ review_pending: false }).in("id", ids);
     setApprovingIds((prev) => {
-      const next = new Set(prev);
+      const next = new Map(prev);
       ids.forEach((id) => next.delete(id));
       return next;
     });
     if (error) {
-      setReviewError(`Odobritev ni uspela: ${error.message}`);
+      setReviewError(`${kind === "approve" ? "Odobritev" : "Vrnitev"} ni uspela: ${error.message}`);
       return;
     }
     setSongs((prev) => prev.map((s) => (ids.includes(s.id) ? { ...s, review_pending: false } : s)));
@@ -3197,87 +3204,99 @@ export default function Dashboard({ user }: { user: User }) {
                     </div>
                     {reviewExpanded.has(song.id) && (
                     <>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-dashed border-teal-500/50 px-3 pb-3 pt-2.5 text-xs text-neutral-600 dark:border-teal-400/40 dark:text-neutral-300">
-                      <span>{song.genre}</span>
-                      <span>{formatEraLabel(song.era)}</span>
-                      {song.mood && <span>{song.mood}</span>}
-                      {song.origin && <span>{song.origin}</span>}
+                    {/* Mreža enako velikih gumbov: urejanje in vrnitev,
+                        preverjanje, Odobri čez vso širino. */}
+                    <div className="space-y-2 border-t border-dashed border-teal-500/50 px-3 pb-3 pt-2 dark:border-teal-400/40">
                       {!song.chords_text && (
-                        <span className="text-amber-600 dark:text-amber-400">brez akordov v aplikaciji</span>
+                        <p className="text-xs text-amber-600 dark:text-amber-400">brez akordov v aplikaciji</p>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => setChordsEditSong(song)}
-                        title="Napredni urejevalnik besedila z akordi in tablatur"
-                        className="ml-auto inline-flex items-center rounded-full border border-orange-400/60 px-3 py-1.5 text-sm font-medium text-orange-700 transition hover:bg-orange-400/10 dark:text-orange-300"
-                      >
-                        Uredi besedilo
-                      </button>
-                      <button
-                        type="button"
-                        disabled={approvingIds.has(song.id) || !reviewReady(song)}
-                        title={reviewReady(song) ? "Odobri" : "Najprej potrdi: akordi preverjeni in predvajalnik preverjen"}
-                        onClick={() => handleApprove([song])}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-50"
-                      >
-                        <svg
-                          aria-hidden="true"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2.2}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="h-4 w-4 shrink-0"
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setChordsEditSong(song)}
+                          title="Napredni urejevalnik besedila z akordi in tablatur"
+                          className={`${REVIEW_BTN} border border-orange-400/60 text-orange-700 hover:bg-orange-400/10 dark:text-orange-300`}
                         >
-                          <path d="M20 6 9 17l-5-5" />
-                        </svg>
-                        {approvingIds.has(song.id) ? "Odobravam…" : "Odobri"}
-                      </button>
-                    </div>
-                    {/* Oboje mora biti potrjeno, preden se skladba lahko odobri. */}
-                    <div className="flex flex-wrap items-center gap-2 px-3 pb-3 text-xs">
-                      <button
-                        type="button"
-                        aria-pressed={!!song.verified_chords_at}
-                        onClick={() => handleVerify(song, "verified_chords_at", song.verified_chords_at ? null : new Date().toISOString())}
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                          song.verified_chords_at
-                            ? "border-emerald-500/70 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                            : "border-neutral-400/60 text-neutral-600 hover:border-emerald-500/70 dark:text-neutral-300"
-                        }`}
-                      >
-                        {song.verified_chords_at ? "✓ Akordi preverjeni" : "Akordi preverjeni?"}
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={!!song.verified_player_at}
-                        disabled={!song.chords_text}
-                        title={
-                          song.verified_player_at
-                            ? "Klik razveljavi oznako"
-                            : "Označi, da Smart play pri tej skladbi dela dobro (časi in posnetek se zaklenejo ob naslednjem predvajanju)"
-                        }
-                        onClick={() => {
-                          if (song.verified_player_at) {
-                            if (window.confirm("Razveljavim oznako \"Predvajalnik preverjen\"?")) handleVerify(song, "verified_player_at", null);
-                            return;
+                          Uredi besedilo
+                        </button>
+                        <button
+                          type="button"
+                          disabled={approvingIds.has(song.id)}
+                          title="Vrne skladbo med Komade brez odobritve; oznake preverjanja ostanejo, kot so"
+                          onClick={() => {
+                            if (window.confirm(`Vrnem "${song.title}" med Komade brez odobritve?`)) handleApprove([song], "return");
+                          }}
+                          className={`${REVIEW_BTN} border border-neutral-400/60 text-neutral-700 hover:bg-neutral-500/10 dark:text-neutral-300`}
+                        >
+                          {approvingIds.get(song.id) === "return" ? "Vračam…" : "Vrni brez odobritve"}
+                        </button>
+                        <hr className="col-span-2 my-0.5 border-t border-teal-500/30 dark:border-teal-400/25" />
+                        {/* Oboje mora biti potrjeno, preden se skladba lahko odobri. */}
+                        <button
+                          type="button"
+                          aria-pressed={!!song.verified_chords_at}
+                          title={song.verified_chords_at ? "Klik razveljavi oznako" : "Označi, da so akordi pregledani"}
+                          onClick={() => handleVerify(song, "verified_chords_at", song.verified_chords_at ? null : new Date().toISOString())}
+                          className={`${REVIEW_BTN} border ${
+                            song.verified_chords_at
+                              ? "border-emerald-500/70 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                              : "border-neutral-400/60 text-neutral-600 hover:border-emerald-500/70 dark:text-neutral-300"
+                          }`}
+                        >
+                          {song.verified_chords_at ? "✓ Akordi" : "Akordi?"}
+                        </button>
+                        <button
+                          type="button"
+                          aria-pressed={!!song.verified_player_at}
+                          disabled={!song.chords_text}
+                          title={
+                            song.verified_player_at
+                              ? "Klik razveljavi oznako"
+                              : "Označi, da Smart play pri tej skladbi dela dobro (časi in posnetek se zaklenejo ob naslednjem predvajanju)"
                           }
-                          // Samo oznaka; čase in posnetek pregledovalnik zamrzne ob
-                          // naslednjem predvajanju (ChordsViewer, samodejna zamrznitev).
-                          handleVerify(song, "verified_player_at", new Date().toISOString());
-                        }}
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition disabled:opacity-50 ${
-                          song.verified_player_at
-                            ? "border-emerald-500/70 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                            : "border-neutral-400/60 text-neutral-600 hover:border-emerald-500/70 dark:text-neutral-300"
-                        }`}
-                      >
-                        {song.verified_player_at ? "✓ Predvajalnik preverjen" : "Predvajalnik preverjen?"}
-                      </button>
-                      {!reviewReady(song) && (
-                        <span className="text-neutral-500 dark:text-neutral-400">Odobritev je mogoča po obeh potrditvah.</span>
-                      )}
+                          onClick={() => {
+                            if (song.verified_player_at) {
+                              if (window.confirm("Razveljavim oznako \"Predvajalnik preverjen\"?")) handleVerify(song, "verified_player_at", null);
+                              return;
+                            }
+                            // Samo oznaka; čase in posnetek pregledovalnik zamrzne ob
+                            // naslednjem predvajanju (ChordsViewer, samodejna zamrznitev).
+                            handleVerify(song, "verified_player_at", new Date().toISOString());
+                          }}
+                          className={`${REVIEW_BTN} border ${
+                            song.verified_player_at
+                              ? "border-emerald-500/70 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                              : "border-neutral-400/60 text-neutral-600 hover:border-emerald-500/70 dark:text-neutral-300"
+                          }`}
+                        >
+                          {song.verified_player_at ? "✓ Predvajalnik" : "Predvajalnik?"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={approvingIds.has(song.id) || !reviewReady(song)}
+                          title={reviewReady(song) ? "Odobri" : "Najprej potrdi: akordi in predvajalnik"}
+                          onClick={() => handleApprove([song])}
+                          className={`${REVIEW_BTN} col-span-2 bg-teal-600 font-semibold text-white hover:bg-teal-700`}
+                        >
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2.2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="h-4 w-4 shrink-0"
+                          >
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                          {approvingIds.get(song.id) === "approve"
+                            ? "Odobravam…"
+                            : reviewReady(song)
+                              ? "Odobri"
+                              : "Odobri (najprej potrdi oboje)"}
+                        </button>
+                      </div>
                     </div>
                     </>
                     )}
