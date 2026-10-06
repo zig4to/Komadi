@@ -84,19 +84,24 @@ export function pickBestCandidate(candidates: LrcCandidate[], videoDuration: num
 
 // Primerjava besedila: male črke, brez diakritike in ločil ("Moët" = "moet",
 // UG zapis "Mo&euml;t" prav tako).
-function words(text: string): string[] {
+// Spremni vokal v oklepajih ("(hallelujah)") se izpusti; withParens = true ga
+// pusti (za vrstice, ki so skoraj samo spremni vokal — glej alignLyrics).
+// Polnila se poenotijo: "hm", "hmm", "mmm" = "mm"; "oh", "ooh", "oh-uuh-uh" = "oh"
+// (fillers = false: ne — za lineKey, da se ključi shranjenih časov ne spremenijo).
+function words(text: string, withParens = false, fillers = true): string[] {
   return text
     .replace(/&(\w)\w*;/g, "$1")
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
-    .replace(/\([^)]*\)/g, " ")
+    .replace(/\([^)]*\)/g, (p) => (withParens ? p : " "))
     // Zlogi z vezajem v akordih ("Guaran-teed", "Extra-ordinarily", tudi
     // raztegnjeni "pr--vi", "kr----vi") in opuščaj ("She's", "don't") = ena beseda.
     .replace(/(\p{L})[-'’]+(\p{L})/gu, "$1$2")
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim()
     .split(" ")
+    .map((w) => (!fillers ? w : /^h?m+$/.test(w) ? "mm" : w.length > 1 && /^[ouh]+$/.test(w) && /[ou]/.test(w) ? "oh" : w))
     // Enočrkovne ("a", "i") ne povedo nič o tem, katera vrstica je prava.
     .filter((w) => w.length > 1);
 }
@@ -177,26 +182,46 @@ const LINE_SEC_PER_WORD = 0.9;
 const LINE_SEC_MIN = 5;
 
 export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncPoint[]; matched: number } {
+  // words = brez oklepajev, all = z njimi. Vrstica samo iz spremnega vokala
+  // ("(hare krishna)") ima words = all. Ujemanje šteje boljše od obeh:
+  // "Mm, mm, mm (Hallelujah)" proti "Hmm (hallelujah)" se ujame šele z oklepaji.
   const lyricLines = body
-    .map((l, i) => ({ index: i, words: words(lineLyric(l) ?? "") }))
+    .map((l, i) => {
+      const text = lineLyric(l) ?? "";
+      const all = words(text, true);
+      const w = words(text);
+      return { index: i, words: w.length ? w : all, all };
+    })
     .filter((l) => l.words.length > 0);
   const m = lyricLines.length;
   // Vrstice LRC z besedilom (k = indeks v lrc).
-  const sung = lrc.map((l, k) => ({ k, w: words(l.text) })).filter((x) => x.w.length > 0);
+  const sung = lrc
+    .map((l, k) => {
+      const all = words(l.text, true);
+      const w = words(l.text);
+      return { k, w: w.length ? w : all, all };
+    })
+    .filter((x) => x.w.length > 0);
   const n = sung.length;
   if (!m || !n) return { points: [], matched: 0 };
-  // Besede b brez tistih, ki jih je porabila prejšnja vrstica LRC na isti vrstici.
+  // Besede b brez tistih, ki so jih porabile prejšnje vrstice LRC na isti vrstici.
+  // Najprej enaka beseda, šele nato podobna — sicer "amarillos" odstrani
+  // "amarillo" in pusti "amarillos".
   const minus = (b: string[], used: string[]) => {
     const rest = [...b];
     for (const x of used) {
-      const i = rest.findIndex((r) => sameWord(r, x));
+      let i = rest.indexOf(x);
+      if (i < 0) i = rest.findIndex((r) => sameWord(r, x));
       if (i >= 0) rest.splice(i, 1);
     }
     return rest;
   };
   // Polnilo iz ene ponovljene besede ("Run, run, run, run", "la la la"): delno
   // ujemanje (skupen "run" z "You'd better run, better run") ni dovolj.
-  const minScore = sung.map(({ w }) => (w.length >= 3 && new Set(w).size === 1 ? 0.8 : ALIGN_MIN));
+  const minFor = (w: string[]) => (w.length >= 3 && new Set(w).size === 1 ? 0.8 : ALIGN_MIN);
+  const minScore = sung.map(({ w }) => minFor(w));
+  // Z oklepaji "Mm, mm, mm (Hallelujah)" ni več samo polnilo.
+  const minScoreAll = sung.map(({ all }) => minFor(all));
   // f[i][j + 1] = najboljša vsota po prvih i vrsticah LRC, ko je zadnja povezana
   // vrstica tablature j (j = -1: še nobena). lastI = katera vrstica LRC je bila
   // zadnja povezana v tem stanju; from = prejšnja vrstica tablature, če je bila
@@ -206,18 +231,28 @@ export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncP
   f[0][0] = 0;
   const lastI: Int32Array[] = [new Int32Array(m + 1).fill(-1)];
   const from: Int32Array[] = [new Int32Array(m + 1).fill(-2)];
+  // used[j + 1] = besede VSEH vrstic LRC, ki so v tem stanju že na vrstici j (ne le
+  // zadnje): "Amarillo by mornin'" + "Amarillo's where I'll be" na eni vrstici —
+  // naslednji "Amarillo by mornin'" je sicer spet našel "svoje" neporabljene
+  // besede, ostal na isti vrstici in oznaka ni šla na ponovitev pod njo.
+  let used: string[][] = new Array(m + 1).fill([]);
   for (let i = 1; i <= n; i++) {
     const w = sung[i - 1].w;
     const prev = f[i - 1];
     const cur = Float64Array.from(prev);
     const curLast = Int32Array.from(lastI[i - 1]);
     const curFrom = new Int32Array(m + 1).fill(-2);
+    const curUsed = [...used];
     for (let j = 0; j < m; j++) {
       let best = NONE;
       let bestFrom = -2;
       // Nova vrstica (od prejšnje j2 < j naprej).
-      const fresh = similarity(w, lyricLines[j].words);
-      if (fresh >= minScore[i - 1]) {
+      const plain = similarity(w, lyricLines[j].words);
+      const withParens = similarity(sung[i - 1].all, lyricLines[j].all);
+      // Z oklepaji samo, ko brez njih ne gre — sicer podvojen spremni vokal
+      // ("Če ne bi pil, (če ne bi pil)") prevlada nad ostankom na isti vrstici.
+      const fresh = plain >= minScore[i - 1] ? plain : withParens >= minScoreAll[i - 1] ? withParens : 0;
+      if (fresh > 0) {
         for (let j2 = -1; j2 < j; j2++) {
           if (prev[j2 + 1] === NONE) continue;
           const v = prev[j2 + 1] + fresh - (j - j2 - 1) * ALIGN_SKIP;
@@ -229,7 +264,7 @@ export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncP
       }
       // Ista vrstica kot prejšnja povezana vrstica LRC: samo z neporabljenimi besedami.
       if (prev[j + 1] !== NONE && lastI[i - 1][j + 1] >= 0) {
-        const stay = similarity(w, minus(lyricLines[j].words, sung[lastI[i - 1][j + 1]].w));
+        const stay = similarity(w, minus(lyricLines[j].words, used[j + 1]));
         if (stay >= minScore[i - 1] && prev[j + 1] + stay > best) {
           best = prev[j + 1] + stay;
           bestFrom = j;
@@ -239,11 +274,13 @@ export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncP
         cur[j + 1] = best;
         curLast[j + 1] = i - 1;
         curFrom[j + 1] = bestFrom;
+        curUsed[j + 1] = bestFrom === j ? [...used[j + 1], ...w] : w;
       }
     }
     f.push(cur);
     lastI.push(curLast);
     from.push(curFrom);
+    used = curUsed;
   }
   // Najboljši konec in pot nazaj: assigned[i] = vrstica tablature za i-to vrstico LRC (ali -1).
   let j = -1;
@@ -415,7 +452,7 @@ export function manualSyncPoints(points: { t: number; line: number; end?: number
 export function lineKey(line: ChordsLine | undefined): string {
   if (!line) return "";
   const lyric = lineLyric(line);
-  if (lyric) return words(lyric).join(" ");
+  if (lyric) return words(lyric, false, false).join(" ");
   if (line.kind === "chords") return `ch:${line.chords.length}`;
   if (line.kind === "text") {
     const n = line.segments.filter((s) => "chord" in s).length;

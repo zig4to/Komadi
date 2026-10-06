@@ -1970,8 +1970,8 @@ export default function ChordsViewer({
       let span = 0;
       let gap = false;
       let gapInfo: ReturnType<typeof instrumentalGapAt> = null;
+      const lt = t - offset;
       if (points) {
-        const lt = t - offset;
         ({ lineIndex: line, progress, span } = lineProgressAt(points, lt));
         // Instrumentalni del: zapeta vrstica končana, naslednja ≥ SS_GAP_MIN s.
         gapInfo = instrumentalGapAt(points, lt, SS_GAP_MIN);
@@ -1995,6 +1995,19 @@ export default function ChordsViewer({
           rowPos = from + (to - from) * q;
           k = Math.floor(rowPos);
           rate = clock.playing && q > 0 && q < 1 ? (to - from) / (gapInfo.length / 2) : 0;
+        }
+      }
+      // Intro (pred prvo zapeto vrstico): pogled enakomerno drsi čez vrstice
+      // intra in pride na prvo zapeto vrstico ravno, ko se začne petje — prej je
+      // stal na vrhu in ob prvi vrstici skočil dol (My Sweet Lord).
+      if (points?.length && line < 0) {
+        const first = points[0];
+        const to = rowFor(first.lineIndex);
+        if (to > 0 && first.time > 0) {
+          const q = Math.min(1, Math.max(0, lt / first.time));
+          rowPos = to * q;
+          k = Math.floor(rowPos);
+          rate = clock.playing && q < 1 ? to / first.time : 0;
         }
       }
       ease(rowTarget(rowPos), dt);
