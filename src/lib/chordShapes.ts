@@ -86,3 +86,62 @@ export function findChordShapes(db: ChordDb, name: string): ChordPosition[] {
   }
   return find(quality);
 }
+
+// Prijemi, zapisani v opisu skladbe (kot na Ultimate Guitar:
+// "Cadd4    x 3 3 0 1 0", "Gadd11 320013", "F: x-3-3-2-1-x") → ime → prijem.
+// Pragovi so absolutni (od E do e); nad 4. pragom se shema premakne
+// (baseFret = najnižji pritisnjen prag). Prste in barre opis ne pove —
+// ugane jih guessFingers.
+const DESC_SHAPE_RE = /^\s*([A-H][#b]?[^\s:=]*)\s*[:=]?\s+((?:[xX\d]{1,2}[\s-]*){6})\s*$/;
+export function parseDescriptionShapes(content: string): Map<string, ChordPosition> {
+  const shapes = new Map<string, ChordPosition>();
+  for (const raw of content.split(/\r?\n/)) {
+    const line = raw.replace(/\[\/?ch\]/g, "");
+    const m = line.match(DESC_SHAPE_RE);
+    if (!m) continue;
+    const spec = m[2].trim();
+    const tokens = /[\s-]/.test(spec) ? spec.split(/[\s-]+/) : spec.split("");
+    if (tokens.length !== 6) continue;
+    const abs = tokens.map((t) => (/^[xX]$/.test(t) ? -1 : Number(t)));
+    if (abs.some((f) => Number.isNaN(f) || f > 24)) continue;
+    const pressed = abs.filter((f) => f > 0);
+    const top = Math.max(0, ...pressed);
+    const baseFret = top <= 4 ? 1 : Math.min(...pressed);
+    const frets = abs.map((f) => (f <= 0 ? f : f - baseFret + 1));
+    shapes.set(m[1], { frets, ...guessFingers(frets), baseFret });
+  }
+  return shapes;
+}
+
+// Prsti za prijem iz opisa (opis jih ne pove): po pragovih navzgor, na istem
+// pragu od debele strune proti tanki; razmak 2 pragov preskoči prst (C: 1 na
+// H, 2 na D, 3 na A; F x3321x: 3 na A, 4 na D). Več kot 4 pritisnjene strune
+// → barre s 1. prstom na najnižjem pragu, ostale z 2–4.
+function guessFingers(frets: number[]): { fingers: number[]; barres: number[] } {
+  const fingers = [0, 0, 0, 0, 0, 0];
+  const notes = frets
+    .map((fret, string) => ({ fret, string }))
+    .filter((n) => n.fret > 0)
+    .sort((a, b) => a.fret - b.fret || a.string - b.string);
+  if (!notes.length) return { fingers, barres: [] };
+  const barres: number[] = [];
+  let rest = notes;
+  let prev = { finger: 0, fret: notes[0].fret };
+  if (notes.length > 4) {
+    const low = notes[0].fret;
+    const onLow = notes.filter((n) => n.fret === low);
+    rest = notes.filter((n) => n.fret !== low);
+    if (onLow.length < 2 || rest.length > 3) return { fingers, barres: [] };
+    onLow.forEach((n) => (fingers[n.string] = 1));
+    barres.push(low);
+    prev = { finger: 1, fret: low };
+  }
+  rest.forEach((n, i) => {
+    const remaining = rest.length - i - 1;
+    const stretch = prev.finger === 0 ? 1 : prev.finger + Math.max(1, n.fret - prev.fret);
+    const finger = Math.max(prev.finger + 1, Math.min(stretch, 4 - remaining));
+    fingers[n.string] = finger;
+    prev = { finger, fret: n.fret };
+  });
+  return { fingers, barres };
+}

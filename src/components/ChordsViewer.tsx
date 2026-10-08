@@ -17,7 +17,7 @@ import {
   transposeChord,
   type ChordsLine,
 } from "@/lib/chords";
-import { findChordShapes, loadChordDb, type ChordPosition } from "@/lib/chordShapes";
+import { findChordShapes, loadChordDb, parseDescriptionShapes, type ChordPosition } from "@/lib/chordShapes";
 import {
   alignLyrics,
   chordAt,
@@ -56,6 +56,8 @@ export type SharedViewProp =
 
 const FONT_KEY = "komadi:chords:font";
 const SIMPLIFY_KEY = "komadi:chords:simplify";
+// "Pokaži akorde": sheme vseh akordov skladbe desno od naslova (kot na UG).
+const SHOW_SHAPES_KEY = "komadi:chords:showShapes";
 const BG_KEY = "komadi:chords:bg";
 const CHORD_COLOR_KEY = "komadi:chords:chordColor";
 const TEXT_COLOR_KEY = "komadi:chords:textColor";
@@ -314,6 +316,22 @@ export default function ChordsViewer({
   // "Poenostavi" (D7 → D, Am7 → Am …) — ena nastavitev za vse skladbe.
   const [simplify, setSimplify] = useState(() => readNumber(SIMPLIFY_KEY, 0) === 1);
   useEffect(() => writeNumber(SIMPLIFY_KEY, simplify ? 1 : 0), [simplify]);
+
+  // "Pokaži akorde" — ena nastavitev za vse skladbe.
+  const [showShapes, setShowShapes] = useState(() => readNumber(SHOW_SHAPES_KEY, 0) === 1);
+  useEffect(() => writeNumber(SHOW_SHAPES_KEY, showShapes ? 1 : 0), [showShapes]);
+  // Prijemi iz opisa skladbe ("Cadd4  x 3 3 0 1 0") imajo prednost pred bazo.
+  const descShapes = useMemo(() => parseDescriptionShapes(chordsText), [chordsText]);
+  // Baza prijemov (naloži se ob prvi shemi ali ko je "Pokaži akorde" vklopljen).
+  const [chordDb, setChordDb] = useState<Awaited<ReturnType<typeof loadChordDb>> | null>(null);
+  useEffect(() => {
+    if (!showShapes || chordDb) return;
+    let alive = true;
+    loadChordDb().then((db) => alive && setChordDb(db));
+    return () => {
+      alive = false;
+    };
+  }, [showShapes, chordDb]);
 
   // "Tema": ozadje vsebine in barva akordov — ena nastavitev za vse skladbe.
   const [bgIndex, setBgIndex] = useState(() => readNumber(BG_KEY, DEFAULT_BG));
@@ -760,6 +778,22 @@ export default function ChordsViewer({
     const t = transposeChord(name, semitones);
     return simplify ? simplifyChord(t) : t;
   };
+
+  // "Pokaži akorde": vsi akordi v pesmi (kot so prikazani), po vrsti prve pojavitve.
+  const songChords = useMemo(() => {
+    if (!showShapes) return [];
+    const names = new Set<string>();
+    const add = (name: string | null) => {
+      if (name) names.add(simplify ? simplifyChord(transposeChord(name, semitones)) : transposeChord(name, semitones));
+    };
+    for (const line of body) {
+      if (line.kind === "chords") line.chords.forEach((c) => add(c.name));
+      else if (line.kind === "pair") line.chunks.forEach((c) => add(c.chord));
+      else if (line.kind === "text") line.segments.forEach((s) => "chord" in s && add(s.chord));
+      else if (line.kind === "tab") line.header?.forEach((c) => add(c.name));
+    }
+    return [...names];
+  }, [showShapes, body, semitones, simplify]);
 
   // Tablature v pesmi so privzeto skrite (ostane samo vrstica akordov nad
   // njimi); gumb "Tab" ob naslovu sekcije jih prikaže za to sekcijo. Lastnik
@@ -2195,7 +2229,8 @@ export default function ChordsViewer({
     cancelHide();
     const r = el.getBoundingClientRect();
     loadChordDb().then((db) => {
-      const positions = findChordShapes(db, name);
+      const own = descShapes.get(name);
+      const positions = [...(own ? [own] : []), ...findChordShapes(db, name)];
       if (!positions.length) return setShapeTip(null);
       // Nad akordom (spodnji rob okna 6 px nad njim); pod njim samo, če zgoraj ni prostora.
       const above = r.top > 180;
@@ -2497,6 +2532,17 @@ export default function ChordsViewer({
           }`}
         >
           Simpl
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowShapes((v) => !v)}
+          aria-pressed={showShapes}
+          title="Pokaži prijeme vseh akordov skladbe"
+          className={`flex h-8 items-center whitespace-nowrap rounded-full border border-orange-400 px-2.5 text-xs font-medium transition active:scale-95 ${
+            showShapes ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
+          }`}
+        >
+          Pokaži akorde
         </button>
         <div className="flex items-center rounded-full border border-orange-400 p-0.5" role="group" aria-label="Velikost pisave">
           <button
@@ -2894,7 +2940,8 @@ export default function ChordsViewer({
       <div className={`flex min-h-0 flex-1 flex-col lg:flex-row ${editing ? "hidden" : ""}`}>
         <div ref={scrollRef} className={`min-h-0 flex-1 overflow-auto px-4 pb-32 pt-4 [scrollbar-width:none] lg:px-16 [&::-webkit-scrollbar]:hidden ${editing ? "hidden" : ""}`}>
           <div className="font-mono leading-snug text-(--cv-text)" style={{ fontSize }}>
-            <div className="mb-4 font-sans">
+            <div className="mb-4 flex flex-wrap items-start gap-x-8 gap-y-3 font-sans">
+            <div className="shrink-0">
               <h2 className="text-xl font-semibold text-(--cv-title)">{song.title}</h2>
               <p className="text-sm text-(--cv-muted)">{song.author}</p>
               {capo !== null && (
@@ -2922,6 +2969,24 @@ export default function ChordsViewer({
                   </svg>
                 </button>
               )}
+            </div>
+            {/* "Pokaži akorde": prijemi vseh akordov (najprej iz opisa, sicer iz baze — izbrana različica). */}
+            {showShapes && songChords.length > 0 && (
+              <div className="flex flex-wrap gap-x-2 gap-y-2" aria-label="Akordi v skladbi">
+                {songChords.map((name) => {
+                  const own = descShapes.get(name);
+                  const positions = own ? [own] : chordDb ? findChordShapes(chordDb, name) : [];
+                  const position = own ?? positions[Math.min(shapeChoice[name] ?? 0, Math.max(0, positions.length - 1))];
+                  return position ? (
+                    <ChordDiagram key={name} name={name} position={position} />
+                  ) : (
+                    <span key={name} className="px-2 text-sm font-bold text-(--cv-chord)" title="Prijem ni znan">
+                      {name}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             </div>
             {descriptionOpen && (
               <div className="mb-4 rounded-lg border border-(--cv-border) bg-(--cv-panel) p-3 text-[0.85em] text-(--cv-text)">
