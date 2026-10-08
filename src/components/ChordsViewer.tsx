@@ -212,6 +212,59 @@ function writeNumber(key: string, value: number) {
   } catch {}
 }
 
+// Zamik besedila kot "+1,25"; klik na številko jo odpre za vnos poljubne
+// vrednosti v sekundah (npr. 30, -2,5) — Enter/izhod iz polja potrdi, Esc prekliče.
+function OffsetValue({
+  value,
+  disabled,
+  onSet,
+  className,
+}: {
+  value: number;
+  disabled: boolean;
+  onSet: (seconds: number) => void;
+  className: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = `${value > 0 ? "+" : ""}${value.toFixed(2).replace(".", ",")}`;
+  const commit = () => {
+    if (draft === null) return;
+    const n = Number(draft.trim().replace(",", ".").replace(/\s*s$/i, ""));
+    if (draft.trim() !== "" && Number.isFinite(n)) onSet(n);
+    setDraft(null);
+  };
+  if (draft !== null) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        inputMode="decimal"
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => e.target.select()}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") commit();
+          else if (e.key === "Escape") setDraft(null);
+        }}
+        aria-label="Zamik besedila v sekundah"
+        className={`${className} rounded border border-orange-400 bg-neutral-900 px-1 outline-none`}
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => setDraft(String(value).replace(".", ","))}
+      title={disabled ? undefined : "Klikni in vpiši zamik v sekundah"}
+      className={`${className} rounded underline decoration-dotted underline-offset-2 hover:text-white disabled:no-underline`}
+    >
+      {shown}
+    </button>
+  );
+}
+
 export default function ChordsViewer({
   song,
   onClose,
@@ -924,7 +977,10 @@ export default function ChordsViewer({
   });
   // Računalnik: gumbi za zamik v vrstici se razprejo šele ob kliku na "Zamik".
   const [offsetOpen, setOffsetOpen] = useState(false);
-  const lrcOffset = playingVideo ? (lrcOffsets[playingVideo] ?? 0) : 0;
+  // Posnetek, za katerega velja zamik: tisti, ki igra, pred prvim predvajanjem
+  // pa prvi kandidat (zaigra ob ▶) — tako se zamik da vpisati že vnaprej.
+  const offsetVideo = playingVideo ?? videoIds[0] ?? null;
+  const lrcOffset = offsetVideo ? (lrcOffsets[offsetVideo] ?? 0) : 0;
   const [lrcOffsetError, setLrcOffsetError] = useState<string | null>(null);
   const saveOffsetTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(saveOffsetTimerRef.current), []);
@@ -933,9 +989,11 @@ export default function ChordsViewer({
   // zaklenjena, dokler je ne prijaviš v "Popravi skladbe" (inFix) ali je še v
   // "Pregled in odobritev" (review_pending).
   const offsetLocked = !!verifiedPlayerAt && !inFix && !song.review_pending;
-  const changeLrcOffset = (delta: number) => {
-    if (!playingVideo || offsetLocked) return;
-    const next = { ...lrcOffsets, [playingVideo]: Math.round((lrcOffset + delta) * 4) / 4 };
+  const changeLrcOffset = (delta: number) => setLrcOffset(lrcOffset + delta);
+  // Poljuben zamik (vpisan s klikom na številko), na 0,01 s natančno.
+  const setLrcOffset = (seconds: number) => {
+    if (!offsetVideo || offsetLocked) return;
+    const next = { ...lrcOffsets, [offsetVideo]: Math.round(seconds * 100) / 100 };
     setLrcOffsets(next);
     try {
       window.localStorage.setItem(lrcOffsetsKey(song.id), JSON.stringify(next));
@@ -2572,7 +2630,7 @@ export default function ChordsViewer({
             className="hidden items-center rounded-full border border-orange-400 py-0.5 pl-2.5 pr-0.5 lg:flex"
             role="group"
             aria-label="Zamik besedila"
-            title={playingVideo ? "Zamik besedila za posnetek, ki igra" : "Najprej zaženi predvajanje"}
+            title={playingVideo ? "Zamik besedila za posnetek, ki igra" : "Zamik besedila za posnetek, ki zaigra ob ▶"}
           >
             <button
               type="button"
@@ -2591,14 +2649,16 @@ export default function ChordsViewer({
             </button>
             {offsetOpen && (
               <>
-                <button type="button" onClick={() => changeLrcOffset(-LRC_OFFSET_STEP)} disabled={!playingVideo || offsetLocked} aria-label="Besedilo 0,25 s prej" title="Besedilo 0,25 s prej" className={toneButton}>
+                <button type="button" onClick={() => changeLrcOffset(-LRC_OFFSET_STEP)} disabled={!offsetVideo || offsetLocked} aria-label="Besedilo 0,25 s prej" title="Besedilo 0,25 s prej" className={toneButton}>
                   −
                 </button>
-                <span className="w-11 text-center text-xs tabular-nums text-neutral-200">
-                  {lrcOffset > 0 ? "+" : ""}
-                  {lrcOffset.toFixed(2).replace(".", ",")}
-                </span>
-                <button type="button" onClick={() => changeLrcOffset(LRC_OFFSET_STEP)} disabled={!playingVideo || offsetLocked} aria-label="Besedilo 0,25 s pozneje" title="Besedilo 0,25 s pozneje" className={toneButton}>
+                <OffsetValue
+                  value={lrcOffset}
+                  disabled={!offsetVideo || offsetLocked}
+                  onSet={setLrcOffset}
+                  className="w-12 text-center text-xs tabular-nums text-neutral-200"
+                />
+                <button type="button" onClick={() => changeLrcOffset(LRC_OFFSET_STEP)} disabled={!offsetVideo || offsetLocked} aria-label="Besedilo 0,25 s pozneje" title="Besedilo 0,25 s pozneje" className={toneButton}>
                   +
                 </button>
               </>
@@ -2791,26 +2851,28 @@ export default function ChordsViewer({
                       ? "zaklenjeno — preverjena skladba (spremeniš ga prek Popravi skladbe)"
                       : playingVideo
                         ? "za posnetek, ki igra"
-                        : "najprej zaženi predvajanje"}
+                        : "za posnetek, ki zaigra ob ▶"}
                   </span>
                 </span>
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => changeLrcOffset(-LRC_OFFSET_STEP)}
-                    disabled={!playingVideo || offsetLocked}
+                    disabled={!offsetVideo || offsetLocked}
                     className="rounded-full border border-orange-400 px-2 text-xs text-amber-400 disabled:opacity-40"
                   >
                     −0,25 s
                   </button>
-                  <span className="w-12 text-center text-[11px] tabular-nums text-neutral-300">
-                    {lrcOffset > 0 ? "+" : ""}
-                    {lrcOffset.toFixed(2).replace(".", ",")}
-                  </span>
+                  <OffsetValue
+                    value={lrcOffset}
+                    disabled={!offsetVideo || offsetLocked}
+                    onSet={setLrcOffset}
+                    className="w-14 text-center text-[11px] tabular-nums text-neutral-300"
+                  />
                   <button
                     type="button"
                     onClick={() => changeLrcOffset(LRC_OFFSET_STEP)}
-                    disabled={!playingVideo || offsetLocked}
+                    disabled={!offsetVideo || offsetLocked}
                     className="rounded-full border border-orange-400 px-2 text-xs text-amber-400 disabled:opacity-40"
                   >
                     +0,25 s
