@@ -217,10 +217,34 @@ export default function ChordsTextEditor({
     };
   }, [lrcCandidates, syncText, videoDuration]);
   const lrcOffset = playingVideo ? (song.lrc_offsets?.[playingVideo] ?? 0) : 0;
-  const onVideoTime = (seconds: number, duration: number) => {
+  // Zadnji znani čas in ali posnetek igra (za skok ob kliku na vrstico).
+  const playbackRef = useRef({ time: 0, playing: false });
+  const onVideoTime = (seconds: number, duration: number, playing: boolean) => {
+    playbackRef.current = { time: seconds, playing };
     if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
     const line = smartOn && sync ? lineProgressAt(sync.points, seconds - lrcOffset).lineIndex : -1;
     setActiveLine((prev) => (prev === line ? prev : line));
+  };
+  // Med predvajanjem klik na vrstico skoči tja (kot v pregledovalniku):
+  // vrstica brez besedila (akordi, razdelek) → prva naslednja z besedilom
+  // (največ 3 naprej); ponovljena vrstica → ponovitev, časovno najbližja
+  // trenutnemu mestu, začetek njenega razpona. Označevanje (izbira) ne skače.
+  const seekToEditorLine = (lineIndex: number) => {
+    if (!sync || !playbackRef.current.playing) return;
+    let target = -1;
+    for (let i = lineIndex; i <= lineIndex + 3 && target < 0; i++) if (sync.points.some((p) => p.lineIndex === i)) target = i;
+    if (target < 0) return;
+    const now = playbackRef.current.time - lrcOffset;
+    let best = -1;
+    sync.points.forEach((p, k) => {
+      if (p.lineIndex !== target) return;
+      if (best < 0 || Math.abs(p.time - now) < Math.abs(sync.points[best].time - now)) best = k;
+    });
+    while (best > 0 && sync.points[best - 1].lineIndex === target) best--;
+    if (playerCtl.current?.seekAndPlay(sync.points[best].time + lrcOffset - 0.3)) {
+      setSmartOn(true);
+      setActiveLine(target);
+    }
   };
 
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -731,7 +755,12 @@ export default function ChordsTextEditor({
             }}
             onKeyDown={onKeyDown}
             onSelect={updateCaret}
-            onClick={updateCaret}
+            onClick={(e) => {
+              updateCaret();
+              const ta = e.currentTarget;
+              if (e.detail !== 1 || ta.selectionStart !== ta.selectionEnd) return;
+              seekToEditorLine(ta.value.slice(0, ta.selectionStart).split("\n").length - 1);
+            }}
             onKeyUp={updateCaret}
             onScroll={syncScroll}
             wrap="off"
