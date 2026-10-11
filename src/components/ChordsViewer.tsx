@@ -1,5 +1,6 @@
 "use client";
 
+import { BACKGROUND_COLORS, PatternSvg } from "@/lib/backgroundPatterns";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import AutoScrollControl from "@/components/AutoScrollControl";
@@ -3983,13 +3984,18 @@ export default function ChordsViewer({
               </div>
             </>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
+            <div className="relative isolate flex flex-1 flex-col items-center justify-center gap-6 bg-[#0a0a0b] px-6 text-center text-white">
+              {/* Začetni zaslon Sam Špili: isto ozadje kot aplikacija (vzorec Vrat kitare). */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+                <PatternSvg id="fretboard" colors={BACKGROUND_COLORS} className="h-full w-full" />
+                <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_45%,rgba(255,255,255,0.04),transparent_70%)]" />
+              </div>
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Zapri"
                 title="Zapri"
-                className="absolute right-3 top-3 p-1.5 text-(--cv-muted) hover:text-(--cv-text)"
+                className="absolute right-3 top-3 p-1.5 text-neutral-400 hover:text-white"
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
                   <path d="M18 6 6 18M6 6l12 12" />
@@ -4001,7 +4007,7 @@ export default function ChordsViewer({
                   onClick={follower ? ssFollowerFullscreen : enterLandscapeFullscreen}
                   aria-label="Celozaslonsko"
                   title={follower ? "Celozaslonsko" : "Celozaslonsko (ležeče)"}
-                  className="absolute right-12 top-3 p-1.5 text-(--cv-muted) hover:text-(--cv-text)"
+                  className="absolute right-12 top-3 p-1.5 text-neutral-400 hover:text-white"
                 >
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
                     <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
@@ -4009,17 +4015,17 @@ export default function ChordsViewer({
                 </button>
               )}
               <div>
-                <p className="text-4xl font-bold leading-tight sm:text-6xl">{song.title}</p>
-                <p className="mt-2 text-xl text-(--cv-muted) sm:text-3xl">{song.author}</p>
+                <p className="text-4xl font-light leading-tight tracking-tight sm:text-6xl">{song.title}</p>
+                <p className="mt-2 text-xl font-light text-neutral-400 sm:text-3xl">{song.author}</p>
               </div>
               {follower ? (
                 <div className="flex flex-col items-center gap-4">
-                  <p className="text-base text-(--cv-muted)">Čakaš, da {follower.leaderName} zažene skladbo …</p>
+                  <p className="text-base text-neutral-400">Čakaš, da {follower.leaderName} zažene skladbo …</p>
                   {!ssIsFullscreen && canBrowserFullscreen() && (
                     <button
                       type="button"
                       onClick={ssFollowerFullscreen}
-                      className="flex items-center gap-2 rounded-full border border-orange-400 px-4 py-2 text-sm font-medium text-orange-400 active:scale-95"
+                      className="flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-sm font-medium text-white backdrop-blur-xl transition hover:bg-white/[0.12] active:scale-95"
                     >
                       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                         <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
@@ -4035,21 +4041,23 @@ export default function ChordsViewer({
                 disabled={ssRequested}
                 aria-label="Predvajaj"
                 title="Predvajaj"
-                className="flex h-24 w-24 items-center justify-center rounded-full bg-orange-400 text-neutral-900 shadow-lg transition hover:bg-orange-300 active:scale-95 disabled:opacity-70 sm:h-28 sm:w-28"
+                className="group relative flex h-24 w-24 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-xl transition hover:scale-105 hover:border-white/25 hover:bg-white/[0.1] active:scale-95 disabled:opacity-70 sm:h-28 sm:w-28"
               >
+                {/* Nežen obroč okrog gumba */}
+                <span aria-hidden="true" className="pointer-events-none absolute -inset-3 rounded-full border border-white/[0.06] transition group-hover:-inset-4 group-hover:border-white/10" />
                 {ssRequested ? (
-                  <span className="h-8 w-8 animate-spin rounded-full border-4 border-neutral-900/30 border-t-neutral-900" />
+                  <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
                 ) : (
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="ml-1.5 h-12 w-12">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="ml-1.5 h-10 w-10 sm:h-11 sm:w-11">
                     <path d="M7 4.5v15l12.5-7.5L7 4.5z" />
                   </svg>
                 )}
               </button>
               )}
               {!smartAvailable && (
-                <p className="text-sm text-(--cv-muted)">Za to skladbo še ni besedila s časi — Smart play ne bo sledil petju.</p>
+                <p className="text-sm text-neutral-400">Za to skladbo še ni besedila s časi — Smart play ne bo sledil petju.</p>
               )}
-              <p className="hidden text-sm text-(--cv-muted) portrait:block">Za večje vrstice obrni telefon v ležeči položaj.</p>
+              <p className="hidden text-sm text-neutral-500 portrait:block">Za večje vrstice obrni telefon v ležeči položaj.</p>
             </div>
           )}
         </div>
