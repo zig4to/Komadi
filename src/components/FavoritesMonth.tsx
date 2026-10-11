@@ -137,11 +137,11 @@ export function FavoriteCard({
         borderColor: `${accent}38`,
         boxShadow: `0 8px 18px -14px ${accent}66`,
       }}
-      className="relative isolate flex items-center gap-2.5 overflow-hidden rounded-xl border bg-white p-2 pr-12 dark:bg-[#111114]"
+      className="relative isolate flex items-center gap-2.5 overflow-hidden rounded-xl border bg-white p-2 pr-12 dark:rounded-2xl dark:border-white/[0.08]! dark:bg-white/[0.035] dark:bg-none! dark:shadow-none! dark:transition dark:hover:bg-white/[0.06]"
     >
       <div
         style={{ backgroundColor: `${accent}33`, color: accent }}
-        className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg text-lg font-bold"
+        className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg text-lg font-bold dark:rounded-xl"
       >
         {authorImage ? (
           <img
@@ -163,7 +163,7 @@ export function FavoriteCard({
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-semibold leading-tight text-neutral-900 dark:text-neutral-100">{song.title}</p>
+        <p className="truncate text-[15px] font-semibold leading-tight text-neutral-900 dark:font-normal dark:text-white">{song.title}</p>
         <p className="flex min-w-0 items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
           <button
             type="button"
@@ -232,7 +232,7 @@ export function FavoriteCard({
           skladba odstrani samo v meniju SongCard (Priljubljena). */}
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute -right-5 top-1/2 -z-10 -translate-y-1/2 opacity-20 ${
+        className={`pointer-events-none absolute -right-5 top-1/2 -z-10 -translate-y-1/2 opacity-20 dark:opacity-10 ${
           variant === "verified" ? "text-orange-500 dark:text-orange-400" : "text-amber-500 dark:text-amber-400"
         }`}
       >
@@ -365,7 +365,7 @@ function Swiper({
                 onClick={() => scrollToGroup(i)}
                 aria-label={`Skupina ${i + 1}`}
                 className={`h-1.5 rounded-full transition-all ${
-                  i === active ? "w-5 bg-amber-500" : "w-1.5 bg-neutral-300 hover:bg-neutral-400 dark:bg-neutral-700"
+                  i === active ? "w-5 bg-amber-500 dark:bg-white/80" : "w-1.5 bg-neutral-300 hover:bg-neutral-400 dark:bg-white/20 dark:hover:bg-white/40"
                 }`}
               />
             ))}
@@ -394,7 +394,7 @@ function ArrowButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={direction === "left" ? "Nazaj" : "Naprej"}
-      className="flex h-7 w-7 items-center justify-center rounded-full border border-neutral-300 text-neutral-600 transition-colors hover:border-amber-500 hover:text-amber-500 disabled:pointer-events-none disabled:opacity-30 dark:border-neutral-700 dark:text-neutral-300"
+      className="flex h-7 w-7 items-center justify-center rounded-full border border-neutral-300 text-neutral-600 transition-colors hover:border-amber-500 hover:text-amber-500 disabled:pointer-events-none disabled:opacity-30 dark:border-white/10 dark:text-neutral-400 dark:hover:border-white/20 dark:hover:bg-white/[0.08] dark:hover:text-white"
     >
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
         <path d={direction === "left" ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
@@ -433,7 +433,7 @@ function OthersColumns({
       {people.map((p) => (
         <div
           key={p.userId}
-          className="flex w-[86%] shrink-0 snap-start flex-col rounded-2xl border border-amber-500/25 bg-amber-500/[0.03] p-2 sm:w-[calc(50%-6px)] lg:w-[calc((100%-24px)/3)]"
+          className="flex w-[86%] shrink-0 snap-start flex-col rounded-2xl border border-amber-500/25 bg-amber-500/[0.03] p-2 dark:rounded-[20px] dark:border-white/[0.08] dark:bg-white/[0.025] sm:w-[calc(50%-6px)] lg:w-[calc((100%-24px)/3)]"
         >
           <div className="mb-2 flex items-center gap-2 px-1">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-[11px] font-bold text-amber-700 dark:text-amber-300">
@@ -548,7 +548,7 @@ export function FavoritesThisMonth({
   return (
     <section className="mb-5">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-1.5 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
+        <h2 className="flex items-center gap-1.5 text-lg font-semibold text-neutral-800 dark:font-light dark:text-white">
           <StarIcon filled={false} className="h-[18px] w-[18px] text-amber-500 dark:text-amber-400" />
           Priljubljeno {MONTH_GENITIVE[Number(key.slice(5)) - 1]}
         </h2>
@@ -561,7 +561,7 @@ export function FavoritesThisMonth({
             className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition ${
               othersToggled
                 ? "border-amber-500 bg-amber-500 text-white dark:text-neutral-950"
-                : "border-amber-500/50 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300"
+                : "border-amber-500/50 text-amber-700 hover:bg-amber-500/10 dark:border-white/10 dark:bg-white/[0.05] dark:text-amber-300 dark:hover:bg-white/[0.1]"
             }`}
           >
             <UsersIcon className="h-[15px] w-[15px]" />
@@ -577,7 +577,7 @@ export function FavoritesThisMonth({
           <OthersColumns people={people} authorImages={authorImages} {...handlers} />
         </>
       ) : items.length === 0 ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/[0.04] px-4 py-3.5 text-sm text-neutral-600 dark:text-neutral-300">
+        <div className="flex items-center gap-3 rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/[0.04] dark:border-white/10 dark:bg-white/[0.03] px-4 py-3.5 text-sm text-neutral-600 dark:text-neutral-300">
           <StarIcon filled={false} className="h-5 w-5 shrink-0 text-amber-500" />
           <p>
             Ta mesec še ni priljubljenih. Skladbo dodaš v meniju kartice (☰) z gumbom{" "}
@@ -633,7 +633,7 @@ export function VerifiedSongs({
   return (
     <section className="mb-5">
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <h2 className="flex items-center gap-1.5 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
+        <h2 className="flex items-center gap-1.5 text-lg font-semibold text-neutral-800 dark:font-light dark:text-white">
           <PlayCircleIcon className="h-[18px] w-[18px] text-orange-500 dark:text-orange-400" />
           Preverjeno špila
         </h2>
@@ -641,7 +641,7 @@ export function VerifiedSongs({
       </div>
 
       {items.length === 0 ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-dashed border-orange-500/40 bg-orange-500/[0.04] px-4 py-3.5 text-sm text-neutral-600 dark:text-neutral-300">
+        <div className="flex items-center gap-3 rounded-2xl border border-dashed border-orange-500/40 bg-orange-500/[0.04] dark:border-white/10 dark:bg-white/[0.03] px-4 py-3.5 text-sm text-neutral-600 dark:text-neutral-300">
           <CheckIcon className="h-5 w-5 shrink-0 text-orange-500" />
           <p>
             Še ni preverjenih skladb. Skladbo preveriš na strani <span className="font-medium">Pregled in odobritev</span> ali v ⚙
@@ -697,7 +697,7 @@ export function FavoritesArchive({ songs, ...handlers }: { songs: Song[] } & Car
     <div className="space-y-8">
       {months.map(([key, list]) => (
         <section key={key}>
-          <h2 className="mb-2 flex items-baseline gap-2 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
+          <h2 className="mb-2 flex items-baseline gap-2 text-lg font-semibold text-neutral-800 dark:font-light dark:text-white">
             {monthLabel(key)}
             <span className="text-sm font-normal text-neutral-500 dark:text-neutral-400">{list.length}</span>
           </h2>

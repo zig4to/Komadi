@@ -64,7 +64,7 @@ export default function JamArchive({
     <div className="space-y-8">
       {sortedDays.map(([key, list]) => (
         <section key={key}>
-          <h2 className="mb-3 flex items-baseline gap-2 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
+          <h2 className="mb-3 flex items-baseline gap-2 text-lg font-semibold text-neutral-800 dark:font-light dark:text-white">
             {dayLabel(key)}
             <span className="text-sm font-normal text-neutral-500 dark:text-neutral-400">{skladb(list.length)}</span>
           </h2>

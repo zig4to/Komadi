@@ -48,7 +48,7 @@ export default function JamTargetMenu({
       role="menu"
       data-view-portal
       style={{ top: anchor.bottom + 4, left }}
-      className="fixed z-50 w-48 space-y-0.5 rounded-xl border border-fuchsia-500/40 bg-white p-1.5 shadow-xl dark:border-fuchsia-400/40 dark:bg-neutral-900"
+      className="fixed z-50 w-48 space-y-0.5 rounded-xl border border-fuchsia-500/40 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-neutral-900"
     >
       <JamTargetItems onPick={onPick} />
     </div>,

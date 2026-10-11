@@ -100,7 +100,7 @@ export default function JamBoard({
           value={pickerQuery}
           onChange={(e) => setPickerQuery(e.target.value)}
           placeholder="Išči po naslovu ali avtorju…"
-          className="w-full rounded-full border border-fuchsia-500/40 bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] px-4 py-2 text-sm text-neutral-800 placeholder-neutral-500 transition focus:outline-none dark:border-fuchsia-400/40 dark:text-neutral-200 dark:placeholder-neutral-500"
+          className="w-full rounded-full border border-fuchsia-500/40 bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] px-4 py-2 text-sm text-neutral-800 placeholder-neutral-500 transition focus:outline-none dark:border-white/10 dark:text-neutral-200 dark:placeholder-neutral-500"
         />
         {pickerQuery.trim() && pickerResults.length === 0 && (
           <p className="text-sm text-neutral-500 dark:text-neutral-400">Ni zadetkov.</p>
@@ -138,7 +138,7 @@ export default function JamBoard({
         <button
           type="button"
           onClick={() => setPickerOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-full border border-fuchsia-500/40 bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.24)_15%,rgba(192,38,211,0.06)_95%)] dark:border-fuchsia-400/40 dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.32)_15%,rgba(192,38,211,0.1)_95%)]"
+          className="inline-flex items-center gap-1.5 rounded-full border border-fuchsia-500/40 bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.24)_15%,rgba(192,38,211,0.06)_95%)] dark:border-white/10 dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
         >
           <svg
             aria-hidden="true"
@@ -168,7 +168,7 @@ export default function JamBoard({
       </div>
 
       {quickAddOpen && (
-        <div className="space-y-2 rounded-lg border border-fuchsia-500/40 bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] p-3 dark:border-fuchsia-400/40">
+        <div className="space-y-2 rounded-lg border border-fuchsia-500/40 bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] p-3 dark:border-white/10">
           <input
             autoFocus
             value={quickAddTitle}

@@ -54,13 +54,13 @@ function AuthorCard({
         borderColor: `${accent}38`,
         boxShadow: `0 8px 18px -12px ${accent}30, 0 2px 8px -4px rgb(0 0 0 / 0.15)`,
       }}
-      className={`rounded-2xl border bg-white p-3.5 dark:bg-[#111114] ${className}`}
+      className={`rounded-2xl border bg-white p-3.5 dark:rounded-[20px] dark:border-white/[0.08]! dark:bg-white/[0.035] dark:bg-none! dark:shadow-none! ${className}`}
     >
       <button
         type="button"
         onClick={() => onFilterAuthor(group.author)}
         style={{ color: accent }}
-        className="mb-2 block text-left text-lg leading-tight font-bold hover:underline lg:text-xl"
+        className="mb-2 block text-left text-lg leading-tight font-bold hover:underline lg:text-xl dark:font-light"
       >
         {group.author}
       </button>

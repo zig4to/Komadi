@@ -302,16 +302,16 @@ export function HighlightRow({
                 borderColor: `${accent}38`,
                 boxShadow: `0 10px 24px -10px ${accent}${shadowAlpha}, 0 2px 8px -4px rgb(0 0 0 / 0.15)`,
               }}
-              className={`group relative flex ${cardSizeClassName} shrink-0 flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition active:scale-[0.97] ${
+              className={`group relative flex ${cardSizeClassName} shrink-0 flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition active:scale-[0.97] dark:rounded-[20px] dark:border-white/[0.08]! dark:shadow-none! ${
                 image
                   ? "bg-neutral-800 text-white"
-                  : "bg-white text-neutral-900 dark:bg-[#111114] dark:text-white"
+                  : "bg-white text-neutral-900 dark:bg-white/[0.035] dark:bg-none! dark:text-white dark:hover:bg-white/[0.06]"
               }`}
             >
               {image && (
                 <span
                   aria-hidden="true"
-                  className={`absolute inset-0 ${imageOpacityClassName}`}
+                  className={`absolute inset-0 dark:grayscale-[30%] ${imageOpacityClassName}`}
                   style={{
                     backgroundImage: `url(${image})`,
                     backgroundSize: "cover",
@@ -330,14 +330,14 @@ export function HighlightRow({
                 <span
                   aria-hidden="true"
                   style={{ color: accent }}
-                  className="pointer-events-none absolute -right-4 -bottom-4 h-20 w-20 rotate-[-12deg] opacity-[0.22] transition-transform duration-300 group-active:rotate-[-6deg]"
+                  className="pointer-events-none absolute -right-4 -bottom-4 h-20 w-20 rotate-[-12deg] opacity-[0.22] transition-transform duration-300 group-active:rotate-[-6deg] dark:opacity-[0.12]"
                 >
                   {icon}
                 </span>
               )}
               <div className="relative">
                 <p
-                  className={`${labelClassName} leading-tight font-bold`}
+                  className={`${labelClassName} leading-tight font-bold dark:font-light`}
                   style={labelStroke ? { WebkitTextStroke: `1px ${accent}38` } : undefined}
                 >
                   {formatLabel(item.label)}

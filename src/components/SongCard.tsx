@@ -250,10 +250,10 @@ export default function SongCard({
   return (
     <div
       style={cardStyle}
-      className={`relative isolate overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] px-4 py-3 transition duration-200 hover:-translate-y-0.5 dark:bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.20),transparent_60%)] lg:min-h-[112px] ${
+      className={`relative isolate overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] px-4 py-3 transition duration-200 hover:-translate-y-0.5 dark:rounded-[20px] dark:bg-none dark:bg-white/[0.035] dark:shadow-none! lg:min-h-[112px] ${
         highlighted
           ? "border-emerald-500"
-          : "border-neutral-200 dark:border-neutral-800"
+          : "border-neutral-200 dark:border-white/[0.08]!"
       }`}
     >
       {/* Odobrena skladba, ročno preverjena: dve kljukici desno spodaj — rumena
@@ -295,7 +295,7 @@ export default function SongCard({
             const img = e.currentTarget;
             if (img.naturalHeight > img.naturalWidth) setPortraitSrc(authorImage);
           }}
-          className="pointer-events-none absolute inset-y-0 -right-8 h-full w-[63%] object-cover opacity-60 lg:opacity-20"
+          className="pointer-events-none absolute inset-y-0 -right-8 h-full w-[63%] object-cover opacity-60 lg:opacity-20 dark:opacity-45 dark:grayscale-[35%] dark:lg:opacity-25"
           style={{
             clipPath: IMAGE_CLIP_PATH,
             zIndex: -1,
@@ -305,7 +305,7 @@ export default function SongCard({
       )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-medium text-neutral-900 lg:text-base dark:text-neutral-100">
+          <p className="truncate text-lg font-medium text-neutral-900 lg:text-base dark:font-normal dark:text-white">
             {song.title}
           </p>
           <button

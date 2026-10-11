@@ -89,7 +89,7 @@ export function ImportReports({ batches, error }: { batches: ImportBatch[]; erro
         return (
           <div
             key={b.id}
-            className="overflow-hidden rounded-2xl border-2 border-fuchsia-500/40 bg-fuchsia-500/[0.04] dark:border-fuchsia-400/30"
+            className="overflow-hidden rounded-2xl border-2 border-fuchsia-500/40 bg-fuchsia-500/[0.04] dark:border-white/10"
           >
             <button
               type="button"
@@ -109,7 +109,7 @@ export function ImportReports({ batches, error }: { batches: ImportBatch[]; erro
             </button>
 
             {open && (
-              <div className="space-y-4 border-t border-dashed border-fuchsia-500/40 px-4 pb-4 pt-3 text-sm dark:border-fuchsia-400/30">
+              <div className="space-y-4 border-t border-dashed border-fuchsia-500/40 px-4 pb-4 pt-3 text-sm dark:border-white/10">
                 {added.length > 0 && (
                   <section className="space-y-2">
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Dodane skladbe</h3>

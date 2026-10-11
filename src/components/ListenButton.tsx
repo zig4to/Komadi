@@ -83,7 +83,7 @@ export default function ListenButton({
         aria-expanded={menuOpen}
         aria-label="Poslušaj"
         title="Poslušaj"
-        className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 bg-white/70 px-1 py-0.5 leading-none text-emerald-600 backdrop-blur-sm transition hover:border-emerald-500 hover:text-emerald-700 dark:border-emerald-400/40 dark:bg-neutral-900/70 dark:text-emerald-400 dark:hover:text-emerald-300"
+        className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 bg-white/70 px-1 py-0.5 leading-none text-emerald-600 backdrop-blur-sm transition hover:border-emerald-500 hover:text-emerald-700 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] dark:text-emerald-400 dark:hover:text-emerald-300"
       >
         <svg
           aria-hidden="true"

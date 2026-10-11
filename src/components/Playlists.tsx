@@ -21,9 +21,9 @@ function skladb(n: number) {
 }
 
 const inputClass =
-  "w-full rounded-full border border-yellow-500/40 bg-[linear-gradient(115deg,rgba(202,138,4,0.14)_15%,rgba(202,138,4,0.03)_95%)] px-4 py-2 text-sm text-neutral-800 placeholder-neutral-500 transition focus:outline-none dark:border-yellow-400/40 dark:text-neutral-200 dark:placeholder-neutral-500";
+  "w-full rounded-full border border-yellow-500/40 bg-[linear-gradient(115deg,rgba(202,138,4,0.14)_15%,rgba(202,138,4,0.03)_95%)] px-4 py-2 text-sm text-neutral-800 placeholder-neutral-500 transition focus:outline-none dark:border-white/10 dark:text-neutral-200 dark:placeholder-neutral-500";
 const buttonClass =
-  "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-yellow-500/40 bg-[linear-gradient(115deg,rgba(202,138,4,0.14)_15%,rgba(202,138,4,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(202,138,4,0.24)_15%,rgba(202,138,4,0.06)_95%)] disabled:opacity-40 dark:border-yellow-400/40 dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(202,138,4,0.32)_15%,rgba(202,138,4,0.1)_95%)]";
+  "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-yellow-500/40 bg-[linear-gradient(115deg,rgba(202,138,4,0.14)_15%,rgba(202,138,4,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(202,138,4,0.24)_15%,rgba(202,138,4,0.06)_95%)] disabled:opacity-40 dark:border-white/10 dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]";
 
 export default function Playlists({
   songs,
@@ -301,7 +301,7 @@ export default function Playlists({
                 key={p.id}
                 type="button"
                 onClick={() => setSelectedId(p.id)}
-                className="flex items-center gap-3 rounded-xl border border-yellow-500/30 bg-[linear-gradient(115deg,rgba(202,138,4,0.10)_15%,rgba(202,138,4,0.02)_95%)] px-4 py-3 text-left transition hover:border-yellow-500 dark:border-yellow-400/30 dark:hover:border-yellow-400"
+                className="flex items-center gap-3 rounded-xl border border-yellow-500/30 bg-[linear-gradient(115deg,rgba(202,138,4,0.10)_15%,rgba(202,138,4,0.02)_95%)] px-4 py-3 text-left transition hover:border-yellow-500 dark:border-white/10 dark:hover:border-yellow-400"
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 shrink-0 text-yellow-600 dark:text-yellow-400">
                   <path d="M16 6H3" />

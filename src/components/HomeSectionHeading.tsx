@@ -24,7 +24,7 @@ export default function HomeSectionHeading({
   onToggle: () => void;
 }) {
   return (
-    <h2 className="mb-2 text-lg font-semibold text-neutral-800 dark:text-neutral-100">
+    <h2 className="mb-2 text-lg font-semibold text-neutral-800 dark:font-light dark:text-white">
       <button
         type="button"
         onClick={onToggle}

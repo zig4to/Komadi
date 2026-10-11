@@ -2119,7 +2119,7 @@ export default function Dashboard({ user }: { user: User }) {
               >
                 <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
               </svg>
-              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
+              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:font-light dark:text-white dark:drop-shadow-none">
                 {jamShared && !jamArchiveOpen ? "Bitne Jam!" : "Privat Jam!"}
               </span>
             </h1>
@@ -2204,7 +2204,7 @@ export default function Dashboard({ user }: { user: User }) {
                 <circle cx="12" cy="12" r="6" />
                 <circle cx="12" cy="12" r="2" />
               </svg>
-              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
+              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:font-light dark:text-white dark:drop-shadow-none">
                 Mojih 20 skladb
               </span>
             </h1>
@@ -2247,7 +2247,7 @@ export default function Dashboard({ user }: { user: User }) {
                 <path d="M21 15V6" />
                 <circle cx="18.5" cy="15.5" r="2.5" />
               </svg>
-              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
+              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:font-light dark:text-white dark:drop-shadow-none">
                 Playliste
               </span>
             </h1>
@@ -2286,7 +2286,7 @@ export default function Dashboard({ user }: { user: User }) {
               >
                 <path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />
               </svg>
-              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
+              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:font-light dark:text-white dark:drop-shadow-none">
                 Arhiv priljubljenih
               </span>
             </h1>
@@ -2329,7 +2329,7 @@ export default function Dashboard({ user }: { user: User }) {
                 <path d="M16 6H3" />
                 <path d="M12 18H3" />
               </svg>
-              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
+              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:font-light dark:text-white dark:drop-shadow-none">
                 Čakalna vrsta
               </span>
             </h1>
@@ -2369,7 +2369,7 @@ export default function Dashboard({ user }: { user: User }) {
                 <path d="M21.8 10A10 10 0 1 1 17 3.34" />
                 <path d="m9 11 3 3L22 4" />
               </svg>
-              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
+              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:font-light dark:text-white dark:drop-shadow-none">
                 Pregled in odobritev
               </span>
             </h1>
@@ -2408,7 +2408,7 @@ export default function Dashboard({ user }: { user: User }) {
               >
                 <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
               </svg>
-              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
+              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:font-light dark:text-white dark:drop-shadow-none">
                 Popravi skladbe
               </span>
             </h1>
@@ -2450,14 +2450,14 @@ export default function Dashboard({ user }: { user: User }) {
                     strokeWidth={1.8}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="h-6 w-6 shrink-0 text-emerald-600 dark:text-emerald-400"
+                    className="h-6 w-6 shrink-0 text-emerald-600 dark:text-neutral-200"
                   >
                     <path d="m11.9 12.1 4.514-4.514" />
                     <path d="M20.1 2.3a1 1 0 0 0-1.4 0l-1.114 1.114A2 2 0 0 0 17 4.828v1.344a2 2 0 0 1-.586 1.414A2 2 0 0 1 17.828 7h1.344a2 2 0 0 0 1.414-.586L21.7 5.3a1 1 0 0 0 0-1.4z" />
                     <path d="m6 16 2 2" />
                     <path d="M8.23 9.85A3 3 0 0 1 11 8a5 5 0 0 1 5 5 3 3 0 0 1-1.85 2.77l-.92.38A2 2 0 0 0 12 18a4 4 0 0 1-4 4 6 6 0 0 1-6-6 4 4 0 0 1 4-4 2 2 0 0 0 1.85-1.23z" />
                   </svg>
-                  <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:text-white dark:drop-shadow-[0_1px_6px_rgba(255,255,255,0.15)]">
+                  <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:font-light dark:text-white dark:drop-shadow-none">
                     Bitne Tabs
                   </span>
                 </button>
@@ -2483,7 +2483,7 @@ export default function Dashboard({ user }: { user: User }) {
                 disabled={!isSupabaseConfigured}
                 aria-label="Dodaj skladbo"
                 title="Dodaj skladbo"
-                className="inline-flex items-center justify-center gap-1.5 rounded-full border border-emerald-500/50 bg-transparent p-2.5 text-emerald-600 transition hover:bg-emerald-500/10 disabled:opacity-40 lg:px-4 lg:py-2 dark:border-emerald-400/50 dark:text-emerald-400"
+                className="inline-flex items-center justify-center gap-1.5 rounded-full border border-emerald-500/50 bg-transparent p-2.5 text-emerald-600 transition hover:bg-emerald-500/10 disabled:opacity-40 lg:px-4 lg:py-2 dark:border-white/10 dark:bg-white/[0.05] dark:text-neutral-100 dark:hover:bg-white/[0.1]"
               >
                 <svg
                   aria-hidden="true"
@@ -2518,10 +2518,10 @@ export default function Dashboard({ user }: { user: User }) {
                 aria-pressed={sharedOn}
                 aria-label="Skupno"
                 title="Skupno — skladbe drugih uporabnikov, uvozi jih v svojo knjižnico"
-                className={`ml-1.5 inline-flex items-center justify-center rounded-full border border-sky-500/50 p-2.5 transition dark:border-sky-400/50 ${
+                className={`ml-1.5 inline-flex items-center justify-center rounded-full border border-sky-500/50 p-2.5 transition dark:border-white/10 ${
                   sharedOn
                     ? "bg-[linear-gradient(115deg,#0284c7_15%,#38bdf8_100%)] text-white"
-                    : "bg-transparent text-sky-600 hover:bg-sky-500/10 dark:text-sky-400"
+                    : "bg-transparent text-sky-600 hover:bg-sky-500/10 dark:bg-white/[0.05] dark:text-sky-300 dark:hover:bg-white/[0.1]"
                 }`}
               >
                 <svg
@@ -2712,7 +2712,7 @@ export default function Dashboard({ user }: { user: User }) {
                 value={goalPickerQuery}
                 onChange={(e) => setGoalPickerQuery(e.target.value)}
                 placeholder="Išči po naslovu ali avtorju…"
-                className="w-full rounded-full border border-amber-500/40 bg-[linear-gradient(115deg,rgba(217,119,6,0.14)_15%,rgba(217,119,6,0.03)_95%)] px-4 py-2 text-sm text-neutral-800 placeholder-neutral-500 transition focus:outline-none dark:border-amber-400/40 dark:text-neutral-200 dark:placeholder-neutral-500"
+                className="w-full rounded-full border border-amber-500/40 bg-[linear-gradient(115deg,rgba(217,119,6,0.14)_15%,rgba(217,119,6,0.03)_95%)] px-4 py-2 text-sm text-neutral-800 placeholder-neutral-500 transition focus:outline-none dark:border-white/10 dark:text-neutral-200 dark:placeholder-neutral-500"
               />
               {goalPickerQuery.trim() && goalPickerResults.length === 0 && (
                 <p className="text-sm text-neutral-500 dark:text-neutral-400">
@@ -2754,7 +2754,7 @@ export default function Dashboard({ user }: { user: User }) {
                 <button
                   type="button"
                   onClick={() => setGoalPickerOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-[linear-gradient(115deg,rgba(217,119,6,0.14)_15%,rgba(217,119,6,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(217,119,6,0.24)_15%,rgba(217,119,6,0.06)_95%)] dark:border-amber-400/40 dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(217,119,6,0.32)_15%,rgba(217,119,6,0.1)_95%)]"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-[linear-gradient(115deg,rgba(217,119,6,0.14)_15%,rgba(217,119,6,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(217,119,6,0.24)_15%,rgba(217,119,6,0.06)_95%)] dark:border-white/10 dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
                 >
                   <svg
                     aria-hidden="true"
@@ -2784,7 +2784,7 @@ export default function Dashboard({ user }: { user: User }) {
               </div>
 
               {goalQuickAddOpen && (
-                <div className="space-y-2 rounded-lg border border-amber-500/40 bg-[linear-gradient(115deg,rgba(217,119,6,0.14)_15%,rgba(217,119,6,0.03)_95%)] p-3 dark:border-amber-400/40">
+                <div className="space-y-2 rounded-lg border border-amber-500/40 bg-[linear-gradient(115deg,rgba(217,119,6,0.14)_15%,rgba(217,119,6,0.03)_95%)] p-3 dark:border-white/10">
                   <input
                     autoFocus
                     value={goalQuickAddTitle}
@@ -2836,7 +2836,7 @@ export default function Dashboard({ user }: { user: User }) {
                   {goalItems.map((item, i) => (
                     <div
                       key={item.key}
-                      className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-2.5 dark:border-neutral-800 dark:bg-neutral-900"
+                      className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-2.5 dark:border-white/[0.08] dark:bg-white/[0.035]"
                     >
                       <span
                         className={`w-6 shrink-0 text-right text-lg font-semibold ${
@@ -2954,7 +2954,7 @@ export default function Dashboard({ user }: { user: User }) {
         <div className="mt-3! space-y-4">
           <hr className="border-t border-neutral-200 dark:border-neutral-800" />
 
-          <div role="tablist" className="flex gap-1 overflow-x-auto rounded-full border border-fuchsia-500/30 p-1 text-sm dark:border-fuchsia-400/30">
+          <div role="tablist" className="flex gap-1 overflow-x-auto rounded-full border border-fuchsia-500/30 p-1 text-sm dark:border-white/10">
             {QUEUE_TABS.map((tab) => (
               <button
                 key={tab}
@@ -3001,7 +3001,7 @@ export default function Dashboard({ user }: { user: User }) {
                 return (
                   <div
                     key={q.id}
-                    className="overflow-hidden rounded-2xl border-2 border-fuchsia-500/50 bg-fuchsia-500/[0.05] shadow-sm dark:border-fuchsia-400/40 dark:bg-fuchsia-400/[0.05]"
+                    className="overflow-hidden rounded-2xl border-2 border-fuchsia-500/50 bg-fuchsia-500/[0.05] shadow-sm dark:border-white/10 dark:bg-fuchsia-400/[0.05]"
                   >
                     <div className="space-y-0.5 px-4 pb-2 pt-3">
                       <p className="truncate text-lg font-medium text-neutral-900 lg:text-base dark:text-neutral-100">
@@ -3015,7 +3015,7 @@ export default function Dashboard({ user }: { user: User }) {
                       </p>
                     </div>
 
-                    <div className="border-t border-dashed border-fuchsia-500/40 px-3 pb-3 pt-2.5 dark:border-fuchsia-400/30">
+                    <div className="border-t border-dashed border-fuchsia-500/40 px-3 pb-3 pt-2.5 dark:border-white/10">
                       {confirmRemoveQueuedId === q.id ? (
                         <div className="space-y-1.5 rounded-lg border border-red-500/40 bg-red-500/5 p-2">
                           <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200">
@@ -3087,7 +3087,7 @@ export default function Dashboard({ user }: { user: User }) {
                     </div>
 
                     {adding && (
-                      <div id="song-form" className="border-t border-dashed border-fuchsia-500/40 px-2 pb-2 pt-2 dark:border-fuchsia-400/30">
+                      <div id="song-form" className="border-t border-dashed border-fuchsia-500/40 px-2 pb-2 pt-2 dark:border-white/10">
                         <SongForm
                           key={`queue:${q.id}`}
                           initial={null}
@@ -3147,7 +3147,7 @@ export default function Dashboard({ user }: { user: User }) {
                 {reviewSongs.map((song) => (
                   <div
                     key={song.id}
-                    className="overflow-hidden rounded-2xl border-2 border-teal-500/60 bg-teal-500/[0.06] shadow-sm dark:border-teal-400/50 dark:bg-teal-400/[0.05]"
+                    className="overflow-hidden rounded-2xl border-2 border-teal-500/60 bg-teal-500/[0.06] shadow-sm dark:border-white/10 dark:bg-teal-400/[0.05]"
                   >
                     {/* Glava: klik razpre/pospravi nastavitve pod kartico. */}
                     <button
@@ -3206,7 +3206,7 @@ export default function Dashboard({ user }: { user: User }) {
                     <>
                     {/* Mreža enako velikih gumbov: urejanje in vrnitev,
                         preverjanje, Odobri čez vso širino. */}
-                    <div className="space-y-2 border-t border-dashed border-teal-500/50 px-3 pb-3 pt-2 dark:border-teal-400/40">
+                    <div className="space-y-2 border-t border-dashed border-teal-500/50 px-3 pb-3 pt-2 dark:border-white/10">
                       {!song.chords_text && (
                         <p className="text-xs text-amber-600 dark:text-amber-400">brez akordov v aplikaciji</p>
                       )}
@@ -3230,7 +3230,7 @@ export default function Dashboard({ user }: { user: User }) {
                         >
                           {approvingIds.get(song.id) === "return" ? "Vračam…" : "Vrni brez odobritve"}
                         </button>
-                        <hr className="col-span-2 my-0.5 border-t border-teal-500/30 dark:border-teal-400/25" />
+                        <hr className="col-span-2 my-0.5 border-t border-teal-500/30 dark:border-white/10" />
                         {/* Oboje mora biti potrjeno, preden se skladba lahko odobri. */}
                         <button
                           type="button"
@@ -3327,7 +3327,7 @@ export default function Dashboard({ user }: { user: User }) {
                 // rumeno obrobljenem okvirju, da je jasno, kaj sodi skupaj.
                 <div
                   key={song.id}
-                  className="overflow-hidden rounded-2xl border-2 border-yellow-500/60 bg-yellow-500/[0.06] shadow-sm dark:border-yellow-400/50 dark:bg-yellow-400/[0.05]"
+                  className="overflow-hidden rounded-2xl border-2 border-yellow-500/60 bg-yellow-500/[0.06] shadow-sm dark:border-white/10 dark:bg-yellow-400/[0.05]"
                 >
                   <div className="flex items-center gap-1.5 bg-yellow-500/15 px-3 py-1.5 text-xs font-semibold text-yellow-800 dark:bg-yellow-400/15 dark:text-yellow-300">
                     <svg
@@ -3367,7 +3367,7 @@ export default function Dashboard({ user }: { user: User }) {
                       onToggleFavorite={handleToggleFavorite}
                     />
                   </div>
-                  <div className="relative space-y-2 border-t border-dashed border-yellow-500/50 px-3 pb-3 pt-2.5 text-sm dark:border-yellow-400/40">
+                  <div className="relative space-y-2 border-t border-dashed border-yellow-500/50 px-3 pb-3 pt-2.5 text-sm dark:border-white/10">
                     <ul className="space-y-1.5">
                       {songReports.map((r) => (
                         <li key={r.id} className="flex items-start gap-1.5">
@@ -3517,7 +3517,7 @@ export default function Dashboard({ user }: { user: User }) {
                     )}
                   </div>
                   {editing?.id === song.id && (
-                    <div className="border-t border-dashed border-yellow-500/50 px-2 pb-2 dark:border-yellow-400/40">
+                    <div className="border-t border-dashed border-yellow-500/50 px-2 pb-2 dark:border-white/10">
                       {renderEditForm(song)}
                     </div>
                   )}
@@ -3551,7 +3551,7 @@ export default function Dashboard({ user }: { user: User }) {
           )}
 
           {partialOpen && partialDimension && (
-            <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+            <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-white/[0.08] dark:bg-white/[0.035]">
               <div className="mb-3 flex items-center justify-between">
                 <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
                   🔀 Delno naključno — {PARTIAL_LABELS[partialDimension]}
@@ -3627,7 +3627,7 @@ export default function Dashboard({ user }: { user: User }) {
           )}
 
           {randomPick && (
-            <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+            <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-white/[0.08] dark:bg-white/[0.035]">
               <div className="mb-4 flex items-center justify-between">
                 <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
                   🎲 Naključno izbrana skladba
@@ -3664,13 +3664,13 @@ export default function Dashboard({ user }: { user: User }) {
                   onClick={pickRandomFive}
                   aria-label="Prikaži 5 naključnih skladb"
                   title="Prikaži 5 naključnih skladb"
-                  className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 px-3 py-1 text-sm text-neutral-600 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-emerald-400/40 dark:text-neutral-300 dark:hover:text-emerald-400"
+                  className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 px-3 py-1 text-sm text-neutral-600 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:text-neutral-300 dark:hover:text-emerald-400"
                 >
                   ↻ 5
                 </button>
                 <button
                   onClick={handlePickAnother}
-                  className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 px-3 py-1 text-sm text-neutral-600 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-emerald-400/40 dark:text-neutral-300 dark:hover:text-emerald-400"
+                  className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 px-3 py-1 text-sm text-neutral-600 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:text-neutral-300 dark:hover:text-emerald-400"
                 >
                   ↻ Izberi drugo
                 </button>
@@ -3710,7 +3710,7 @@ export default function Dashboard({ user }: { user: User }) {
           )}
 
           {addChoiceOpen && (
-            <div className="rounded-xl border border-neutral-200 bg-white p-5 space-y-4 dark:border-neutral-800 dark:bg-neutral-900">
+            <div className="rounded-xl border border-neutral-200 bg-white p-5 space-y-4 dark:border-white/[0.08] dark:bg-white/[0.035]">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Dodaj skladbo</h2>
                 <button
@@ -3750,7 +3750,7 @@ export default function Dashboard({ user }: { user: User }) {
           {quickAddOpen && (
             <div
               id="quick-add-form"
-              className="rounded-xl border border-fuchsia-500/40 bg-white p-5 space-y-3 dark:border-fuchsia-400/40 dark:bg-neutral-900"
+              className="rounded-xl border border-fuchsia-500/40 bg-white p-5 space-y-3 dark:border-white/10 dark:bg-neutral-900"
             >
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Hitro dodaj skladbo</h2>
@@ -3846,7 +3846,7 @@ export default function Dashboard({ user }: { user: User }) {
                   enterKeyHint="search"
                   disabled={!isSupabaseConfigured}
                   aria-label="Išči po naslovu ali avtorju"
-                  className="w-full rounded-full border border-rose-500/40 bg-[linear-gradient(115deg,rgba(225,29,72,0.14)_15%,rgba(225,29,72,0.03)_95%)] py-2 pl-10 pr-9 text-sm text-neutral-800 transition focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.24)_15%,rgba(225,29,72,0.06)_95%)] focus:outline-none disabled:opacity-40 dark:border-rose-400/40 dark:text-neutral-200 dark:focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.32)_15%,rgba(225,29,72,0.1)_95%)]"
+                  className="w-full rounded-full border border-rose-500/40 bg-[linear-gradient(115deg,rgba(225,29,72,0.14)_15%,rgba(225,29,72,0.03)_95%)] py-2 pl-10 pr-9 text-sm text-neutral-800 transition focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.24)_15%,rgba(225,29,72,0.06)_95%)] focus:outline-none disabled:opacity-40 dark:border-white/10 dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:focus:bg-white/[0.1]"
                 />
                 {/* Placeholder as an overlay so it can be shorter on phones
                     (a native placeholder can't change text per breakpoint). */}
@@ -3909,10 +3909,10 @@ export default function Dashboard({ user }: { user: User }) {
                 disabled={!isSupabaseConfigured}
                 aria-pressed={jamOpen}
                 aria-label="Jam"
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-fuchsia-500/40 py-2 ${searchWide ? "px-2.5 lg:px-4" : "px-4"} text-sm font-medium transition disabled:opacity-40 dark:border-fuchsia-400/40 ${
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-fuchsia-500/40 py-2 ${searchWide ? "px-2.5 lg:px-4" : "px-4"} text-sm font-medium transition disabled:opacity-40 dark:border-white/10 ${
                   jamOpen
                     ? "bg-[linear-gradient(115deg,#a21caf_15%,#e879f9_100%)] text-white"
-                    : "bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.24)_15%,rgba(192,38,211,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.32)_15%,rgba(192,38,211,0.1)_95%)]"
+                    : "bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.24)_15%,rgba(192,38,211,0.06)_95%)] dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
                 }`}
               >
                 <svg
@@ -3936,10 +3936,10 @@ export default function Dashboard({ user }: { user: User }) {
                 disabled={!isSupabaseConfigured}
                 aria-pressed={playlistsOpen}
                 aria-label="Playliste"
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-yellow-500/40 py-2 ${searchWide ? "px-2.5 lg:px-4" : "px-4"} text-sm font-medium transition disabled:opacity-40 dark:border-yellow-400/40 ${
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-yellow-500/40 py-2 ${searchWide ? "px-2.5 lg:px-4" : "px-4"} text-sm font-medium transition disabled:opacity-40 dark:border-white/10 ${
                   playlistsOpen
                     ? "bg-[linear-gradient(115deg,#a16207_15%,#facc15_100%)] text-white"
-                    : "bg-[linear-gradient(115deg,rgba(202,138,4,0.14)_15%,rgba(202,138,4,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(202,138,4,0.24)_15%,rgba(202,138,4,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(202,138,4,0.32)_15%,rgba(202,138,4,0.1)_95%)]"
+                    : "bg-[linear-gradient(115deg,rgba(202,138,4,0.14)_15%,rgba(202,138,4,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(202,138,4,0.24)_15%,rgba(202,138,4,0.06)_95%)] dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
                 }`}
               >
                 <svg
@@ -3973,7 +3973,7 @@ export default function Dashboard({ user }: { user: User }) {
                 type="button"
                 onClick={pickRandom}
                 disabled={!isSupabaseConfigured}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-violet-500/40 bg-[linear-gradient(115deg,rgba(124,58,237,0.14)_15%,rgba(124,58,237,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(124,58,237,0.24)_15%,rgba(124,58,237,0.06)_95%)] disabled:opacity-40 dark:border-violet-400/40 dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(124,58,237,0.32)_15%,rgba(124,58,237,0.1)_95%)]"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-violet-500/40 bg-[linear-gradient(115deg,rgba(124,58,237,0.14)_15%,rgba(124,58,237,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(124,58,237,0.24)_15%,rgba(124,58,237,0.06)_95%)] disabled:opacity-40 dark:border-white/10 dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
               >
                 <svg
                   aria-hidden="true"
@@ -3998,7 +3998,7 @@ export default function Dashboard({ user }: { user: User }) {
                 type="button"
                 onClick={handlePartialStart}
                 disabled={!isSupabaseConfigured}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-cyan-600/40 bg-[linear-gradient(115deg,rgba(8,145,178,0.14)_15%,rgba(8,145,178,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(8,145,178,0.24)_15%,rgba(8,145,178,0.06)_95%)] disabled:opacity-40 dark:border-cyan-400/40 dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(8,145,178,0.32)_15%,rgba(8,145,178,0.1)_95%)]"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-cyan-600/40 bg-[linear-gradient(115deg,rgba(8,145,178,0.14)_15%,rgba(8,145,178,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(8,145,178,0.24)_15%,rgba(8,145,178,0.06)_95%)] disabled:opacity-40 dark:border-white/10 dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
               >
                 <svg
                   aria-hidden="true"
@@ -4033,10 +4033,10 @@ export default function Dashboard({ user }: { user: User }) {
                 }
                 disabled={!isSupabaseConfigured}
                 aria-pressed={activeView === "newest"}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/50 px-4 py-2 text-sm font-medium transition disabled:opacity-40 dark:border-emerald-400/50 ${
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/50 px-4 py-2 text-sm font-medium transition disabled:opacity-40 dark:border-white/10 ${
                   activeView === "newest"
                     ? "bg-[linear-gradient(115deg,#059669_15%,#34d399_100%)] text-white"
-                    : "bg-[linear-gradient(115deg,rgba(16,185,129,0.14)_15%,rgba(16,185,129,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.24)_15%,rgba(16,185,129,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.32)_15%,rgba(16,185,129,0.1)_95%)]"
+                    : "bg-[linear-gradient(115deg,rgba(16,185,129,0.14)_15%,rgba(16,185,129,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.24)_15%,rgba(16,185,129,0.06)_95%)] dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
                 }`}
               >
                 <svg
@@ -4066,10 +4066,10 @@ export default function Dashboard({ user }: { user: User }) {
                 }
                 disabled={!isSupabaseConfigured}
                 aria-pressed={activeView === "popular"}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-orange-500/50 px-4 py-2 text-sm font-medium transition disabled:opacity-40 dark:border-orange-400/50 ${
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-orange-500/50 px-4 py-2 text-sm font-medium transition disabled:opacity-40 dark:border-white/10 ${
                   activeView === "popular"
                     ? "bg-[linear-gradient(115deg,#ea580c_15%,#fb923c_100%)] text-white"
-                    : "bg-[linear-gradient(115deg,rgba(249,115,22,0.14)_15%,rgba(249,115,22,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(249,115,22,0.24)_15%,rgba(249,115,22,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(249,115,22,0.32)_15%,rgba(249,115,22,0.1)_95%)]"
+                    : "bg-[linear-gradient(115deg,rgba(249,115,22,0.14)_15%,rgba(249,115,22,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(249,115,22,0.24)_15%,rgba(249,115,22,0.06)_95%)] dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
                 }`}
               >
                 <svg
@@ -4149,7 +4149,7 @@ export default function Dashboard({ user }: { user: User }) {
             )}
 
           {authorFilter && (
-            <div className="mt-3! rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <div className="mt-3! rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm dark:border-white/[0.08] dark:bg-white/[0.035]">
               <span className="text-neutral-700 dark:text-neutral-300">
                 Skladbe izvajalca:{" "}
                 <span className="text-base font-semibold text-emerald-600 dark:text-emerald-400">
@@ -4264,7 +4264,7 @@ export default function Dashboard({ user }: { user: User }) {
                   <div className="flex min-w-0 items-center gap-2">
                     {/* Brez filtra je naslov (in prazen prostor desno do puščice) zložljiv —
                         isti vzorec kot ostali razdelki domače strani; z filtrom je desno "Nazaj". */}
-                    <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100">
+                    <h2 className="text-lg font-semibold text-neutral-800 dark:font-light dark:text-white">
                       {sharedOn || hasActiveFilters(filters) || authorFilter ? (
                         sharedOn ? "Skupno" : songsHeading
                       ) : (
@@ -4386,7 +4386,7 @@ export default function Dashboard({ user }: { user: User }) {
                               )
                                 handleImportShared(importable);
                             }}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-500/10 disabled:opacity-50 dark:border-emerald-400/50 dark:text-emerald-400"
+                            className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-500/10 disabled:opacity-50 dark:border-white/10 dark:text-emerald-400"
                           >
                             <svg
                               aria-hidden="true"
@@ -4619,7 +4619,7 @@ function CompactCard({
   onChordsClick?: (song: Song) => void;
 }) {
   return (
-    <div className="min-w-0 rounded-xl border border-neutral-200 bg-white p-3 transition hover:-translate-y-0.5 dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="min-w-0 rounded-xl border border-neutral-200 bg-white p-3 transition hover:-translate-y-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
       <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">
         {song.title}
       </p>
@@ -4649,7 +4649,7 @@ function CompactRow({
           ? // Oblika trzalice (guitar pick): oster kot = konica, preostali
             // trije zaobljeni = telo trzalice.
             "rounded-tl-sm rounded-tr-3xl rounded-br-3xl rounded-bl-3xl border-orange-400 bg-orange-500/10 dark:border-orange-600"
-          : "rounded-xl border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+          : "rounded-xl border-neutral-200 bg-white dark:border-white/[0.08] dark:bg-white/[0.035]"
       }`}
     >
       <span
@@ -4714,7 +4714,7 @@ function RecentGroupSection({
             <div
               key={group.label}
               style={{ borderLeftColor: accent, borderLeftWidth: 3 }}
-              className="rounded-xl border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900"
+              className="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.035]"
             >
               <p
                 className="mb-1.5 truncate text-sm font-semibold"

@@ -68,7 +68,7 @@ export default function SortMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         title="Razvrsti"
-        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-2 py-1 text-xs font-medium leading-none text-neutral-600 transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-300 dark:hover:text-amber-400"
+        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-2 py-1 text-xs font-medium leading-none text-neutral-600 transition hover:border-amber-500 hover:text-amber-600 dark:border-white/10 dark:bg-neutral-900/70 dark:text-neutral-300 dark:hover:text-amber-400"
       >
         <svg
           aria-hidden="true"

@@ -111,7 +111,7 @@ export default function ChordsButtons({
           aria-expanded={menuOpen}
           title="Akordi"
           aria-label="Akordi"
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-400/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-400/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] dark:text-neutral-400 dark:hover:text-amber-400"
         >
           <svg
             aria-hidden="true"
@@ -352,7 +352,7 @@ export default function ChordsButtons({
           rel="noopener noreferrer"
           onClick={() => onChordsClick?.(song)}
           title="Odpri na Ultimate Guitar"
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-orange-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-orange-500 hover:text-orange-600 dark:border-orange-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-orange-400"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-orange-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-orange-500 hover:text-orange-600 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] dark:text-neutral-400 dark:hover:text-orange-400"
         >
           <svg
             aria-hidden="true"
@@ -377,7 +377,7 @@ export default function ChordsButtons({
           rel="noopener noreferrer"
           onClick={() => onChordsClick?.(song)}
           title="Odpri na Zabrenkaj.si"
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-emerald-500 hover:text-emerald-600 dark:border-emerald-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-emerald-400"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] dark:text-neutral-400 dark:hover:text-emerald-400"
         >
           <GuitarIcon className="h-[11px] w-[11px] shrink-0 text-emerald-600 dark:text-emerald-400" />
           Zabrenkaj.si
@@ -391,7 +391,7 @@ export default function ChordsButtons({
           rel="noopener noreferrer"
           onClick={() => onChordsClick?.(song)}
           title={`Akordi na ${otherLabel}`}
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-violet-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-violet-500 hover:text-violet-600 dark:border-violet-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-violet-400"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-violet-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-violet-500 hover:text-violet-600 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] dark:text-neutral-400 dark:hover:text-violet-400"
         >
           <SongbookIcon className="h-[11px] w-[11px] shrink-0 text-violet-600 dark:text-violet-400" />
           {otherLabel}
@@ -406,7 +406,7 @@ export default function ChordsButtons({
             onChordsClick?.(song);
           }}
           title="Odpri PDF akorde"
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-amber-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-amber-400"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] dark:text-neutral-400 dark:hover:text-amber-400"
         >
           <svg
             aria-hidden="true"
@@ -433,7 +433,7 @@ export default function ChordsButtons({
         target="_blank"
         rel="noopener noreferrer"
         title="Spletno iskanje akordov"
-        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-sky-500 hover:text-sky-600 dark:border-sky-400/40 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-sky-400"
+        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-sky-500/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-sky-500 hover:text-sky-600 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] dark:text-neutral-400 dark:hover:text-sky-400"
       >
         <GlobeIcon className="h-[11px] w-[11px] shrink-0 text-sky-500" />
         {sourceCount === 0 ? "Spletno iskanje" : "Splet"}

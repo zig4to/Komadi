@@ -203,7 +203,7 @@ export default function SongForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-xl border border-neutral-200 bg-white p-5 space-y-4 dark:border-neutral-800 dark:bg-neutral-900"
+      className="rounded-xl border border-neutral-200 bg-white p-5 space-y-4 dark:border-white/[0.08] dark:bg-white/[0.035]"
     >
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">

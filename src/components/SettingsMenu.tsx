@@ -302,7 +302,7 @@ export default function SettingsMenu({
         className={`inline-flex items-center justify-center rounded-full border border-current/40 p-2.5 transition-all duration-300 ${
           menuOpen
             ? "animate-menu-open bg-slate-400/25 text-slate-800 ring-2 ring-slate-400/35 dark:bg-slate-400/20 dark:text-slate-100 dark:ring-slate-400/30"
-            : "bg-[linear-gradient(115deg,rgba(100,116,139,0.14)_15%,rgba(100,116,139,0.03)_95%)] text-slate-600 hover:bg-[linear-gradient(115deg,rgba(100,116,139,0.24)_15%,rgba(100,116,139,0.06)_95%)] dark:text-slate-400 dark:hover:bg-[linear-gradient(115deg,rgba(100,116,139,0.32)_15%,rgba(100,116,139,0.1)_95%)]"
+            : "bg-[linear-gradient(115deg,rgba(100,116,139,0.14)_15%,rgba(100,116,139,0.03)_95%)] text-slate-600 hover:bg-[linear-gradient(115deg,rgba(100,116,139,0.24)_15%,rgba(100,116,139,0.06)_95%)] dark:text-slate-400 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
         }`}
       >
         <svg

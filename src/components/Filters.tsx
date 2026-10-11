@@ -19,10 +19,10 @@ export function FiltersToggle() {
         data-filters-toggle
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-blue-500/50 px-4 py-2 text-sm font-medium transition dark:border-blue-400/50 ${
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-blue-500/50 px-4 py-2 text-sm font-medium transition dark:border-white/10 ${
           open
             ? "bg-[linear-gradient(115deg,#2563eb_15%,#60a5fa_100%)] text-white"
-            : "bg-[linear-gradient(115deg,rgba(37,99,235,0.14)_15%,rgba(37,99,235,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(37,99,235,0.24)_15%,rgba(37,99,235,0.06)_95%)] dark:text-neutral-200 dark:hover:bg-[linear-gradient(115deg,rgba(37,99,235,0.32)_15%,rgba(37,99,235,0.1)_95%)]"
+            : "bg-[linear-gradient(115deg,rgba(37,99,235,0.14)_15%,rgba(37,99,235,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(37,99,235,0.24)_15%,rgba(37,99,235,0.06)_95%)] dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
         }`}
       >
         <svg
@@ -75,7 +75,7 @@ export default function Filters({
   return (
     <div
       data-filters-panel
-      className="mt-3! space-y-4 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900"
+      className="mt-3! space-y-4 rounded-xl border border-neutral-200 bg-white p-5 dark:border-white/[0.08] dark:bg-white/[0.035]"
     >
       <div className="flex justify-start">
         <button
@@ -84,7 +84,7 @@ export default function Filters({
             onChange(emptyFilters);
             setOpen(false);
           }}
-          className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 px-3 py-1 text-xs text-neutral-500 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-emerald-400/40 dark:text-neutral-400 dark:hover:text-emerald-400"
+          className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 px-3 py-1 text-xs text-neutral-500 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:text-neutral-400 dark:hover:text-emerald-400"
         >
           Počisti filtre
         </button>
