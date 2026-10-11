@@ -25,12 +25,22 @@ const MENU_TONES = {
   violet: { rgb: "139 92 246", box: "bg-violet-500/[0.07] dark:bg-white/[0.035]", label: "text-violet-700 dark:text-violet-400" },
 } as const;
 
-function MenuSection({ tone, label, children }: { tone: keyof typeof MENU_TONES; label?: string; children: React.ReactNode }) {
+function MenuSection({
+  tone,
+  label,
+  className = "",
+  children,
+}: {
+  tone: keyof typeof MENU_TONES;
+  label?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
   const t = MENU_TONES[tone];
   return (
     <div
       style={{ "--menu-hover": `rgb(${t.rgb} / 0.18)`, "--menu-active": `rgb(${t.rgb} / 0.3)` } as React.CSSProperties}
-      className={`rounded-lg p-0.5 [&+&]:mt-1.5 ${t.box}`}
+      className={`rounded-lg p-0.5 [&+&]:mt-1.5 ${t.box} ${className}`}
     >
       {label && (
         <p className={`px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider ${t.label}`}>{label}</p>
@@ -86,6 +96,8 @@ export default function SettingsMenu({
   onOpenFavArchive,
   onOpenJamArchive,
   favArchiveMonthCount = 0,
+  onOpenShared,
+  sharedOn = false,
   onOpenReview,
   reviewCount = 0,
   user,
@@ -108,6 +120,9 @@ export default function SettingsMenu({
   // Odpre Jam s prikazanim arhivom preteklih Jamov.
   onOpenJamArchive?: () => void;
   favArchiveMonthCount?: number;
+  // Telefon: "Skupno" (skladbe drugih uporabnikov) je tu namesto v navigaciji.
+  onOpenShared?: () => void;
+  sharedOn?: boolean;
   // Odpre celostransko stran "Pregled in odobritev" (skladbe z review_pending).
   onOpenReview?: () => void;
   reviewCount?: number;
@@ -621,6 +636,41 @@ export default function SettingsMenu({
           )}
 
           </MenuSection>
+          {onOpenShared && (
+            <MenuSection tone="sky" label="Skupno" className="lg:hidden">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onOpenShared();
+                }}
+                aria-pressed={sharedOn}
+                className={`mt-0.5 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 transition-colors hover:bg-(--menu-hover) active:bg-(--menu-active) dark:text-neutral-200 ${
+                  sharedOn ? "bg-(--menu-hover)" : ""
+                }`}
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-[18px] w-[18px] shrink-0 text-sky-600 dark:text-sky-400"
+                >
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                <span className="min-w-0">
+                  <span className="block">Skladbe drugih</span>
+                  <span className="block text-xs font-normal text-neutral-500">uvozi jih v svojo knjižnico</span>
+                </span>
+              </button>
+            </MenuSection>
+          )}
           <MenuSection tone="sky" label="Delavnica">
           <button
             type="button"

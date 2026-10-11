@@ -2721,6 +2721,8 @@ export default function Dashboard({ user }: { user: User }) {
                     window.scrollTo({ top: 0 });
                   }}
                   favArchiveMonthCount={favoriteArchiveMonths(songs).length}
+                  onOpenShared={() => handleMainNav("shared")}
+                  sharedOn={sharedOn}
                 />
               </div>
             </div>

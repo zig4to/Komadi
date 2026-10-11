@@ -2,7 +2,8 @@
 
 // Glavna navigacija (tabletke): Domov · Jam · Playliste · Skupno. Na
 // računalniku v glavi domače strani, na telefonu (in na računalniku na
-// celozaslonskih straneh) kot vrstica pod glavo. Ikone obdržijo barvo
+// celozaslonskih straneh) kot vrstica pod glavo. Skupno je na telefonu v
+// meniju ⋮ (oddelek "Skupno" pod Uporabnikom), ne v vrstici. Ikone obdržijo barvo
 // funkcije, aktivna tabletka je poudarjena.
 
 export type MainNavTab = "home" | "jam" | "playlists" | "shared";
@@ -80,7 +81,9 @@ export default function MainNav({
             onClick={() => onSelect(t.id)}
             disabled={disabled}
             aria-current={on ? "page" : undefined}
-            className={`inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition disabled:opacity-40 lg:flex-none lg:px-3.5 ${
+            className={`min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition disabled:opacity-40 lg:flex-none lg:px-3.5 ${
+              t.id === "shared" ? "hidden lg:inline-flex" : "inline-flex"
+            } ${
               on
                 ? "bg-neutral-900 font-medium text-white dark:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
                 : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-white/[0.05] dark:hover:text-neutral-200"
