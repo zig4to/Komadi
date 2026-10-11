@@ -13,8 +13,16 @@ export default function ThemeProvider() {
   const { pattern } = useTheme();
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 hidden overflow-hidden dark:block">
+      {/* Telefon: blažji sij (manjši zaslon, isti krogi pokrijejo več). */}
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 lg:hidden"
+        style={{
+          backgroundImage:
+            "radial-gradient(32rem 24rem at 100% 0%, rgba(139,92,246,0.08), transparent 65%), radial-gradient(30rem 22rem at 0% 100%, rgba(16,185,129,0.06), transparent 65%)",
+        }}
+      />
+      <div
+        className="absolute inset-0 hidden lg:block"
         style={{
           backgroundImage:
             "radial-gradient(55rem 38rem at 100% 0%, rgba(139,92,246,0.13), transparent 65%), radial-gradient(50rem 36rem at 0% 100%, rgba(16,185,129,0.10), transparent 65%)",
