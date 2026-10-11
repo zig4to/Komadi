@@ -3,6 +3,7 @@
 import { useFlipUpMenu } from "@/lib/useFlipUpMenu";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import JamTargetMenu from "@/components/JamTargetMenu";
 import ListenButton from "@/components/ListenButton";
 import PdfViewer from "@/components/PdfViewer";
 import { enterLandscapeFullscreen, openChordsViewer } from "@/lib/openChords";
@@ -32,6 +33,8 @@ export default function ChordsButtons({
   stacked = false,
   merged = false,
   menuAlign = "left",
+  onAddToJam,
+  onAddToSharedJam,
 }: {
   song: Song;
   onChordsClick?: (song: Song) => void;
@@ -48,9 +51,14 @@ export default function ChordsButtons({
   // gumb tik ob desnem robu vrstice (CompactRow na "Popularno"), da se meni
   // ne razteza čez desni rob zaslona.
   menuAlign?: "left" | "right";
+  // Gumb "Dodaj v Jam" v spodnji vrstici izbire akordov (samo kjer ga kartica
+  // podpira); z onAddToSharedJam najprej vpraša, kateri Jam.
+  onAddToJam?: (song: Song) => void;
+  onAddToSharedJam?: (song: Song) => void;
 }) {
   const [pdfOpen, setPdfOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [jamAnchor, setJamAnchor] = useState<DOMRect | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; bottom: number; left: number; width: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLElement | null>(null);
@@ -74,6 +82,7 @@ export default function ChordsButtons({
     if (!menuOpen) return;
     function onPointerDown(e: PointerEvent) {
       const target = e.target as Node;
+      if ((target as Element).closest?.("[data-view-portal]") && !menuPanelRef.current?.contains(target)) return;
       if (!cardRef.current?.contains(target) && !menuPanelRef.current?.contains(target)) setMenuOpen(false);
     }
     function onKey(e: KeyboardEvent) {
@@ -308,16 +317,53 @@ export default function ChordsButtons({
               )}
               </div>
               <div className="my-0.5 border-t border-neutral-200 dark:border-white/[0.08]" />
-              <a
-                href={searchUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
-              >
-                <GlobeIcon className="h-[13px] w-[13px] shrink-0 text-sky-500" />
-                Spletno iskanje
-              </a>
+              <div className="flex items-center gap-1.5 px-1 pb-0.5 pt-1">
+                <a
+                  href={searchUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setMenuOpen(false)}
+                  title="Spletno iskanje"
+                  aria-label="Spletno iskanje"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white transition hover:bg-neutral-100 dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.1] text-sky-500"
+                >
+                  <GlobeIcon className="h-4 w-4 shrink-0" />
+                </a>
+                <ListenButton song={song} large />
+                {onAddToJam && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      if (onAddToSharedJam) {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setJamAnchor((open) => (open ? null : rect));
+                        return;
+                      }
+                      onAddToJam(song);
+                      setMenuOpen(false);
+                    }}
+                    title="Dodaj v Jam"
+                    aria-label="Dodaj v Jam"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white transition hover:bg-neutral-100 dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.1] text-fuchsia-600 dark:text-fuchsia-400"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
+                      <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+                    </svg>
+                  </button>
+                )}
+                {jamAnchor && onAddToJam && onAddToSharedJam && (
+                  <JamTargetMenu
+                    anchor={jamAnchor}
+                    onClose={() => setJamAnchor(null)}
+                    onPick={(target) => {
+                      setJamAnchor(null);
+                      if (target === "private") onAddToJam(song);
+                      else onAddToSharedJam(song);
+                      setMenuOpen(false);
+                    }}
+                  />
+                )}
+              </div>
             </div>,
             document.body,
           )}

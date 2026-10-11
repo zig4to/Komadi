@@ -15,9 +15,12 @@ import type { Song } from "@/types/song";
 export default function ListenButton({
   song,
   menuAlign = "left",
+  large = false,
 }: {
   song: Song;
   menuAlign?: "left" | "right";
+  // Okrogel ikonski gumb (spodnja vrstica izbire akordov pod kartico).
+  large?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; bottom: number; left?: number; right?: number } | null>(null);
@@ -83,7 +86,11 @@ export default function ListenButton({
         aria-expanded={menuOpen}
         aria-label="Poslušaj"
         title="Poslušaj"
-        className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 bg-white/70 px-1 py-0.5 leading-none text-emerald-600 backdrop-blur-sm transition hover:border-emerald-500 hover:text-emerald-700 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] dark:text-emerald-400 dark:hover:text-emerald-300"
+        className={
+          large
+            ? "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white transition hover:bg-neutral-100 dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.1] text-emerald-600 dark:text-emerald-400"
+            : "inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 bg-white/70 px-1 py-0.5 leading-none text-emerald-600 backdrop-blur-sm transition hover:border-emerald-500 hover:text-emerald-700 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] dark:text-emerald-400 dark:hover:text-emerald-300"
+        }
       >
         <svg
           aria-hidden="true"
@@ -93,7 +100,7 @@ export default function ListenButton({
           strokeWidth={1.8}
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="h-[13px] w-[13px] shrink-0"
+          className={large ? "h-4 w-4 shrink-0" : "h-[13px] w-[13px] shrink-0"}
         >
           <path d="M9 18V5l12-2v13" />
           <circle cx="6" cy="18" r="3" />

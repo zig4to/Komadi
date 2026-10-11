@@ -640,7 +640,7 @@ export default function SongCard({
       </div>
 
       <div className="mt-1 flex w-full min-w-0 flex-wrap items-center gap-1.5 text-xs">
-        <ChordsButtons song={song} onChordsClick={onChordsClick} merged />
+        <ChordsButtons song={song} onChordsClick={onChordsClick} merged onAddToJam={onAddToJam} onAddToSharedJam={onAddToSharedJam} />
       </div>
 
       {playlistPickerOpen && (

@@ -177,7 +177,7 @@ export function FavoriteCard({
           {date && <span className="shrink-0">· {date}</span>}
         </p>
         <span className="mt-1 inline-flex items-center gap-1">
-          <ChordsButtons song={song} onChordsClick={onChordsClick} merged />
+          <ChordsButtons song={song} onChordsClick={onChordsClick} merged onAddToJam={onAddToJam} onAddToSharedJam={onAddToSharedJam} />
           {onAddToJam && (
             <button
               type="button"
