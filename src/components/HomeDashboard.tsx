@@ -457,6 +457,7 @@ function TopoCorner({ hover }: { hover: string }) {
 
 // Valovna oblika zvoka (stolpci kot v predvajalniku) v spodnjem desnem kotu
 // kartice Preverjeno špila — skladbe, ki "špilajo". Proti levi stolpci upadejo.
+// Barva stolpca prek currentColor (class na <rect>), zato vsak svojo.
 const WAVE = [0.35, 0.6, 0.45, 0.8, 0.55, 1, 0.7, 0.9, 0.5, 0.75, 0.4, 0.65, 0.3];
 function WaveCorner({ hover }: { hover: string }) {
   return (
@@ -471,7 +472,19 @@ function WaveCorner({ hover }: { hover: string }) {
           const x = 160 - 8 - i * 11;
           const fade = 1 - i / (WAVE.length + 2);
           const height = 10 + h * 70 * fade;
-          return <rect key={i} x={x - 3} y={118 - height} width={6} height={height} rx={3} />;
+          // Ob prehodu izmenično bel in oranžen stolpec.
+          return (
+            <rect
+              key={i}
+              x={x - 3}
+              y={118 - height}
+              width={6}
+              height={height}
+              rx={3}
+              stroke="currentColor"
+              className={`transition-colors duration-300 ${i % 2 ? "group-hover:text-neutral-900/30 dark:group-hover:text-white/50" : "group-hover:text-orange-400/75"}`}
+            />
+          );
         })}
       </g>
     </svg>
