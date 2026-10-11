@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { User } from "@supabase/supabase-js";
 import ChordsButtons from "@/components/ChordsButtons";
 import JamBoard, { type JamBoardItem } from "@/components/JamBoard";
@@ -1935,6 +1935,118 @@ export default function Dashboard({ user }: { user: User }) {
   // Skupni Jam: Nazaj vrne na osebni Jam.
   useBackableOpen(jamOpen && jamShared && !jamArchiveOpen, () => setJamShared(false));
   // Privat Jam / Skupni Jam (JamModeToggle): vedno je izbran eden; izbira zapre arhiv.
+  // Računalnik (lg): iskanje je v glavi (kot na predogledu), na telefonu v
+  // vrstici pod njo — vedno samo eno polje, da searchInputRef kaže nanj.
+  const isDesktop = useSyncExternalStore(
+    (cb) => {
+      const mq = window.matchMedia("(min-width: 1024px)");
+      mq.addEventListener("change", cb);
+      return () => mq.removeEventListener("change", cb);
+    },
+    () => window.matchMedia("(min-width: 1024px)").matches,
+    () => false,
+  );
+  // "/" kjerkoli (razen v polju za vnos) skoči v iskanje.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.closest("input, textarea, select, [contenteditable='true']"))) return;
+      if (!searchInputRef.current) return;
+      e.preventDefault();
+      searchInputRef.current.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  function renderSearchBox(className: string) {
+    return (
+      <div className={className}>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-rose-600 dark:text-neutral-500"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                <input
+                  ref={searchInputRef}
+                  value={filters.search}
+                  onChange={(e) =>
+                    handleFiltersChange({ ...filters, search: e.target.value })
+                  }
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                  // Enter na telefonski tipkovnici zapre tipkovnico (rezultati so že spodaj).
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
+                  enterKeyHint="search"
+                  disabled={!isSupabaseConfigured}
+                  aria-label="Išči po naslovu ali avtorju"
+                  className="w-full rounded-full border border-rose-500/40 bg-[linear-gradient(115deg,rgba(225,29,72,0.14)_15%,rgba(225,29,72,0.03)_95%)] py-2 pl-10 pr-9 text-sm text-neutral-800 transition focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.24)_15%,rgba(225,29,72,0.06)_95%)] focus:outline-none disabled:opacity-40 dark:border-white/10 dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:focus:bg-white/[0.1]"
+                />
+                {/* Placeholder as an overlay so it can be shorter on phones
+                    (a native placeholder can't change text per breakpoint). */}
+                {!filters.search && (
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none absolute left-9 top-1/2 -translate-y-1/2 whitespace-nowrap text-sm text-neutral-500 lg:left-10 ${
+                      isSupabaseConfigured ? "" : "opacity-40"
+                    }`}
+                  >
+                    <span className="lg:hidden">Išči</span>
+                    <span className="hidden lg:inline">
+                      Išči skladbo ali avtorja
+                    </span>
+                  </span>
+                )}
+                {/* ✕ znotraj polja, čisto desno: viden že ob kliku v polje (fokus) ali z
+                    vpisanim besedilom; počisti iskanje in ga zapre (izgubi fokus). onPointerDown
+                    prepreči, da bi polje izgubilo fokus (in se ✕ skril), preden se klik zgodi. */}
+                {/* Računalnik: namig za bližnjico "/" (fokus v iskanje). */}
+                {!searchWide && (
+                  <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-neutral-300 px-1.5 text-[10px] leading-4 text-neutral-500 lg:block dark:border-white/10">
+                    /
+                  </kbd>
+                )}
+                {searchWide && (
+                  <button
+                    type="button"
+                    onPointerDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      handleFiltersChange({ ...filters, search: "" });
+                      searchInputRef.current?.blur();
+                      setSearchFocused(false);
+                    }}
+                    aria-label="Zapri iskanje"
+                    title="Zapri iskanje"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-3.5 w-3.5"
+                    >
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+      </div>
+    );
+  }
+
   // Glavna navigacija (Domov · Jam · Playliste · Skupno). Druge celozaslonske
   // strani (Mojih 20, Popravi, Pregled …) nimajo zavihka — takrat ni aktiven noben.
   const activeNav: MainNavTab | null = jamOpen
@@ -2526,6 +2638,7 @@ export default function Dashboard({ user }: { user: User }) {
               <MainNav active={activeNav} onSelect={handleMainNav} disabled={!isSupabaseConfigured} className="hidden lg:flex" />
             </div>
             <div className="flex items-center gap-2">
+              {isDesktop && renderSearchBox("relative w-64 xl:w-72")}
               <button
                 onClick={() => {
                   if (voiceAddOpen) {
@@ -2545,7 +2658,7 @@ export default function Dashboard({ user }: { user: User }) {
                 disabled={!isSupabaseConfigured}
                 aria-label="Dodaj skladbo"
                 title="Dodaj skladbo"
-                className="inline-flex items-center justify-center gap-1.5 rounded-full border border-emerald-500/50 bg-transparent p-2.5 text-emerald-600 transition hover:bg-emerald-500/10 disabled:opacity-40 lg:px-4 lg:py-2 dark:border-white/10 dark:bg-white/[0.05] dark:text-neutral-100 dark:hover:bg-white/[0.1]"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-500/50 bg-transparent text-emerald-600 transition hover:bg-emerald-500/10 disabled:opacity-40 dark:border-white/10 dark:bg-white/[0.05] dark:text-neutral-100 dark:hover:bg-white/[0.1]"
               >
                 <svg
                   aria-hidden="true"
@@ -2559,11 +2672,8 @@ export default function Dashboard({ user }: { user: User }) {
                 >
                   <path d="M12 5v14M5 12h14" />
                 </svg>
-                <span className="hidden text-sm font-medium lg:inline">
-                  Dodaj nov komad
-                </span>
               </button>
-              <div className="ml-1.5">
+              <div>
                 <SettingsMenu
                   user={user}
                   onImported={(imported) =>
@@ -3843,88 +3953,7 @@ export default function Dashboard({ user }: { user: User }) {
 
           <div className="space-y-2.5 lg:flex lg:flex-wrap lg:items-center lg:gap-2 lg:space-y-0">
             <div className="flex items-center gap-2 lg:contents">
-              <div
-                className={`relative lg:w-1/2 lg:max-w-xs lg:flex-none ${
-                  "min-w-0 flex-1"
-                }`}
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-rose-600 dark:text-rose-400"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.3-4.3" />
-                </svg>
-                <input
-                  ref={searchInputRef}
-                  value={filters.search}
-                  onChange={(e) =>
-                    handleFiltersChange({ ...filters, search: e.target.value })
-                  }
-                  onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setSearchFocused(false)}
-                  // Enter na telefonski tipkovnici zapre tipkovnico (rezultati so že spodaj).
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") e.currentTarget.blur();
-                  }}
-                  enterKeyHint="search"
-                  disabled={!isSupabaseConfigured}
-                  aria-label="Išči po naslovu ali avtorju"
-                  className="w-full rounded-full border border-rose-500/40 bg-[linear-gradient(115deg,rgba(225,29,72,0.14)_15%,rgba(225,29,72,0.03)_95%)] py-2 pl-10 pr-9 text-sm text-neutral-800 transition focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.24)_15%,rgba(225,29,72,0.06)_95%)] focus:outline-none disabled:opacity-40 dark:border-white/10 dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:focus:bg-white/[0.1]"
-                />
-                {/* Placeholder as an overlay so it can be shorter on phones
-                    (a native placeholder can't change text per breakpoint). */}
-                {!filters.search && (
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none absolute left-9 top-1/2 -translate-y-1/2 whitespace-nowrap text-sm text-neutral-500 lg:left-10 ${
-                      isSupabaseConfigured ? "" : "opacity-40"
-                    }`}
-                  >
-                    <span className="lg:hidden">Išči</span>
-                    <span className="hidden lg:inline">
-                      Išči po naslovu ali avtorju…
-                    </span>
-                  </span>
-                )}
-                {/* ✕ znotraj polja, čisto desno: viden že ob kliku v polje (fokus) ali z
-                    vpisanim besedilom; počisti iskanje in ga zapre (izgubi fokus). onPointerDown
-                    prepreči, da bi polje izgubilo fokus (in se ✕ skril), preden se klik zgodi. */}
-                {searchWide && (
-                  <button
-                    type="button"
-                    onPointerDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      handleFiltersChange({ ...filters, search: "" });
-                      searchInputRef.current?.blur();
-                      setSearchFocused(false);
-                    }}
-                    aria-label="Zapri iskanje"
-                    title="Zapri iskanje"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300"
-                  >
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-3.5 w-3.5"
-                    >
-                      <path d="M18 6 6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-
+              {!isDesktop && renderSearchBox("relative min-w-0 flex-1")}
             </div>
 
             {/* Telefon: med iskanjem (polje v fokusu) se vrstica Naključno/Delno/Novo/Popularno/Filtri

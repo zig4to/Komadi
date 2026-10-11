@@ -299,10 +299,10 @@ export default function SettingsMenu({
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         title="Meni"
-        className={`inline-flex items-center justify-center rounded-full border border-current/40 p-2.5 transition-all duration-300 ${
+        className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-current/40 transition-all duration-300 dark:border-white/10 ${
           menuOpen
-            ? "animate-menu-open bg-slate-400/25 text-slate-800 ring-2 ring-slate-400/35 dark:bg-slate-400/20 dark:text-slate-100 dark:ring-slate-400/30"
-            : "bg-[linear-gradient(115deg,rgba(100,116,139,0.14)_15%,rgba(100,116,139,0.03)_95%)] text-slate-600 hover:bg-[linear-gradient(115deg,rgba(100,116,139,0.24)_15%,rgba(100,116,139,0.06)_95%)] dark:text-slate-400 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
+            ? "animate-menu-open bg-slate-400/25 text-slate-800 ring-2 ring-slate-400/35 dark:bg-white/[0.14] dark:text-white dark:ring-white/15"
+            : "bg-[linear-gradient(115deg,rgba(100,116,139,0.14)_15%,rgba(100,116,139,0.03)_95%)] text-slate-600 hover:bg-[linear-gradient(115deg,rgba(100,116,139,0.24)_15%,rgba(100,116,139,0.06)_95%)] dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
         }`}
       >
         <svg
@@ -315,9 +315,9 @@ export default function SettingsMenu({
           strokeLinejoin="round"
           className="h-[18px] w-[18px] shrink-0"
         >
-          <path d="M4 6h16" />
-          <path d="M4 12h16" />
-          <path d="M4 18h16" />
+          <circle cx="12" cy="5" r="1" />
+          <circle cx="12" cy="12" r="1" />
+          <circle cx="12" cy="19" r="1" />
         </svg>
       </button>
 
