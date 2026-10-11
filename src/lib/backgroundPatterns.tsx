@@ -20,10 +20,11 @@ export function isPatternId(v: unknown): v is PatternId {
 const W = 1440;
 const H = 900;
 
-type Colors = { line: string; accent: string };
+// dots = barva pik na vratu kitare (privzeto accent).
+type Colors = { line: string; accent: string; dots?: string };
 
 // Ozadje: zelo temne črte (3 % bele) z redkimi smaragdnimi poudarki.
-export const BACKGROUND_COLORS: Colors = { line: "rgba(255,255,255,0.03)", accent: "rgba(52,211,153,0.08)" };
+export const BACKGROUND_COLORS: Colors = { line: "rgba(255,255,255,0.03)", accent: "rgba(52,211,153,0.08)", dots: "rgba(52,211,153,0.22)" };
 
 // Na ozkem (pokončnem) zaslonu se vidi samo del širine; poravnava pove, kateri
 // del — pri zvočniku in diagramu desni, kjer sta narisana.
@@ -86,7 +87,7 @@ function fretStringY(i: number, x: number) {
   return H * 0.62 - spread / 2 + (spread / 5) * i - 120 * t;
 }
 
-function Fretboard({ line, accent }: Colors) {
+function Fretboard({ line, accent, dots }: Colors) {
   const fx = (n: number) => -80 + (W + 300) * (1 - Math.pow(2, -n / 12)) * 1.3;
   const sy = fretStringY;
   return (
@@ -100,7 +101,8 @@ function Fretboard({ line, accent }: Colors) {
       })}
       {[3, 5, 7, 9, 12, 15, 17].map((n) => {
         const x = (fx(n - 1) + fx(n)) / 2;
-        return <circle key={`d${n}`} cx={x} cy={(sy(2, x) + sy(3, x)) / 2} r={4} stroke={accent} />;
+        // Pike: večje in zapolnjene, da so vidne (blažje od strun pa še vedno v ozadju).
+        return <circle key={`d${n}`} cx={x} cy={(sy(2, x) + sy(3, x)) / 2} r={6} stroke={dots ?? accent} fill={dots ?? accent} fillOpacity={0.45} />;
       })}
     </>
   );
