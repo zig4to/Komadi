@@ -272,11 +272,14 @@ function Swiper({
   groupClassName,
   className = "",
   renderCard,
+  arrows = false,
 }: {
   groups: Song[][];
   groupClassName: string;
   className?: string;
   renderCard: (song: Song) => React.ReactNode;
+  // Gumba ‹ › levo in desno od pik (za miško na računalniku).
+  arrows?: boolean;
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
@@ -352,21 +355,51 @@ function Swiper({
       </div>
 
       {positions > 1 && (
-        <div className="mt-2.5 flex justify-center gap-1.5">
-          {Array.from({ length: positions }, (_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => scrollToGroup(i)}
-              aria-label={`Skupina ${i + 1}`}
-              className={`h-1.5 rounded-full transition-all ${
-                i === active ? "w-5 bg-amber-500" : "w-1.5 bg-neutral-300 hover:bg-neutral-400 dark:bg-neutral-700"
-              }`}
-            />
-          ))}
+        <div className={`flex items-center justify-center gap-3 ${arrows ? "mt-1.5" : "mt-2.5"}`}>
+          {arrows && <ArrowButton direction="left" disabled={active === 0} onClick={() => scrollToGroup(active - 1)} />}
+          <div className="flex justify-center gap-1.5">
+            {Array.from({ length: positions }, (_, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => scrollToGroup(i)}
+                aria-label={`Skupina ${i + 1}`}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === active ? "w-5 bg-amber-500" : "w-1.5 bg-neutral-300 hover:bg-neutral-400 dark:bg-neutral-700"
+                }`}
+              />
+            ))}
+          </div>
+          {arrows && (
+            <ArrowButton direction="right" disabled={active >= positions - 1} onClick={() => scrollToGroup(active + 1)} />
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+function ArrowButton({
+  direction,
+  disabled,
+  onClick,
+}: {
+  direction: "left" | "right";
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={direction === "left" ? "Nazaj" : "Naprej"}
+      className="flex h-7 w-7 items-center justify-center rounded-full border border-neutral-300 text-neutral-600 transition-colors hover:border-amber-500 hover:text-amber-500 disabled:pointer-events-none disabled:opacity-30 dark:border-neutral-700 dark:text-neutral-300"
+    >
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+        <path d={direction === "left" ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
+      </svg>
+    </button>
   );
 }
 
@@ -564,6 +597,7 @@ export function FavoritesThisMonth({
             groups={chunk(items, DESKTOP_PAGE_SIZE)}
             groupClassName="grid w-full grid-cols-3 content-start gap-x-3 gap-y-2"
             renderCard={renderCard}
+            arrows
           />
         </>
       )}
@@ -627,6 +661,7 @@ export function VerifiedSongs({
             groups={chunk(items, DESKTOP_PAGE_SIZE)}
             groupClassName="grid w-full grid-cols-3 content-start gap-x-3 gap-y-2"
             renderCard={renderCard}
+            arrows
           />
         </>
       )}
