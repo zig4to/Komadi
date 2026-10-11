@@ -213,8 +213,8 @@ export function HomeBento({
     <div className={`grid grid-cols-6 gap-3 lg:grid-cols-12 ${className}`}>
       {showStats && (
         <>
-          <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} decor={<TopoCorner hover="group-hover:text-neutral-400/40 dark:group-hover:text-neutral-400/40" />} />
-          <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={`/${total}`} dot="bg-orange-400" onClick={onOpenVerified} decor={<WaveCorner hover="group-hover:text-orange-400/40 dark:group-hover:text-orange-400/40" />} />
+          <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} decor={<TopoCorner hover="deco:text-neutral-400/40 dark:deco:text-neutral-400/40" />} />
+          <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={`/${total}`} dot="bg-orange-400" onClick={onOpenVerified} decor={<VerifiedCorner hover="deco:text-orange-400/40 dark:deco:text-orange-400/40" />} />
           <StatCard className="col-span-3" label="V pregledu" value={review} dot="bg-teal-400" onClick={onOpenReview} decor={<ChecklistCorner />} />
           <StatCard className="col-span-3" label="V Skupnem Jamu" value={jamCount} dot="bg-fuchsia-400" pulse={jamCount > 0} onClick={onOpenJam} decor={<CirclesCorner />} />
         </>
@@ -461,37 +461,26 @@ function TopoCorner({ hover }: { hover: string }) {
   );
 }
 
-// Valovna oblika zvoka (stolpci kot v predvajalniku) v spodnjem desnem kotu
-// kartice Preverjeno špila — skladbe, ki "špilajo". Proti levi stolpci upadejo.
-// Barva stolpca prek currentColor (class na <rect>), zato vsak svojo.
-const WAVE = [0.35, 0.6, 0.45, 0.8, 0.55, 1, 0.7, 0.9, 0.5, 0.75, 0.4, 0.65, 0.3];
-function WaveCorner({ hover }: { hover: string }) {
+// Preverjeno špila: znak "preverjeno" — kljukica v krogu, okrog nje valovi
+// (kot da skladba igra); ob prehodu (telefon: stalno) kljukica oranžna, valovi
+// izmenično oranžni in beli.
+function VerifiedCorner({ hover }: { hover: string }) {
+  const cx = 128;
+  const cy = 92;
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 160 120"
-      preserveAspectRatio="xMaxYMax meet"
-      className={`pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] transition-colors duration-300 dark:text-white/[0.045] ${hover}`}
-    >
-      <g fill="none" stroke="currentColor" strokeWidth="1" vectorEffect="non-scaling-stroke">
-        {WAVE.map((h, i) => {
-          const x = 160 - 8 - i * 11;
-          const fade = 1 - i / (WAVE.length + 2);
-          const height = 10 + h * 70 * fade;
-          // Ob prehodu izmenično bel in oranžen stolpec.
-          return (
-            <rect
-              key={i}
-              x={x - 3}
-              y={118 - height}
-              width={6}
-              height={height}
-              rx={3}
-              stroke="currentColor"
-              className={`transition-colors duration-300 ${i % 2 ? "group-hover:text-neutral-900/20 dark:group-hover:text-white/25" : "group-hover:text-orange-400/40"}`}
-            />
-          );
-        })}
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className={`pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] dark:text-white/[0.045] transition-colors duration-300 ${hover}`}>
+      <g fill="none" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+        {[22, 36, 50, 64].map((r, i) => (
+          <circle
+            key={r}
+            cx={cx}
+            cy={cy}
+            r={r}
+            stroke="currentColor"
+            className={`transition-colors duration-300 ${i === 0 ? "" : i % 2 ? "deco:text-neutral-900/20 dark:deco:text-white/25" : "deco:text-orange-400/40"}`}
+          />
+        ))}
+        <path d={`M ${cx - 9} ${cy} l 6 6 l 12 -13`} stroke="currentColor" className="transition-colors duration-300 deco:text-orange-400/55" />
       </g>
     </svg>
   );
@@ -509,11 +498,11 @@ function ChecklistCorner() {
           const x = 66 + i * 6;
           return (
             <g key={i}>
-              <rect x={x} y={y - 7} width={14} height={14} rx={3} stroke="currentColor" className="transition-colors duration-300 group-hover:text-neutral-900/20 dark:group-hover:text-white/25" />
+              <rect x={x} y={y - 7} width={14} height={14} rx={3} stroke="currentColor" className="transition-colors duration-300 deco:text-neutral-900/20 dark:deco:text-white/25" />
               {i < 3 && (
-                <path d={`M${x + 3} ${y} l3.5 3.5 l6 -7`} stroke="currentColor" className="transition-colors duration-300 group-hover:text-teal-400/45" />
+                <path d={`M${x + 3} ${y} l3.5 3.5 l6 -7`} stroke="currentColor" className="transition-colors duration-300 deco:text-teal-400/45" />
               )}
-              <path d={`M${x + 22} ${y} H 172`} stroke="currentColor" className="transition-colors duration-300 group-hover:text-neutral-900/20 dark:group-hover:text-white/25" />
+              <path d={`M${x + 22} ${y} H 172`} stroke="currentColor" className="transition-colors duration-300 deco:text-neutral-900/20 dark:deco:text-white/25" />
             </g>
           );
         })}
@@ -541,7 +530,7 @@ function CirclesCorner() {
             cy={c.cy}
             r={c.r}
             stroke="currentColor"
-            className={`transition-colors duration-300 ${i % 2 ? "group-hover:text-neutral-900/20 dark:group-hover:text-white/25" : "group-hover:text-fuchsia-400/45"}`}
+            className={`transition-colors duration-300 ${i % 2 ? "deco:text-neutral-900/20 dark:deco:text-white/25" : "deco:text-fuchsia-400/45"}`}
           />
         ))}
       </g>
@@ -564,7 +553,7 @@ function DiceCorner() {
             key={i}
             transform={`rotate(${d.rot} ${d.x + d.s / 2} ${d.y + d.s / 2})`}
             stroke="currentColor"
-            className={`transition-colors duration-300 ${i % 2 ? "group-hover:text-neutral-900/20 dark:group-hover:text-white/25" : "group-hover:text-violet-400/45"}`}
+            className={`transition-colors duration-300 ${i % 2 ? "deco:text-neutral-900/20 dark:deco:text-white/25" : "deco:text-violet-400/45"}`}
           >
             <rect x={d.x} y={d.y} width={d.s} height={d.s} rx={d.s * 0.18} stroke="currentColor" />
             {d.pips.map(([px, py], j) => (
@@ -593,7 +582,7 @@ function ShuffleCorner() {
             <g
               key={i}
               stroke="currentColor"
-              className={`transition-colors duration-300 ${i % 2 ? "group-hover:text-neutral-900/20 dark:group-hover:text-white/25" : "group-hover:text-lime-400/45"}`}
+              className={`transition-colors duration-300 ${i % 2 ? "deco:text-neutral-900/20 dark:deco:text-white/25" : "deco:text-lime-400/45"}`}
             >
               <path d={d} stroke="currentColor" />
               <path d={`M 142 ${y - 7} L 150 ${y} L 142 ${y + 7}`} stroke="currentColor" />

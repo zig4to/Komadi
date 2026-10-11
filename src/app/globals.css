@@ -3,6 +3,17 @@
 /* Ročni preklop teme prek razreda .dark na <html> (ne samo prefers-color-scheme). */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Okrasni vzorci v karticah domače strani: obarvani ob prehodu z miško, na
+   napravah brez miške (telefon) pa stalno. */
+@custom-variant deco {
+  &:where(.group:hover *) {
+    @slot;
+  }
+  @media (hover: none) {
+    @slot;
+  }
+}
+
 @theme inline {
   --font-sans: var(--font-geist);
   --font-mono: var(--font-geist-mono);
