@@ -408,7 +408,7 @@ export default function YouTubeMiniPlayer({
           role="listbox"
           aria-label="Posnetki"
           style={pickerPos.full ? { top: pickerPos.top, left: 8, right: 8 } : { top: pickerPos.top, right: pickerPos.right }}
-          className={`fixed z-40 ${pickerPos.full ? "" : "w-[min(22rem,calc(100vw-1rem))]"} rounded-xl border border-orange-400 bg-neutral-900 p-1.5 font-sans shadow-xl`}
+          className={`fixed z-40 ${pickerPos.full ? "" : "w-[min(22rem,calc(100vw-1rem))]"} rounded-xl border border-orange-400 dark:border-white/15 bg-neutral-900 p-1.5 font-sans shadow-xl`}
         >
           <p className="px-2 pb-1 pt-0.5 text-[11px] font-medium text-neutral-400">Kateri posnetek naj se predvaja?</p>
           {saveError && <p className="px-2 pb-1 text-[10px] text-red-400">Izbira ni shranjena: {saveError}</p>}
@@ -490,9 +490,9 @@ export default function YouTubeMiniPlayer({
               value={customUrl}
               onChange={(e) => setCustomUrl(e.target.value)}
               placeholder="Prilepi YouTube povezavo"
-              className="min-w-0 flex-1 rounded-lg border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs text-neutral-100 outline-none focus:border-orange-400"
+              className="min-w-0 flex-1 rounded-lg border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs text-neutral-100 outline-none focus:border-orange-400 dark:border-white/15"
             />
-            <button type="submit" className="shrink-0 rounded-lg border border-orange-400 px-2 text-xs text-amber-400 hover:bg-orange-400/15">
+            <button type="submit" className="shrink-0 rounded-lg border border-orange-400 dark:border-white/15 px-2 text-xs text-amber-400 hover:bg-orange-400/15">
               Predvajaj
             </button>
           </form>
@@ -639,7 +639,7 @@ export default function YouTubeMiniPlayer({
               aria-pressed={smartOn}
               aria-label={smartOn ? "Izklopi Smart play" : "Smart play: akordi sledijo petju"}
               title={smartOn ? "Izklopi Smart play" : "Smart play: akordi sledijo petju"}
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 transition disabled:opacity-60 active:scale-95 ${
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 transition disabled:opacity-60 active:scale-95 ${
                 smartOn ? "bg-orange-400 text-neutral-900" : "text-amber-400 hover:bg-orange-400/15"
               }`}
             >
@@ -656,7 +656,7 @@ export default function YouTubeMiniPlayer({
             disabled={loading}
             aria-label={playing ? "Premor" : "Predvajaj"}
             title={playing ? "Premor" : "Predvajaj skladbo"}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-60 active:scale-95"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-60 active:scale-95"
           >
             {playIcon}
           </button>
@@ -666,7 +666,7 @@ export default function YouTubeMiniPlayer({
             disabled={!ready}
             aria-label="Na začetek skladbe"
             title="Na začetek skladbe"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-40 active:scale-95"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-40 active:scale-95"
           >
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
               <path d="M6 5h2.5v14H6zM20 5v14L9 12l11-7z" />
@@ -713,7 +713,7 @@ export default function YouTubeMiniPlayer({
           <div
             role="group"
             aria-label="Predvajalnik"
-            className="fixed right-3 top-1/2 z-10 flex -translate-y-1/2 flex-col items-center gap-1 rounded-xl border border-orange-400 bg-neutral-900/85 p-1 shadow-lg backdrop-blur"
+            className="fixed right-3 top-1/2 z-10 flex -translate-y-1/2 flex-col items-center gap-1 rounded-xl border border-orange-400 dark:border-white/15 bg-neutral-900/85 p-1 shadow-lg backdrop-blur"
           >
             <button
               type="button"
@@ -738,7 +738,7 @@ export default function YouTubeMiniPlayer({
               disabled={loading}
               aria-label={playing ? "Premor" : "Predvajaj"}
               title={playing ? "Premor" : "Predvajaj skladbo"}
-              className={`${floatButton} border border-orange-400`}
+              className={`${floatButton} border border-orange-400 dark:border-white/15`}
             >
               {playIcon}
             </button>

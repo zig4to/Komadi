@@ -2770,7 +2770,7 @@ export default function ChordsViewer({
 
       <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900/80 px-3 py-1.5 lg:px-16">
         <div
-          className="flex items-center rounded-full border border-orange-400 py-0.5 pl-2.5 pr-0.5"
+          className="flex items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5"
           role="group"
           aria-label="Transpozicija"
         >
@@ -2795,7 +2795,7 @@ export default function ChordsViewer({
           onClick={() => setSimplify((v) => !v)}
           aria-pressed={simplify}
           title="Poenostavi akorde (D7 → D, Am7 → Am)"
-          className={`flex h-8 items-center rounded-full border border-orange-400 px-2.5 text-xs font-medium transition active:scale-95 ${
+          className={`flex h-8 items-center rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
             simplify ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
           }`}
         >
@@ -2806,13 +2806,13 @@ export default function ChordsViewer({
           onClick={() => setShowShapes((v) => !v)}
           aria-pressed={showShapes}
           title="Pokaži prijeme vseh akordov skladbe"
-          className={`flex h-8 items-center whitespace-nowrap rounded-full border border-orange-400 px-2.5 text-xs font-medium transition active:scale-95 ${
+          className={`flex h-8 items-center whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
             showShapes ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
           }`}
         >
           Pokaži akorde
         </button>
-        <div className="flex items-center rounded-full border border-orange-400 p-0.5" role="group" aria-label="Velikost pisave">
+        <div className="flex items-center rounded-full border border-orange-400 dark:border-white/15 p-0.5" role="group" aria-label="Velikost pisave">
           <button
             type="button"
             onClick={() => setFontSize((f) => Math.max(MIN_FONT, f - FONT_STEP))}
@@ -2837,7 +2837,7 @@ export default function ChordsViewer({
         {/* Računalnik: zamik Smart playa v vrstici (na telefonu v ⚙ → Napredne nastavitve). */}
         {smartAvailable && (
           <div
-            className="hidden items-center rounded-full border border-orange-400 py-0.5 pl-2.5 pr-0.5 lg:flex"
+            className="hidden items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5 lg:flex"
             role="group"
             aria-label="Zamik besedila"
             title={playingVideo ? "Zamik besedila za posnetek, ki igra" : "Zamik besedila za posnetek, ki zaigra ob ▶"}
@@ -2883,7 +2883,7 @@ export default function ChordsViewer({
             onClick={onOpenEditor}
             disabled={!!recorder}
             title="Napredni urejevalnik besedila z akordi in tablatur"
-            className="hidden h-8 items-center gap-1.5 rounded-full border border-orange-400 px-3 text-xs text-neutral-200 transition hover:text-white disabled:opacity-40 active:scale-95 lg:flex"
+            className="hidden h-8 items-center gap-1.5 rounded-full border border-orange-400 dark:border-white/15 px-3 text-xs text-neutral-200 transition hover:text-white disabled:opacity-40 active:scale-95 lg:flex"
           >
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-amber-400">
               <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -2898,7 +2898,7 @@ export default function ChordsViewer({
           onClick={recorder ? cancelRecorder : startRecorder}
           aria-pressed={!!recorder}
           title={recorder ? "Prekliči snemanje časov" : "Posnemi čase vrstic in akordov za Smart play"}
-          className={`hidden h-8 items-center gap-1.5 rounded-full border border-orange-400 px-3 text-xs transition active:scale-95 lg:flex ${
+          className={`hidden h-8 items-center gap-1.5 rounded-full border border-orange-400 dark:border-white/15 px-3 text-xs transition active:scale-95 lg:flex ${
             recorder ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
           }`}
         >
@@ -2912,7 +2912,7 @@ export default function ChordsViewer({
           aria-expanded={themeMenuPos !== null}
           aria-label="Nastavitve"
           title="Nastavitve"
-          className={`flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 transition active:scale-95 ${
+          className={`flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 transition active:scale-95 ${
             themeMenuPos ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
           }`}
         >
@@ -2926,7 +2926,7 @@ export default function ChordsViewer({
           onClick={enterFullscreen}
           aria-label="Celozaslonski način"
           title="Celozaslonski način"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 text-neutral-200 transition hover:text-white active:scale-95"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-neutral-200 transition hover:text-white active:scale-95"
         >
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
             <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
@@ -2956,7 +2956,7 @@ export default function ChordsViewer({
           onClick={exitFullscreen}
           aria-label="Izhod iz celozaslonskega načina"
           title="Izhod iz celozaslonskega načina"
-          className="fixed right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-orange-400 bg-neutral-900/70 text-amber-400 backdrop-blur active:scale-95"
+          className="fixed right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 bg-neutral-900/70 text-amber-400 backdrop-blur active:scale-95"
         >
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
             <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" />
@@ -2970,7 +2970,7 @@ export default function ChordsViewer({
           role="dialog"
           aria-label="Nastavitve"
           style={{ top: themeMenuPos.top, bottom: themeMenuPos.bottom, left: themeMenuPos.left, maxHeight: themeMenuPos.maxHeight }}
-          className={`fixed w-72 space-y-3 overflow-y-auto rounded-xl border border-orange-400 bg-neutral-900 p-3 font-sans shadow-xl ${samSpili ? "z-50" : "z-10"}`}
+          className={`fixed w-72 space-y-3 overflow-y-auto rounded-xl border border-orange-400 dark:border-white/10 dark:glass-menu dark:rounded-2xl bg-neutral-900 p-3 font-sans shadow-xl ${samSpili ? "z-50" : "z-10"}`}
         >
           {/* "Sam Špili" prekrije urejevalnik, snemanje in samodejno pomikanje — tam jih ni. */}
           {!samSpili && (
