@@ -33,7 +33,7 @@ function redirectUrl() {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-base text-neutral-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100";
+  "w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-base text-neutral-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 dark:border-white/10 dark:bg-white/[0.04] dark:text-neutral-100";
 const submitClass =
   "w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50";
 
@@ -198,7 +198,7 @@ export default function LoginScreen({
           </p>
         </div>
 
-        <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+        <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-white/[0.08] dark:rounded-[26px] dark:bg-white/[0.035] dark:backdrop-blur-xl">
           {recovery ? (
             <form onSubmit={handleNewPassword} className="space-y-3">
               <p className="text-sm font-medium">Nastavi novo geslo</p>
@@ -215,7 +215,7 @@ export default function LoginScreen({
             </form>
           ) : (
             <>
-              <div role="tablist" className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-900">
+              <div role="tablist" className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.05]">
                 {(["login", "register"] as const).map((t) => (
                   <button
                     key={t}
@@ -225,7 +225,7 @@ export default function LoginScreen({
                     onClick={() => switchTab(t)}
                     className={`rounded-md py-1.5 text-sm font-medium transition ${
                       tab === t
-                        ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-100"
+                        ? "bg-white text-neutral-900 shadow-sm dark:bg-white/[0.12] dark:text-neutral-100"
                         : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
                     }`}
                   >

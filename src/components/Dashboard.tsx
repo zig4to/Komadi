@@ -2628,7 +2628,7 @@ export default function Dashboard({ user }: { user: User }) {
             <JamModeToggle shared={jamShared && !jamArchiveOpen} onSelect={selectJamMode} />
             {presenceDots}
           </div>
-          <hr className="border-t border-neutral-200 dark:border-neutral-800" />
+          <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
 
           {jamArchiveOpen ? (
             <JamArchive
@@ -2717,7 +2717,7 @@ export default function Dashboard({ user }: { user: User }) {
         </div>
       ) : goalOpen ? (
         <div className="mt-3! space-y-4">
-          <hr className="border-t border-neutral-200 dark:border-neutral-800" />
+          <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
 
           {goalPickerOpen ? (
             <div className="space-y-3">
@@ -2739,7 +2739,7 @@ export default function Dashboard({ user }: { user: User }) {
                     key={song.id}
                     type="button"
                     onClick={() => handleAddToGoal(song)}
-                    className="block w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm hover:border-amber-500 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-amber-400"
+                    className="block w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm hover:border-amber-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:hover:border-amber-400"
                   >
                     <span className="font-medium text-neutral-900 dark:text-neutral-100">
                       {song.title}
@@ -2791,7 +2791,7 @@ export default function Dashboard({ user }: { user: User }) {
                     setGoalQuickAddOpen(true);
                     setGoalQuickAddError(null);
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-600 transition hover:border-amber-500 hover:text-amber-600 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-amber-400 dark:hover:text-amber-400"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-600 transition hover:border-amber-500 hover:text-amber-600 dark:border-white/10 dark:text-neutral-300 dark:hover:border-amber-400 dark:hover:text-amber-400"
                 >
                   Skladbe ni
                 </button>
@@ -2804,13 +2804,13 @@ export default function Dashboard({ user }: { user: User }) {
                     value={goalQuickAddTitle}
                     onChange={(e) => setGoalQuickAddTitle(e.target.value)}
                     placeholder="Naslov skladbe"
-                    className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
+                    className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-neutral-200 dark:placeholder-neutral-500"
                   />
                   <input
                     value={goalQuickAddAuthor}
                     onChange={(e) => setGoalQuickAddAuthor(e.target.value)}
                     placeholder="Avtor"
-                    className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
+                    className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-neutral-200 dark:placeholder-neutral-500"
                   />
                   {goalQuickAddError && (
                     <p className="text-sm text-red-600 dark:text-red-400">
@@ -2869,7 +2869,7 @@ export default function Dashboard({ user }: { user: User }) {
                             ? handleToggleGoalLearned(item.song)
                             : handleToggleGoalExtraLearned(item.extra)
                         }
-                        className="h-4 w-4 shrink-0 rounded border-neutral-300 text-amber-600 focus:ring-amber-500 dark:border-neutral-700 dark:bg-neutral-800"
+                        className="h-4 w-4 shrink-0 rounded border-neutral-300 text-amber-600 focus:ring-amber-500 dark:border-white/10 dark:bg-white/[0.04]"
                       />
                       <div className="min-w-0 flex-1">
                         <p
@@ -2924,7 +2924,7 @@ export default function Dashboard({ user }: { user: User }) {
         </div>
       ) : playlistsOpen ? (
         <div className="mt-3! space-y-4">
-          <hr className="border-t border-neutral-200 dark:border-neutral-800" />
+          <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
           <Playlists
             songs={songs}
             renderSongCard={(song) => (
@@ -2951,7 +2951,7 @@ export default function Dashboard({ user }: { user: User }) {
         </div>
       ) : favArchiveOpen ? (
         <div className="mt-3! space-y-4">
-          <hr className="border-t border-neutral-200 dark:border-neutral-800" />
+          <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
           <FavoritesArchive
             songs={songs}
             authorImages={authorImages}
@@ -2966,7 +2966,7 @@ export default function Dashboard({ user }: { user: User }) {
         </div>
       ) : queueOpen ? (
         <div className="mt-3! space-y-4">
-          <hr className="border-t border-neutral-200 dark:border-neutral-800" />
+          <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
 
           <div role="tablist" className="flex gap-1 overflow-x-auto rounded-full border border-fuchsia-500/30 p-1 text-sm dark:border-white/10">
             {QUEUE_TABS.map((tab) => (
@@ -3015,7 +3015,7 @@ export default function Dashboard({ user }: { user: User }) {
                 return (
                   <div
                     key={q.id}
-                    className="overflow-hidden rounded-2xl border-2 border-fuchsia-500/50 bg-fuchsia-500/[0.05] shadow-sm dark:border-white/10 dark:bg-fuchsia-400/[0.05]"
+                    className="overflow-hidden rounded-2xl border-2 border-fuchsia-500/50 bg-fuchsia-500/[0.05] shadow-sm dark:border-white/10 dark:bg-white/[0.035]"
                   >
                     <div className="space-y-0.5 px-4 pb-2 pt-3">
                       <p className="truncate text-lg font-medium text-neutral-900 lg:text-base dark:text-neutral-100">
@@ -3049,7 +3049,7 @@ export default function Dashboard({ user }: { user: User }) {
                             <button
                               type="button"
                               onClick={() => setConfirmRemoveQueuedId(null)}
-                              className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs text-neutral-600 hover:border-neutral-400 dark:border-neutral-700 dark:text-neutral-300"
+                              className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs text-neutral-600 hover:border-neutral-400 dark:border-white/10 dark:text-neutral-300"
                             >
                               Ne
                             </button>
@@ -3081,7 +3081,7 @@ export default function Dashboard({ user }: { user: User }) {
                             onClick={() => setConfirmRemoveQueuedId(q.id)}
                             aria-label="Odstrani iz čakalne vrste"
                             title="Odstrani iz čakalne vrste"
-                            className="rounded-lg border border-neutral-300 px-2 py-1.5 text-neutral-500 hover:border-red-500 hover:text-red-600 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-red-400"
+                            className="rounded-lg border border-neutral-300 px-2 py-1.5 text-neutral-500 hover:border-red-500 hover:text-red-600 dark:border-white/10 dark:text-neutral-400 dark:hover:text-red-400"
                           >
                             <svg
                               aria-hidden="true"
@@ -3125,7 +3125,7 @@ export default function Dashboard({ user }: { user: User }) {
         </div>
       ) : reviewOpen ? (
         <div className="mt-3! space-y-4">
-          <hr className="border-t border-neutral-200 dark:border-neutral-800" />
+          <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
 
           {reviewError && (
             <p className="text-sm text-red-600 dark:text-red-400">{reviewError}</p>
@@ -3161,7 +3161,7 @@ export default function Dashboard({ user }: { user: User }) {
                 {reviewSongs.map((song) => (
                   <div
                     key={song.id}
-                    className="overflow-hidden rounded-2xl border-2 border-teal-500/60 bg-teal-500/[0.06] shadow-sm dark:border-white/10 dark:bg-teal-400/[0.05]"
+                    className="overflow-hidden rounded-2xl border-2 border-teal-500/60 bg-teal-500/[0.06] shadow-sm dark:border-white/10 dark:bg-white/[0.035]"
                   >
                     {/* Glava: klik razpre/pospravi nastavitve pod kartico. */}
                     <button
@@ -3322,7 +3322,7 @@ export default function Dashboard({ user }: { user: User }) {
         </div>
       ) : fixOpen ? (
         <div className="mt-3! space-y-4">
-          <hr className="border-t border-neutral-200 dark:border-neutral-800" />
+          <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
 
           {reportsError && (
             <p className="text-sm text-red-600 dark:text-red-400">
@@ -3341,7 +3341,7 @@ export default function Dashboard({ user }: { user: User }) {
                 // rumeno obrobljenem okvirju, da je jasno, kaj sodi skupaj.
                 <div
                   key={song.id}
-                  className="overflow-hidden rounded-2xl border-2 border-yellow-500/60 bg-yellow-500/[0.06] shadow-sm dark:border-white/10 dark:bg-yellow-400/[0.05]"
+                  className="overflow-hidden rounded-2xl border-2 border-yellow-500/60 bg-yellow-500/[0.06] shadow-sm dark:border-white/10 dark:bg-white/[0.035]"
                 >
                   <div className="flex items-center gap-1.5 bg-yellow-500/15 px-3 py-1.5 text-xs font-semibold text-yellow-800 dark:bg-yellow-400/15 dark:text-yellow-300">
                     <svg
@@ -3406,7 +3406,7 @@ export default function Dashboard({ user }: { user: User }) {
                                 rows={3}
                                 autoFocus
                                 placeholder="Kaj je narobe?"
-                                className="w-full resize-none rounded-lg border border-neutral-300 bg-white/80 px-2 py-1.5 text-sm text-neutral-800 outline-none focus:border-yellow-500 dark:border-neutral-700 dark:bg-neutral-900/80 dark:text-neutral-100"
+                                className="w-full resize-none rounded-lg border border-neutral-300 bg-white/80 px-2 py-1.5 text-sm text-neutral-800 outline-none focus:border-yellow-500 dark:border-white/10 dark:bg-neutral-900/80 dark:text-neutral-100"
                               />
                               <div className="flex gap-1.5 text-xs">
                                 <button
@@ -3421,7 +3421,7 @@ export default function Dashboard({ user }: { user: User }) {
                                   type="button"
                                   onClick={() => setNoteEditId(null)}
                                   disabled={noteSaving}
-                                  className="flex-1 rounded-lg border border-neutral-300 px-2 py-1 text-neutral-600 hover:border-neutral-400 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+                                  className="flex-1 rounded-lg border border-neutral-300 px-2 py-1 text-neutral-600 hover:border-neutral-400 disabled:opacity-50 dark:border-white/10 dark:text-neutral-300"
                                 >
                                   Prekliči
                                 </button>
@@ -3493,7 +3493,7 @@ export default function Dashboard({ user }: { user: User }) {
                           <button
                             type="button"
                             onClick={() => setConfirmResolveId(null)}
-                            className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs text-neutral-600 hover:border-neutral-400 dark:border-neutral-700 dark:text-neutral-300"
+                            className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs text-neutral-600 hover:border-neutral-400 dark:border-white/10 dark:text-neutral-300"
                           >
                             Ne še
                           </button>
@@ -3591,7 +3591,7 @@ export default function Dashboard({ user }: { user: User }) {
                         setPartialError(null);
                       }}
                       placeholder="npr. Oasis"
-                      className="flex-1 rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 focus:border-emerald-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                      className="flex-1 rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 focus:border-emerald-500 focus:outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-neutral-100"
                     />
                     <datalist id="komadi-authors-list">
                       {usedAuthors.map((a) => (
@@ -3606,7 +3606,7 @@ export default function Dashboard({ user }: { user: User }) {
                       setPartialValue(e.target.value);
                       setPartialError(null);
                     }}
-                    className="flex-1 rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 focus:border-emerald-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="flex-1 rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 focus:border-emerald-500 focus:outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-neutral-100"
                   >
                     <option value="">— izberi —</option>
                     {(partialDimension === "genre"
@@ -3691,7 +3691,7 @@ export default function Dashboard({ user }: { user: User }) {
               </div>
 
               {randomFive && (
-                <div className="mt-4 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+                <div className="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                   {randomFive.length === 0 ? (
                     <p className="text-sm text-neutral-500">
                       Ni dovolj skladb za prikaz.
@@ -3764,7 +3764,7 @@ export default function Dashboard({ user }: { user: User }) {
           {quickAddOpen && (
             <div
               id="quick-add-form"
-              className="rounded-xl border border-fuchsia-500/40 bg-white p-5 space-y-3 dark:border-white/10 dark:bg-neutral-900"
+              className="rounded-xl border border-fuchsia-500/40 bg-white p-5 space-y-3 dark:border-white/10 dark:bg-white/[0.035]"
             >
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Hitro dodaj skladbo</h2>
@@ -3781,13 +3781,13 @@ export default function Dashboard({ user }: { user: User }) {
                 value={quickAddAuthor}
                 onChange={(e) => setQuickAddAuthor(e.target.value)}
                 placeholder="Avtor"
-                className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
+                className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-neutral-200 dark:placeholder-neutral-500"
               />
               <input
                 value={quickAddTitle}
                 onChange={(e) => setQuickAddTitle(e.target.value)}
                 placeholder="Naslov skladbe"
-                className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
+                className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-neutral-200 dark:placeholder-neutral-500"
               />
               {quickAddError && (
                 <p className="text-sm text-red-600 dark:text-red-400">
@@ -4354,7 +4354,7 @@ export default function Dashboard({ user }: { user: User }) {
                         if (sharedOn) closeShared();
                         handleBackFromFilter();
                       }}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-50 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/[0.08]"
                     >
                       <svg
                         aria-hidden="true"
@@ -4525,7 +4525,7 @@ export default function Dashboard({ user }: { user: User }) {
                               block: "start",
                             })
                           }
-                          className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:border-neutral-400 hover:bg-neutral-100 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/[0.08]"
                         >
                           <svg
                             aria-hidden="true"
@@ -4643,7 +4643,7 @@ function LoadMoreSentinel({ onVisible }: { onVisible: () => void }) {
       ref={ref}
       type="button"
       onClick={() => onVisibleRef.current()}
-      className="mx-auto mt-4 block rounded-full border border-neutral-300 px-4 py-1.5 text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+      className="mx-auto mt-4 block rounded-full border border-neutral-300 px-4 py-1.5 text-sm text-neutral-600 dark:border-white/10 dark:text-neutral-300"
     >
       Pokaži več
     </button>

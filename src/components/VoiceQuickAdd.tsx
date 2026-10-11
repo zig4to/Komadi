@@ -236,7 +236,7 @@ export default function VoiceQuickAdd({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full border border-neutral-300 px-4 py-1.5 text-sm text-neutral-600 hover:border-neutral-400 dark:border-neutral-700 dark:text-neutral-300"
+            className="rounded-full border border-neutral-300 px-4 py-1.5 text-sm text-neutral-600 hover:border-neutral-400 dark:border-white/10 dark:text-neutral-300"
           >
             Zapri
           </button>
@@ -341,7 +341,7 @@ export default function VoiceQuickAdd({
               listen(i);
             }}
             className={`rounded-lg border px-3 py-2 text-left transition ${
-              step === i ? "border-sky-500 bg-white/70 dark:bg-neutral-900/70" : "border-neutral-300 dark:border-neutral-700"
+              step === i ? "border-sky-500 bg-white/70 dark:bg-neutral-900/70" : "border-neutral-300 dark:border-white/10"
             }`}
           >
             <dt className="text-xs text-neutral-500 dark:text-neutral-400">{s.key === "title" ? "Naslov" : "Izvajalec"} · tapni za ponovitev</dt>

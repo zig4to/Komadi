@@ -141,7 +141,7 @@ export default function ChordsButtons({
               role="menu"
               data-view-portal
               style={{ top: menuPos.bottom + 4, left: menuPos.left, right: menuPos.right }}
-              className="fixed z-50 w-40 space-y-0.5 rounded-xl border border-amber-400 bg-white p-1.5 shadow-xl dark:border-amber-400/70 dark:bg-neutral-900"
+              className="fixed z-50 w-40 space-y-0.5 rounded-xl border border-amber-400 bg-white p-1.5 shadow-xl dark:border-white/10 dark:glass-menu dark:rounded-2xl"
             >
               {hasSamSpili(song) && (
                 <button
@@ -152,7 +152,7 @@ export default function ChordsButtons({
                     openChordsViewer(song.id, "samspili");
                     onChordsClick?.(song);
                   }}
-                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
                 >
                   <svg
                     aria-hidden="true"
@@ -178,7 +178,7 @@ export default function ChordsButtons({
                     openChordsViewer(song.id);
                     onChordsClick?.(song);
                   }}
-                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
                 >
                   <svg
                     aria-hidden="true"
@@ -206,7 +206,7 @@ export default function ChordsButtons({
                   setMenuOpen(false);
                   onChordsClick?.(song);
                 }}
-                className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
               >
                 <svg
                   aria-hidden="true"
@@ -232,7 +232,7 @@ export default function ChordsButtons({
                     setMenuOpen(false);
                     onChordsClick?.(song);
                   }}
-                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
                 >
                   <GuitarIcon className="h-[13px] w-[13px] shrink-0 text-emerald-600 dark:text-emerald-400" />
                   Zabrenkaj.si
@@ -248,7 +248,7 @@ export default function ChordsButtons({
                     onChordsClick?.(song);
                   }}
                   title={`Akordi na ${otherLabel}`}
-                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
                 >
                   <SongbookIcon className="h-[13px] w-[13px] shrink-0 text-violet-600 dark:text-violet-400" />
                   <span className="truncate">{otherLabel}</span>
@@ -262,7 +262,7 @@ export default function ChordsButtons({
                   setPdfOpen(true);
                   onChordsClick?.(song);
                 }}
-                className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
               >
                 <svg
                   aria-hidden="true"
@@ -283,13 +283,13 @@ export default function ChordsButtons({
                 PDF akordi
               </button>
               )}
-              <div className="my-0.5 border-t border-neutral-200 dark:border-neutral-800" />
+              <div className="my-0.5 border-t border-neutral-200 dark:border-white/[0.08]" />
               <a
                 href={searchUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
               >
                 <GlobeIcon className="h-[13px] w-[13px] shrink-0 text-sky-500" />
                 Spletno iskanje

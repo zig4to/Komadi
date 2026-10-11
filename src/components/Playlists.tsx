@@ -228,7 +228,7 @@ export default function Playlists({
                     type="button"
                     disabled={added}
                     onClick={() => handleAddSong(song)}
-                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm hover:border-yellow-500 disabled:opacity-60 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-yellow-400"
+                    className="flex w-full items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm hover:border-yellow-500 disabled:opacity-60 dark:border-white/[0.08] dark:bg-white/[0.035] dark:hover:border-yellow-400"
                   >
                     <span className="min-w-0 truncate">
                       <span className="font-medium text-neutral-900 dark:text-neutral-100">{song.title}</span>

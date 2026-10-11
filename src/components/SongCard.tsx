@@ -327,7 +327,7 @@ export default function SongCard({
               className={`inline-flex shrink-0 items-center justify-center rounded-full border p-1 backdrop-blur-sm transition lg:border-2 lg:p-1.5 ${
                 similarOpen
                   ? "border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                  : "border-neutral-300 bg-white/70 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-emerald-400 lg:border-neutral-400 dark:lg:border-neutral-500"
+                  : "border-neutral-300 bg-white/70 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:bg-neutral-900/70 dark:text-neutral-400 dark:hover:text-emerald-400 lg:border-neutral-400 dark:lg:border-neutral-500"
               }`}
             >
               <svg
@@ -389,7 +389,7 @@ export default function SongCard({
                 role="menu"
                 data-view-portal
                 style={{ top: actionsMenuPos.top, left: actionsMenuPos.left }}
-                className="fixed z-50 max-h-[calc(100dvh-1rem)] w-48 space-y-0.5 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
+                className="fixed z-50 max-h-[calc(100dvh-1rem)] w-48 space-y-0.5 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl dark:border-white/10 dark:glass-menu dark:rounded-2xl"
               >
                 {onImport && (
                   <button
@@ -399,7 +399,7 @@ export default function SongCard({
                       setActionsOpen(false);
                       onImport(song);
                     }}
-                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-emerald-600 hover:bg-neutral-100 disabled:opacity-50 disabled:hover:bg-transparent dark:text-emerald-400 dark:hover:bg-neutral-800"
+                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-emerald-600 hover:bg-neutral-100 disabled:opacity-50 disabled:hover:bg-transparent dark:text-emerald-400 dark:hover:bg-white/[0.08]"
                   >
                     <svg
                       aria-hidden="true"
@@ -432,7 +432,7 @@ export default function SongCard({
                     setActionsOpen(false);
                     onEdit(song);
                   }}
-                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-sky-600 hover:bg-neutral-100 dark:text-sky-400 dark:hover:bg-neutral-800"
+                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-sky-600 hover:bg-neutral-100 dark:text-sky-400 dark:hover:bg-white/[0.08]"
                 >
                   <svg
                     aria-hidden="true"
@@ -461,7 +461,7 @@ export default function SongCard({
                       onAddToJam(song);
                     }}
                     aria-expanded={onAddToSharedJam ? jamChoiceOpen : undefined}
-                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-violet-600 hover:bg-neutral-100 dark:text-violet-400 dark:hover:bg-neutral-800"
+                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-violet-600 hover:bg-neutral-100 dark:text-violet-400 dark:hover:bg-white/[0.08]"
                   >
                     <svg
                       aria-hidden="true"
@@ -500,7 +500,7 @@ export default function SongCard({
                     setReportOpen(false);
                     openPlaylistPicker();
                   }}
-                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-yellow-600 hover:bg-neutral-100 dark:text-yellow-400 dark:hover:bg-neutral-800"
+                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-yellow-600 hover:bg-neutral-100 dark:text-yellow-400 dark:hover:bg-white/[0.08]"
                 >
                   <svg
                     aria-hidden="true"
@@ -530,7 +530,7 @@ export default function SongCard({
                       onToggleFavorite(song);
                     }}
                     aria-pressed={song.favorite}
-                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-white/[0.08]"
                   >
                     <svg
                       aria-hidden="true"
@@ -556,7 +556,7 @@ export default function SongCard({
                     setPlaylistPickerOpen(false);
                     setReportOpen(true);
                   }}
-                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-white/[0.08]"
                 >
                   <svg
                     aria-hidden="true"
@@ -582,7 +582,7 @@ export default function SongCard({
                       setActionsOpen(false);
                       onSendToReview(song);
                     }}
-                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-white/[0.08]"
                   >
                     <svg
                       aria-hidden="true"
@@ -608,7 +608,7 @@ export default function SongCard({
                       setActionsOpen(false);
                       onDelete(song.id);
                     }}
-                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-red-600 hover:bg-neutral-100 dark:text-red-400 dark:hover:bg-neutral-800"
+                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-red-600 hover:bg-neutral-100 dark:text-red-400 dark:hover:bg-white/[0.08]"
                   >
                     <svg
                       aria-hidden="true"
@@ -643,7 +643,7 @@ export default function SongCard({
       </div>
 
       {playlistPickerOpen && (
-        <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+        <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-white/[0.08]">
           <p className="text-xs font-medium text-neutral-700 dark:text-neutral-200">
             Dodaj v playlisto
           </p>
@@ -665,7 +665,7 @@ export default function SongCard({
                   className={`flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left text-sm transition ${
                     selectedPlaylistId === p.id
                       ? "border-yellow-500 bg-yellow-500/15 text-neutral-900 dark:text-neutral-100"
-                      : "border-neutral-300 text-neutral-700 hover:border-yellow-500 dark:border-neutral-700 dark:text-neutral-300"
+                      : "border-neutral-300 text-neutral-700 hover:border-yellow-500 dark:border-white/10 dark:text-neutral-300"
                   }`}
                 >
                   <span
@@ -694,7 +694,7 @@ export default function SongCard({
               type="button"
               onClick={() => setPlaylistPickerOpen(false)}
               disabled={playlistBusy}
-              className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-neutral-600 hover:border-neutral-400 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+              className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-neutral-600 hover:border-neutral-400 disabled:opacity-50 dark:border-white/10 dark:text-neutral-300"
             >
               Prekliči
             </button>
@@ -703,7 +703,7 @@ export default function SongCard({
       )}
 
       {reportOpen && (
-        <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+        <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-white/[0.08]">
           <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-200">
             <svg
               aria-hidden="true"
@@ -726,7 +726,7 @@ export default function SongCard({
             placeholder="Kaj je narobe? (neobvezno)"
             rows={2}
             autoFocus
-            className="w-full resize-none rounded-lg border border-neutral-300 bg-white/80 px-2 py-1.5 text-sm text-neutral-800 outline-none focus:border-yellow-500 dark:border-neutral-700 dark:bg-neutral-900/80 dark:text-neutral-100"
+            className="w-full resize-none rounded-lg border border-neutral-300 bg-white/80 px-2 py-1.5 text-sm text-neutral-800 outline-none focus:border-yellow-500 dark:border-white/10 dark:bg-neutral-900/80 dark:text-neutral-100"
           />
           <div className="flex gap-1.5 text-xs">
             <button
@@ -745,7 +745,7 @@ export default function SongCard({
                 setReportMessage(null);
               }}
               disabled={reportBusy}
-              className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-neutral-600 hover:border-neutral-400 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+              className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-neutral-600 hover:border-neutral-400 disabled:opacity-50 dark:border-white/10 dark:text-neutral-300"
             >
               Prekliči
             </button>
@@ -771,7 +771,7 @@ export default function SongCard({
       {similarOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-800"
+          className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-white/[0.08]"
         >
           {similarLoading && (
             <p className="text-sm text-neutral-500">Iščem podobne skladbe…</p>
@@ -784,7 +784,7 @@ export default function SongCard({
             similarSongs.map((s, i) => (
               <div
                 key={i}
-                className="flex items-center justify-between gap-2 rounded-lg border border-neutral-200 p-2 text-sm dark:border-neutral-800"
+                className="flex items-center justify-between gap-2 rounded-lg border border-neutral-200 p-2 text-sm dark:border-white/[0.08]"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">
@@ -799,7 +799,7 @@ export default function SongCard({
                   onClick={() => onAddSimilar?.(s)}
                   aria-label={`Dodaj ${s.title} v knjižnico`}
                   title="Dodaj v knjižnico"
-                  className="shrink-0 rounded-lg border border-neutral-300 p-1.5 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-emerald-400"
+                  className="shrink-0 rounded-lg border border-neutral-300 p-1.5 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:text-neutral-400 dark:hover:text-emerald-400"
                 >
                   <svg
                     aria-hidden="true"
@@ -835,7 +835,7 @@ export default function SongCard({
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="shrink-0 rounded-full border border-neutral-300 px-1.5 py-0.5 text-[11px] leading-none text-neutral-500 dark:border-neutral-700 dark:text-neutral-400 lg:border-neutral-400 dark:lg:border-neutral-500">
+    <span className="shrink-0 rounded-full border border-neutral-300 px-1.5 py-0.5 text-[11px] leading-none text-neutral-500 dark:border-white/10 dark:text-neutral-400 lg:border-neutral-400 dark:lg:border-neutral-500">
       {children}
     </span>
   );

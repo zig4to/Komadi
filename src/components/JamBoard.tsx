@@ -111,7 +111,7 @@ export default function JamBoard({
               key={song.id}
               type="button"
               onClick={() => addSong(song)}
-              className="block w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm hover:border-fuchsia-500 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-fuchsia-400"
+              className="block w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm hover:border-fuchsia-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:hover:border-fuchsia-400"
             >
               <span className="font-medium text-neutral-900 dark:text-neutral-100">{song.title}</span>
               <span className="text-neutral-500 dark:text-neutral-400"> — {song.author}</span>
@@ -161,7 +161,7 @@ export default function JamBoard({
             setQuickAddOpen(true);
             setQuickAddError(null);
           }}
-          className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-600 transition hover:border-fuchsia-500 hover:text-fuchsia-600 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-fuchsia-400 dark:hover:text-fuchsia-400"
+          className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-600 transition hover:border-fuchsia-500 hover:text-fuchsia-600 dark:border-white/10 dark:text-neutral-300 dark:hover:border-fuchsia-400 dark:hover:text-fuchsia-400"
         >
           Skladbe ni
         </button>
@@ -174,13 +174,13 @@ export default function JamBoard({
             value={quickAddTitle}
             onChange={(e) => setQuickAddTitle(e.target.value)}
             placeholder="Naslov skladbe"
-            className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
+            className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-neutral-200 dark:placeholder-neutral-500"
           />
           <input
             value={quickAddAuthor}
             onChange={(e) => setQuickAddAuthor(e.target.value)}
             placeholder="Avtor"
-            className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:placeholder-neutral-500"
+            className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder-neutral-500 focus:outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-neutral-200 dark:placeholder-neutral-500"
           />
           {quickAddError && <p className="text-sm text-red-600 dark:text-red-400">{quickAddError}</p>}
           <div className="flex items-center gap-3">
@@ -226,10 +226,10 @@ export default function JamBoard({
                 </p>
               )}
               <div
-                className={`flex items-center gap-2 rounded-full border bg-white py-2 pl-2 dark:bg-neutral-900 ${showAddedBy ? "pr-2" : "pr-4"} ${
+                className={`flex items-center gap-2 rounded-full border bg-white py-2 pl-2 dark:bg-white/[0.035] ${showAddedBy ? "pr-2" : "pr-4"} ${
                   item.key === firstUnplayedKey
                     ? "border-emerald-400 dark:border-emerald-600"
-                    : "border-neutral-200 dark:border-neutral-800"
+                    : "border-neutral-200 dark:border-white/[0.08]"
                 }`}
               >
                 <span
@@ -247,7 +247,7 @@ export default function JamBoard({
                   type="checkbox"
                   checked={item.played}
                   onChange={() => onTogglePlayed(item)}
-                  className="h-4 w-4 shrink-0 rounded border-neutral-300 text-fuchsia-600 focus:ring-fuchsia-500 dark:border-neutral-700 dark:bg-neutral-800"
+                  className="h-4 w-4 shrink-0 rounded border-neutral-300 text-fuchsia-600 focus:ring-fuchsia-500 dark:border-white/10 dark:bg-white/[0.04]"
                 />
                 <div className="min-w-0 flex-1">
                   <p

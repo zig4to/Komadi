@@ -19,10 +19,10 @@ import type { QueuedSong, Song, SongReport } from "@/types/song";
 // celi Tailwind razredi, da jih Tailwind najde v izvorni kodi.
 // rgb = barva oddelka za osvetlitev postavk ob prehodu/kliku (--menu-hover/--menu-active).
 const MENU_TONES = {
-  emerald: { rgb: "16 185 129", box: "bg-emerald-500/[0.06] dark:bg-emerald-400/[0.06]", label: "text-emerald-700 dark:text-emerald-400" },
-  sky: { rgb: "14 165 233", box: "bg-sky-500/[0.07] dark:bg-sky-400/[0.07]", label: "text-sky-700 dark:text-sky-400" },
-  amber: { rgb: "245 158 11", box: "bg-amber-500/[0.08] dark:bg-amber-400/[0.07]", label: "text-amber-700 dark:text-amber-400" },
-  violet: { rgb: "139 92 246", box: "bg-violet-500/[0.07] dark:bg-violet-400/[0.07]", label: "text-violet-700 dark:text-violet-400" },
+  emerald: { rgb: "16 185 129", box: "bg-emerald-500/[0.06] dark:bg-white/[0.035]", label: "text-emerald-700 dark:text-emerald-400" },
+  sky: { rgb: "14 165 233", box: "bg-sky-500/[0.07] dark:bg-white/[0.035]", label: "text-sky-700 dark:text-sky-400" },
+  amber: { rgb: "245 158 11", box: "bg-amber-500/[0.08] dark:bg-white/[0.035]", label: "text-amber-700 dark:text-amber-400" },
+  violet: { rgb: "139 92 246", box: "bg-violet-500/[0.07] dark:bg-white/[0.035]", label: "text-violet-700 dark:text-violet-400" },
 } as const;
 
 function MenuSection({ tone, label, children }: { tone: keyof typeof MENU_TONES; label?: string; children: React.ReactNode }) {
@@ -324,7 +324,7 @@ export default function SettingsMenu({
       {menuOpen && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-20 mt-2 w-72 rounded-xl border border-neutral-200 bg-white p-1.5 text-sm shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
+          className="absolute right-0 top-full z-20 mt-2 w-72 rounded-xl border border-neutral-200 bg-white p-1.5 text-sm shadow-xl dark:border-white/10 dark:glass-menu dark:rounded-2xl"
         >
           <MenuSection tone="emerald">
           {user && <UserMenuSection user={user} />}
@@ -371,7 +371,7 @@ export default function SettingsMenu({
               <SectionToggle label="Tema" open={themeOpen} onToggle={() => setThemeOpen((v) => !v)} />
               {themeOpen && (
                 <div className="mt-1.5">
-                  <div className="flex gap-1 rounded-lg border border-neutral-200 p-1 dark:border-neutral-800">
+                  <div className="flex gap-1 rounded-lg border border-neutral-200 p-1 dark:border-white/[0.08]">
                     {THEME_OPTIONS.map((opt) => (
                       <button
                         key={opt.value}
@@ -381,7 +381,7 @@ export default function SettingsMenu({
                         className={`flex-1 rounded-md px-2 py-1 text-xs transition ${
                           theme === opt.value
                             ? "bg-emerald-600 font-medium text-white"
-                            : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                            : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-white/[0.08]"
                         }`}
                       >
                         {opt.label}
@@ -476,7 +476,7 @@ export default function SettingsMenu({
                   type="button"
                   onClick={handleSaveBackup}
                   disabled={backupBusy !== null}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs font-medium text-neutral-700 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:text-emerald-400"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs font-medium text-neutral-700 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-white/10 dark:text-neutral-200 dark:hover:text-emerald-400"
                 >
                   <svg
                     aria-hidden="true"
@@ -498,7 +498,7 @@ export default function SettingsMenu({
                   type="button"
                   onClick={handleShareBackup}
                   disabled={backupBusy !== null}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs font-medium text-neutral-700 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:text-emerald-400"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs font-medium text-neutral-700 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-white/10 dark:text-neutral-200 dark:hover:text-emerald-400"
                 >
                   <svg
                     aria-hidden="true"
@@ -548,7 +548,7 @@ export default function SettingsMenu({
               <button
                 type="button"
                 onClick={() => importFileRef.current?.click()}
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs font-medium text-neutral-700 hover:border-emerald-500 hover:text-emerald-600 dark:border-neutral-700 dark:text-neutral-200 dark:hover:text-emerald-400"
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-neutral-300 px-2 py-1.5 text-xs font-medium text-neutral-700 hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:text-neutral-200 dark:hover:text-emerald-400"
               >
                 <svg
                   aria-hidden="true"
@@ -568,7 +568,7 @@ export default function SettingsMenu({
               </button>
 
               {importPending && (
-                <div className="mt-2 space-y-1.5 rounded-lg border border-neutral-200 p-2 text-xs dark:border-neutral-800">
+                <div className="mt-2 space-y-1.5 rounded-lg border border-neutral-200 p-2 text-xs dark:border-white/[0.08]">
                   <p className="font-medium text-neutral-700 dark:text-neutral-200">
                     {importPending.songs.length === 0
                       ? "Ni najdenih skladb za uvoz."
@@ -594,7 +594,7 @@ export default function SettingsMenu({
                       type="button"
                       onClick={() => setImportPending(null)}
                       disabled={importBusy}
-                      className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-neutral-600 hover:border-neutral-400 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300"
+                      className="flex-1 rounded-lg border border-neutral-300 px-2 py-1.5 text-neutral-600 hover:border-neutral-400 disabled:opacity-50 dark:border-white/10 dark:text-neutral-300"
                     >
                       Prekliči
                     </button>
@@ -683,7 +683,7 @@ export default function SettingsMenu({
                   {queuedSongs.map((q) => (
                     <li
                       key={q.id}
-                      className="flex items-center gap-2 rounded-lg border border-neutral-200 px-2 py-1.5 text-xs dark:border-neutral-800"
+                      className="flex items-center gap-2 rounded-lg border border-neutral-200 px-2 py-1.5 text-xs dark:border-white/[0.08]"
                     >
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-neutral-800 dark:text-neutral-200">
@@ -846,7 +846,7 @@ export default function SettingsMenu({
                     return (
                     <li
                       key={r.id}
-                      className="rounded-lg border border-neutral-200 px-2 py-1.5 text-xs dark:border-neutral-800"
+                      className="rounded-lg border border-neutral-200 px-2 py-1.5 text-xs dark:border-white/[0.08]"
                     >
                       <button
                         type="button"
@@ -877,7 +877,7 @@ export default function SettingsMenu({
                       </button>
 
                       {expanded && (
-                        <div className="mt-1.5 space-y-1.5 border-t border-neutral-200 pt-1.5 dark:border-neutral-800">
+                        <div className="mt-1.5 space-y-1.5 border-t border-neutral-200 pt-1.5 dark:border-white/[0.08]">
                           <p className="whitespace-pre-wrap break-words text-neutral-700 dark:text-neutral-300">
                             {r.note || (
                               <span className="italic text-neutral-400 dark:text-neutral-500">
@@ -891,7 +891,7 @@ export default function SettingsMenu({
                               setMenuOpen(false);
                               onOpenFix?.(r.song_id);
                             }}
-                            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium text-sky-600 hover:bg-neutral-100 dark:text-sky-400 dark:hover:bg-neutral-800"
+                            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium text-sky-600 hover:bg-neutral-100 dark:text-sky-400 dark:hover:bg-white/[0.08]"
                           >
                             <svg
                               aria-hidden="true"

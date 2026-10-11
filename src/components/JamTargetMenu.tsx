@@ -48,7 +48,7 @@ export default function JamTargetMenu({
       role="menu"
       data-view-portal
       style={{ top: anchor.bottom + 4, left }}
-      className="fixed z-50 w-48 space-y-0.5 rounded-xl border border-fuchsia-500/40 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-neutral-900"
+      className="fixed z-50 w-48 space-y-0.5 rounded-xl border border-fuchsia-500/40 bg-white p-1.5 shadow-xl dark:border-white/10 dark:glass-menu dark:rounded-2xl"
     >
       <JamTargetItems onPick={onPick} />
     </div>,
@@ -59,7 +59,7 @@ export default function JamTargetMenu({
 // Obe možnosti (tudi v meniju SongCard.tsx).
 export function JamTargetItems({ onPick }: { onPick: (target: JamTarget) => void }) {
   const item =
-    "flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-violet-600 hover:bg-neutral-100 dark:text-violet-400 dark:hover:bg-neutral-800";
+    "flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-violet-600 hover:bg-neutral-100 dark:text-violet-400 dark:hover:bg-white/[0.08]";
   return (
     <>
       <button

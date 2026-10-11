@@ -76,7 +76,7 @@ export default function UserMenuSection({ user: initialUser }: { user: User }) {
                   autoComplete="given-name"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className="w-full rounded-lg border border-neutral-300 bg-transparent px-2 py-1.5 text-sm dark:border-neutral-700"
+                  className="w-full rounded-lg border border-neutral-300 bg-transparent px-2 py-1.5 text-sm dark:border-white/10"
                 />
                 <input
                   type="text"
@@ -84,7 +84,7 @@ export default function UserMenuSection({ user: initialUser }: { user: User }) {
                   autoComplete="family-name"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="w-full rounded-lg border border-neutral-300 bg-transparent px-2 py-1.5 text-sm dark:border-neutral-700"
+                  className="w-full rounded-lg border border-neutral-300 bg-transparent px-2 py-1.5 text-sm dark:border-white/10"
                 />
               </div>
               <button
@@ -101,7 +101,7 @@ export default function UserMenuSection({ user: initialUser }: { user: User }) {
           <button
             type="button"
             onClick={() => supabase.auth.signOut()}
-            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-white/[0.08]"
           >
             <svg
               aria-hidden="true"

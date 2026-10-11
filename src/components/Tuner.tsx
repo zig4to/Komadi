@@ -286,7 +286,7 @@ export default function Tuner({ onClose }: { onClose: () => void }) {
       className="fixed inset-0 z-50 flex flex-col bg-white text-neutral-900 dark:bg-[#0d0d10] dark:text-neutral-100"
       style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="flex items-center gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+      <div className="flex items-center gap-3 border-b border-neutral-200 px-4 py-3 dark:border-white/[0.08]">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0 text-orange-500">
           <path d="M12 3v3" />
           <path d="M5.6 5.6l2.1 2.1" />
@@ -302,7 +302,7 @@ export default function Tuner({ onClose }: { onClose: () => void }) {
           type="button"
           onClick={onClose}
           aria-label="Zapri"
-          className="rounded-full border border-neutral-300 px-3 py-1 text-sm font-medium dark:border-neutral-700"
+          className="rounded-full border border-neutral-300 px-3 py-1 text-sm font-medium dark:border-white/10"
         >
           ✕
         </button>
@@ -318,7 +318,7 @@ export default function Tuner({ onClose }: { onClose: () => void }) {
             className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium whitespace-nowrap transition-colors ${
               t.id === tuning.id
                 ? "border-orange-400 bg-orange-400/15 text-orange-700 dark:text-orange-300"
-                : "border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                : "border-neutral-300 text-neutral-600 dark:border-white/10 dark:text-neutral-300"
             }`}
           >
             {t.name}
@@ -387,7 +387,7 @@ export default function Tuner({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* Strune: tap = uglaševanje samo te strune, ponoven tap = samodejno */}
-      <div className="flex flex-col items-center gap-3 border-t border-neutral-200 px-4 py-4 dark:border-neutral-800">
+      <div className="flex flex-col items-center gap-3 border-t border-neutral-200 px-4 py-4 dark:border-white/[0.08]">
         <div className="flex flex-wrap justify-center gap-2">
           {tuning.notes.map((s, i) => {
             const active = target?.stringIndex === i;
@@ -405,7 +405,7 @@ export default function Tuner({ onClose }: { onClose: () => void }) {
                       ? "border-orange-400 bg-orange-400/15 text-orange-600 dark:text-orange-300"
                       : locked
                         ? "border-orange-400 text-orange-600 dark:text-orange-300"
-                        : "border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"
+                        : "border-neutral-300 text-neutral-600 dark:border-white/10 dark:text-neutral-300"
                 }`}
               >
                 {s.label}
@@ -417,11 +417,11 @@ export default function Tuner({ onClose }: { onClose: () => void }) {
         <div className="flex items-center gap-4 text-xs text-neutral-500">
           <span>{lockedString == null ? "Samodejno (najbližja struna)" : "Izbrana struna — tapni jo za samodejno"}</span>
           <span className="flex items-center gap-1">
-            <button type="button" onClick={() => changeA4(-1)} aria-label="A4 nižje" className="h-6 w-6 rounded-full border border-neutral-300 dark:border-neutral-700">
+            <button type="button" onClick={() => changeA4(-1)} aria-label="A4 nižje" className="h-6 w-6 rounded-full border border-neutral-300 dark:border-white/10">
               −
             </button>
             <span className="tabular-nums">A4 = {a4} Hz</span>
-            <button type="button" onClick={() => changeA4(1)} aria-label="A4 višje" className="h-6 w-6 rounded-full border border-neutral-300 dark:border-neutral-700">
+            <button type="button" onClick={() => changeA4(1)} aria-label="A4 višje" className="h-6 w-6 rounded-full border border-neutral-300 dark:border-white/10">
               +
             </button>
           </span>

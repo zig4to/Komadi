@@ -174,7 +174,7 @@ export default function Filters({
                 onChange={(e) =>
                   onChange({ ...filters, favoriteOnly: e.target.checked })
                 }
-                className="h-4 w-4 rounded border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-800"
+                className="h-4 w-4 rounded border-neutral-300 bg-white dark:border-white/10 dark:bg-neutral-800"
               />
               Samo priljubljene
             </label>
@@ -252,7 +252,7 @@ function Chip({
       className={`rounded-full border px-3 py-1 text-xs transition ${
         active
           ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-          : "border-neutral-300 text-neutral-500 hover:border-neutral-400 hover:text-neutral-800 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-neutral-500 dark:hover:text-neutral-200"
+          : "border-neutral-300 text-neutral-500 hover:border-neutral-400 hover:text-neutral-800 dark:border-white/10 dark:text-neutral-400 dark:hover:border-neutral-500 dark:hover:text-neutral-200"
       }`}
     >
       {label}

@@ -54,7 +54,7 @@ export default function JamSettingsMenu() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-30 mt-2 w-64 rounded-xl border border-neutral-200 bg-white p-3 text-sm shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
+          className="absolute right-0 top-full z-30 mt-2 w-64 rounded-xl border border-neutral-200 bg-white p-3 text-sm shadow-xl dark:border-white/10 dark:glass-menu dark:rounded-2xl"
         >
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-fuchsia-600 dark:text-fuchsia-400">
             Nastavitve Jama

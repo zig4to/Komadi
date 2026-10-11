@@ -110,14 +110,14 @@ export default function ListenButton({
             role="menu"
             data-view-portal
             style={{ top: menuPos.bottom + 4, left: menuPos.left, right: menuPos.right }}
-            className="fixed z-50 w-36 space-y-0.5 rounded-xl border border-emerald-500 bg-white p-1.5 shadow-xl dark:border-emerald-400/70 dark:bg-neutral-900"
+            className="fixed z-50 w-36 space-y-0.5 rounded-xl border border-emerald-500 bg-white p-1.5 shadow-xl dark:border-white/10 dark:glass-menu dark:rounded-2xl"
           >
             <a
               href={spotifyUrl}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setMenuOpen(false)}
-              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
             >
               <svg
                 aria-hidden="true"
@@ -141,7 +141,7 @@ export default function ListenButton({
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setMenuOpen(false)}
-              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
             >
               <svg
                 aria-hidden="true"
@@ -163,7 +163,7 @@ export default function ListenButton({
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setMenuOpen(false)}
-              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
             >
               <svg
                 aria-hidden="true"

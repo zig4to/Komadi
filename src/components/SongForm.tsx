@@ -272,7 +272,7 @@ export default function SongForm({
               disabled={guessing}
               aria-label="Predlagaj obdobje z AI"
               title="Predlagaj obdobje z AI"
-              className="inline-flex shrink-0 items-center justify-center rounded-lg border border-neutral-300 px-2.5 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-emerald-400"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg border border-neutral-300 px-2.5 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-white/10 dark:text-neutral-400 dark:hover:text-emerald-400"
             >
               <svg
                 aria-hidden="true"
@@ -310,7 +310,7 @@ export default function SongForm({
                   setAddingMood(false);
                   setForm({ ...form, mood: null });
                 }}
-                className="shrink-0 rounded-lg border border-neutral-300 px-3 text-sm text-neutral-600 hover:border-neutral-400 dark:border-neutral-700 dark:text-neutral-300"
+                className="shrink-0 rounded-lg border border-neutral-300 px-3 text-sm text-neutral-600 hover:border-neutral-400 dark:border-white/10 dark:text-neutral-300"
               >
                 Prekliči
               </button>
@@ -355,7 +355,7 @@ export default function SongForm({
                   setAddingOrigin(false);
                   setForm({ ...form, origin: null });
                 }}
-                className="shrink-0 rounded-lg border border-neutral-300 px-3 text-sm text-neutral-600 hover:border-neutral-400 dark:border-neutral-700 dark:text-neutral-300"
+                className="shrink-0 rounded-lg border border-neutral-300 px-3 text-sm text-neutral-600 hover:border-neutral-400 dark:border-white/10 dark:text-neutral-300"
               >
                 Prekliči
               </button>
@@ -395,7 +395,7 @@ export default function SongForm({
               type="button"
               onClick={() => chordsFileInputRef.current?.click()}
               disabled={uploadingChords}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:text-emerald-400"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-white/10 dark:text-neutral-300 dark:hover:text-emerald-400"
             >
               <svg
                 aria-hidden="true"
@@ -475,14 +475,14 @@ export default function SongForm({
             type="checkbox"
             checked={form.favorite}
             onChange={(e) => setForm({ ...form, favorite: e.target.checked })}
-            className="h-4 w-4 rounded border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-800"
+            className="h-4 w-4 rounded border-neutral-300 bg-white dark:border-white/10 dark:bg-neutral-800"
           />
           Priljubljena
         </label>
 
         <div className="flex items-center gap-2">
           {authorImage && (
-            <div className="group relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-neutral-300 dark:border-neutral-700">
+            <div className="group relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-neutral-300 dark:border-white/10">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={authorImage} alt="" className="h-full w-full object-cover" />
               <button
@@ -513,7 +513,7 @@ export default function SongForm({
             disabled={uploadingImage || !form.author.trim()}
             aria-label="Naloži sliko avtorja"
             title="Naloži sliko avtorja"
-            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-neutral-300 p-2 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:text-emerald-400"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-neutral-300 p-2 text-neutral-500 hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50 dark:border-white/10 dark:text-neutral-400 dark:hover:text-emerald-400"
           >
             <svg
               aria-hidden="true"
@@ -548,7 +548,7 @@ export default function SongForm({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+          className="rounded-lg px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-white/[0.08]"
         >
           Prekliči
         </button>
@@ -565,7 +565,7 @@ export default function SongForm({
 }
 
 const inputClass =
-  "w-full rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 focus:border-emerald-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100";
+  "w-full rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 focus:border-emerald-500 focus:outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-neutral-100";
 
 function Field({
   label,

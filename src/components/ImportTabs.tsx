@@ -54,8 +54,8 @@ function Pill({ children, tone = "neutral" }: { children: React.ReactNode; tone?
     tone === "ok"
       ? "border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
       : tone === "off"
-        ? "border-neutral-300 text-neutral-400 line-through dark:border-neutral-700 dark:text-neutral-500"
-        : "border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300";
+        ? "border-neutral-300 text-neutral-400 line-through dark:border-white/10 dark:text-neutral-500"
+        : "border-neutral-300 text-neutral-600 dark:border-white/10 dark:text-neutral-300";
   return (
     <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[11px] leading-none ${cls}`}>{children}</span>
   );
@@ -117,7 +117,7 @@ export function ImportReports({ batches, error }: { batches: ImportBatch[]; erro
                       {added.map((a, i) => (
                         <li
                           key={a.song_id ?? i}
-                          className="rounded-lg border border-neutral-200 bg-white/60 p-2.5 dark:border-neutral-800 dark:bg-neutral-900/40"
+                          className="rounded-lg border border-neutral-200 bg-white/60 p-2.5 dark:border-white/[0.08] dark:bg-neutral-900/40"
                         >
                           <p className="font-medium text-neutral-900 dark:text-neutral-100">
                             {a.title} <span className="font-normal text-neutral-500">— {a.author}</span>
@@ -225,7 +225,7 @@ export function ImportHistory({
           .sort((x, y) => x.title.localeCompare(y.title, "sl"));
         const open = openIds.has(b.id);
         return (
-          <div key={b.id} className="rounded-2xl border border-neutral-200 dark:border-neutral-800">
+          <div key={b.id} className="rounded-2xl border border-neutral-200 dark:border-white/[0.08]">
             <button
               type="button"
               onClick={() =>
@@ -246,7 +246,7 @@ export function ImportHistory({
               <Chevron open={open} />
             </button>
             {open && (
-              <ul className="divide-y divide-neutral-200 border-t border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+              <ul className="divide-y divide-neutral-200 border-t border-neutral-200 dark:divide-neutral-800 dark:border-white/[0.08]">
                 {batchSongs.length === 0 && (
                   <li className="px-4 py-2 text-sm text-neutral-500">Skladbe iz tega uvoza niso več v knjižnici.</li>
                 )}
