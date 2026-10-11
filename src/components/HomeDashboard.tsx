@@ -98,6 +98,7 @@ function ActionCard({
   viewToggle,
   row = false,
   className = "",
+  decor,
 }: {
   label: string;
   hint: string;
@@ -110,6 +111,8 @@ function ActionCard({
   // Vodoravna (nizka) kartica: ikona, besedilo in puščica v eni vrsti.
   row?: boolean;
   className?: string;
+  // Okras v ozadju kartice (blag vzorec v spodnjem desnem kotu).
+  decor?: React.ReactNode;
 }) {
   return (
     <button
@@ -118,12 +121,13 @@ function ActionCard({
       disabled={disabled}
       aria-pressed={active}
       {...(viewToggle ? { "data-view-toggle": true } : {})}
-      className={`${CARD} group flex min-w-0 gap-3 p-3.5 text-left transition disabled:opacity-40 lg:p-4 ${
+      className={`${CARD} group relative isolate flex min-w-0 gap-3 overflow-hidden p-3.5 text-left transition disabled:opacity-40 lg:p-4 ${
         row ? "flex-row items-center" : "flex-col justify-between"
       } ${
         active ? `ring-2 ${tone.ring} ${tone.tint}` : "hover:bg-neutral-50 dark:hover:bg-white/[0.06]"
       } ${className}`}
     >
+      {decor}
       <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-100 dark:bg-white/[0.06] ${tone.text}`}>
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
           {icon}
@@ -220,6 +224,7 @@ export function HomeBento({
         label="Naključno"
         hint="ena skladba iz knjižnice"
         tone={TONES.violet}
+        decor={<DiceCorner />}
         onClick={onRandom}
         disabled={disabled}
         icon={
@@ -238,6 +243,7 @@ export function HomeBento({
         label="Delno naključno"
         hint="po žanru, avtorju, obdobju …"
         tone={TONES.lime}
+        decor={<ShuffleCorner />}
         onClick={onPartial}
         disabled={disabled}
         icon={
@@ -538,6 +544,62 @@ function CirclesCorner() {
             className={`transition-colors duration-300 ${i % 2 ? "group-hover:text-neutral-900/20 dark:group-hover:text-white/25" : "group-hover:text-fuchsia-400/45"}`}
           />
         ))}
+      </g>
+    </svg>
+  );
+}
+
+// Naključno: raztresene kocke s pikami; ob prehodu izmenično vijolična in bela.
+const DICE = [
+  { x: 112, y: 70, s: 40, rot: 18, pips: [[0.25, 0.25], [0.5, 0.5], [0.75, 0.75]] },
+  { x: 70, y: 86, s: 30, rot: -14, pips: [[0.28, 0.28], [0.72, 0.28], [0.28, 0.72], [0.72, 0.72]] },
+  { x: 132, y: 22, s: 26, rot: -30, pips: [[0.5, 0.5]] },
+];
+function DiceCorner() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] dark:text-white/[0.045]">
+      <g fill="none" strokeWidth="1" vectorEffect="non-scaling-stroke">
+        {DICE.map((d, i) => (
+          <g
+            key={i}
+            transform={`rotate(${d.rot} ${d.x + d.s / 2} ${d.y + d.s / 2})`}
+            stroke="currentColor"
+            className={`transition-colors duration-300 ${i % 2 ? "group-hover:text-neutral-900/20 dark:group-hover:text-white/25" : "group-hover:text-violet-400/45"}`}
+          >
+            <rect x={d.x} y={d.y} width={d.s} height={d.s} rx={d.s * 0.18} stroke="currentColor" />
+            {d.pips.map(([px, py], j) => (
+              <circle key={j} cx={d.x + px * d.s} cy={d.y + py * d.s} r={d.s * 0.07} stroke="currentColor" />
+            ))}
+          </g>
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+// Delno naključno: prekrižane puščice "premešaj"; ob prehodu limetina in bela.
+function ShuffleCorner() {
+  const paths = [
+    "M 40 100 C 90 100, 100 40, 150 40",
+    "M 40 40 C 90 40, 100 100, 150 100",
+    "M 60 70 C 95 70, 110 70, 150 70",
+  ];
+  return (
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] dark:text-white/[0.045]">
+      <g fill="none" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+        {paths.map((d, i) => {
+          const y = [40, 100, 70][i];
+          return (
+            <g
+              key={i}
+              stroke="currentColor"
+              className={`transition-colors duration-300 ${i % 2 ? "group-hover:text-neutral-900/20 dark:group-hover:text-white/25" : "group-hover:text-lime-400/45"}`}
+            >
+              <path d={d} stroke="currentColor" />
+              <path d={`M 142 ${y - 7} L 150 ${y} L 142 ${y + 7}`} stroke="currentColor" />
+            </g>
+          );
+        })}
       </g>
     </svg>
   );
