@@ -873,6 +873,8 @@ export default function ChordsViewer({
   // ta bi ujel fixed sličico YouTube videa), okvir (overflow-hidden) se skrči.
   // Samo za uporabnikovo drsenje (zadnjih 800 ms dotik/kolesce), ne za samodejno
   // pomikanje (Smart play, autoscroll). Ob koncu se dokonča do konca ali nazaj.
+  // Besedilo vrstici potiska: za kolikor se vrstici skrčita, se vrne pomik
+  // besedila (scrollTop), da se besedilo premika točno s prstom in ne zdrsne pod njiju.
   const barsItemRef = useRef<HTMLDivElement>(null);
   const barsFirstRef = useRef<HTMLDivElement>(null);
   const barsOffsetRef = useRef(0);
@@ -881,38 +883,59 @@ export default function ChordsViewer({
     const item = barsItemRef.current;
     const first = barsFirstRef.current;
     if (!el || !item || !first) return;
-    const setOffset = (o: number, animate: boolean) => {
+    let last = el.scrollTop;
+    let raf = 0;
+    // Nastavi zamik vrstic; z compensate besedilo ostane pod prstom (potisk).
+    const setOffset = (o: number, compensate: boolean) => {
       const full = item.offsetHeight + barsOffsetRef.current;
       const v = Math.max(0, Math.min(full, o));
+      const applied = v - barsOffsetRef.current;
       barsOffsetRef.current = v;
-      first.style.transition = animate ? "margin-top 220ms ease-out" : "none";
       first.style.marginTop = v ? `-${v}px` : "";
+      if (compensate && applied !== 0) {
+        el.scrollTop -= applied;
+        last = el.scrollTop;
+      }
     };
     if (barsHidden || editing) {
       setOffset(0, false);
       return;
     }
-    let last = el.scrollTop;
+    // Dokončanje premika (spust na pol poti): kratka animacija, besedilo potuje zraven.
+    const animateTo = (target: number) => {
+      cancelAnimationFrame(raf);
+      const from = barsOffsetRef.current;
+      const t0 = performance.now();
+      const step = (now: number) => {
+        const k = Math.min(1, (now - t0) / 200);
+        const ease = 1 - (1 - k) * (1 - k);
+        setOffset(from + (target - from) * ease, true);
+        if (k < 1) raf = requestAnimationFrame(step);
+      };
+      raf = requestAnimationFrame(step);
+    };
     let lastUser = 0;
     let snapTimer = 0;
     const markUser = () => {
       lastUser = performance.now();
+      cancelAnimationFrame(raf);
     };
     const onScroll = () => {
       const top = el.scrollTop;
       const d = top - last;
       last = top;
+      if (d === 0) return;
       if (top <= 0) {
-        setOffset(0, true);
+        if (barsOffsetRef.current > 0) animateTo(0);
         return;
       }
       if (performance.now() - lastUser > 800) return;
-      setOffset(barsOffsetRef.current + d, false);
+      setOffset(barsOffsetRef.current + d, true);
       window.clearTimeout(snapTimer);
       snapTimer = window.setTimeout(() => {
         const full = item.offsetHeight + barsOffsetRef.current;
         const o = barsOffsetRef.current;
-        if (o > 0 && o < full) setOffset(o > full / 2 ? full : 0, true);
+        if (o > 0 && o < full) animateTo(o > full / 2 ? full : 0);
       }, 180);
     };
     el.addEventListener("scroll", onScroll, { passive: true });
@@ -922,6 +945,7 @@ export default function ChordsViewer({
     el.addEventListener("wheel", markUser, { passive: true });
     return () => {
       window.clearTimeout(snapTimer);
+      cancelAnimationFrame(raf);
       el.removeEventListener("scroll", onScroll);
       el.removeEventListener("touchstart", markUser);
       el.removeEventListener("touchmove", markUser);
