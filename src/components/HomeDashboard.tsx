@@ -450,7 +450,7 @@ function TopoCorner({ hover }: { hover: string }) {
       aria-hidden="true"
       viewBox="0 0 160 120"
       preserveAspectRatio="xMaxYMax meet"
-      className={`pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] transition-colors duration-300 dark:text-white/[0.045] ${hover}`}
+      className={`pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:opacity-50 text-neutral-900/[0.05] transition-colors duration-300 dark:text-white/[0.045] ${hover}`}
     >
       <g fill="none" stroke="currentColor" strokeWidth="1" vectorEffect="non-scaling-stroke">
         {Array.from({ length: 6 }, (_, i) => (
@@ -468,7 +468,7 @@ function VerifiedCorner({ hover }: { hover: string }) {
   const cx = 128;
   const cy = 92;
   return (
-    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className={`pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] dark:text-white/[0.045] transition-colors duration-300 ${hover}`}>
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className={`pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:opacity-50 text-neutral-900/[0.05] dark:text-white/[0.045] transition-colors duration-300 ${hover}`}>
       <g fill="none" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
         {[22, 36, 50, 64].map((r, i) => (
           <circle
@@ -491,7 +491,7 @@ function VerifiedCorner({ hover }: { hover: string }) {
 function ChecklistCorner() {
   const rows = [0, 1, 2, 3];
   return (
-    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] dark:text-white/[0.045]">
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:opacity-50 text-neutral-900/[0.05] dark:text-white/[0.045]">
       <g fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
         {rows.map((i) => {
           const y = 34 + i * 24;
@@ -521,7 +521,7 @@ const JAM_CIRCLES = [
 ];
 function CirclesCorner() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] dark:text-white/[0.045]">
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:opacity-50 text-neutral-900/[0.05] dark:text-white/[0.045]">
       <g fill="none" strokeWidth="1" vectorEffect="non-scaling-stroke">
         {JAM_CIRCLES.map((c, i) => (
           <circle
@@ -546,7 +546,7 @@ const DICE = [
 ];
 function DiceCorner() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] dark:text-white/[0.045]">
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:opacity-50 text-neutral-900/[0.05] dark:text-white/[0.045]">
       <g fill="none" strokeWidth="1" vectorEffect="non-scaling-stroke">
         {DICE.map((d, i) => (
           <g
@@ -574,7 +574,7 @@ function ShuffleCorner() {
     "M 60 70 C 95 70, 110 70, 150 70",
   ];
   return (
-    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] dark:text-white/[0.045]">
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:opacity-50 text-neutral-900/[0.05] dark:text-white/[0.045]">
       <g fill="none" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
         {paths.map((d, i) => {
           const y = [40, 100, 70][i];
