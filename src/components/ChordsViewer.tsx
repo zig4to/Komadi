@@ -549,7 +549,7 @@ export default function ChordsViewer({
                   className={`h-7 w-7 overflow-hidden rounded-full border border-neutral-600 ${bgIndex === i ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-neutral-900" : ""}`}
                 >
                   {b.pattern && (
-                    <PatternSvg id={b.pattern} colors={{ line: "rgba(255,255,255,0.45)", accent: "rgba(52,211,153,0.9)" }} className="h-full w-full" />
+                    <PatternSvg id={b.pattern} colors={{ line: "rgba(255,255,255,0.45)", accent: "rgba(52,211,153,0.9)", birds: 0.95 }} className="h-full w-full" />
                   )}
                 </span>
                 {b.label}

@@ -20,10 +20,11 @@ export function isPatternId(v: unknown): v is PatternId {
 const W = 1440;
 const H = 900;
 
-type Colors = { line: string; accent: string };
+// birds = prosojnost barvnih ptic na vratu kitare (privzeto 0.16).
+type Colors = { line: string; accent: string; birds?: number };
 
 // Ozadje: zelo temne črte (3 % bele) z redkimi smaragdnimi poudarki.
-export const BACKGROUND_COLORS: Colors = { line: "rgba(255,255,255,0.03)", accent: "rgba(52,211,153,0.08)" };
+export const BACKGROUND_COLORS: Colors = { line: "rgba(255,255,255,0.03)", accent: "rgba(52,211,153,0.08)", birds: 0.16 };
 
 // Na ozkem (pokončnem) zaslonu se vidi samo del širine; poravnava pove, kateri
 // del — pri zvočniku in diagramu desni, kjer sta narisana.
@@ -79,6 +80,19 @@ function Topo({ line, accent }: Colors) {
 
 // Vrat kitare v perspektivi: 6 strun se zbliža proti desni, prečke se gostijo
 // kot na pravi kitari (12. koren iz 2), piki na 3., 5., 7. … prečki.
+// Ptica v letu (krila, glava, rep), v enotah okoli (0, 0), širina ~2.
+const BIRD_PATH =
+  "M -1.1 -0.05 C -0.75 -0.55 -0.35 -0.6 -0.05 -0.1 C 0.05 -0.3 0.25 -0.32 0.32 -0.18 C 0.55 -0.62 0.85 -0.6 1.1 -0.2 M -0.05 -0.1 C 0.05 0.12 0.2 0.25 0.05 0.42 M 0.32 -0.18 L 0.48 -0.22";
+const BIRD_INLAYS = [
+  { fret: 3, color: "#34d399", tilt: -8 },
+  { fret: 5, color: "#38bdf8", tilt: 6 },
+  { fret: 7, color: "#a78bfa", tilt: -4 },
+  { fret: 9, color: "#f472b6", tilt: 10 },
+  { fret: 12, color: "#fbbf24", tilt: -12 },
+  { fret: 15, color: "#2dd4bf", tilt: 4 },
+  { fret: 17, color: "#fb7185", tilt: -6 },
+];
+
 // Višina strune i na x (vrat kitare v perspektivi) — skupno za vzorec in svetlobo.
 function fretStringY(i: number, x: number) {
   const t = Math.min(1, Math.max(0, (x + 80) / (W + 160)));
@@ -86,7 +100,7 @@ function fretStringY(i: number, x: number) {
   return H * 0.62 - spread / 2 + (spread / 5) * i - 120 * t;
 }
 
-function Fretboard({ line, accent }: Colors) {
+function Fretboard({ line, accent, birds = 0.16 }: Colors) {
   const fx = (n: number) => -80 + (W + 300) * (1 - Math.pow(2, -n / 12)) * 1.3;
   const sy = fretStringY;
   return (
@@ -98,9 +112,25 @@ function Fretboard({ line, accent }: Colors) {
         const x = fx(n);
         return <path key={`f${n}`} d={seg([x, sy(0, x) - 14], [x, sy(5, x) + 14])} stroke={line} />;
       })}
-      {[3, 5, 7, 9, 12, 15, 17].map((n) => {
-        const x = (fx(n - 1) + fx(n)) / 2;
-        return <circle key={`d${n}`} cx={x} cy={(sy(2, x) + sy(3, x)) / 2} r={4} stroke={accent} />;
+      {/* Intarzije: barvne ptice v letu (kot na kitarah PRS) namesto pik; na 12. dve. */}
+      {BIRD_INLAYS.flatMap(({ fret, color, tilt }, k) => {
+        const x = (fx(fret - 1) + fx(fret)) / 2;
+        const gap = (sy(5, x) - sy(0, x)) / 5;
+        const mid = (sy(2, x) + sy(3, x)) / 2;
+        const ys = fret === 12 ? [mid - gap * 1.05, mid + gap * 1.05] : [mid];
+        return ys.map((y, j) => (
+          <path
+            key={`b${k}-${j}`}
+            d={BIRD_PATH}
+            stroke={color}
+            strokeOpacity={birds}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.2}
+            vectorEffect="non-scaling-stroke"
+            transform={`translate(${x} ${y}) rotate(${tilt + j * 18}) scale(${gap * 0.55})`}
+          />
+        ));
       })}
     </>
   );
@@ -208,7 +238,7 @@ export function FretboardGlow({ className }: { className?: string }) {
         </mask>
       </defs>
       <g mask="url(#fret-glow-mask)" fill="none" strokeWidth="1" vectorEffect="non-scaling-stroke">
-        <Fretboard line="rgba(255,255,255,0.13)" accent="rgba(52,211,153,0.3)" />
+        <Fretboard line="rgba(255,255,255,0.13)" accent="rgba(52,211,153,0.3)" birds={0.45} />
       </g>
     </svg>
   );
