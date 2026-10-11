@@ -76,6 +76,25 @@ textarea,
   }
 }
 
+/* Meni ⚙ v Sam Špili (ChordsViewer, razred ss-phone-menu) na telefonu: večje
+   besedilo — drobne velikosti znotraj menija se povečajo, meni je širši. */
+@media (max-width: 1023px) {
+  .ss-phone-menu {
+    width: min(20rem, calc(100vw - 1rem));
+    font-size: 0.875rem;
+  }
+  .ss-phone-menu .text-xs {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  .ss-phone-menu .text-\[11px\] {
+    font-size: 13px;
+  }
+  .ss-phone-menu .text-\[10px\] {
+    font-size: 12px;
+  }
+}
+
 /* Izbira akordov pod kartico: razpre se navzdol. */
 @keyframes chords-drop {
   0% {

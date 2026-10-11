@@ -974,7 +974,6 @@ export default function ChordsViewer({
     () => (syncedLines?.points.length ? remapLines(syncedLines.points, body) : null),
     [syncedLines, body],
   );
-  const syncBroken = !!syncedRemap && !syncedRemap.ok;
   const sync = useMemo(() => {
     if (wrongVideo) return null;
     if (syncedRemap?.ok) {
@@ -1613,21 +1612,6 @@ export default function ChordsViewer({
         {verifyCheck}
         {verifiedPlayerAt ? `Predvajalnik preverjen (${verifyDate(verifiedPlayerAt)})` : "Označi: predvajalnik preverjen"}
       </button>
-      <p className="px-1 text-[10px] leading-tight text-neutral-500">
-        {verifiedPlayerAt
-          ? wrongVideo
-            ? "Preverjen posnetek ni na voljo — igra drug posnetek, zato Smart play ne sledi."
-            : syncBroken
-              ? "Časi se ne ujemajo več z besedilom — preveri ponovno."
-              : !syncedLines?.frozen
-                ? "Označeno; posnetek in časi vrstic se zaklenejo ob naslednjem predvajanju."
-                : "Zaklenjeno: posnetek, časi vrstic in zamik. Klik razveljavi oznako."
-          : !sync?.points.length
-            ? "Ni besedila s časi — najprej Posnemi čase."
-            : !playingVideo
-              ? "Najprej zaženi predvajanje in preveri, da vrstice sledijo petju."
-              : "Zaklene ta posnetek, čase vrstic in zamik — skladba bo vedno delala enako."}
-      </p>
       {verifyMsg && <p className="px-1 text-[10px] leading-tight text-red-400">{verifyMsg}</p>}
     </div>
   );
@@ -2980,7 +2964,7 @@ export default function ChordsViewer({
           role="dialog"
           aria-label="Nastavitve"
           style={{ top: themeMenuPos.top, bottom: themeMenuPos.bottom, left: themeMenuPos.left, maxHeight: themeMenuPos.maxHeight }}
-          className={`fixed w-72 space-y-3 overflow-y-auto rounded-xl border border-orange-400 dark:border-white/10 dark:glass-menu dark:rounded-2xl bg-neutral-900 p-3 font-sans shadow-xl ${samSpili ? "z-50" : "z-10"}`}
+          className={`fixed w-72 space-y-3 overflow-y-auto rounded-xl border border-orange-400 dark:border-white/10 dark:glass-menu dark:rounded-2xl bg-neutral-900 p-3 font-sans shadow-xl ${samSpili ? "ss-phone-menu z-50" : "z-10"}`}
         >
           {/* "Sam Špili" prekrije urejevalnik, snemanje in samodejno pomikanje — tam jih ni. */}
           {!samSpili && (
@@ -3007,13 +2991,12 @@ export default function ChordsViewer({
               <p className="px-1 text-[13px] font-medium text-neutral-400">Nastavitve</p>
               <div className="border-t border-neutral-700 px-1 pt-2">
                 {pickerHeader("Tema", ssSettingsThemeOpen, () => setSsSettingsThemeOpen((v) => !v))}
-                {ssSettingsThemeOpen && <div className="space-y-3 pl-2">{themePickers}</div>}
+                {ssSettingsThemeOpen && <div className="mt-3 space-y-3 pl-2">{themePickers}</div>}
               </div>
             </>
           ) : (
             themePickers
           )}
-          {verifyPlayerRow}
           {/* Pametni predvajalnik: v glavnih nastavitvah (ne v naprednih). */}
           <div className="border-t border-neutral-700 px-1 pt-2">
             <button
@@ -3177,6 +3160,8 @@ export default function ChordsViewer({
               </div>
             )}
           </div>
+          {/* Predvajalnik preverjen: čisto na dnu menija. */}
+          <div className="border-t border-neutral-700 pt-2">{verifyPlayerRow}</div>
         </div>
       )}
 
