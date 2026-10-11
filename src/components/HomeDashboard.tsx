@@ -209,8 +209,8 @@ export function HomeBento({
     <div className={`grid grid-cols-6 gap-3 lg:grid-cols-12 ${className}`}>
       {showStats && (
         <>
-          <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} decor={<TopoCorner />} />
-          <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={`/${total}`} dot="bg-orange-400" onClick={onOpenVerified} decor={<WaveCorner />} />
+          <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} decor={<TopoCorner hover="group-hover:text-neutral-400/70 dark:group-hover:text-neutral-400/70" />} />
+          <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={`/${total}`} dot="bg-orange-400" onClick={onOpenVerified} decor={<WaveCorner hover="group-hover:text-orange-400/70 dark:group-hover:text-orange-400/70" />} />
           <StatCard className="col-span-3" label="V pregledu" value={review} dot="bg-teal-400" onClick={onOpenReview} />
           <StatCard className="col-span-3" label="V Skupnem Jamu" value={jamCount} dot="bg-fuchsia-400" pulse={jamCount > 0} onClick={onOpenJam} />
         </>
@@ -436,14 +436,15 @@ export function HomeAside({
 }
 
 // Plastnice (kot vzorec ozadja "Plastnice") v spodnjem desnem kotu kartice.
-function TopoCorner() {
+// hover = barva vzorca ob prehodu z miško (ista kot krogec kartice).
+function TopoCorner({ hover }: { hover: string }) {
   // Središče izven kartice (desno spodaj), zato se vidijo le loki v kotu.
   return (
     <svg
       aria-hidden="true"
       viewBox="0 0 160 120"
       preserveAspectRatio="xMaxYMax meet"
-      className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] transition-colors duration-300 group-hover:text-neutral-900/25 dark:text-white/[0.045] dark:group-hover:text-white/40"
+      className={`pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] transition-colors duration-300 dark:text-white/[0.045] ${hover}`}
     >
       <g fill="none" stroke="currentColor" strokeWidth="1" vectorEffect="non-scaling-stroke">
         {Array.from({ length: 6 }, (_, i) => (
@@ -457,13 +458,13 @@ function TopoCorner() {
 // Valovna oblika zvoka (stolpci kot v predvajalniku) v spodnjem desnem kotu
 // kartice Preverjeno špila — skladbe, ki "špilajo". Proti levi stolpci upadejo.
 const WAVE = [0.35, 0.6, 0.45, 0.8, 0.55, 1, 0.7, 0.9, 0.5, 0.75, 0.4, 0.65, 0.3];
-function WaveCorner() {
+function WaveCorner({ hover }: { hover: string }) {
   return (
     <svg
       aria-hidden="true"
       viewBox="0 0 160 120"
       preserveAspectRatio="xMaxYMax meet"
-      className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] transition-colors duration-300 group-hover:text-neutral-900/25 dark:text-white/[0.045] dark:group-hover:text-white/40"
+      className={`pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] transition-colors duration-300 dark:text-white/[0.045] ${hover}`}
     >
       <g fill="none" stroke="currentColor" strokeWidth="1" vectorEffect="non-scaling-stroke">
         {WAVE.map((h, i) => {
