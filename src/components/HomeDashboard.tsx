@@ -162,6 +162,7 @@ export function HomeBento({
   review,
   jamCount,
   onOpenVerified,
+  onOpenAll,
   onOpenReview,
   onOpenJam,
   onRandom,
@@ -183,6 +184,7 @@ export function HomeBento({
   review: number;
   jamCount: number;
   onOpenVerified: () => void;
+  onOpenAll: () => void;
   onOpenReview: () => void;
   onOpenJam: () => void;
   onRandom: () => void;
@@ -202,7 +204,7 @@ export function HomeBento({
     <div className={`grid grid-cols-6 gap-3 lg:grid-cols-12 ${className}`}>
       {showStats && (
         <>
-          <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" />
+          <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} />
           <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={`/${total}`} dot="bg-orange-400" onClick={onOpenVerified} />
           <StatCard className="col-span-3" label="V pregledu" value={review} dot="bg-teal-400" onClick={onOpenReview} />
           <StatCard className="col-span-3" label="V Skupnem Jamu" value={jamCount} dot="bg-fuchsia-400" pulse={jamCount > 0} onClick={onOpenJam} />

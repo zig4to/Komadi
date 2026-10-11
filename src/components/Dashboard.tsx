@@ -331,6 +331,8 @@ export default function Dashboard({ user }: { user: User }) {
   // "Preverjeno špila": celostranski seznam preverjenih skladb (klik na kartico
   // statistike na domači strani) — enak vzorec kot ostale celostranske strani.
   const [verifiedOpen, setVerifiedOpen] = usePersistentBool("komadi:verified:open", false);
+  // "Vse skladbe": celostranski seznam vse knjižnice (klik na kartico statistike).
+  const [allSongsOpen, setAllSongsOpen] = usePersistentBool("komadi:allsongs:open", false);
   const [queueOpen, setQueueOpen] = usePersistentBool("komadi:queue:open", false);
   // "Arhiv priljubljenih": priljubljene preteklih mesecev (FavoritesMonth.tsx).
   const [favArchiveOpen, setFavArchiveOpen] = usePersistentBool("komadi:favarchive:open", false);
@@ -808,38 +810,13 @@ export default function Dashboard({ user }: { user: User }) {
     setImportBusy(false);
   }
 
-  const displaySongs = useMemo(() => {
-    const byTitle = (a: Song, b: Song) => a.title.localeCompare(b.title, "sl");
-    // "1960s" ni v ERAS, a obstaja v bazi (glej past "Pred 1960"/"1960s"
-    // v CLAUDE.md) — uvrsti ga takoj za "Pred 1960"; neznane na konec.
-    const eraIndex = (s: Song) => {
-      const i = ERAS.indexOf(s.era);
-      if (i >= 0) return i;
-      return (s.era as string) === "1960s" ? 0.5 : ERAS.length;
-    };
-    return filteredSongs
-      .filter((s) => !reportedSongIds.has(s.id))
-      .sort((a, b) => {
-        switch (songSort) {
-          case "newest":
-            return b.created_at.localeCompare(a.created_at);
-          case "oldest":
-            return a.created_at.localeCompare(b.created_at);
-          case "za":
-            return byTitle(b, a);
-          case "author":
-            return a.author.localeCompare(b.author, "sl") || byTitle(a, b);
-          case "popular":
-            return b.copy_count - a.copy_count || byTitle(a, b);
-          case "era-old":
-            return eraIndex(a) - eraIndex(b) || byTitle(a, b);
-          case "era-new":
-            return eraIndex(b) - eraIndex(a) || byTitle(a, b);
-          default:
-            return byTitle(a, b);
-        }
-      });
-  }, [filteredSongs, songSort, reportedSongIds]);
+  const displaySongs = useMemo(
+    () => filteredSongs.filter((s) => !reportedSongIds.has(s.id)).sort(songComparator(songSort)),
+    [filteredSongs, songSort, reportedSongIds],
+  );
+  // Stran "Vse skladbe" (klik na kartico statistike): vsa knjižnica, isti vrstni red.
+  const allSongsSorted = useMemo(() => [...songs].sort(songComparator(songSort)), [songs, songSort]);
+  const [allSongsVisible, setAllSongsVisible] = useState(RESULTS_PAGE);
 
   // Razpoloženja niso fiksen nabor: obrazcu ponudimo privzete predloge +
   // vsa že uporabljena (uporabniško dodana), filtru pa samo tista, ki jih
@@ -1062,6 +1039,7 @@ export default function Dashboard({ user }: { user: User }) {
     setPlaylistsOpen(false);
     setReviewOpen(false);
     setVerifiedOpen(false);
+    setAllSongsOpen(false);
     setFavArchiveOpen(true);
     window.scrollTo({ top: 0 });
   }
@@ -1073,6 +1051,7 @@ export default function Dashboard({ user }: { user: User }) {
     setQueueOpen(false);
     setFavArchiveOpen(false);
     setVerifiedOpen(false);
+    setAllSongsOpen(false);
     setReviewOpen(false);
     setPlaylistsOpen(true);
     window.scrollTo({ top: 0 });
@@ -1084,6 +1063,7 @@ export default function Dashboard({ user }: { user: User }) {
     setFixOpen(false);
     setFavArchiveOpen(false);
     setVerifiedOpen(false);
+    setAllSongsOpen(false);
     setReviewOpen(false);
     setPlaylistsOpen(false);
     setQueueOpen(true);
@@ -1169,6 +1149,7 @@ export default function Dashboard({ user }: { user: User }) {
     setFixOpen(false);
     setFavArchiveOpen(false);
     setVerifiedOpen(false);
+    setAllSongsOpen(false);
     setPlaylistsOpen(false);
     setReviewError(null);
     setReviewOpen(true);
@@ -1244,6 +1225,7 @@ export default function Dashboard({ user }: { user: User }) {
     setQueueOpen(false);
     setFavArchiveOpen(false);
     setVerifiedOpen(false);
+    setAllSongsOpen(false);
     setReviewOpen(false);
     setPlaylistsOpen(false);
     setFixOpen(true);
@@ -2064,7 +2046,7 @@ export default function Dashboard({ user }: { user: User }) {
     ? "jam"
     : playlistsOpen
       ? "playlists"
-      : goalOpen || fixOpen || queueOpen || favArchiveOpen || reviewOpen || verifiedOpen
+      : goalOpen || fixOpen || queueOpen || favArchiveOpen || reviewOpen || verifiedOpen || allSongsOpen
         ? null
         : sharedOn
           ? "shared"
@@ -2076,6 +2058,7 @@ export default function Dashboard({ user }: { user: User }) {
     setQueueOpen(false);
     setFavArchiveOpen(false);
     setVerifiedOpen(false);
+    setAllSongsOpen(false);
     setReviewOpen(false);
     setPlaylistsOpen(false);
   }
@@ -2112,6 +2095,15 @@ export default function Dashboard({ user }: { user: User }) {
   const activeFilterCount =
     filters.genres.length + filters.eras.length + filters.moods.length + filters.origins.length + (filters.favoriteOnly ? 1 : 0);
 
+  function openAllSongs() {
+    closeFullPages();
+    if (sharedOn) closeShared();
+    setActiveView("list");
+    setAllSongsVisible(RESULTS_PAGE);
+    setAllSongsOpen(true);
+    window.scrollTo({ top: 0 });
+  }
+
   function openVerified() {
     closeFullPages();
     if (sharedOn) closeShared();
@@ -2127,6 +2119,7 @@ export default function Dashboard({ user }: { user: User }) {
     setQueueOpen(false);
     setFavArchiveOpen(false);
     setVerifiedOpen(false);
+    setAllSongsOpen(false);
     setReviewOpen(false);
     setPlaylistsOpen(false);
     selectJamMode(true);
@@ -2144,6 +2137,7 @@ export default function Dashboard({ user }: { user: User }) {
   useBackableOpen(reviewOpen, () => setReviewOpen(false));
   useBackableOpen(favArchiveOpen, () => setFavArchiveOpen(false));
   useBackableOpen(verifiedOpen, () => setVerifiedOpen(false));
+  useBackableOpen(allSongsOpen, () => setAllSongsOpen(false));
   useBackableOpen(playlistsOpen, () => setPlaylistsOpen(false));
   useBackableOpen(goalPickerOpen, () => setGoalPickerOpen(false));
 
@@ -2473,6 +2467,47 @@ export default function Dashboard({ user }: { user: User }) {
               Nazaj
             </button>
           </>
+        ) : allSongsOpen ? (
+          <>
+            <h1 className="flex items-center gap-2">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-6 w-6 shrink-0 text-neutral-500 dark:text-neutral-300"
+              >
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:font-light dark:text-white dark:drop-shadow-none">
+                Vse skladbe
+              </span>
+            </h1>
+            <button
+              type="button"
+              onClick={() => setAllSongsOpen(false)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4 shrink-0"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              Nazaj
+            </button>
+          </>
         ) : verifiedOpen ? (
           <>
             <h1 className="flex items-center gap-2">
@@ -2754,6 +2789,7 @@ export default function Dashboard({ user }: { user: User }) {
                     setQueueOpen(false);
                     setFavArchiveOpen(false);
                     setVerifiedOpen(false);
+                    setAllSongsOpen(false);
                     setReviewOpen(false);
                     setPlaylistsOpen(false);
                     setGoalOpen(true);
@@ -2778,6 +2814,7 @@ export default function Dashboard({ user }: { user: User }) {
                     setQueueOpen(false);
                     setFavArchiveOpen(false);
                     setVerifiedOpen(false);
+                    setAllSongsOpen(false);
                     setReviewOpen(false);
                     setPlaylistsOpen(false);
                     setJamOpen(true);
@@ -3148,6 +3185,40 @@ export default function Dashboard({ user }: { user: User }) {
             )}
           />
         </div>
+      ) : allSongsOpen ? (
+        <div className="mt-3! space-y-4">
+          <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-neutral-500">{allSongsSorted.length} skladb</span>
+            <SortMenu value={songSort} onChange={setSongSort} />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {allSongsSorted.slice(0, allSongsVisible).map((song) => (
+              <div key={song.id}>
+                <SongCard
+                  song={song}
+                  authorImage={authorImages[song.author] ?? null}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onFilterAuthor={(author) => {
+                    setAllSongsOpen(false);
+                    handleFilterByAuthor(author);
+                  }}
+                  onAddToJam={handleAddToJam}
+                  onAddToSharedJam={handleAddToSharedJam}
+                  onChordsClick={handleChordsClick}
+                  onReported={handleReported}
+                  onSendToReview={handleSendToReview}
+                  onToggleFavorite={handleToggleFavorite}
+                />
+                {renderEditForm(song)}
+              </div>
+            ))}
+          </div>
+          {allSongsSorted.length > allSongsVisible && (
+            <LoadMoreSentinel key={allSongsVisible} onVisible={() => setAllSongsVisible((n) => n + RESULTS_PAGE)} />
+          )}
+        </div>
       ) : verifiedOpen ? (
         <div className="mt-3! space-y-6">
           <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
@@ -3185,6 +3256,7 @@ export default function Dashboard({ user }: { user: User }) {
                                 onEdit={handleEdit}
                                 onFilterAuthor={(author) => {
                                   setVerifiedOpen(false);
+                                  setAllSongsOpen(false);
                                   handleFilterByAuthor(author);
                                 }}
                                 onAddToJam={handleAddToJam}
@@ -3202,6 +3274,7 @@ export default function Dashboard({ user }: { user: User }) {
                               authorImage={authorImages[song.author] ?? null}
                               onFilterAuthor={(author) => {
                                 setVerifiedOpen(false);
+                                setAllSongsOpen(false);
                                 handleFilterByAuthor(author);
                               }}
                               onEdit={() => {}}
@@ -3227,6 +3300,7 @@ export default function Dashboard({ user }: { user: User }) {
             onFilterAuthor={(author) => {
               setFavArchiveOpen(false);
               setVerifiedOpen(false);
+              setAllSongsOpen(false);
               handleFilterByAuthor(author);
             }}
             onChordsClick={handleChordsClick}
@@ -4115,6 +4189,7 @@ export default function Dashboard({ user }: { user: User }) {
               review={reviewSongs.length}
               jamCount={sharedJamItems.filter((x) => !x.played).length}
               onOpenVerified={openVerified}
+              onOpenAll={openAllSongs}
               onOpenReview={openReview}
               onOpenJam={openSharedJam}
               onRandom={pickRandom}
@@ -4646,6 +4721,38 @@ function JamModeToggle({ shared, onSelect }: { shared: boolean; onSelect: (share
       </button>
     </div>
   );
+}
+
+// Vrstni red seznama skladb (SortMenu): skupen za "Vsi Komadi" in stran "Vse skladbe".
+function songComparator(sort: string) {
+  const byTitle = (a: Song, b: Song) => a.title.localeCompare(b.title, "sl");
+  // "1960s" ni v ERAS, a obstaja v bazi (glej past "Pred 1960"/"1960s"
+  // v CLAUDE.md) — uvrsti ga takoj za "Pred 1960"; neznane na konec.
+  const eraIndex = (s: Song) => {
+    const i = ERAS.indexOf(s.era);
+    if (i >= 0) return i;
+    return (s.era as string) === "1960s" ? 0.5 : ERAS.length;
+  };
+  return (a: Song, b: Song) => {
+    switch (sort) {
+      case "newest":
+        return b.created_at.localeCompare(a.created_at);
+      case "oldest":
+        return a.created_at.localeCompare(b.created_at);
+      case "za":
+        return byTitle(b, a);
+      case "author":
+        return a.author.localeCompare(b.author, "sl") || byTitle(a, b);
+      case "popular":
+        return b.copy_count - a.copy_count || byTitle(a, b);
+      case "era-old":
+        return eraIndex(a) - eraIndex(b) || byTitle(a, b);
+      case "era-new":
+        return eraIndex(b) - eraIndex(a) || byTitle(a, b);
+      default:
+        return byTitle(a, b);
+    }
+  };
 }
 
 function LoadMoreSentinel({ onVisible }: { onVisible: () => void }) {
