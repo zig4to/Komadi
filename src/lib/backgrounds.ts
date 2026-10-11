@@ -1,3 +1,5 @@
+import type { PatternId } from "@/lib/backgroundPatterns";
+
 // Ozadja vsebine pregledovalnika akordov (⚙ → Tema → Barva ozadja, tudi v
 // "Sam Špili") in ozadja aplikacije (⋮ → Nastavitve → Tema). Zgornji vrstici
 // pregledovalnika ostaneta temni.
@@ -16,7 +18,14 @@ export const BACKGROUNDS = [
   { label: "Temno zelena", light: false, bg: "#0a1711", text: "#eef7f1", title: "#ffffff", muted: "#94ab9f", panel: "#06100b", border: "#2f4a3d" },
   { label: "Svinčena", light: false, bg: "#303030", text: "#f5f5f5", title: "#ffffff", muted: "#adadad", panel: "#1f1f1f", border: "#585858" },
   { label: "Oglje", light: false, bg: "#1f1f1f", text: "#f5f5f5", title: "#ffffff", muted: "#a3a3a3", panel: "#121212", border: "#4d4d4d" },
+  // Ozadja z vzorcem (enaki kot vzorci ozadja aplikacije): grafitna podlaga +
+  // tanke črte. Samo za pregledovalnik akordov / Sam Špili — v izbiri ozadja
+  // aplikacije jih ni (tam je vzorec ločena izbira, ⋮ → Nastavitve → Tema → Vzorec).
+  { label: "Plastnice", light: false, bg: "#0a0a0b", text: "#f5f5f5", title: "#ffffff", muted: "#a3a3a3", panel: "#141416", border: "#3a3a3f", pattern: "topo" as PatternId },
+  { label: "Vrat kitare", light: false, bg: "#0a0a0b", text: "#f5f5f5", title: "#ffffff", muted: "#a3a3a3", panel: "#141416", border: "#3a3a3f", pattern: "fretboard" as PatternId },
+  { label: "Zvočnik", light: false, bg: "#0a0a0b", text: "#f5f5f5", title: "#ffffff", muted: "#a3a3a3", panel: "#141416", border: "#3a3a3f", pattern: "speaker" as PatternId },
+  { label: "Akordni diagram", light: false, bg: "#0a0a0b", text: "#f5f5f5", title: "#ffffff", muted: "#a3a3a3", panel: "#141416", border: "#3a3a3f", pattern: "chord" as PatternId },
 ];
 // Od svetlega do temnega (sive: Grafit, Svinčena, Temno siva, Oglje,
 // Antracit, Črna), rjava na koncu.
-export const BACKGROUND_ORDER = [0, 1, 4, 10, 2, 11, 5, 3, 6, 7, 8, 9];
+export const BACKGROUND_ORDER = [0, 1, 4, 10, 2, 11, 5, 3, 6, 7, 8, 9, 12, 13, 14, 15];

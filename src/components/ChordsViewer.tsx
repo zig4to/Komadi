@@ -546,8 +546,12 @@ export default function ChordsViewer({
               >
                 <span
                   style={{ backgroundColor: b.bg }}
-                  className={`h-7 w-7 rounded-full border border-neutral-600 ${bgIndex === i ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-neutral-900" : ""}`}
-                />
+                  className={`h-7 w-7 overflow-hidden rounded-full border border-neutral-600 ${bgIndex === i ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-neutral-900" : ""}`}
+                >
+                  {b.pattern && (
+                    <PatternSvg id={b.pattern} colors={{ line: "rgba(255,255,255,0.45)", accent: "rgba(52,211,153,0.9)" }} className="h-full w-full" />
+                  )}
+                </span>
                 {b.label}
               </button>
             );
@@ -2687,7 +2691,12 @@ export default function ChordsViewer({
     "flex h-7 min-w-7 items-center justify-center rounded-full text-sm font-medium text-neutral-200 hover:bg-neutral-800 hover:text-white disabled:opacity-40 active:scale-95";
 
   return createPortal(
-    <div ref={setRoot} data-view-portal onClick={(e) => e.stopPropagation()} style={themeVars} className="fixed inset-0 z-50 flex flex-col bg-(--cv-bg) pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
+    <div ref={setRoot} data-view-portal onClick={(e) => e.stopPropagation()} style={themeVars} className="fixed inset-0 z-50 isolate flex flex-col bg-(--cv-bg) pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
+      {theme.pattern && (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+          <PatternSvg id={theme.pattern} colors={BACKGROUND_COLORS} className="h-full w-full" />
+        </div>
+      )}
       {/* Med samodejnim pomikanjem zgornji vrstici zdrsneta gor (celozaslonski
           način), ob pavzi se vrneta. Skrito s CSS, ne odstranjeno — predvajalnik
           mora ostati, da glasba igra naprej. */}
@@ -3731,9 +3740,14 @@ export default function ChordsViewer({
       {/* "Sam Špili": prekrije pregledovalnik (predvajalnik ostane spodaj in igra). */}
       {samSpili && (
         <div
-          className="absolute inset-0 z-40 flex flex-col overflow-hidden bg-(--cv-bg) text-(--cv-text)"
+          className="absolute inset-0 z-40 isolate flex flex-col overflow-hidden bg-(--cv-bg) text-(--cv-text)"
           onClick={follower ? ssFollowerFullscreen : undefined}
         >
+          {theme.pattern && (
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+              <PatternSvg id={theme.pattern} colors={BACKGROUND_COLORS} className="h-full w-full" />
+            </div>
+          )}
           {ssShowLines ? (
             <>
               {/* Blaga navpična črta levo od stolpca gumbov — besedilo se konča pred njo;

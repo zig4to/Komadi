@@ -420,7 +420,7 @@ export default function SettingsMenu({
                       />
                       Osnovna
                     </button>
-                    {BACKGROUND_ORDER.map((i) => {
+                    {BACKGROUND_ORDER.filter((i) => !BACKGROUNDS[i].pattern).map((i) => {
                       const b = BACKGROUNDS[i];
                       return (
                         <button
