@@ -75,7 +75,7 @@ function StatCard({
       {onClick && <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-neutral-400 dark:text-neutral-600" />}
     </>
   );
-  const cls = `${CARD} relative isolate block overflow-hidden p-4 text-left ${className}`;
+  const cls = `${CARD} group relative isolate block overflow-hidden p-4 text-left ${className}`;
   return onClick ? (
     <button type="button" onClick={onClick} className={`${cls} transition hover:bg-neutral-50 dark:hover:bg-white/[0.06]`}>
       {body}
@@ -443,7 +443,7 @@ function TopoCorner() {
       aria-hidden="true"
       viewBox="0 0 160 120"
       preserveAspectRatio="xMaxYMax meet"
-      className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] dark:text-white/[0.045]"
+      className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] transition-colors duration-300 group-hover:text-neutral-900/25 dark:text-white/[0.045] dark:group-hover:text-white/40"
     >
       <g fill="none" stroke="currentColor" strokeWidth="1" vectorEffect="non-scaling-stroke">
         {Array.from({ length: 6 }, (_, i) => (
