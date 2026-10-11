@@ -249,6 +249,7 @@ export default function SongCard({
 
   return (
     <div
+      data-chords-card
       style={cardStyle}
       className={`relative isolate overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] px-4 py-3 transition duration-200 hover:-translate-y-0.5 dark:rounded-[26px] dark:bg-none dark:bg-white/[0.035] dark:shadow-none! lg:min-h-[112px] ${
         highlighted
@@ -643,7 +644,7 @@ export default function SongCard({
       </div>
 
       {playlistPickerOpen && (
-        <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-white/[0.08]">
+        <div data-no-card-click className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-white/[0.08]">
           <p className="text-xs font-medium text-neutral-700 dark:text-neutral-200">
             Dodaj v playlisto
           </p>
@@ -703,7 +704,7 @@ export default function SongCard({
       )}
 
       {reportOpen && (
-        <div className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-white/[0.08]">
+        <div data-no-card-click className="mt-3 space-y-2 border-t border-neutral-200 pt-3 dark:border-white/[0.08]">
           <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-200">
             <svg
               aria-hidden="true"

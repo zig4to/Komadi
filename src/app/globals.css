@@ -76,8 +76,21 @@ textarea,
   }
 }
 
+/* Izbira akordov pod kartico: razpre se navzdol. */
+@keyframes chords-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
 @theme {
   --animate-menu-open: menu-open 300ms ease-out;
+  --animate-chords-drop: chords-drop 180ms ease-out;
 }
 
 /* Nameščena aplikacija čez cel zaslon (manifest "display": "fullscreen"): ni

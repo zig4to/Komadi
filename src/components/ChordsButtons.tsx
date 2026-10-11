@@ -18,6 +18,9 @@ const hasSamSpili = (song: Song) =>
   (song.review_pending || !!song.verified_player_at || SAM_SPILI_TEST_TITLES.includes(song.title.trim().toLowerCase()));
 import type { Song } from "@/types/song";
 
+// Kliki na te elemente v kartici ne odprejo izbire akordov (imajo svojo akcijo).
+const CARD_INTERACTIVE = "button, a, input, textarea, select, label, summary, [role='menu'], [data-no-card-click]";
+
 // Skrajšana različica gumbov "UG Tabs"/"PDF akordi" iz SongCard.tsx (samo
 // "UG"/"PDF"), za uporabo na kompaktnih karticah (Novo/Popularno/
 // Predstavljeno), kjer za polna besedila ni dovolj prostora. Ista logika
@@ -29,7 +32,6 @@ export default function ChordsButtons({
   stacked = false,
   merged = false,
   menuAlign = "left",
-  iconOnly = false,
 }: {
   song: Song;
   onChordsClick?: (song: Song) => void;
@@ -46,13 +48,12 @@ export default function ChordsButtons({
   // gumb tik ob desnem robu vrstice (CompactRow na "Popularno"), da se meni
   // ne razteza čez desni rob zaslona.
   menuAlign?: "left" | "right";
-  // Gumb "Akordi" samo z ikono, brez besedila (Jam — privat in Skupni).
-  iconOnly?: boolean;
 }) {
   const [pdfOpen, setPdfOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; bottom: number; left?: number; right?: number } | null>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; bottom: number; left: number; width: number } | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLElement | null>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
   // Blizu dna zaslona se meni odpre nad gumbom (useFlipUpMenu).
   useFlipUpMenu(menuPanelRef, menuOpen ? menuPos : null);
@@ -73,7 +74,7 @@ export default function ChordsButtons({
     if (!menuOpen) return;
     function onPointerDown(e: PointerEvent) {
       const target = e.target as Node;
-      if (!buttonRef.current?.contains(target) && !menuPanelRef.current?.contains(target)) setMenuOpen(false);
+      if (!cardRef.current?.contains(target) && !menuPanelRef.current?.contains(target)) setMenuOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setMenuOpen(false);
@@ -86,50 +87,68 @@ export default function ChordsButtons({
     };
   }, [menuOpen]);
 
-  // Združen meni "Akordi" se prikaže, kadar je poleg spletnega iskanja na
-  // voljo vsaj en vir (UG / PDF / Zabrenkaj / druga stran); brez virov ostane samo gumb
-  // "Spletno iskanje".
-  if (merged && sourceCount >= 1) {
+  // Kartica kot gumb (namesto gumba "Akordi"): klik na kartico (element z
+  // data-chords-card, v katerem je ta komponenta) odpre izbiro akordov pod
+  // kartico; kliki na gumbe/povezave v kartici gredo naprej kot prej.
+  useEffect(() => {
+    if (!merged) return;
+    const card = rootRef.current?.closest<HTMLElement>("[data-chords-card]") ?? null;
+    cardRef.current = card;
+    if (!card) return;
+    card.classList.add("cursor-pointer");
+    const onClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest("[data-chords-card]") !== card) return;
+      const hit = t.closest(CARD_INTERACTIVE);
+      if (hit && hit !== card && card.contains(hit)) return;
+      if (window.getSelection()?.toString()) return;
+      const rect = card.getBoundingClientRect();
+      setMenuPos({ top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width });
+      setMenuOpen((v) => !v);
+    };
+    card.addEventListener("click", onClick);
+    return () => {
+      card.removeEventListener("click", onClick);
+      card.classList.remove("cursor-pointer");
+    };
+  }, [merged]);
+
+  // Plošča je fiksna (portal): med pomikanjem in ob spremembi velikosti sledi kartici.
+  useEffect(() => {
+    if (!menuOpen) return;
+    let raf = 0;
+    const follow = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const card = cardRef.current;
+        if (!card) return;
+        const r = card.getBoundingClientRect();
+        if (r.bottom < 0 || r.top > window.innerHeight) {
+          setMenuOpen(false);
+          return;
+        }
+        setMenuPos({ top: r.top, bottom: r.bottom, left: r.left, width: r.width });
+      });
+    };
+    window.addEventListener("scroll", follow, true);
+    window.addEventListener("resize", follow);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", follow, true);
+      window.removeEventListener("resize", follow);
+    };
+  }, [menuOpen]);
+
+  // Izbira akordov (Sam Špili, Akordi v aplikaciji, UG, Zabrenkaj, druga stran,
+  // PDF, Spletno iskanje) se odpre s klikom na kartico; v kartici ostane samo ♪.
+  if (merged) {
+    const panelWidth = menuPos ? Math.max(220, Math.min(menuPos.width, 460)) : 220;
+    const panelLeft = menuPos
+      ? Math.min(Math.max(8, menuAlign === "right" ? menuPos.left + menuPos.width - panelWidth : menuPos.left), window.innerWidth - panelWidth - 8)
+      : 0;
+    const wide = panelWidth >= 300;
     return (
-      <div className={stacked ? "flex shrink-0 items-center gap-1" : "mt-1 flex items-center gap-1"}>
-        <button
-          ref={buttonRef}
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!menuOpen) {
-              const rect = e.currentTarget.getBoundingClientRect();
-              setMenuPos(
-                menuAlign === "right"
-                  ? { top: rect.top, bottom: rect.bottom, right: window.innerWidth - rect.right }
-                  : { top: rect.top, bottom: rect.bottom, left: rect.left },
-              );
-            }
-            setMenuOpen((v) => !v);
-          }}
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          title="Akordi"
-          aria-label="Akordi"
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-400/40 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium leading-none text-neutral-500 backdrop-blur-sm transition hover:border-amber-500 hover:text-amber-600 dark:border-white/10 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] dark:text-neutral-400 dark:hover:text-amber-400"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.3}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-[15px] w-[15px] shrink-0"
-          >
-            <rect x="5" y="3" width="14" height="18" rx="1.5" />
-            <path d="M9.7 3v18M14.3 3v18M5 8.5h14M5 14h14" />
-            <circle cx="9.7" cy="11.2" r="1.3" />
-            <circle cx="14.3" cy="16.8" r="1.3" />
-          </svg>
-          {!iconOnly && "Akordi"}
-        </button>
+      <div ref={rootRef} className={stacked ? "flex shrink-0 items-center gap-1" : "mt-1 flex items-center gap-1"}>
         <ListenButton song={song} menuAlign={menuAlign} />
 
         {menuOpen &&
@@ -140,9 +159,13 @@ export default function ChordsButtons({
               ref={menuPanelRef}
               role="menu"
               data-view-portal
-              style={{ top: menuPos.bottom + 4, left: menuPos.left, right: menuPos.right }}
-              className="fixed z-50 w-40 space-y-0.5 rounded-xl border border-amber-400 bg-white p-1.5 shadow-xl dark:border-white/10 dark:glass-menu dark:rounded-2xl"
+              style={{ top: menuPos.bottom + 6, left: panelLeft, width: panelWidth }}
+              className="fixed z-50 origin-top animate-chords-drop rounded-2xl border border-amber-400 bg-white p-1.5 shadow-xl dark:border-white/10 dark:glass-menu"
             >
+              <p className="truncate px-2 pb-1 pt-0.5 text-[11px] text-neutral-500">
+                Akordi · {song.title}
+              </p>
+              <div className={wide ? "grid grid-cols-2 gap-0.5" : "space-y-0.5"}>
               {hasSamSpili(song) && (
                 <button
                   type="button"
@@ -283,6 +306,7 @@ export default function ChordsButtons({
                 PDF akordi
               </button>
               )}
+              </div>
               <div className="my-0.5 border-t border-neutral-200 dark:border-white/[0.08]" />
               <a
                 href={searchUrl}

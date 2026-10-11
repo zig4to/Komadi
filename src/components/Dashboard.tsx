@@ -3086,6 +3086,7 @@ export default function Dashboard({ user }: { user: User }) {
                   {goalItems.map((item, i) => (
                     <div
                       key={item.key}
+                      data-chords-card
                       className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-2.5 dark:border-white/[0.08] dark:bg-white/[0.035]"
                     >
                       <span
@@ -4793,7 +4794,7 @@ function CompactCard({
   onChordsClick?: (song: Song) => void;
 }) {
   return (
-    <div className="min-w-0 rounded-xl border border-neutral-200 bg-white p-3 transition hover:-translate-y-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
+    <div data-chords-card className="min-w-0 rounded-xl border border-neutral-200 bg-white p-3 transition hover:-translate-y-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
       <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">
         {song.title}
       </p>
@@ -4828,6 +4829,7 @@ function CompactRow({
 }) {
   return (
     <div
+      data-chords-card
       className={`flex min-w-0 items-center gap-3 border transition ${
         highlighted
           ? "rounded-[22px] border-rose-400/60 bg-rose-500/[0.06] px-4 py-3.5 hover:bg-rose-500/10 dark:border-rose-400/40 dark:bg-rose-500/[0.05] dark:hover:bg-rose-500/[0.09]"
@@ -4924,7 +4926,7 @@ function RecentGroupSongRow({
   onChordsClick?: (song: Song) => void;
 }) {
   return (
-    <div className="flex w-full flex-col items-start rounded-lg px-1.5 py-1 text-left">
+    <div data-chords-card className="flex w-full flex-col items-start rounded-lg px-1.5 py-1 text-left transition hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
       <span className="w-full truncate text-sm text-neutral-800 dark:text-neutral-200">
         {song.title}
       </span>

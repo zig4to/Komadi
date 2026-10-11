@@ -132,6 +132,7 @@ export function FavoriteCard({
 
   return (
     <div
+      data-chords-card
       style={{
         backgroundImage: `linear-gradient(100deg, ${accent}1f 0%, transparent 65%)`,
         borderColor: `${accent}38`,

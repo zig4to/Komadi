@@ -226,6 +226,7 @@ export default function JamBoard({
                 </p>
               )}
               <div
+                data-chords-card
                 className={`flex items-center gap-2 rounded-full border bg-white py-2 pl-2 dark:bg-white/[0.035] ${showAddedBy ? "pr-2" : "pr-4"} ${
                   item.key === firstUnplayedKey
                     ? "border-emerald-400 dark:border-emerald-600"
@@ -264,7 +265,7 @@ export default function JamBoard({
                   <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{item.author}</p>
                 </div>
                 {item.song && (
-                  <ChordsButtons song={item.song} onChordsClick={onChordsClick} stacked merged iconOnly menuAlign="right" />
+                  <ChordsButtons song={item.song} onChordsClick={onChordsClick} stacked merged menuAlign="right" />
                 )}
                 <button
                   type="button"
