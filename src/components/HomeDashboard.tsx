@@ -1,5 +1,6 @@
 "use client";
 
+import { topoRing } from "@/lib/backgroundPatterns";
 import type { SharedJamItem, Song } from "@/types/song";
 
 // Domača stran — pozdrav, statistika in desni stolpec (računalnik) v slogu
@@ -48,6 +49,7 @@ function StatCard({
   pulse,
   onClick,
   className = "",
+  decor,
 }: {
   label: string;
   value: number;
@@ -56,9 +58,12 @@ function StatCard({
   pulse?: boolean;
   onClick?: () => void;
   className?: string;
+  // Okras v ozadju kartice (npr. plastnice v spodnjem desnem kotu).
+  decor?: React.ReactNode;
 }) {
   const body = (
     <>
+      {decor}
       <span className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot} ${pulse ? "animate-pulse" : ""}`} />
         <span className="truncate">{label}</span>
@@ -70,7 +75,7 @@ function StatCard({
       {onClick && <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-neutral-400 dark:text-neutral-600" />}
     </>
   );
-  const cls = `${CARD} relative block p-4 text-left ${className}`;
+  const cls = `${CARD} relative isolate block overflow-hidden p-4 text-left ${className}`;
   return onClick ? (
     <button type="button" onClick={onClick} className={`${cls} transition hover:bg-neutral-50 dark:hover:bg-white/[0.06]`}>
       {body}
@@ -204,7 +209,7 @@ export function HomeBento({
     <div className={`grid grid-cols-6 gap-3 lg:grid-cols-12 ${className}`}>
       {showStats && (
         <>
-          <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} />
+          <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} decor={<TopoCorner />} />
           <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={`/${total}`} dot="bg-orange-400" onClick={onOpenVerified} />
           <StatCard className="col-span-3" label="V pregledu" value={review} dot="bg-teal-400" onClick={onOpenReview} />
           <StatCard className="col-span-3" label="V Skupnem Jamu" value={jamCount} dot="bg-fuchsia-400" pulse={jamCount > 0} onClick={onOpenJam} />
@@ -427,6 +432,25 @@ export function HomeAside({
 
       <VerifiedChart songs={songs} />
     </aside>
+  );
+}
+
+// Plastnice (kot vzorec ozadja "Plastnice") v spodnjem desnem kotu kartice.
+function TopoCorner() {
+  // Središče izven kartice (desno spodaj), zato se vidijo le loki v kotu.
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 160 120"
+      preserveAspectRatio="xMaxYMax meet"
+      className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] dark:text-white/[0.045]"
+    >
+      <g fill="none" stroke="currentColor" strokeWidth="1" vectorEffect="non-scaling-stroke">
+        {Array.from({ length: 6 }, (_, i) => (
+          <path key={i} d={topoRing(175, 135, 14 + i * 15, 1.7 + i * 0.22)} />
+        ))}
+      </g>
+    </svg>
   );
 }
 

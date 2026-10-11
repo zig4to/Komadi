@@ -51,7 +51,7 @@ const pt = (x: number, y: number, first: boolean) => `${first ? "M" : "L"}${x.to
 const seg = (a: [number, number], b: [number, number]) => `${pt(a[0], a[1], true)}${pt(b[0], b[1], false)}`;
 
 // Plastnice (kot zemljevid).
-function topoRing(cx: number, cy: number, r: number, seed: number) {
+export function topoRing(cx: number, cy: number, r: number, seed: number) {
   let d = "";
   for (let i = 0; i <= 120; i++) {
     const a = (i / 120) * Math.PI * 2;
