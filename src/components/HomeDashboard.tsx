@@ -209,8 +209,8 @@ export function HomeBento({
     <div className={`grid grid-cols-6 gap-3 lg:grid-cols-12 ${className}`}>
       {showStats && (
         <>
-          <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} decor={<TopoCorner hover="group-hover:text-neutral-400/70 dark:group-hover:text-neutral-400/70" />} />
-          <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={`/${total}`} dot="bg-orange-400" onClick={onOpenVerified} decor={<WaveCorner hover="group-hover:text-orange-400/70 dark:group-hover:text-orange-400/70" />} />
+          <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} decor={<TopoCorner hover="group-hover:text-neutral-400/40 dark:group-hover:text-neutral-400/40" />} />
+          <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={`/${total}`} dot="bg-orange-400" onClick={onOpenVerified} decor={<WaveCorner hover="group-hover:text-orange-400/40 dark:group-hover:text-orange-400/40" />} />
           <StatCard className="col-span-3" label="V pregledu" value={review} dot="bg-teal-400" onClick={onOpenReview} />
           <StatCard className="col-span-3" label="V Skupnem Jamu" value={jamCount} dot="bg-fuchsia-400" pulse={jamCount > 0} onClick={onOpenJam} />
         </>
@@ -482,7 +482,7 @@ function WaveCorner({ hover }: { hover: string }) {
               height={height}
               rx={3}
               stroke="currentColor"
-              className={`transition-colors duration-300 ${i % 2 ? "group-hover:text-neutral-900/30 dark:group-hover:text-white/50" : "group-hover:text-orange-400/75"}`}
+              className={`transition-colors duration-300 ${i % 2 ? "group-hover:text-neutral-900/20 dark:group-hover:text-white/25" : "group-hover:text-orange-400/40"}`}
             />
           );
         })}
