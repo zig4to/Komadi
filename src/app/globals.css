@@ -113,6 +113,43 @@ textarea,
   }
 }
 
+/* Naključno izbrana skladba (SongCard highlighted): rob rahlo utripa vijolično;
+   delno naključno izbrana limetino in malo manj izrazito. */
+@keyframes random-pick-pulse {
+  0%,
+  100% {
+    border-color: rgb(139 92 246 / 0.3);
+  }
+  50% {
+    border-color: rgb(139 92 246 / 0.85);
+  }
+}
+@keyframes partial-pick-pulse {
+  0%,
+  100% {
+    border-color: rgb(163 230 53 / 0.2);
+  }
+  50% {
+    border-color: rgb(163 230 53 / 0.6);
+  }
+}
+.random-pick-pulse {
+  animation: random-pick-pulse 2.4s ease-in-out infinite;
+}
+.partial-pick-pulse {
+  animation: partial-pick-pulse 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .random-pick-pulse {
+    animation: none;
+    border-color: rgb(139 92 246 / 0.6);
+  }
+  .partial-pick-pulse {
+    animation: none;
+    border-color: rgb(163 230 53 / 0.45);
+  }
+}
+
 /* Izbira akordov pod kartico: razpre se navzdol. */
 @keyframes chords-drop {
   0% {

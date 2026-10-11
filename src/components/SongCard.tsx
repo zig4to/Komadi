@@ -31,6 +31,7 @@ export default function SongCard({
   onImport,
   inLibrary = false,
   highlighted = false,
+  highlightTone = "violet",
   hideVerifiedBadges = false,
 }: {
   song: Song;
@@ -53,6 +54,9 @@ export default function SongCard({
   onImport?: (song: Song) => void;
   inLibrary?: boolean;
   highlighted?: boolean;
+  // Barva utripajočega roba izpostavljene kartice: vijolična = Naključno,
+  // limetina = Delno naključno.
+  highlightTone?: "violet" | "lime";
   // Brez kljukic "preverjeno" (stran Preverjeno špila — tam so vse preverjene).
   hideVerifiedBadges?: boolean;
 }) {
@@ -232,17 +236,18 @@ export default function SongCard({
   //   if (similarSongs.length === 0) fetchSimilar([]);
   // }
 
-  // Emerald ~152° za izpostavljeno (naključno izbrano) kartico, sicer
-  // stabilna barva (h/s/l) iz imena avtorja — tako imajo vse skladbe istega
+  // Stabilna barva (h/s/l) iz imena avtorja — tako imajo vse skladbe istega
   // avtorja enako barvno shemo (isto barvo uporabimo tudi za obrobo/senco
   // spodaj in za delni gradient ozadja, glej className). Obroba je manj
   // nasičena/temnejša od osnovne barve, da ne "kriči" enako glasno.
-  const { h, s, l } = highlighted ? { h: 152, s: 70, l: 42 } : authorAccentHsl(song.author);
+  const { h, s, l } = authorAccentHsl(song.author);
   const borderS = Math.max(s - 35, 0);
   const borderL = Math.max(l - 13, 12);
   const cardStyle = {
+    // Izpostavljena (naključno izbrana) kartica: rob rahlo utripa v barvi
+    // highlightTone (.random-pick-pulse / .partial-pick-pulse v globals.css).
     boxShadow: highlighted
-      ? "0 12px 36px -18px rgb(16 185 129 / 0.16), 0 2px 8px -6px rgb(0 0 0 / 0.32)"
+      ? `0 18px 40px -18px hsl(${h} ${s}% ${l}% / 0.22), 0 4px 12px -6px rgb(0 0 0 / 0.28)`
       : `0 12px 36px -20px hsl(${h} ${s}% ${l}% / 0.13), 0 2px 8px -7px rgb(0 0 0 / 0.32)`,
     borderColor: highlighted ? undefined : `hsl(${h} ${borderS}% ${borderL}% / 0.4)`,
     "--hue": h,
@@ -256,7 +261,7 @@ export default function SongCard({
       style={cardStyle}
       className={`relative isolate overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] px-4 py-3 transition duration-200 hover:-translate-y-0.5 dark:rounded-[26px] dark:bg-none dark:bg-white/[0.035] dark:shadow-none! lg:min-h-[112px] ${
         highlighted
-          ? "border-emerald-500"
+          ? `${highlightTone === "lime" ? "partial-pick-pulse" : "random-pick-pulse"} dark:bg-white/[0.055]`
           : "border-neutral-200 dark:border-white/[0.08]!"
       }`}
     >

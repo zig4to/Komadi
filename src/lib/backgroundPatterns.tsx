@@ -210,7 +210,7 @@ export function FretboardGlow({ className }: { className?: string }) {
         </mask>
       </defs>
       <g mask="url(#fret-glow-mask)" fill="none" strokeWidth="1" vectorEffect="non-scaling-stroke">
-        <Fretboard line="rgba(255,255,255,0.13)" accent="rgba(52,211,153,0.3)" />
+        <Fretboard line="rgba(255,255,255,0.13)" accent="rgba(52,211,153,0.15)" />
       </g>
     </svg>
   );

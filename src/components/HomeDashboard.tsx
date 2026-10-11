@@ -44,19 +44,26 @@ export function HomeGreeting({ firstName, songCount }: { firstName: string; song
 function StatCard({
   label,
   value,
+  icon,
+  hint,
   suffix,
   dot,
   pulse,
   onClick,
+  disabled,
   className = "",
   decor,
 }: {
   label: string;
-  value: number;
+  // Velika tanka številka; namesto nje lahko ikona (Naključno, Delno naključno).
+  value?: number;
+  icon?: React.ReactNode;
+  hint?: string;
   suffix?: string;
   dot: string;
   pulse?: boolean;
   onClick?: () => void;
+  disabled?: boolean;
   className?: string;
   // Okras v ozadju kartice (npr. plastnice v spodnjem desnem kotu).
   decor?: React.ReactNode;
@@ -68,16 +75,22 @@ function StatCard({
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot} ${pulse ? "animate-pulse" : ""}`} />
         <span className="truncate">{label}</span>
       </span>
-      <span className="mt-3 block text-4xl font-light tabular-nums text-neutral-900 dark:font-extralight dark:text-white">
-        {value}
-        {suffix && <span className="text-2xl text-neutral-400 dark:text-neutral-600">{suffix}</span>}
-      </span>
+      {icon ? (
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" className="mt-3 block h-10 w-10 text-neutral-900 dark:text-white">
+          {icon}
+        </svg>
+      ) : (
+        <span className="mt-3 block text-4xl font-light tabular-nums text-neutral-900 dark:font-extralight dark:text-white">
+          {value}
+          {suffix && <span className="text-2xl text-neutral-400 dark:text-neutral-600">{suffix}</span>}
+        </span>
+      )}
       {onClick && <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-neutral-400 dark:text-neutral-600" />}
     </>
   );
   const cls = `${CARD} group relative isolate block overflow-hidden p-4 text-left ${className}`;
   return onClick ? (
-    <button type="button" onClick={onClick} className={`${cls} transition hover:bg-neutral-50 dark:hover:bg-white/[0.06]`}>
+    <button type="button" onClick={onClick} disabled={disabled} title={hint} className={`${cls} transition hover:bg-neutral-50 disabled:opacity-40 dark:hover:bg-white/[0.06]`}>
       {body}
     </button>
   ) : (
@@ -85,7 +98,7 @@ function StatCard({
   );
 }
 
-// Kartica-dejanje (Naključno, Novo, Filtri …): barvna ikona, naslov, opis;
+// Kartica-dejanje (Novo, Popularno, Filtri …; Naključno in Delno sta StatCard z ikono): barvna ikona, naslov, opis;
 // aktivna (odprt pogled / panel) je poudarjena z obrobo v barvi ikone.
 function ActionCard({
   label,
@@ -143,7 +156,7 @@ function ActionCard({
 }
 
 // Barve novih kartic se ne ponavljajo s statistiko (siva, oranžna, turkizna,
-// fuksija): Naključno vijolična, Delno limetina, Novo smaragdna, Popularno
+// fuksija): Naključno vijolična, Delno limetina (pikica), Novo smaragdna, Popularno
 // rožnata, Filtri modra, Uglaševalec jantarna.
 const TONES = {
   violet: { text: "text-violet-600 dark:text-violet-400", ring: "ring-violet-500/50", tint: "bg-violet-500/[0.06]" },
@@ -219,11 +232,11 @@ export function HomeBento({
           <StatCard className="col-span-3" label="V Skupnem Jamu" value={jamCount} dot="bg-fuchsia-400" pulse={jamCount > 0} onClick={onOpenJam} decor={<CirclesCorner />} />
         </>
       )}
-      <ActionCard
+      <StatCard
         className="col-span-3"
         label="Naključno"
         hint="ena skladba iz knjižnice"
-        tone={TONES.violet}
+        dot="bg-violet-400"
         decor={<DiceCorner />}
         onClick={onRandom}
         disabled={disabled}
@@ -238,11 +251,11 @@ export function HomeBento({
           </>
         }
       />
-      <ActionCard
+      <StatCard
         className="col-span-3"
         label="Delno naključno"
         hint="po žanru, avtorju, obdobju …"
-        tone={TONES.lime}
+        dot="bg-lime-400"
         decor={<ShuffleCorner />}
         onClick={onPartial}
         disabled={disabled}
@@ -450,7 +463,7 @@ function TopoCorner({ hover }: { hover: string }) {
       aria-hidden="true"
       viewBox="0 0 160 120"
       preserveAspectRatio="xMaxYMax meet"
-      className={`pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:opacity-35 text-neutral-900/[0.05] transition-colors duration-300 dark:text-white/[0.045] ${hover}`}
+      className={`pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:hidden text-neutral-900/[0.05] transition-colors duration-300 dark:text-white/[0.045] ${hover}`}
     >
       <g fill="none" stroke="currentColor" strokeWidth="1" vectorEffect="non-scaling-stroke">
         {Array.from({ length: 6 }, (_, i) => (
@@ -462,13 +475,13 @@ function TopoCorner({ hover }: { hover: string }) {
 }
 
 // Preverjeno špila: znak "preverjeno" — kljukica v krogu, okrog nje valovi
-// (kot da skladba igra); ob prehodu (telefon: stalno) kljukica oranžna, valovi
-// izmenično oranžni in beli.
+// (kot da skladba igra); ob prehodu kljukica oranžna, valovi
+// izmenično oranžni in beli. Na telefonu (hover:none) vzorcev v kotih ni.
 function VerifiedCorner({ hover }: { hover: string }) {
   const cx = 128;
   const cy = 92;
   return (
-    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className={`pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:opacity-35 text-neutral-900/[0.05] dark:text-white/[0.045] transition-colors duration-300 ${hover}`}>
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className={`pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:hidden text-neutral-900/[0.05] dark:text-white/[0.045] transition-colors duration-300 ${hover}`}>
       <g fill="none" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
         {[22, 36, 50, 64].map((r, i) => (
           <circle
@@ -491,7 +504,7 @@ function VerifiedCorner({ hover }: { hover: string }) {
 function ChecklistCorner() {
   const rows = [0, 1, 2, 3];
   return (
-    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:opacity-35 text-neutral-900/[0.05] dark:text-white/[0.045]">
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:hidden text-neutral-900/[0.05] dark:text-white/[0.045]">
       <g fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
         {rows.map((i) => {
           const y = 34 + i * 24;
@@ -521,7 +534,7 @@ const JAM_CIRCLES = [
 ];
 function CirclesCorner() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:opacity-35 text-neutral-900/[0.05] dark:text-white/[0.045]">
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:hidden text-neutral-900/[0.05] dark:text-white/[0.045]">
       <g fill="none" strokeWidth="1" vectorEffect="non-scaling-stroke">
         {JAM_CIRCLES.map((c, i) => (
           <circle
@@ -546,7 +559,7 @@ const DICE = [
 ];
 function DiceCorner() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:opacity-35 text-neutral-900/[0.05] dark:text-white/[0.045]">
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:hidden text-neutral-900/[0.05] dark:text-white/[0.045]">
       <g fill="none" strokeWidth="1" vectorEffect="non-scaling-stroke">
         {DICE.map((d, i) => (
           <g
@@ -574,7 +587,7 @@ function ShuffleCorner() {
     "M 60 70 C 95 70, 110 70, 150 70",
   ];
   return (
-    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:opacity-35 text-neutral-900/[0.05] dark:text-white/[0.045]">
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:hidden text-neutral-900/[0.05] dark:text-white/[0.045]">
       <g fill="none" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
         {paths.map((d, i) => {
           const y = [40, 100, 70][i];

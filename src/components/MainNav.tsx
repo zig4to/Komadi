@@ -4,7 +4,8 @@
 // računalniku v glavi domače strani, na telefonu (in na računalniku na
 // celozaslonskih straneh) kot vrstica pod glavo. Skupno je na telefonu v
 // meniju ⋮ (oddelek "Skupno" pod Uporabnikom), ne v vrstici. Ikone obdržijo barvo
-// funkcije, aktivna tabletka je poudarjena.
+// funkcije, aktivna tabletka je poudarjena. Telefon: desno od Playlist ikona
+// za iskanje (onSearch), ki odpre iskalno vrstico pod glavo.
 
 export type MainNavTab = "home" | "jam" | "playlists" | "shared";
 
@@ -60,11 +61,15 @@ export default function MainNav({
   onSelect,
   disabled,
   className = "",
+  onSearch,
+  searchActive,
 }: {
   active: MainNavTab | null;
   onSelect: (tab: MainNavTab) => void;
   disabled?: boolean;
   className?: string;
+  onSearch?: () => void;
+  searchActive?: boolean;
 }) {
   return (
     <nav
@@ -105,6 +110,38 @@ export default function MainNav({
           </button>
         );
       })}
+      {onSearch && (
+        <button
+          type="button"
+          data-view-toggle
+          // Ne vzemi fokusa iskalnemu polju, sicer bi se ob dotiku najprej zaprlo (blur).
+          onPointerDown={(e) => e.preventDefault()}
+          onClick={onSearch}
+          disabled={disabled}
+          aria-label="Išči"
+          aria-pressed={searchActive}
+          title="Išči"
+          className={`inline-flex shrink-0 items-center justify-center rounded-full px-3 py-1.5 transition disabled:opacity-40 lg:hidden ${
+            searchActive
+              ? "bg-neutral-900 text-white dark:bg-white/[0.12]"
+              : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-white/[0.05]"
+          }`}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4 text-neutral-700 dark:text-white"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+        </button>
+      )}
     </nav>
   );
 }

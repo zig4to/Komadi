@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { flushSync } from "react-dom";
 import type { User } from "@supabase/supabase-js";
 import ChordsButtons from "@/components/ChordsButtons";
 import JamBoard, { type JamBoardItem } from "@/components/JamBoard";
@@ -245,6 +246,9 @@ export default function Dashboard({ user }: { user: User }) {
   // Naslovna vrstica seznama "Vsi Komadi" — cilj gumba "Vrni se na vrh".
   const listHeadingRef = useRef<HTMLDivElement>(null);
   const searchWide = searchFocused || filters.search !== "";
+  // Telefon: iskalna vrstica pod glavo je skrita, odpre jo ikona v glavni
+  // navigaciji (desno od Playlist); vidna ostane, dokler je kaj vpisano.
+  const [searchOpen, setSearchOpen] = useState(false);
   // "Akordi v aplikaciji": odprta skladba je v localStorage (src/lib/openChords.ts),
   // da po osvežitvi ostane odprta; pregledovalnik se izriše samo tu.
   const openChordsId = useOpenChordsSongId();
@@ -374,6 +378,7 @@ export default function Dashboard({ user }: { user: User }) {
   const [partialDimension, setPartialDimension] =
     useState<PartialDimension | null>(null);
   const [partialValue, setPartialValue] = useState("");
+  const [partialAuthorOpen, setPartialAuthorOpen] = useState(false);
   const [partialError, setPartialError] = useState<string | null>(null);
   // Ali trenutni randomPick prihaja iz "Delno naključno" (izbran po merilu) —
   // v tem primeru mora "Izberi drugo" spet odpreti izbirni obrazec (isto
@@ -1963,7 +1968,7 @@ export default function Dashboard({ user }: { user: User }) {
                   strokeWidth={2}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-rose-600 dark:text-neutral-500"
+                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500 dark:text-neutral-400"
                 >
                   <circle cx="11" cy="11" r="8" />
                   <path d="m21 21-4.3-4.3" />
@@ -1975,7 +1980,10 @@ export default function Dashboard({ user }: { user: User }) {
                     handleFiltersChange({ ...filters, search: e.target.value })
                   }
                   onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setSearchFocused(false)}
+                  onBlur={(e) => {
+                    setSearchFocused(false);
+                    if (!e.currentTarget.value) setSearchOpen(false);
+                  }}
                   // Enter na telefonski tipkovnici zapre tipkovnico (rezultati so že spodaj).
                   onKeyDown={(e) => {
                     if (e.key === "Enter") e.currentTarget.blur();
@@ -1983,7 +1991,7 @@ export default function Dashboard({ user }: { user: User }) {
                   enterKeyHint="search"
                   disabled={!isSupabaseConfigured}
                   aria-label="Išči po naslovu ali avtorju"
-                  className="w-full rounded-full border border-rose-500/40 bg-[linear-gradient(115deg,rgba(225,29,72,0.14)_15%,rgba(225,29,72,0.03)_95%)] py-2 pl-10 pr-9 text-sm text-neutral-800 transition focus:bg-[linear-gradient(115deg,rgba(225,29,72,0.24)_15%,rgba(225,29,72,0.06)_95%)] focus:outline-none disabled:opacity-40 dark:border-white/10 dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:focus:bg-white/[0.1]"
+                  className="w-full rounded-full border border-neutral-300 bg-white py-2 pl-10 pr-9 text-sm text-neutral-800 transition focus:border-neutral-400 focus:outline-none disabled:opacity-40 dark:border-white/10 dark:text-neutral-200 dark:bg-white/[0.05] dark:focus:border-white/20 dark:focus:bg-white/[0.1]"
                 />
                 {/* Placeholder as an overlay so it can be shorter on phones
                     (a native placeholder can't change text per breakpoint). */}
@@ -2017,6 +2025,7 @@ export default function Dashboard({ user }: { user: User }) {
                       handleFiltersChange({ ...filters, search: "" });
                       searchInputRef.current?.blur();
                       setSearchFocused(false);
+                      setSearchOpen(false);
                     }}
                     aria-label="Zapri iskanje"
                     title="Zapri iskanje"
@@ -2051,6 +2060,24 @@ export default function Dashboard({ user }: { user: User }) {
         : sharedOn
           ? "shared"
           : "home";
+  const phoneSearchShown = searchOpen || filters.search !== "";
+  // Ikona za iskanje (telefon): odpre vrstico in takoj fokusira polje — v istem
+  // dotiku (flushSync), sicer telefon ne odpre tipkovnice. Z drugih strani
+  // najprej skoči na domačo stran; ponoven dotik zapre in počisti iskanje.
+  function handlePhoneSearch() {
+    const onHome = activeNav === "home" || activeNav === "shared";
+    if (onHome && phoneSearchShown) {
+      handleFiltersChange({ ...filters, search: "" });
+      searchInputRef.current?.blur();
+      setSearchOpen(false);
+      return;
+    }
+    flushSync(() => {
+      if (!onHome) handleMainNav("home");
+      setSearchOpen(true);
+    });
+    searchInputRef.current?.focus();
+  }
   function closeFullPages() {
     setJamOpen(false);
     setGoalOpen(false);
@@ -2734,7 +2761,7 @@ export default function Dashboard({ user }: { user: User }) {
                     <path d="m6 16 2 2" />
                     <path d="M8.23 9.85A3 3 0 0 1 11 8a5 5 0 0 1 5 5 3 3 0 0 1-1.85 2.77l-.92.38A2 2 0 0 0 12 18a4 4 0 0 1-4 4 6 6 0 0 1-6-6 4 4 0 0 1 4-4 2 2 0 0 0 1.85-1.23z" />
                   </svg>
-                  <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:font-light dark:text-white dark:drop-shadow-none">
+                  <span className="text-2xl font-semibold tracking-[0.015em] text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:font-light dark:text-white dark:drop-shadow-none">
                     Bitne Tabs
                   </span>
                 </button>
@@ -2835,6 +2862,8 @@ export default function Dashboard({ user }: { user: User }) {
         active={activeNav}
         onSelect={handleMainNav}
         disabled={!isSupabaseConfigured}
+        onSearch={handlePhoneSearch}
+        searchActive={phoneSearchShown && (activeNav === "home" || activeNav === "shared")}
         className={`mt-3! w-full lg:w-fit ${activeNav === "home" || activeNav === "shared" ? "lg:hidden" : ""}`}
       />
 
@@ -3908,97 +3937,165 @@ export default function Dashboard({ user }: { user: User }) {
           )}
 
           {partialOpen && partialDimension && (
-            <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-white/[0.08] dark:bg-white/[0.035]">
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                  🔀 Delno naključno — {PARTIAL_LABELS[partialDimension]}
+            <div className="rounded-2xl border border-neutral-200 bg-white p-4 lg:p-5 dark:rounded-[26px] dark:border-white/[0.08] dark:bg-white/[0.035]">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <p className="flex min-w-0 items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-lime-400" />
+                  <span className="truncate">
+                    Delno naključno · <span className="text-neutral-900 dark:text-white">{PARTIAL_LABELS[partialDimension]}</span>
+                  </span>
                 </p>
                 <button
+                  type="button"
                   onClick={() => setPartialOpen(false)}
                   aria-label="Zapri"
                   title="Zapri"
-                  className="text-xs text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+                  className="-m-1.5 shrink-0 rounded-full p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-500 dark:hover:bg-white/[0.06] dark:hover:text-neutral-200"
                 >
-                  ✕
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row">
-                {partialDimension === "author" ? (
-                  <>
-                    <input
-                      list="komadi-authors-list"
-                      value={partialValue}
-                      onChange={(e) => {
-                        setPartialValue(e.target.value);
-                        setPartialError(null);
-                      }}
-                      placeholder="npr. Oasis"
-                      className="flex-1 rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 focus:border-emerald-500 focus:outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-neutral-100"
-                    />
-                    <datalist id="komadi-authors-list">
-                      {usedAuthors.map((a) => (
-                        <option key={a} value={a} />
-                      ))}
-                    </datalist>
-                  </>
-                ) : (
-                  <select
+              {partialDimension === "author" ? (
+                // Lasten spustni seznam avtorjev (datalist se ob kliku v polje ne odpre):
+                // odpre se ob fokusu, filtrira po vpisanih besedah (poljuben vrstni red).
+                <div className="relative">
+                  <input
                     value={partialValue}
                     onChange={(e) => {
                       setPartialValue(e.target.value);
                       setPartialError(null);
+                      setPartialAuthorOpen(true);
                     }}
-                    className="flex-1 rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm text-neutral-900 focus:border-emerald-500 focus:outline-none dark:border-white/10 dark:bg-white/[0.04] dark:text-neutral-100"
-                  >
-                    <option value="">— izberi —</option>
-                    {(partialDimension === "genre"
-                      ? usedGenres
-                      : partialDimension === "era"
-                        ? usedEras
-                        : partialDimension === "origin"
-                          ? usedOrigins
-                          : usedMoods
-                    ).map((v) => (
-                      <option key={v} value={v}>
+                    onFocus={() => setPartialAuthorOpen(true)}
+                    onClick={() => setPartialAuthorOpen(true)}
+                    onBlur={() => setPartialAuthorOpen(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setPartialAuthorOpen(false);
+                        handlePartialConfirm();
+                      } else if (e.key === "Escape") setPartialAuthorOpen(false);
+                    }}
+                    placeholder="npr. Oasis"
+                    enterKeyHint="go"
+                    autoComplete="off"
+                    role="combobox"
+                    aria-expanded={partialAuthorOpen}
+                    aria-controls="komadi-authors-list"
+                    className="w-full rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-800 transition placeholder:text-neutral-500 focus:border-neutral-400 focus:outline-none dark:border-white/10 dark:bg-white/[0.05] dark:text-neutral-200 dark:focus:border-white/20 dark:focus:bg-white/[0.1]"
+                  />
+                  {partialAuthorOpen && (() => {
+                    const words = partialValue.toLowerCase().split(/\s+/).filter(Boolean);
+                    const matches = usedAuthors.filter((a) => {
+                      const low = a.toLowerCase();
+                      return words.every((w) => low.includes(w));
+                    });
+                    if (matches.length === 0 || (matches.length === 1 && matches[0] === partialValue)) return null;
+                    return (
+                      <ul
+                        id="komadi-authors-list"
+                        role="listbox"
+                        className="absolute inset-x-0 top-full z-20 mt-1.5 max-h-64 overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-1 shadow-lg dark:border-white/[0.08] dark:bg-neutral-900"
+                      >
+                        {matches.map((a) => (
+                          <li key={a} role="option" aria-selected={a === partialValue}>
+                            <button
+                              type="button"
+                              // Brez tega bi polje izgubilo fokus (in zaprlo seznam) pred klikom.
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setPartialValue(a);
+                                setPartialError(null);
+                                setPartialAuthorOpen(false);
+                              }}
+                              className={`block w-full truncate rounded-xl px-3 py-2 text-left text-sm transition hover:bg-neutral-100 dark:hover:bg-white/[0.06] ${
+                                a === partialValue ? "text-neutral-900 dark:text-white" : "text-neutral-600 dark:text-neutral-300"
+                              }`}
+                            >
+                              {a}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    );
+                  })()}
+                </div>
+              ) : (
+                // Vrednosti kot tabletke (namesto spustnega seznama), izbrana poudarjena.
+                <div className="flex max-h-56 flex-wrap gap-1.5 overflow-y-auto">
+                  {(partialDimension === "genre"
+                    ? usedGenres
+                    : partialDimension === "era"
+                      ? usedEras
+                      : partialDimension === "origin"
+                        ? usedOrigins
+                        : usedMoods
+                  ).map((v) => {
+                    const on = partialValue === v;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => {
+                          setPartialValue(on ? "" : v);
+                          setPartialError(null);
+                        }}
+                        className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                          on
+                            ? "border-neutral-900 bg-neutral-900 text-white dark:border-white/20 dark:bg-white/[0.14] dark:text-white"
+                            : "border-neutral-200 text-neutral-600 hover:bg-neutral-100 dark:border-white/[0.08] dark:text-neutral-300 dark:hover:bg-white/[0.06]"
+                        }`}
+                      >
                         {v}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <p className="min-w-0 text-sm text-red-600 dark:text-red-400">{partialError}</p>
                 <button
                   type="button"
                   onClick={handlePartialConfirm}
-                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+                  className="inline-flex shrink-0 items-center gap-2 rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
                 >
-                  Izberi naključno skladbo
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="m18 14 4 4-4 4" />
+                    <path d="m18 2 4 4-4 4" />
+                    <path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" />
+                    <path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" />
+                    <path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" />
+                  </svg>
+                  Izberi naključno
                 </button>
               </div>
-
-              {partialError && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-                  {partialError}
-                </p>
-              )}
             </div>
           )}
 
           {randomPick && (
-            <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-white/[0.08] dark:bg-white/[0.035]">
-              <div className="mb-4 flex items-center justify-between">
-                <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                  🎲 Naključno izbrana skladba
+            <div className="rounded-2xl border border-neutral-200 bg-white p-4 lg:p-5 dark:rounded-[26px] dark:border-white/[0.08] dark:bg-white/[0.035]">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <p className="flex min-w-0 items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${randomPickFromPartial ? "bg-lime-400" : "bg-violet-400"}`} />
+                  <span className="truncate">{randomPickFromPartial ? "Delno naključno izbrana skladba" : "Naključno izbrana skladba"}</span>
                 </p>
                 <button
+                  type="button"
                   onClick={() => {
                     setRandomPick(null);
                     setRandomFive(null);
                   }}
                   aria-label="Zapri"
                   title="Zapri"
-                  className="text-xs text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+                  className="-m-1.5 shrink-0 rounded-full p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-500 dark:hover:bg-white/[0.06] dark:hover:text-neutral-200"
                 >
-                  ✕
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
               <SongCard
@@ -4014,22 +4111,39 @@ export default function Dashboard({ user }: { user: User }) {
                 onSendToReview={handleSendToReview}
                 onToggleFavorite={handleToggleFavorite}
                 highlighted
+                highlightTone={randomPickFromPartial ? "lime" : "violet"}
               />
               {renderEditForm(randomPick)}
-              <div className="mt-5 flex items-center justify-end gap-3">
+              <div className="mt-4 flex items-center justify-end gap-2">
                 <button
+                  type="button"
                   onClick={pickRandomFive}
                   aria-label="Prikaži 5 naključnih skladb"
                   title="Prikaži 5 naključnih skladb"
-                  className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 px-3 py-1 text-sm text-neutral-600 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:text-neutral-300 dark:hover:text-emerald-400"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 px-4 py-2 text-sm text-neutral-600 transition hover:bg-neutral-100 dark:border-white/[0.08] dark:text-neutral-300 dark:hover:bg-white/[0.06]"
                 >
-                  ↻ 5
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <rect width="7" height="7" x="3" y="3" rx="1.5" />
+                    <rect width="7" height="7" x="14" y="3" rx="1.5" />
+                    <rect width="7" height="7" x="3" y="14" rx="1.5" />
+                    <rect width="7" height="7" x="14" y="14" rx="1.5" />
+                  </svg>
+                  5 naključnih
                 </button>
                 <button
+                  type="button"
                   onClick={handlePickAnother}
-                  className="inline-flex shrink-0 items-center rounded-full border border-emerald-500/40 px-3 py-1 text-sm text-neutral-600 transition hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:text-neutral-300 dark:hover:text-emerald-400"
+                  className="inline-flex shrink-0 items-center gap-2 rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
                 >
-                  ↻ Izberi drugo
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                    <path d="M16 8h.01" />
+                    <path d="M8 8h.01" />
+                    <path d="M8 16h.01" />
+                    <path d="M16 16h.01" />
+                    <path d="M12 12h.01" />
+                  </svg>
+                  Izberi drugo
                 </button>
               </div>
 
@@ -4168,7 +4282,7 @@ export default function Dashboard({ user }: { user: User }) {
             </div>
           )}
 
-          {!isDesktop && (
+          {!isDesktop && phoneSearchShown && (
             <div className="flex items-center gap-2">{renderSearchBox("relative min-w-0 flex-1")}</div>
           )}
 
