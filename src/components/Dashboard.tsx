@@ -3248,6 +3248,7 @@ export default function Dashboard({ user }: { user: User }) {
                           {g.own ? (
                             <>
                               <SongCard
+                              hideVerifiedBadges
                                 song={song}
                                 authorImage={authorImages[song.author] ?? null}
                                 onEdit={handleEdit}
@@ -3267,6 +3268,7 @@ export default function Dashboard({ user }: { user: User }) {
                             </>
                           ) : (
                             <SongCard
+                              hideVerifiedBadges
                               song={song}
                               authorImage={authorImages[song.author] ?? null}
                               onFilterAuthor={(author) => {

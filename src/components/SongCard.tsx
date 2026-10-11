@@ -31,6 +31,7 @@ export default function SongCard({
   onImport,
   inLibrary = false,
   highlighted = false,
+  hideVerifiedBadges = false,
 }: {
   song: Song;
   authorImage?: string | null;
@@ -52,6 +53,8 @@ export default function SongCard({
   onImport?: (song: Song) => void;
   inLibrary?: boolean;
   highlighted?: boolean;
+  // Brez kljukic "preverjeno" (stran Preverjeno špila — tam so vse preverjene).
+  hideVerifiedBadges?: boolean;
 }) {
   // Podobno (similar-songs) — začasno onemogočeno.
   // const [similarOpen, setSimilarOpen] = useState(false);
@@ -259,7 +262,7 @@ export default function SongCard({
     >
       {/* Odobrena skladba, ročno preverjena: dve kljukici desno spodaj — rumena
           = akordi v aplikaciji, oranžna = predvajalnik (Smart play, Sam Špili). */}
-      {!song.review_pending && (song.verified_chords_at || song.verified_player_at) && (
+      {!hideVerifiedBadges && !song.review_pending && (song.verified_chords_at || song.verified_player_at) && (
         <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1">
           {song.verified_chords_at && (
             <span
