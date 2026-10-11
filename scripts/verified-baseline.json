@@ -1,9 +1,106 @@
 {
- "e4182104-de7b-4b1c-b8ec-02d0a186f280": {
-  "title": "George Strait - Amarillo by morning",
+ "02fdae06-1da7-44c6-8309-919b6061f7e5": {
+  "title": "Chayce Beckham - 23",
   "issues": [
    "ni zamrznjena (časi se še računajo iz LRCLIB)"
   ],
+  "changes": [
+   {
+    "t": 0,
+    "line": -1,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 0.3,
+    "line": -1,
+    "ahead": -1,
+    "chord": "1:0",
+    "chordPhone": "1:0"
+   },
+   {
+    "t": 1.5,
+    "line": -1,
+    "ahead": -1,
+    "chord": "1:1",
+    "chordPhone": "1:1"
+   },
+   {
+    "t": 2.9,
+    "line": -1,
+    "ahead": -1,
+    "chord": "1:2",
+    "chordPhone": "1:2"
+   },
+   {
+    "t": 4.3,
+    "line": -1,
+    "ahead": -1,
+    "chord": "1:3",
+    "chordPhone": "1:3"
+   },
+   {
+    "t": 5.6,
+    "line": -1,
+    "ahead": -1,
+    "chord": "2:0",
+    "chordPhone": "2:0"
+   },
+   {
+    "t": 7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "2:1",
+    "chordPhone": "2:1"
+   },
+   {
+    "t": 8.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "2:2",
+    "chordPhone": "2:2"
+   },
+   {
+    "t": 9.7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "2:3",
+    "chordPhone": "2:3"
+   },
+   {
+    "t": 11.1,
+    "line": -1,
+    "ahead": -1,
+    "chord": "2:4",
+    "chordPhone": "2:4"
+   },
+   {
+    "t": 12.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "2:5",
+    "chordPhone": "2:5"
+   },
+   {
+    "t": 14,
+    "line": -1,
+    "ahead": -1,
+    "chord": "2:6",
+    "chordPhone": "2:6"
+   },
+   {
+    "t": 18,
+    "line": -1,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   }
+  ]
+ },
+ "e4182104-de7b-4b1c-b8ec-02d0a186f280": {
+  "title": "George Strait - Amarillo by morning",
+  "issues": [],
   "changes": [
    {
     "t": 0,
@@ -76,21 +173,63 @@
     "chordPhone": "2:4"
    },
    {
+    "t": 18.3,
+    "line": 6,
+    "ahead": -1,
+    "chord": "2:4",
+    "chordPhone": "2:4"
+   },
+   {
     "t": 20.2,
-    "line": -1,
+    "line": 6,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 27.1,
+    "line": 7,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 35.3,
+    "line": 8,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 39.8,
+    "line": 9,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 44.7,
+    "line": 10,
     "ahead": -1,
     "chord": "",
     "chordPhone": ""
    },
    {
     "t": 50.2,
-    "line": -1,
+    "line": 10,
     "ahead": -1,
     "chord": "14:0",
     "chordPhone": "14:0"
    },
    {
     "t": 52.1,
+    "line": 10,
+    "ahead": -1,
+    "chord": "14:1",
+    "chordPhone": "14:1"
+   },
+   {
+    "t": 53.4,
     "line": -1,
     "ahead": -1,
     "chord": "14:1",
@@ -104,28 +243,77 @@
     "chordPhone": "14:2"
    },
    {
+    "t": 55.7,
+    "line": -1,
+    "ahead": 18,
+    "chord": "14:2",
+    "chordPhone": "14:2"
+   },
+   {
     "t": 56.1,
     "line": -1,
+    "ahead": 18,
+    "chord": "14:3",
+    "chordPhone": "14:3"
+   },
+   {
+    "t": 58.5,
+    "line": 18,
     "ahead": -1,
     "chord": "14:3",
     "chordPhone": "14:3"
    },
    {
     "t": 60.1,
-    "line": -1,
+    "line": 18,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 66.3,
+    "line": 19,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 75.1,
+    "line": 20,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 80.2,
+    "line": 21,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 84.5,
+    "line": 22,
     "ahead": -1,
     "chord": "",
     "chordPhone": ""
    },
    {
     "t": 90.1,
-    "line": -1,
+    "line": 22,
     "ahead": -1,
     "chord": "26:0",
     "chordPhone": "26:0"
    },
    {
     "t": 91.8,
+    "line": 22,
+    "ahead": -1,
+    "chord": "26:1",
+    "chordPhone": "26:1"
+   },
+   {
+    "t": 93.1,
     "line": -1,
     "ahead": -1,
     "chord": "26:1",
@@ -139,21 +327,77 @@
     "chordPhone": "26:2"
    },
    {
+    "t": 95.3,
+    "line": -1,
+    "ahead": 22,
+    "chord": "26:2",
+    "chordPhone": "26:2"
+   },
+   {
     "t": 95.8,
     "line": -1,
+    "ahead": 22,
+    "chord": "26:3",
+    "chordPhone": "26:3"
+   },
+   {
+    "t": 98,
+    "line": 22,
     "ahead": -1,
     "chord": "26:3",
     "chordPhone": "26:3"
    },
    {
     "t": 99.8,
-    "line": -1,
+    "line": 22,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 102.2,
+    "line": 30,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 106.2,
+    "line": 31,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 114.8,
+    "line": 32,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 119.1,
+    "line": 33,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 123.9,
+    "line": 34,
     "ahead": -1,
     "chord": "",
     "chordPhone": ""
    },
    {
     "t": 137.6,
+    "line": 34,
+    "ahead": -1,
+    "chord": "39:0",
+    "chordPhone": "39:0"
+   },
+   {
+    "t": 139.3,
     "line": -1,
     "ahead": -1,
     "chord": "39:0",
@@ -650,6 +894,1650 @@
    },
    {
     "t": 131.7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   }
+  ]
+ },
+ "4085caca-d30f-4525-b75a-2f9db34accc9": {
+  "title": "George Ezra - Blame It on Me",
+  "issues": [],
+  "changes": [
+   {
+    "t": 0,
+    "line": -1,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 3.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "1:0",
+    "chordPhone": "1:0"
+   },
+   {
+    "t": 4.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "1:1",
+    "chordPhone": "1:1"
+   },
+   {
+    "t": 5.5,
+    "line": -1,
+    "ahead": -1,
+    "chord": "2:0",
+    "chordPhone": "2:0"
+   },
+   {
+    "t": 6.7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "2:1",
+    "chordPhone": "2:1"
+   },
+   {
+    "t": 7.9,
+    "line": -1,
+    "ahead": -1,
+    "chord": "3:0",
+    "chordPhone": "3:0"
+   },
+   {
+    "t": 9,
+    "line": -1,
+    "ahead": -1,
+    "chord": "3:1",
+    "chordPhone": "3:1"
+   },
+   {
+    "t": 10.2,
+    "line": -1,
+    "ahead": -1,
+    "chord": "4:0",
+    "chordPhone": "4:0"
+   },
+   {
+    "t": 11.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "4:1",
+    "chordPhone": "4:1"
+   },
+   {
+    "t": 11.7,
+    "line": 7,
+    "ahead": -1,
+    "chord": "4:1",
+    "chordPhone": "4:1"
+   },
+   {
+    "t": 15.4,
+    "line": 7,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 16.6,
+    "line": 8,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 21.2,
+    "line": 10,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 30.2,
+    "line": 12,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 34.7,
+    "line": 13,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 40.1,
+    "line": 18,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 47.2,
+    "line": 19,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 54.4,
+    "line": 24,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 59.2,
+    "line": 25,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 72.3,
+    "line": 27,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 80.9,
+    "line": 32,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 85.5,
+    "line": 33,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 91,
+    "line": 38,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 97.8,
+    "line": 39,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 105.3,
+    "line": 44,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 110,
+    "line": 45,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 119.7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 122.4,
+    "line": -1,
+    "ahead": 50,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 125.6,
+    "line": 50,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 132.4,
+    "line": 51,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 140.1,
+    "line": 56,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 144.6,
+    "line": 57,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 153.8,
+    "line": 59,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 163.1,
+    "line": 60,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 172.6,
+    "line": -1,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 175.4,
+    "line": -1,
+    "ahead": 65,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 178.7,
+    "line": 65,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 185.5,
+    "line": 66,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 190.7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   }
+  ]
+ },
+ "f3af4c68-9a3a-4e15-ad34-e30ef45bff12": {
+  "title": "James Blunt - Bonfire Heart",
+  "issues": [
+   "ni zamrznjena (časi se še računajo iz LRCLIB)"
+  ],
+  "changes": [
+   {
+    "t": 0,
+    "line": -1,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   }
+  ]
+ },
+ "cf515c51-4f60-401e-a897-c8b627f759c4": {
+  "title": "Tracy Chapman - Fast Car",
+  "issues": [],
+  "changes": [
+   {
+    "t": 0,
+    "line": -1,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 1.3,
+    "line": -1,
+    "ahead": -1,
+    "chord": "2:0",
+    "chordPhone": "2:0"
+   },
+   {
+    "t": 2.3,
+    "line": -1,
+    "ahead": -1,
+    "chord": "2:1",
+    "chordPhone": "2:1"
+   },
+   {
+    "t": 3.7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "2:2",
+    "chordPhone": "2:2"
+   },
+   {
+    "t": 4.6,
+    "line": -1,
+    "ahead": -1,
+    "chord": "2:3",
+    "chordPhone": "2:3"
+   },
+   {
+    "t": 6.1,
+    "line": -1,
+    "ahead": -1,
+    "chord": "3:0",
+    "chordPhone": "3:0"
+   },
+   {
+    "t": 7.1,
+    "line": -1,
+    "ahead": -1,
+    "chord": "3:1",
+    "chordPhone": "3:1"
+   },
+   {
+    "t": 8.5,
+    "line": -1,
+    "ahead": -1,
+    "chord": "3:2",
+    "chordPhone": "3:2"
+   },
+   {
+    "t": 9.5,
+    "line": -1,
+    "ahead": -1,
+    "chord": "3:3",
+    "chordPhone": "3:3"
+   },
+   {
+    "t": 10.9,
+    "line": -1,
+    "ahead": -1,
+    "chord": "4:0",
+    "chordPhone": "4:0"
+   },
+   {
+    "t": 12,
+    "line": -1,
+    "ahead": -1,
+    "chord": "4:1",
+    "chordPhone": "4:1"
+   },
+   {
+    "t": 13.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "4:2",
+    "chordPhone": "4:2"
+   },
+   {
+    "t": 14.3,
+    "line": -1,
+    "ahead": -1,
+    "chord": "4:3",
+    "chordPhone": "4:3"
+   },
+   {
+    "t": 15.7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "5:0",
+    "chordPhone": "5:0"
+   },
+   {
+    "t": 16.7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "5:1",
+    "chordPhone": "5:1"
+   },
+   {
+    "t": 18.1,
+    "line": -1,
+    "ahead": -1,
+    "chord": "5:2",
+    "chordPhone": "5:2"
+   },
+   {
+    "t": 19,
+    "line": -1,
+    "ahead": -1,
+    "chord": "5:3",
+    "chordPhone": "5:3"
+   },
+   {
+    "t": 20.3,
+    "line": 9,
+    "ahead": -1,
+    "chord": "5:3",
+    "chordPhone": "5:3"
+   },
+   {
+    "t": 22.8,
+    "line": 10,
+    "ahead": -1,
+    "chord": "5:3",
+    "chordPhone": "5:3"
+   },
+   {
+    "t": 23,
+    "line": 10,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 25,
+    "line": 11,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 27.4,
+    "line": 12,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 29.5,
+    "line": 13,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 31.7,
+    "line": 14,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 34.3,
+    "line": 15,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 36.5,
+    "line": 16,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 39.1,
+    "line": 16,
+    "ahead": -1,
+    "chord": "20:0",
+    "chordPhone": "20:0"
+   },
+   {
+    "t": 40.3,
+    "line": 16,
+    "ahead": -1,
+    "chord": "20:1",
+    "chordPhone": "20:1"
+   },
+   {
+    "t": 41,
+    "line": -1,
+    "ahead": -1,
+    "chord": "20:1",
+    "chordPhone": "20:1"
+   },
+   {
+    "t": 41.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "20:2",
+    "chordPhone": "20:2"
+   },
+   {
+    "t": 42.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "20:3",
+    "chordPhone": "20:3"
+   },
+   {
+    "t": 43.8,
+    "line": -1,
+    "ahead": -1,
+    "chord": "21:0",
+    "chordPhone": "21:0"
+   },
+   {
+    "t": 44.4,
+    "line": -1,
+    "ahead": 25,
+    "chord": "21:0",
+    "chordPhone": "21:0"
+   },
+   {
+    "t": 44.7,
+    "line": -1,
+    "ahead": 25,
+    "chord": "21:1",
+    "chordPhone": "21:1"
+   },
+   {
+    "t": 46.1,
+    "line": -1,
+    "ahead": 25,
+    "chord": "21:2",
+    "chordPhone": "21:2"
+   },
+   {
+    "t": 47.1,
+    "line": -1,
+    "ahead": 25,
+    "chord": "21:3",
+    "chordPhone": "21:3"
+   },
+   {
+    "t": 48.2,
+    "line": 25,
+    "ahead": -1,
+    "chord": "21:3",
+    "chordPhone": "21:3"
+   },
+   {
+    "t": 50.6,
+    "line": 26,
+    "ahead": -1,
+    "chord": "21:3",
+    "chordPhone": "21:3"
+   },
+   {
+    "t": 51.1,
+    "line": 26,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 52.5,
+    "line": 27,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 55.1,
+    "line": 28,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 57.6,
+    "line": 29,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 59.5,
+    "line": 30,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 62.2,
+    "line": 31,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 64.2,
+    "line": 32,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 66.9,
+    "line": 32,
+    "ahead": -1,
+    "chord": "36:0",
+    "chordPhone": "36:0"
+   },
+   {
+    "t": 67.8,
+    "line": 32,
+    "ahead": -1,
+    "chord": "36:1",
+    "chordPhone": "36:1"
+   },
+   {
+    "t": 69.2,
+    "line": 32,
+    "ahead": -1,
+    "chord": "36:2",
+    "chordPhone": "36:2"
+   },
+   {
+    "t": 69.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "36:2",
+    "chordPhone": "36:2"
+   },
+   {
+    "t": 70.1,
+    "line": -1,
+    "ahead": -1,
+    "chord": "36:3",
+    "chordPhone": "36:3"
+   },
+   {
+    "t": 71.5,
+    "line": -1,
+    "ahead": -1,
+    "chord": "37:0",
+    "chordPhone": "37:0"
+   },
+   {
+    "t": 72.3,
+    "line": -1,
+    "ahead": 41,
+    "chord": "37:0",
+    "chordPhone": "37:0"
+   },
+   {
+    "t": 72.4,
+    "line": -1,
+    "ahead": 41,
+    "chord": "37:1",
+    "chordPhone": "37:1"
+   },
+   {
+    "t": 73.9,
+    "line": -1,
+    "ahead": 41,
+    "chord": "37:2",
+    "chordPhone": "37:2"
+   },
+   {
+    "t": 74.8,
+    "line": -1,
+    "ahead": 41,
+    "chord": "37:3",
+    "chordPhone": "37:3"
+   },
+   {
+    "t": 75.7,
+    "line": 41,
+    "ahead": -1,
+    "chord": "37:3",
+    "chordPhone": "37:3"
+   },
+   {
+    "t": 78.1,
+    "line": 42,
+    "ahead": -1,
+    "chord": "37:3",
+    "chordPhone": "37:3"
+   },
+   {
+    "t": 78.8,
+    "line": 42,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 80.2,
+    "line": 43,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 82.5,
+    "line": 44,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 85,
+    "line": 45,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 89.3,
+    "line": 46,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 91.7,
+    "line": 47,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 94.4,
+    "line": 47,
+    "ahead": -1,
+    "chord": "51:0",
+    "chordPhone": "51:0"
+   },
+   {
+    "t": 95.3,
+    "line": 47,
+    "ahead": -1,
+    "chord": "51:1",
+    "chordPhone": "51:1"
+   },
+   {
+    "t": 96.7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "51:2",
+    "chordPhone": "51:2"
+   },
+   {
+    "t": 97.6,
+    "line": -1,
+    "ahead": -1,
+    "chord": "51:3",
+    "chordPhone": "51:3"
+   },
+   {
+    "t": 99,
+    "line": -1,
+    "ahead": -1,
+    "chord": "52:0",
+    "chordPhone": "52:0"
+   },
+   {
+    "t": 99.9,
+    "line": -1,
+    "ahead": 56,
+    "chord": "52:0",
+    "chordPhone": "52:0"
+   },
+   {
+    "t": 100,
+    "line": -1,
+    "ahead": 56,
+    "chord": "52:1",
+    "chordPhone": "52:1"
+   },
+   {
+    "t": 101.4,
+    "line": -1,
+    "ahead": 56,
+    "chord": "52:2",
+    "chordPhone": "52:2"
+   },
+   {
+    "t": 102.3,
+    "line": -1,
+    "ahead": 56,
+    "chord": "52:3",
+    "chordPhone": "52:3"
+   },
+   {
+    "t": 103.6,
+    "line": 56,
+    "ahead": -1,
+    "chord": "52:3",
+    "chordPhone": "52:3"
+   },
+   {
+    "t": 105.6,
+    "line": 57,
+    "ahead": -1,
+    "chord": "52:3",
+    "chordPhone": "52:3"
+   },
+   {
+    "t": 108.2,
+    "line": 58,
+    "ahead": -1,
+    "chord": "52:3",
+    "chordPhone": "52:3"
+   },
+   {
+    "t": 110.3,
+    "line": 59,
+    "ahead": -1,
+    "chord": "52:3",
+    "chordPhone": "52:3"
+   },
+   {
+    "t": 113.2,
+    "line": 59,
+    "ahead": -1,
+    "chord": "63:0",
+    "chordPhone": "63:0"
+   },
+   {
+    "t": 114.2,
+    "line": 59,
+    "ahead": -1,
+    "chord": "63:1",
+    "chordPhone": "63:1"
+   },
+   {
+    "t": 115.3,
+    "line": -1,
+    "ahead": -1,
+    "chord": "63:1",
+    "chordPhone": "63:1"
+   },
+   {
+    "t": 115.5,
+    "line": -1,
+    "ahead": -1,
+    "chord": "63:2",
+    "chordPhone": "63:2"
+   },
+   {
+    "t": 116.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "63:3",
+    "chordPhone": "63:3"
+   },
+   {
+    "t": 117.6,
+    "line": -1,
+    "ahead": 69,
+    "chord": "63:3",
+    "chordPhone": "63:3"
+   },
+   {
+    "t": 117.9,
+    "line": -1,
+    "ahead": 69,
+    "chord": "64:0",
+    "chordPhone": "64:0"
+   },
+   {
+    "t": 118.8,
+    "line": -1,
+    "ahead": 69,
+    "chord": "64:1",
+    "chordPhone": "64:1"
+   },
+   {
+    "t": 120.2,
+    "line": -1,
+    "ahead": 69,
+    "chord": "64:2",
+    "chordPhone": "64:2"
+   },
+   {
+    "t": 120.4,
+    "line": 69,
+    "ahead": -1,
+    "chord": "64:2",
+    "chordPhone": "64:2"
+   },
+   {
+    "t": 124.2,
+    "line": 71,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 126.7,
+    "line": 72,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 128.6,
+    "line": 73,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 131,
+    "line": 74,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 135.6,
+    "line": 75,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 142.7,
+    "line": 75,
+    "ahead": -1,
+    "chord": "79:0",
+    "chordPhone": "79:0"
+   },
+   {
+    "t": 143.6,
+    "line": 75,
+    "ahead": -1,
+    "chord": "79:1",
+    "chordPhone": "79:1"
+   },
+   {
+    "t": 144.7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "79:1",
+    "chordPhone": "79:1"
+   },
+   {
+    "t": 145.1,
+    "line": -1,
+    "ahead": -1,
+    "chord": "79:2",
+    "chordPhone": "79:2"
+   },
+   {
+    "t": 146,
+    "line": -1,
+    "ahead": -1,
+    "chord": "79:3",
+    "chordPhone": "79:3"
+   },
+   {
+    "t": 147.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "80:0",
+    "chordPhone": "80:0"
+   },
+   {
+    "t": 148.1,
+    "line": -1,
+    "ahead": 84,
+    "chord": "80:0",
+    "chordPhone": "80:0"
+   },
+   {
+    "t": 148.4,
+    "line": -1,
+    "ahead": 84,
+    "chord": "80:1",
+    "chordPhone": "80:1"
+   },
+   {
+    "t": 149.8,
+    "line": -1,
+    "ahead": 84,
+    "chord": "80:2",
+    "chordPhone": "80:2"
+   },
+   {
+    "t": 150.7,
+    "line": -1,
+    "ahead": 84,
+    "chord": "80:3",
+    "chordPhone": "80:3"
+   },
+   {
+    "t": 152,
+    "line": 84,
+    "ahead": -1,
+    "chord": "80:3",
+    "chordPhone": "80:3"
+   },
+   {
+    "t": 154.3,
+    "line": 85,
+    "ahead": -1,
+    "chord": "80:3",
+    "chordPhone": "80:3"
+   },
+   {
+    "t": 154.7,
+    "line": 85,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 156.3,
+    "line": 86,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 158.4,
+    "line": 87,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 161.1,
+    "line": 88,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 163.3,
+    "line": 89,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 165.7,
+    "line": 90,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 167.9,
+    "line": 91,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 170.6,
+    "line": 91,
+    "ahead": -1,
+    "chord": "95:0",
+    "chordPhone": "95:0"
+   },
+   {
+    "t": 171.4,
+    "line": 91,
+    "ahead": -1,
+    "chord": "95:1",
+    "chordPhone": "95:1"
+   },
+   {
+    "t": 172.9,
+    "line": 91,
+    "ahead": -1,
+    "chord": "95:2",
+    "chordPhone": "95:2"
+   },
+   {
+    "t": 173.1,
+    "line": -1,
+    "ahead": -1,
+    "chord": "95:2",
+    "chordPhone": "95:2"
+   },
+   {
+    "t": 173.8,
+    "line": -1,
+    "ahead": -1,
+    "chord": "95:3",
+    "chordPhone": "95:3"
+   },
+   {
+    "t": 175.2,
+    "line": -1,
+    "ahead": -1,
+    "chord": "96:0",
+    "chordPhone": "96:0"
+   },
+   {
+    "t": 175.4,
+    "line": -1,
+    "ahead": 100,
+    "chord": "96:0",
+    "chordPhone": "96:0"
+   },
+   {
+    "t": 176.2,
+    "line": -1,
+    "ahead": 100,
+    "chord": "96:1",
+    "chordPhone": "96:1"
+   },
+   {
+    "t": 177.6,
+    "line": -1,
+    "ahead": 100,
+    "chord": "96:2",
+    "chordPhone": "96:2"
+   },
+   {
+    "t": 178.1,
+    "line": 100,
+    "ahead": -1,
+    "chord": "96:2",
+    "chordPhone": "96:2"
+   },
+   {
+    "t": 181.6,
+    "line": 100,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 181.9,
+    "line": 101,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 184.4,
+    "line": 102,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 186.1,
+    "line": 103,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 188.5,
+    "line": 104,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 193.2,
+    "line": 105,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 200.2,
+    "line": 105,
+    "ahead": -1,
+    "chord": "109:0",
+    "chordPhone": "109:0"
+   },
+   {
+    "t": 201.1,
+    "line": 105,
+    "ahead": -1,
+    "chord": "109:1",
+    "chordPhone": "109:1"
+   },
+   {
+    "t": 201.9,
+    "line": -1,
+    "ahead": -1,
+    "chord": "109:1",
+    "chordPhone": "109:1"
+   },
+   {
+    "t": 202.5,
+    "line": -1,
+    "ahead": -1,
+    "chord": "109:2",
+    "chordPhone": "109:2"
+   },
+   {
+    "t": 203.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "109:3",
+    "chordPhone": "109:3"
+   },
+   {
+    "t": 204.8,
+    "line": -1,
+    "ahead": -1,
+    "chord": "110:0",
+    "chordPhone": "110:0"
+   },
+   {
+    "t": 205.4,
+    "line": -1,
+    "ahead": 114,
+    "chord": "110:0",
+    "chordPhone": "110:0"
+   },
+   {
+    "t": 205.8,
+    "line": -1,
+    "ahead": 114,
+    "chord": "110:1",
+    "chordPhone": "110:1"
+   },
+   {
+    "t": 207.2,
+    "line": -1,
+    "ahead": 114,
+    "chord": "110:2",
+    "chordPhone": "110:2"
+   },
+   {
+    "t": 208.1,
+    "line": -1,
+    "ahead": 114,
+    "chord": "110:3",
+    "chordPhone": "110:3"
+   },
+   {
+    "t": 209.4,
+    "line": 114,
+    "ahead": -1,
+    "chord": "110:3",
+    "chordPhone": "110:3"
+   },
+   {
+    "t": 211.6,
+    "line": 115,
+    "ahead": -1,
+    "chord": "110:3",
+    "chordPhone": "110:3"
+   },
+   {
+    "t": 212.1,
+    "line": 115,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 213.6,
+    "line": 116,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 215.9,
+    "line": 117,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 218.4,
+    "line": 118,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 220.4,
+    "line": 119,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 223,
+    "line": 120,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 225.1,
+    "line": 121,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 227.8,
+    "line": 121,
+    "ahead": -1,
+    "chord": "125:0",
+    "chordPhone": "125:0"
+   },
+   {
+    "t": 228.8,
+    "line": 121,
+    "ahead": -1,
+    "chord": "125:1",
+    "chordPhone": "125:1"
+   },
+   {
+    "t": 230.1,
+    "line": 121,
+    "ahead": -1,
+    "chord": "125:2",
+    "chordPhone": "125:2"
+   },
+   {
+    "t": 230.2,
+    "line": -1,
+    "ahead": -1,
+    "chord": "125:2",
+    "chordPhone": "125:2"
+   },
+   {
+    "t": 231,
+    "line": -1,
+    "ahead": -1,
+    "chord": "125:3",
+    "chordPhone": "125:3"
+   },
+   {
+    "t": 232.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "126:0",
+    "chordPhone": "126:0"
+   },
+   {
+    "t": 232.5,
+    "line": -1,
+    "ahead": 130,
+    "chord": "126:0",
+    "chordPhone": "126:0"
+   },
+   {
+    "t": 233.3,
+    "line": -1,
+    "ahead": 130,
+    "chord": "126:1",
+    "chordPhone": "126:1"
+   },
+   {
+    "t": 234.7,
+    "line": -1,
+    "ahead": 130,
+    "chord": "126:2",
+    "chordPhone": "126:2"
+   },
+   {
+    "t": 235.2,
+    "line": 130,
+    "ahead": -1,
+    "chord": "126:2",
+    "chordPhone": "126:2"
+   },
+   {
+    "t": 238.7,
+    "line": 130,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 238.9,
+    "line": 131,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 241.4,
+    "line": 132,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 243.4,
+    "line": 133,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 245.7,
+    "line": 134,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 250.7,
+    "line": 135,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 257.4,
+    "line": 135,
+    "ahead": -1,
+    "chord": "139:0",
+    "chordPhone": "139:0"
+   },
+   {
+    "t": 258.3,
+    "line": 135,
+    "ahead": -1,
+    "chord": "139:1",
+    "chordPhone": "139:1"
+   },
+   {
+    "t": 258.6,
+    "line": -1,
+    "ahead": -1,
+    "chord": "139:1",
+    "chordPhone": "139:1"
+   },
+   {
+    "t": 259.7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "139:2",
+    "chordPhone": "139:2"
+   },
+   {
+    "t": 260.6,
+    "line": -1,
+    "ahead": -1,
+    "chord": "139:3",
+    "chordPhone": "139:3"
+   },
+   {
+    "t": 262.1,
+    "line": -1,
+    "ahead": -1,
+    "chord": "140:0",
+    "chordPhone": "140:0"
+   },
+   {
+    "t": 262.3,
+    "line": -1,
+    "ahead": 144,
+    "chord": "140:0",
+    "chordPhone": "140:0"
+   },
+   {
+    "t": 262.9,
+    "line": -1,
+    "ahead": 144,
+    "chord": "140:1",
+    "chordPhone": "140:1"
+   },
+   {
+    "t": 264.3,
+    "line": -1,
+    "ahead": 144,
+    "chord": "140:2",
+    "chordPhone": "140:2"
+   },
+   {
+    "t": 265.3,
+    "line": -1,
+    "ahead": 144,
+    "chord": "140:3",
+    "chordPhone": "140:3"
+   },
+   {
+    "t": 266.4,
+    "line": 144,
+    "ahead": -1,
+    "chord": "140:3",
+    "chordPhone": "140:3"
+   },
+   {
+    "t": 268.4,
+    "line": 145,
+    "ahead": -1,
+    "chord": "140:3",
+    "chordPhone": "140:3"
+   },
+   {
+    "t": 269.3,
+    "line": 145,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 271.1,
+    "line": 146,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 273.4,
+    "line": 147,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 275.9,
+    "line": 147,
+    "ahead": -1,
+    "chord": "151:0",
+    "chordPhone": "151:0"
+   },
+   {
+    "t": 276.7,
+    "line": 147,
+    "ahead": -1,
+    "chord": "151:1",
+    "chordPhone": "151:1"
+   },
+   {
+    "t": 278.1,
+    "line": 147,
+    "ahead": -1,
+    "chord": "151:2",
+    "chordPhone": "151:2"
+   },
+   {
+    "t": 278.5,
+    "line": -1,
+    "ahead": -1,
+    "chord": "151:2",
+    "chordPhone": "151:2"
+   },
+   {
+    "t": 279,
+    "line": -1,
+    "ahead": -1,
+    "chord": "151:3",
+    "chordPhone": "151:3"
+   },
+   {
+    "t": 280.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "152:0",
+    "chordPhone": "152:0"
+   },
+   {
+    "t": 281.3,
+    "line": -1,
+    "ahead": -1,
+    "chord": "152:1",
+    "chordPhone": "152:1"
+   },
+   {
+    "t": 282.8,
+    "line": -1,
+    "ahead": -1,
+    "chord": "152:2",
+    "chordPhone": "152:2"
+   },
+   {
+    "t": 283.7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "152:3",
+    "chordPhone": "152:3"
+   },
+   {
+    "t": 285,
+    "line": -1,
+    "ahead": -1,
+    "chord": "153:0",
+    "chordPhone": "153:0"
+   },
+   {
+    "t": 286,
+    "line": -1,
+    "ahead": -1,
+    "chord": "153:1",
+    "chordPhone": "153:1"
+   },
+   {
+    "t": 287.4,
+    "line": -1,
+    "ahead": -1,
+    "chord": "153:2",
+    "chordPhone": "153:2"
+   },
+   {
+    "t": 288.3,
+    "line": -1,
+    "ahead": -1,
+    "chord": "153:3",
+    "chordPhone": "153:3"
+   },
+   {
+    "t": 289.7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "154:0",
+    "chordPhone": "154:0"
+   },
+   {
+    "t": 290.6,
+    "line": -1,
+    "ahead": -1,
+    "chord": "154:1",
+    "chordPhone": "154:1"
+   },
+   {
+    "t": 294.6,
     "line": -1,
     "ahead": -1,
     "chord": "",
@@ -1222,6 +3110,21 @@
    },
    {
     "t": 153.3,
+    "line": -1,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   }
+  ]
+ },
+ "762fb718-5d3a-46e0-b92e-32720c4e3c74": {
+  "title": "The fugees - Killing Me Softly With His Song",
+  "issues": [
+   "ni zamrznjena (časi se še računajo iz LRCLIB)"
+  ],
+  "changes": [
+   {
+    "t": 0,
     "line": -1,
     "ahead": -1,
     "chord": "",
@@ -4285,19 +6188,24 @@
  },
  "d4612d5a-73d8-407c-87fa-421253cfcdca": {
   "title": "Pixies - Where Is My Mind?",
-  "issues": [
-   "ni zamrznjena (časi se še računajo iz LRCLIB)"
-  ],
+  "issues": [],
   "changes": [
    {
     "t": 0,
-    "line": -1,
+    "line": 2,
     "ahead": -1,
     "chord": "",
     "chordPhone": ""
    },
    {
     "t": 3.4,
+    "line": 2,
+    "ahead": -1,
+    "chord": "4:0",
+    "chordPhone": "4:0"
+   },
+   {
+    "t": 3.8,
     "line": -1,
     "ahead": -1,
     "chord": "4:0",
@@ -4353,70 +6261,252 @@
     "chordPhone": "5:3"
    },
    {
+    "t": 15,
+    "line": -1,
+    "ahead": 12,
+    "chord": "5:3",
+    "chordPhone": "5:3"
+   },
+   {
     "t": 15.5,
     "line": -1,
-    "ahead": -1,
+    "ahead": 12,
     "chord": "6:0",
     "chordPhone": "6:0"
    },
    {
     "t": 17.1,
     "line": -1,
-    "ahead": -1,
+    "ahead": 12,
     "chord": "6:1",
     "chordPhone": "6:1"
    },
    {
     "t": 18.5,
     "line": -1,
-    "ahead": -1,
+    "ahead": 12,
     "chord": "6:2",
     "chordPhone": "6:2"
    },
    {
     "t": 20.2,
     "line": -1,
-    "ahead": -1,
+    "ahead": 12,
     "chord": "6:3",
     "chordPhone": "6:3"
    },
    {
     "t": 21.9,
     "line": -1,
-    "ahead": -1,
+    "ahead": 12,
     "chord": "7:0",
     "chordPhone": "7:0"
    },
    {
     "t": 22.9,
     "line": -1,
-    "ahead": -1,
+    "ahead": 12,
     "chord": "7:1",
     "chordPhone": "7:1"
    },
    {
     "t": 24.5,
     "line": -1,
-    "ahead": -1,
+    "ahead": 12,
     "chord": "7:2",
     "chordPhone": "7:2"
    },
    {
     "t": 26,
     "line": -1,
+    "ahead": 12,
+    "chord": "7:3",
+    "chordPhone": "7:3"
+   },
+   {
+    "t": 26.8,
+    "line": 12,
     "ahead": -1,
     "chord": "7:3",
     "chordPhone": "7:3"
    },
    {
     "t": 30,
+    "line": 12,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 34.1,
+    "line": 13,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 39.6,
+    "line": 14,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 41.4,
+    "line": 15,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 43,
+    "line": 16,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 45.4,
+    "line": 19,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 48,
+    "line": 20,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 50.1,
+    "line": 21,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 55.6,
     "line": -1,
     "ahead": -1,
     "chord": "",
     "chordPhone": ""
    },
    {
+    "t": 58.5,
+    "line": -1,
+    "ahead": 22,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 62,
+    "line": 22,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 69.7,
+    "line": -1,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 71.8,
+    "line": -1,
+    "ahead": 25,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 74.4,
+    "line": 25,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 80.8,
+    "line": 26,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 86.7,
+    "line": 27,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 88.3,
+    "line": 28,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 89.4,
+    "line": 29,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 92.4,
+    "line": 32,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 95.3,
+    "line": 33,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 97,
+    "line": 34,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 102.5,
+    "line": -1,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 105.5,
+    "line": -1,
+    "ahead": 35,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 109,
+    "line": 35,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
     "t": 116,
+    "line": 35,
+    "ahead": -1,
+    "chord": "35:4",
+    "chordPhone": "35:4"
+   },
+   {
+    "t": 116.3,
     "line": -1,
     "ahead": -1,
     "chord": "35:4",
@@ -4437,35 +6527,126 @@
     "chordPhone": "39:0"
    },
    {
+    "t": 122.5,
+    "line": -1,
+    "ahead": 44,
+    "chord": "39:0",
+    "chordPhone": "39:0"
+   },
+   {
     "t": 124.4,
     "line": -1,
-    "ahead": -1,
+    "ahead": 44,
     "chord": "39:1",
     "chordPhone": "39:1"
    },
    {
     "t": 126,
     "line": -1,
-    "ahead": -1,
+    "ahead": 44,
     "chord": "39:2",
     "chordPhone": "39:2"
    },
    {
     "t": 127.4,
     "line": -1,
+    "ahead": 44,
+    "chord": "39:3",
+    "chordPhone": "39:3"
+   },
+   {
+    "t": 129.1,
+    "line": 44,
     "ahead": -1,
     "chord": "39:3",
     "chordPhone": "39:3"
    },
    {
     "t": 131.4,
+    "line": 44,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 136.4,
+    "line": 45,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 141.8,
+    "line": 46,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 143.9,
+    "line": 47,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 145.4,
+    "line": 48,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 147.6,
+    "line": 51,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 150.7,
+    "line": 52,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 152.4,
+    "line": 53,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 157.9,
     "line": -1,
     "ahead": -1,
     "chord": "",
     "chordPhone": ""
    },
    {
+    "t": 160.9,
+    "line": -1,
+    "ahead": 54,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
+    "t": 164.3,
+    "line": 54,
+    "ahead": -1,
+    "chord": "",
+    "chordPhone": ""
+   },
+   {
     "t": 171,
+    "line": 54,
+    "ahead": -1,
+    "chord": "54:4",
+    "chordPhone": "54:4"
+   },
+   {
+    "t": 172,
     "line": -1,
     "ahead": -1,
     "chord": "54:4",

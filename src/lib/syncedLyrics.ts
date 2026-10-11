@@ -342,6 +342,22 @@ export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncP
     // talk to me" v Where Is My Mind?): srednje nima v celoti nobena vrstica
     // LRC, zato šteje, če so njene besede v preostanku te IN v naslednji vrstici
     // LRC (vsaj ena v tej) — sicer ostane brez oznake.
+    // Rep vrstice LRC = besede ZA zadnjo besedo, ki jo ima povezana vrstica.
+    // Deljena vrstica mora imeti vsaj eno besedo v repu: v "I know, shinin'
+    // down like water" je "know" na začetku (konec prejšnje vrstice "It'll rain
+    // a sunny day, I know"), zato "I wanna know" (+ "wanna" iz naslednje
+    // vrstice LRC) ni smela dobiti oznake že med to vrstico — refren je bil
+    // potem cel za eno vrstico naprej (Have You Ever Seen the Rain).
+    const ownWords = [...lyricLines[at].words];
+    let tailStart = 0;
+    w.forEach((x, q) => {
+      const o = ownWords.findIndex((r) => sameWord(r, x));
+      if (o >= 0) {
+        ownWords.splice(o, 1);
+        tailStart = q + 1;
+      }
+    });
+    const tail = w.slice(tailStart);
     let limit = m;
     let nextSung: string[] = [];
     for (let i2 = i + 1; i2 < n; i2++) {
@@ -358,7 +374,7 @@ export function alignLyrics(lrc: LrcLine[], body: ChordsLine[]): { points: SyncP
       const hits = nextWords.filter((x) => rest.some((r) => sameWord(r, x)));
       if (hits.length / nextWords.length < 0.8) {
         const shared = nextWords.filter((x) => rest.some((r) => sameWord(r, x)) || nextSung.some((r) => sameWord(r, x)));
-        if (!hits.length || shared.length / nextWords.length < 0.8) break;
+        if (!hits.some((x) => tail.some((r) => sameWord(r, x))) || shared.length / nextWords.length < 0.8) break;
       }
       for (const x of hits) {
         const q = rest.findIndex((r) => sameWord(r, x));
