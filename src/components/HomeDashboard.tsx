@@ -211,8 +211,8 @@ export function HomeBento({
         <>
           <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} decor={<TopoCorner hover="group-hover:text-neutral-400/40 dark:group-hover:text-neutral-400/40" />} />
           <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={`/${total}`} dot="bg-orange-400" onClick={onOpenVerified} decor={<WaveCorner hover="group-hover:text-orange-400/40 dark:group-hover:text-orange-400/40" />} />
-          <StatCard className="col-span-3" label="V pregledu" value={review} dot="bg-teal-400" onClick={onOpenReview} />
-          <StatCard className="col-span-3" label="V Skupnem Jamu" value={jamCount} dot="bg-fuchsia-400" pulse={jamCount > 0} onClick={onOpenJam} />
+          <StatCard className="col-span-3" label="V pregledu" value={review} dot="bg-teal-400" onClick={onOpenReview} decor={<ChecklistCorner />} />
+          <StatCard className="col-span-3" label="V Skupnem Jamu" value={jamCount} dot="bg-fuchsia-400" pulse={jamCount > 0} onClick={onOpenJam} decor={<CirclesCorner />} />
         </>
       )}
       <ActionCard
@@ -486,6 +486,58 @@ function WaveCorner({ hover }: { hover: string }) {
             />
           );
         })}
+      </g>
+    </svg>
+  );
+}
+
+// V pregledu: kontrolni seznam (vrstice s kvadratki in kljukicami) v kotu;
+// ob prehodu kljukice turkizne, vrstice bele.
+function ChecklistCorner() {
+  const rows = [0, 1, 2, 3];
+  return (
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] dark:text-white/[0.045]">
+      <g fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+        {rows.map((i) => {
+          const y = 34 + i * 24;
+          const x = 66 + i * 6;
+          return (
+            <g key={i}>
+              <rect x={x} y={y - 7} width={14} height={14} rx={3} stroke="currentColor" className="transition-colors duration-300 group-hover:text-neutral-900/20 dark:group-hover:text-white/25" />
+              {i < 3 && (
+                <path d={`M${x + 3} ${y} l3.5 3.5 l6 -7`} stroke="currentColor" className="transition-colors duration-300 group-hover:text-teal-400/45" />
+              )}
+              <path d={`M${x + 22} ${y} H 172`} stroke="currentColor" className="transition-colors duration-300 group-hover:text-neutral-900/20 dark:group-hover:text-white/25" />
+            </g>
+          );
+        })}
+      </g>
+    </svg>
+  );
+}
+
+// V Skupnem Jamu: skupina prekrivajočih se krogov (ljudje, ki igrajo skupaj);
+// ob prehodu izmenično fuksija in bela.
+const JAM_CIRCLES = [
+  { cx: 150, cy: 112, r: 46 },
+  { cx: 112, cy: 120, r: 34 },
+  { cx: 132, cy: 76, r: 28 },
+  { cx: 92, cy: 92, r: 20 },
+];
+function CirclesCorner() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 text-neutral-900/[0.05] dark:text-white/[0.045]">
+      <g fill="none" strokeWidth="1" vectorEffect="non-scaling-stroke">
+        {JAM_CIRCLES.map((c, i) => (
+          <circle
+            key={i}
+            cx={c.cx}
+            cy={c.cy}
+            r={c.r}
+            stroke="currentColor"
+            className={`transition-colors duration-300 ${i % 2 ? "group-hover:text-neutral-900/20 dark:group-hover:text-white/25" : "group-hover:text-fuchsia-400/45"}`}
+          />
+        ))}
       </g>
     </svg>
   );
