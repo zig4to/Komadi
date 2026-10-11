@@ -137,11 +137,11 @@ export function FavoriteCard({
         borderColor: `${accent}38`,
         boxShadow: `0 8px 18px -14px ${accent}66`,
       }}
-      className="relative isolate flex items-center gap-2.5 overflow-hidden rounded-xl border bg-white p-2 pr-12 dark:rounded-2xl dark:border-white/[0.08]! dark:bg-white/[0.035] dark:bg-none! dark:shadow-none! dark:transition dark:hover:bg-white/[0.06]"
+      className="relative isolate flex items-center gap-2.5 overflow-hidden rounded-xl border bg-white p-2 pr-12 dark:rounded-[22px] dark:pr-2 dark:border-white/[0.08]! dark:bg-white/[0.035] dark:bg-none! dark:shadow-none! dark:transition dark:hover:bg-white/[0.06]"
     >
       <div
         style={{ backgroundColor: `${accent}33`, color: accent }}
-        className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg text-lg font-bold dark:rounded-xl"
+        className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg text-lg font-bold dark:rounded-2xl"
       >
         {authorImage ? (
           <img
@@ -232,7 +232,7 @@ export function FavoriteCard({
           skladba odstrani samo v meniju SongCard (Priljubljena). */}
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute -right-5 top-1/2 -z-10 -translate-y-1/2 opacity-20 dark:opacity-10 ${
+        className={`pointer-events-none absolute -right-5 top-1/2 -z-10 -translate-y-1/2 opacity-20 dark:hidden ${
           variant === "verified" ? "text-orange-500 dark:text-orange-400" : "text-amber-500 dark:text-amber-400"
         }`}
       >
@@ -433,7 +433,7 @@ function OthersColumns({
       {people.map((p) => (
         <div
           key={p.userId}
-          className="flex w-[86%] shrink-0 snap-start flex-col rounded-2xl border border-amber-500/25 bg-amber-500/[0.03] p-2 dark:rounded-[20px] dark:border-white/[0.08] dark:bg-white/[0.025] sm:w-[calc(50%-6px)] lg:w-[calc((100%-24px)/3)]"
+          className="flex w-[86%] shrink-0 snap-start flex-col rounded-2xl border border-amber-500/25 bg-amber-500/[0.03] p-2 dark:rounded-[26px] dark:border-white/[0.08] dark:bg-white/[0.025] sm:w-[calc(50%-6px)] lg:w-[calc((100%-24px)/3)]"
         >
           <div className="mb-2 flex items-center gap-2 px-1">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-[11px] font-bold text-amber-700 dark:text-amber-300">

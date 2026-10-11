@@ -250,7 +250,7 @@ export default function SongCard({
   return (
     <div
       style={cardStyle}
-      className={`relative isolate overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] px-4 py-3 transition duration-200 hover:-translate-y-0.5 dark:rounded-[20px] dark:bg-none dark:bg-white/[0.035] dark:shadow-none! lg:min-h-[112px] ${
+      className={`relative isolate overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] px-4 py-3 transition duration-200 hover:-translate-y-0.5 dark:rounded-[26px] dark:bg-none dark:bg-white/[0.035] dark:shadow-none! lg:min-h-[112px] ${
         highlighted
           ? "border-emerald-500"
           : "border-neutral-200 dark:border-white/[0.08]!"
