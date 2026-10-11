@@ -491,7 +491,12 @@ export function remapLines<T extends { line: number; key?: string }>(points: T[]
   const out = points.map((p) => {
     if (!p.key) return p;
     const guess = p.line + shift;
-    for (let d = 0; d <= 50; d++) {
+    // Vrstica samih akordov ima ključ samo "ch:<število>" — ni enoličen. Išči
+    // le blizu; če je ni (akord dodan/odstranjen), ostani na isti vrstici, če
+    // je ta še vrstica z akordi. Prej je skočila na najbližjo drugo vrstico z
+    // istim številom akordov (Boulevard of Broken Dreams: interlude → intro).
+    const chordOnly = p.key.startsWith("ch:");
+    for (let d = 0; d <= (chordOnly ? 3 : 50); d++) {
       for (const j of d ? [guess + d, guess - d] : [guess]) {
         if (keys[j] === p.key) {
           shift = j - p.line;
@@ -500,6 +505,11 @@ export function remapLines<T extends { line: number; key?: string }>(points: T[]
           return { ...p, line: j };
         }
       }
+    }
+    if (chordOnly && keys[guess]?.startsWith("ch:")) {
+      if (guess === p.line) return p;
+      changed = true;
+      return { ...p, line: guess };
     }
     ok = false;
     return p;
@@ -557,7 +567,9 @@ export function flattenChordSections(
     const last = pts[pts.length - 1].t;
     out.push({ t: (s.end != null && s.end > last ? s.end : last + SECTION_TAIL) + off, stop: true });
   }
-  return out.sort((a, b) => a.t - b.t);
+  // Ob enakem času gre konec dela PRED akord, ki se takrat začne: sicer konec
+  // kitice ob prvem akordu interludija ta akord skrije (Boulevard of Broken Dreams).
+  return out.sort((a, b) => a.t - b.t || ("stop" in a ? -1 : 0) - ("stop" in b ? -1 : 0));
 }
 
 // Akord, ki je ob danem času obarvan (ročno posneti synced_chords): zadnja
@@ -578,6 +590,19 @@ export function chordAt(
   }
   const p = points[idx];
   return !p || "stop" in p ? null : { line: p.line, chord: p.chord };
+}
+
+// Vsi akordi, natapkani ob istem trenutku kot tisti, ki ga vrne chordAt (npr.
+// Em na "alone" na koncu kitice in prvi Em interludija) — obarvata se hkrati.
+export function chordsAt(
+  points: ({ t: number; line: number; chord: number } | { t: number; stop: true })[],
+  time: number,
+): { line: number; chord: number }[] {
+  const main = chordAt(points, time);
+  if (!main) return [];
+  const at = points.find((p) => !("stop" in p) && p.line === main.line && p.chord === main.chord && p.t <= time);
+  const t0 = points.filter((p) => !("stop" in p) && p.line === main.line && p.chord === main.chord && p.t <= time).reduce((m, p) => Math.max(m, p.t), at?.t ?? -Infinity);
+  return points.flatMap((p) => (!("stop" in p) && Math.abs(p.t - t0) < 0.02 ? [{ line: p.line, chord: p.chord }] : []));
 }
 
 // Vrstica pesmi za dani čas (zadnja točka, ki se je že začela; pred prvo -1)

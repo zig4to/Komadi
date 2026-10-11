@@ -96,8 +96,9 @@ function formatTime(s: number) {
 }
 
 // Upravljanje predvajalnika od zunaj (ChordsViewer: tap na vrstico med
-// pavzo). seekAndPlay vrne false, če predvajalnik še ni zagnan; currentTime
-// (točen čas, ne zadnji 250-ms onTime — za snemanje časov vrstic) vrne null.
+// pavzo). seekAndPlay predvajalnik po potrebi šele zažene (klik je gesta) in
+// skoči, ko začne igrati — tudi pred prvim ▶; currentTime (točen čas, ne zadnji
+// 250-ms onTime — za snemanje časov vrstic) vrne null, če še ni zagnan.
 export type PlayerController = {
   seekAndPlay: (seconds: number) => boolean;
   currentTime: () => number | null;
@@ -194,6 +195,9 @@ export default function YouTubeMiniPlayer({
     stallTimerRef.current = setTimeout(() => setLoading(false), 3_000);
   };
   const [started, setStarted] = useState(false);
+  // Klik na vrstico pred prvim predvajanjem: predvajalnik se šele ustvari —
+  // čas, na katerega naj skoči, ko začne igrati (tudi po preklopu na rezervni video).
+  const pendingSeekRef = useRef<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorCode, setErrorCode] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -222,6 +226,7 @@ export default function YouTubeMiniPlayer({
         playerVars: { playsinline: 1, rel: 0, modestbranding: 1, autoplay: 1, origin: window.location.origin },
         events: {
           onReady: () => {
+            if (pendingSeekRef.current != null) playerRef.current?.seekTo(pendingSeekRef.current, true);
             playerRef.current?.playVideo();
             armStallTimer();
           },
@@ -235,6 +240,12 @@ export default function YouTubeMiniPlayer({
               setLoading(false);
             }
             if (e.data === 1) {
+              if (pendingSeekRef.current != null) {
+                const t = pendingSeekRef.current;
+                pendingSeekRef.current = null;
+                if (Math.abs((playerRef.current?.getCurrentTime() ?? 0) - t) > 0.5) playerRef.current?.seekTo(t, true);
+                setCurrent(t);
+              }
               setDuration(playerRef.current?.getDuration() ?? 0);
               onPlayingRef.current?.(idsRef.current[attemptRef.current]);
             }
@@ -283,7 +294,12 @@ export default function YouTubeMiniPlayer({
     controllerRef.current = {
       seekAndPlay: (seconds) => {
         const player = playerRef.current;
-        if (!player) return false;
+        if (!player) {
+          // Še ni zagnan: zaženi zdaj (klik je uporabnikova gesta) in skoči, ko začne igrati.
+          pendingSeekRef.current = Math.max(0, seconds);
+          start();
+          return true;
+        }
         const t = Math.max(0, seconds);
         player.seekTo(t, true);
         setCurrent(t);

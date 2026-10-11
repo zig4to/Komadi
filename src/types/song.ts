@@ -88,6 +88,10 @@ export interface ChordSection {
 export interface SyncedChords {
   videoId: string;
   sections: ChordSection[];
+  // Akordi v zapetih vrsticah so natapkani (skill podcrtaj-akorde): akord v
+  // vrstici z besedilom je ob svojem času samo podčrtan, v vrstici brez
+  // besedila (intro, solo, outro) pobarvan.
+  sungUnderline?: boolean;
 }
 
 // frozen = zamrznjeni izračunani časi (ob "Predvajalnik preverjen"), ne ročni

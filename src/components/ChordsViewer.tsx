@@ -21,6 +21,7 @@ import { findChordShapes, loadChordDb, mergeShapes, parseDescriptionShapes, type
 import {
   alignLyrics,
   chordAt,
+  chordsAt,
   flattenChordSections,
   fetchLrcCandidates,
   lineProgressAt,
@@ -58,6 +59,8 @@ const FONT_KEY = "komadi:chords:font";
 const SIMPLIFY_KEY = "komadi:chords:simplify";
 // "Pokaži akorde": sheme vseh akordov skladbe desno od naslova (kot na UG).
 const SHOW_SHAPES_KEY = "komadi:chords:showShapes";
+// Okvir s prijemi (Posebni akordi / Akordi v skladbi) razprt (1) ali zložen (0) — globalno.
+const SHAPES_OPEN_KEY = "komadi:chords:shapesOpen";
 const BG_KEY = "komadi:chords:bg";
 const CHORD_COLOR_KEY = "komadi:chords:chordColor";
 const TEXT_COLOR_KEY = "komadi:chords:textColor";
@@ -390,6 +393,8 @@ export default function ChordsViewer({
   // "Pokaži akorde" — ena nastavitev za vse skladbe.
   const [showShapes, setShowShapes] = useState(() => readNumber(SHOW_SHAPES_KEY, 0) === 1);
   useEffect(() => writeNumber(SHOW_SHAPES_KEY, showShapes ? 1 : 0), [showShapes]);
+  const [shapesOpen, setShapesOpen] = useState(() => readNumber(SHAPES_OPEN_KEY, 1) === 1);
+  useEffect(() => writeNumber(SHAPES_OPEN_KEY, shapesOpen ? 1 : 0), [shapesOpen]);
   // Prijemi iz opisa skladbe ("Cadd4  x 3 3 0 1 0") imajo prednost pred bazo.
   const descShapes = useMemo(() => parseDescriptionShapes(chordsText), [chordsText]);
   // Baza prijemov (naloži se ob prvi shemi ali ko je "Pokaži akorde" vklopljen).
@@ -994,6 +999,8 @@ export default function ChordsViewer({
     syncStateRef.current = { synced_lines: syncedLines, synced_chords: syncedChords, verified_player_at: verifiedPlayerAt };
   });
   const [activeChord, setActiveChord] = useState<{ line: number; chord: number } | null>(null);
+  // Akordi, natapkani ob istem trenutku kot activeChord (obarvani hkrati), ključi "vrstica:akord".
+  const [activeChordsAlso, setActiveChordsAlso] = useState<string>("");
   // Na voljo, če je besedilo s časi ali posneti akordi; sledi pa samo po
   // gumbu "Smart play" (navadni ▶ samo predvaja, kot prej).
   // Časi akordov veljajo samo za posnetek, na katerem so bili posneti: na
@@ -1474,7 +1481,8 @@ export default function ChordsViewer({
     // Shrani samo plasti, ki imajo točke (ali so jih imele): Water Witch s
     // samimi akordi pusti vrstice iz LRCLIB pri miru.
     const nextLines = linePoints.length ? { videoId: syncedLines?.videoId ?? recordVideoId, points: linePoints } : null;
-    const nextChords = sections.length ? { videoId: syncedChords?.videoId ?? recordVideoId, sections } : null;
+    // ...syncedChords: ohrani dodatna polja (sungUnderline).
+    const nextChords = sections.length ? { ...syncedChords, videoId: syncedChords?.videoId ?? recordVideoId, sections } : null;
     const update: Record<string, unknown> = {};
     if (nextLines || syncedLines) update.synced_lines = nextLines;
     if (nextChords || syncedChords) update.synced_chords = nextChords;
@@ -1739,6 +1747,8 @@ export default function ChordsViewer({
     setGapNextLine((prev) => (prev === ahead ? prev : ahead));
     const chord = chordPts.length ? chordAt(chordPts, t) : null;
     setActiveChord((prev) => (prev?.line === chord?.line && prev?.chord === chord?.chord ? prev : chord));
+    const also = chord ? chordsAt(chordPts, t).map((c) => `${c.line}:${c.chord}`).join(" ") : "";
+    setActiveChordsAlso((prev) => (prev === also ? prev : also));
   };
   // Pomik: aktivni akord (intro, solo …) ima prednost pred vrstico.
   const leaderReport = shared?.role === "leader" ? shared.onLocalView : null;
@@ -2494,10 +2504,33 @@ export default function ChordsViewer({
   // Ime akorda (že transponirano/poenostavljeno) s shemo prijema. at = mesto
   // v telesu pesmi (vrstica, zaporedni akord v njej) — samo v telesu: med
   // snemanjem klik zapiše čas akorda, med Smart playem se obarva aktivni.
+  // Akord v vrstici Z BESEDILOM (kitica, refren, zapeti interlude) je ob svojem
+  // času samo podčrtan, pobarvan ostane samo v vrsticah brez besedila (intro,
+  // solo, outro) — za skladbe z natapkanimi akordi petja (skill podcrtaj-akorde).
+  const underlineSung = !!syncedChords?.sungUnderline;
+  // Vrstice z besedilom (za podčrtavanje akordov v zapetih delih).
+  const lyricLineSet = useMemo(
+    () =>
+      new Set(
+        body.flatMap((l, i) =>
+          (l.kind === "pair" && l.chunks.some((c) => c.lyric.trim())) ||
+          (l.kind === "text" && l.segments.some((x) => "text" in x && x.text.trim()))
+            ? [i]
+            : [],
+        ),
+      ),
+    [body],
+  );
   const chordName = (name: string, at?: { line: number; chord: number }) => {
     const key = at ? `${at.line}:${at.chord}` : null;
     // activeChord: med Smart playem iz shranjenih delov, med snemanjem iz osnutka.
-    const active = !!at && shownChord?.line === at.line && shownChord.chord === at.chord;
+    const activeAny =
+      !!at &&
+      ((shownChord?.line === at.line && shownChord.chord === at.chord) ||
+        (!follower && !!activeChord && ` ${activeChordsAlso} `.includes(` ${at.line}:${at.chord} `)));
+    // Test (UNDERLINE_TEST_TITLES): v vrstici z besedilom samo podčrtaj.
+    const underlined = activeAny && underlineSung && lyricLineSet.has(at.line);
+    const active = activeAny && !underlined;
     const recorded = !!recorder && !!key && recordedChords.has(key);
     return (
       <span
@@ -2507,7 +2540,13 @@ export default function ChordsViewer({
           // px + enak negativni mx = malo prostora levo/desno znotraj obrobe,
           // postavitev se ne premakne.
           active ? "-mx-[0.2em] px-[0.2em] rounded-(--cv-mark-radius) bg-(--cv-mark-bg) text-(--cv-mark-text) shadow-[0_0_0_var(--cv-mark-width)_var(--cv-mark-border)]" : ""
-        } ${recorded && !active ? "underline decoration-orange-400 decoration-dotted underline-offset-4" : ""}`}
+        } ${recorded && !activeAny ? "underline decoration-orange-400 decoration-dotted underline-offset-4" : ""}`}
+        style={
+          underlined
+            ? // Spodnja črta, ki sega malo čez ime (podčrtaj tega ne zmore); −margin = padding, nič se ne premakne.
+              { marginInline: "-0.2em", paddingInline: "0.2em", boxShadow: "inset 0 calc(-1 * max(2px, var(--cv-mark-width))) 0 var(--cv-mark-border)" }
+            : undefined
+        }
         onPointerEnter={(e) => {
           if (e.pointerType === "mouse" && !recorder) showShape(name, e.currentTarget);
         }}
@@ -3211,12 +3250,25 @@ export default function ChordsViewer({
                 className={`rounded-xl border px-2.5 pb-1.5 pt-2 ${showShapes ? "border-(--cv-border)" : "border-orange-400/40 bg-orange-400/[0.05]"}`}
                 aria-label={showShapes ? "Akordi v skladbi" : "Posebni akordi"}
               >
-                <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-(--cv-chord)">
+                <button
+                  type="button"
+                  onClick={() => setShapesOpen((v) => !v)}
+                  aria-expanded={shapesOpen}
+                  title={shapesOpen ? "Skrij prijeme" : "Pokaži prijeme"}
+                  className={`flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-(--cv-chord) ${shapesOpen ? "mb-1.5" : ""}`}
+                >
                   {showShapes ? "Akordi v skladbi" : "Posebni akordi"}
-                  {showShapes && specialChords.length > 0 && (
+                  {!shapesOpen && (
+                    <span className="truncate font-normal normal-case tracking-normal text-(--cv-muted)">· {shapeChords.join(", ")}</span>
+                  )}
+                  {shapesOpen && showShapes && specialChords.length > 0 && (
                     <span className="font-normal normal-case tracking-normal text-(--cv-muted)">· posebni so obrobljeni</span>
                   )}
-                </p>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`ml-auto h-3.5 w-3.5 shrink-0 transition ${shapesOpen ? "rotate-180" : ""}`}>
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+              {shapesOpen && (
               <div className="flex flex-wrap gap-x-2 gap-y-2">
                 {shapeChords.map((name) => {
                   const special = showShapes && specialChords.includes(name);
@@ -3260,6 +3312,7 @@ export default function ChordsViewer({
                   );
                 })}
               </div>
+              )}
               </div>
             )}
             </div>
