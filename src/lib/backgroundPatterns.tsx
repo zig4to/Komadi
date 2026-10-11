@@ -79,16 +79,13 @@ function Topo({ line, accent }: Colors) {
 
 // Vrat kitare v perspektivi: 6 strun se zbliža proti desni, prečke se gostijo
 // kot na pravi kitari (12. koren iz 2), piki na 3., 5., 7. … prečki.
-// Višina strune i na x (vrat kitare v perspektivi) — skupno za vzorec in pulze.
-function fretStringY(i: number, x: number) {
-  const t = Math.min(1, Math.max(0, (x + 80) / (W + 160)));
-  const spread = 520 - 300 * t;
-  return H * 0.62 - spread / 2 + (spread / 5) * i - 120 * t;
-}
-
 function Fretboard({ line, accent }: Colors) {
   const fx = (n: number) => -80 + (W + 300) * (1 - Math.pow(2, -n / 12)) * 1.3;
-  const sy = fretStringY;
+  const sy = (i: number, x: number) => {
+    const t = Math.min(1, Math.max(0, (x + 80) / (W + 160)));
+    const spread = 520 - 300 * t;
+    return H * 0.62 - spread / 2 + (spread / 5) * i - 120 * t;
+  };
   return (
     <>
       {Array.from({ length: 6 }, (_, i) => (
@@ -180,36 +177,5 @@ function ChordDiagram(colors: Colors) {
       <ChordGrid x={860} y={140} s={460} rot={-10} dots={[[0, 3], [1, 2], [5, 3]]} marks="--ooo-" {...colors} />
       <ChordGrid x={120} y={560} s={240} rot={8} dots={[[3, 2], [2, 2], [4, 1]]} marks="xo---o" {...colors} />
     </>
-  );
-}
-
-// Barvni pulzi, ki potujejo po strunah vzorca "Vrat kitare" od desne proti
-// levi (animacija stroke-dashoffset, keyframes string-pulse v globals.css).
-// Vsaka struna svoja barva, hitrost in zamik; ob prefers-reduced-motion jih ni.
-const PULSES = [
-  { color: "rgba(52,211,153,0.55)", dur: 7.5, delay: 0 },
-  { color: "rgba(167,139,250,0.5)", dur: 9.5, delay: 2.3 },
-  { color: "rgba(56,189,248,0.5)", dur: 8.2, delay: 4.6 },
-  { color: "rgba(232,121,249,0.45)", dur: 10.5, delay: 1.2 },
-  { color: "rgba(251,191,36,0.4)", dur: 8.8, delay: 6.1 },
-  { color: "rgba(52,211,153,0.45)", dur: 11.5, delay: 3.4 },
-];
-export function FretboardPulses({ className }: { className?: string }) {
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio={ALIGN.fretboard} className={className}>
-      <g fill="none" strokeLinecap="round">
-        {PULSES.map((p, i) => (
-          <path
-            key={i}
-            d={seg([-80, fretStringY(i, -80)], [W + 80, fretStringY(i, W + 80)])}
-            stroke={p.color}
-            strokeWidth={1.6}
-            strokeDasharray="160 4000"
-            className="string-pulse"
-            style={{ animationDuration: `${p.dur}s`, animationDelay: `${p.delay}s` }}
-          />
-        ))}
-      </g>
-    </svg>
   );
 }

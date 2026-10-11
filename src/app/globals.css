@@ -106,28 +106,6 @@ textarea,
   }
 }
 
-/* Pulzi po strunah vzorca "Vrat kitare" (FretboardPulses): odsek potuje od
-   desnega konca strune proti levemu, nato dolga pavza (velik razmik v dasharray). */
-@keyframes string-pulse {
-  from {
-    stroke-dashoffset: -1650;
-  }
-  to {
-    stroke-dashoffset: 200;
-  }
-}
-.string-pulse {
-  stroke-dashoffset: -1650;
-  animation-name: string-pulse;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .string-pulse {
-    display: none;
-  }
-}
-
 /* Izbira akordov pod kartico: razpre se navzdol. */
 @keyframes chords-drop {
   0% {
