@@ -17,7 +17,7 @@ import {
   transposeChord,
   type ChordsLine,
 } from "@/lib/chords";
-import { findChordShapes, loadChordDb, parseDescriptionShapes, type ChordPosition } from "@/lib/chordShapes";
+import { findChordShapes, loadChordDb, mergeShapes, parseDescriptionShapes, type ChordPosition } from "@/lib/chordShapes";
 import {
   alignLyrics,
   chordAt,
@@ -77,6 +77,19 @@ const SHAPE_CHOICE_KEY = "komadi:chords:shapeChoice";
 const LRC_OFFSET_STEP = 0.25;
 // m:ss za časovni razpon instrumentalnega dela.
 const formatSec = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, "0")}`;
+// Navaden durov/molov trozvok (A, Am, Cm, Bbm, F# … tudi kot barre); vse ostalo
+// (/bas, add, sus, 7, maj7, 6, dim …) je "posebni akord", prikazan na vrhu skladbe.
+const isBasicChord = (name: string) => /^[A-H][#b]?m?$/.test(name.replace(/\*+$/, ""));
+// "1 akord", "2 akorda", "3 akordi", "5 akordov" (slovenska dvojina/množina).
+const chordCountLabel = (n: number) => {
+  const m = n % 100;
+  return `${n} ${m === 1 ? "akord" : m === 2 ? "akorda" : m === 3 || m === 4 ? "akordi" : "akordov"}`;
+};
+// "1:27,96" — čas posameznega akorda pri tapkanju (na stotinko).
+const formatSecFine = (s: number) => {
+  const v = Math.max(0, s);
+  return `${Math.floor(v / 60)}:${(v % 60).toFixed(2).padStart(5, "0").replace(".", ",")}`;
+};
 // Id novega instrumentalnega dela (klicano samo iz dogodkov).
 const newSectionId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `s${Date.now()}`;
@@ -85,8 +98,12 @@ const newSectionId = () =>
 const INSTRUMENTAL_TEST_TITLES = ["water witch"];
 // "Sam Špili": odmik besedila od oranžne črte (poudarek vrstice).
 const SS_LINE_INSET = { marginLeft: "-0.45em", paddingLeft: "0.45em" } as const;
-// "Sam Špili": koliko (tipičnih) vrstic nad trenutno ostane vidnih ob njenem začetku.
+// "Sam Špili": koliko (tipičnih) vrstic nad trenutno ostane vidnih ob njenem začetku
+// — najmanj; pri manjši pisavi (več vrstic na zaslonu) velja SS_CENTER.
 const SS_SLOT_ROWS = 1.4;
+// "Sam Špili": sredina trenutne vrstice (na polovici njenega napredka) na tem
+// deležu višine okvirja — bližje sredini zaslona.
+const SS_CENTER = 0.4;
 // "Sam Špili": premor v petju (s), ki šteje kot instrumentalni del — poudarek se ugasne.
 const SS_GAP_MIN = 4;
 // "Sam Špili": ročni pomik (prst/kolešček) ustavi sledenje; po toliko ms brez
@@ -377,14 +394,28 @@ export default function ChordsViewer({
   const descShapes = useMemo(() => parseDescriptionShapes(chordsText), [chordsText]);
   // Baza prijemov (naloži se ob prvi shemi ali ko je "Pokaži akorde" vklopljen).
   const [chordDb, setChordDb] = useState<Awaited<ReturnType<typeof loadChordDb>> | null>(null);
+  // Ali ima pesem kak posebni akord (izračun pred songChords, ki je niže — samo za nalaganje baze).
+  const hasSpecialChords = useMemo(
+    () =>
+      body.some((line) => {
+        const names =
+          line.kind === "chords" ? line.chords.map((c) => c.name)
+          : line.kind === "pair" ? line.chunks.map((c) => c.chord)
+          : line.kind === "text" ? line.segments.map((x) => ("chord" in x ? x.chord : null))
+          : line.kind === "tab" ? (line.header ?? []).map((c) => c.name)
+          : [];
+        return names.some((n) => n && !isBasicChord(n));
+      }),
+    [body],
+  );
   useEffect(() => {
-    if (!showShapes || chordDb) return;
+    if ((!showShapes && !hasSpecialChords) || chordDb) return;
     let alive = true;
     loadChordDb().then((db) => alive && setChordDb(db));
     return () => {
       alive = false;
     };
-  }, [showShapes, chordDb]);
+  }, [showShapes, hasSpecialChords, chordDb]);
 
   // "Tema": ozadje vsebine in barva akordov — ena nastavitev za vse skladbe.
   const [bgIndex, setBgIndex] = useState(() => readNumber(BG_KEY, DEFAULT_BG));
@@ -834,7 +865,6 @@ export default function ChordsViewer({
 
   // "Pokaži akorde": vsi akordi v pesmi (kot so prikazani), po vrsti prve pojavitve.
   const songChords = useMemo(() => {
-    if (!showShapes) return [];
     const names = new Set<string>();
     const add = (name: string | null) => {
       if (name) names.add(simplify ? simplifyChord(transposeChord(name, semitones)) : transposeChord(name, semitones));
@@ -846,7 +876,12 @@ export default function ChordsViewer({
       else if (line.kind === "tab") line.header?.forEach((c) => add(c.name));
     }
     return [...names];
-  }, [showShapes, body, semitones, simplify]);
+  }, [body, semitones, simplify]);
+  // Posebni akordi (vse razen navadnih durovih/molovih trozvokov — A, Am, Cm,
+  // Bbm, F# … tudi kot barre): /bas, add, sus, 7, maj7, 6, dim … Prikazani so
+  // vedno na vrhu; "Pokaži akorde" prikaže vse.
+  const specialChords = useMemo(() => songChords.filter((n) => !isBasicChord(n)), [songChords]);
+  const shapeChords = showShapes ? songChords : specialChords;
 
   // Tablature v pesmi so privzeto skrite (ostane samo vrstica akordov nad
   // njimi); gumb "Tab" ob naslovu sekcije jih prikaže za to sekcijo. Lastnik
@@ -981,6 +1016,45 @@ export default function ChordsViewer({
   // pa prvi kandidat (zaigra ob ▶) — tako se zamik da vpisati že vnaprej.
   const offsetVideo = playingVideo ?? videoIds[0] ?? null;
   const lrcOffset = offsetVideo ? (lrcOffsets[offsetVideo] ?? 0) : 0;
+  // Računalnik: oznake delov skladbe (Intro, Verse 1, Chorus, Solo …) na drsniku
+  // predvajalnika, v času posnetka. Začetek dela = najzgodnejši čas njegovih
+  // vrstic (Smart play) ali posnetih akordov; del brez časov (npr. solo brez
+  // natapkanih akordov) se začne s koncem zadnje zapete vrstice pred njim, del
+  // na začetku pesmi pri 0.
+  const sectionMarkers = useMemo(() => {
+    const lines = (sync?.points ?? []).map((p) => ({ line: p.lineIndex, t: p.time + lrcOffset, end: p.end + lrcOffset }));
+    const chords = chordsWrongVideo ? [] : chordPoints.filter((p): p is { t: number; line: number; chord: number } => "line" in p);
+    if (!lines.length && !chords.length) return [];
+    // Ponovljeni deli brez lastne številke (Chorus ×3) dobijo zaporedno: Chorus 1, 2, 3.
+    const labelCount = new Map<string, number>();
+    for (const l of body) if (l.kind === "section") labelCount.set(l.label, (labelCount.get(l.label) ?? 0) + 1);
+    const labelSeen = new Map<string, number>();
+    const out: { t: number; label: string }[] = [];
+    body.forEach((l, s) => {
+      if (l.kind !== "section") return;
+      const nextIdx = body.findIndex((m, i) => i > s && m.kind === "section");
+      const next = nextIdx < 0 ? body.length : nextIdx;
+      const inside = (line: number) => line > s && line < next;
+      const sung = lines.filter((p) => inside(p.line)).map((p) => p.t);
+      const tapped = chords.filter((p) => inside(p.line)).map((p) => p.t);
+      const before = lines.filter((p) => p.line < s);
+      const sungEnd = before.length ? Math.max(...before.map((p) => p.end)) : null;
+      // Del s petjem: prva zapeta vrstica (ali akord). Instrumentalni del (intro,
+      // solo, outro): ko se konča petje pred njim — prvi natapkan akord pride
+      // pogosto šele kasneje (Dreamer: outro 4:16, prvi C 4:22) — ali prej, če
+      // je akord natapkan pred koncem vrstice.
+      const t = sung.length
+        ? Math.min(...sung, ...tapped)
+        : tapped.length
+          ? Math.min(...tapped, sungEnd ?? Infinity)
+          : (sungEnd ?? 0);
+      const nth = (labelSeen.get(l.label) ?? 0) + 1;
+      labelSeen.set(l.label, nth);
+      const numbered = (labelCount.get(l.label) ?? 0) > 1 && !/\d\s*$/.test(l.label);
+      out.push({ t: Math.max(0, t), label: numbered ? `${l.label} ${nth}` : l.label });
+    });
+    return out.sort((a, b) => a.t - b.t);
+  }, [sync, chordsWrongVideo, chordPoints, lrcOffset, body]);
   const [lrcOffsetError, setLrcOffsetError] = useState<string | null>(null);
   const saveOffsetTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(saveOffsetTimerRef.current), []);
@@ -1044,13 +1118,16 @@ export default function ChordsViewer({
   type RecAction =
     | { kind: "line"; replaced: RecLine[] }
     | { kind: "chord"; sectionId: string }
-    | { kind: "end"; sectionId: string; prev: number | null };
+    | { kind: "end"; sectionId: string; prev: number | null }
+    // ✕ v seznamu akordov dela: odstranjena točka in njeno mesto (↶ jo vrne tja).
+    | { kind: "remove"; sectionId: string; index: number; point: ChordSection["points"][number] };
   // ↷ (ponovi): razveljavljeno dejanje + kar je ↶ odstranil, da ga lahko vrne.
   // Vsako novo dejanje (TAP, akord, Konec) seznam izprazni.
   type RedoAction =
     | { kind: "line"; tap: RecLine; replaced: RecLine[] }
     | { kind: "chord"; sectionId: string; point: ChordSection["points"][number] }
-    | { kind: "end"; sectionId: string; prev: number | null; end: number | null };
+    | { kind: "end"; sectionId: string; prev: number | null; end: number | null }
+    | { kind: "remove"; sectionId: string; index: number; point: ChordSection["points"][number] };
   const [recorder, setRecorder] = useState<{
     lines: RecLine[];
     cursor: number;
@@ -1155,6 +1232,52 @@ export default function ChordsViewer({
     if (!playerCtlRef.current?.seekAndPlay(Math.max(0, start - 2)))
       setRecorderMsg("Najprej enkrat zaženi posnetek z ▶.");
   };
+  // Posamezni akordi dela (zložljivo pod "N akordov"): vsakemu se da premakniti
+  // čas (npr. ko skill spedenaj solo natapka narobe) in ga predvajati od malo
+  // pred njim. Premik spremeni samo t te točke — vrstni red v points ostane,
+  // zato ↶ še vedno odstrani zadnji natapkani akord.
+  const [openChordLists, setOpenChordLists] = useState<Set<string>>(() => new Set());
+  const toggleChordList = (id: string) =>
+    setOpenChordLists((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const shiftChordPoint = (sectionId: string, index: number, delta: number) =>
+    updateSection(sectionId, (s) => ({
+      ...s,
+      points: s.points.map((p, k) => (k === index ? { ...p, t: Math.max(0, Math.round((p.t + delta) * 1000) / 1000) } : p)),
+    }));
+  // ✕ pri akordu: odstrani točko (↶ jo vrne na isto mesto v points).
+  const removeChordPoint = (sectionId: string, index: number) => {
+    if (!recorder) return;
+    const point = recorder.sections.find((s) => s.id === sectionId)?.points[index];
+    if (!point) return;
+    setRecorder({
+      ...recorder,
+      sections: recorder.sections.map((s) => (s.id !== sectionId ? s : { ...s, points: s.points.filter((_, k) => k !== index) })),
+      history: [...recorder.history, { kind: "remove", sectionId, index, point }],
+      future: [],
+      dirty: true,
+    });
+  };
+  const previewChordAt = (t: number) => {
+    if (!playerCtlRef.current?.seekAndPlay(Math.max(0, t - 1.5))) setRecorderMsg("Najprej enkrat zaženi posnetek z ▶.");
+  };
+  // Ime akorda na mestu (line, j) — j kot v renderLine (pri "pair" indeks kosa).
+  const chordNameAt = (line: number, j: number): string => {
+    const l = body[line];
+    let name: string | null | undefined = null;
+    if (l?.kind === "chords") name = l.chords[j]?.name;
+    else if (l?.kind === "tab") name = l.header?.[j]?.name;
+    else if (l?.kind === "pair") name = l.chunks[j]?.chord;
+    else if (l?.kind === "text") {
+      const seg = l.segments[j];
+      name = seg && "chord" in seg ? seg.chord : null;
+    }
+    return name ? display(name) : "?";
+  };
   // Točen čas predvajalnika; null (+ opozorilo), če posnetek ne igra.
   const recordTime = () => {
     const t = playerCtlRef.current?.currentTime();
@@ -1244,6 +1367,18 @@ export default function ChordsViewer({
       });
       return;
     }
+    if (last.kind === "remove") {
+      setRecorder({
+        ...recorder,
+        sections: recorder.sections.map((s) =>
+          s.id !== last.sectionId ? s : { ...s, points: [...s.points.slice(0, last.index), last.point, ...s.points.slice(last.index)] },
+        ),
+        activeId: last.sectionId,
+        history,
+        future: [...recorder.future, last],
+      });
+      return;
+    }
     const section = recorder.sections.find((s) => s.id === last.sectionId);
     const point = section?.points[section.points.length - 1];
     const redo: RedoAction | null =
@@ -1274,6 +1409,17 @@ export default function ChordsViewer({
         lines: [...recorder.lines.filter((p) => !(p.line === line && !p.tap)), next.tap],
         cursor: nextLyricLine(line + 1),
         history: [...recorder.history, { kind: "line", replaced: next.replaced }],
+        future,
+        dirty: true,
+      });
+      return;
+    }
+    if (next.kind === "remove") {
+      setRecorder({
+        ...recorder,
+        sections: recorder.sections.map((s) => (s.id !== next.sectionId ? s : { ...s, points: s.points.filter((_, k) => k !== next.index) })),
+        activeId: next.sectionId,
+        history: [...recorder.history, next],
         future,
         dirty: true,
       });
@@ -1869,7 +2015,11 @@ export default function ChordsViewer({
       // Stalen odmik ene "vrstice" nad trenutno (mediana višin) — z višino
       // prejšnje vrstice (samo akordi = pol nižja) je pogled skočil nazaj.
       const heights = rows.map((r) => r.offsetHeight).sort((x, y) => x - y);
-      slot = (heights[Math.floor(heights.length / 2)] ?? 0) * SS_SLOT_ROWS;
+      // Med vrstico pogled zdrsne za eno vrstico, zato je njena sredina na
+      // polovici napredka ≈ slot od vrha vsebine.
+      const cs = getComputedStyle(box);
+      const availH = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      slot = Math.max((heights[Math.floor(heights.length / 2)] ?? 0) * SS_SLOT_ROWS, SS_CENTER * availH);
       boxH = box.clientHeight;
     };
     measure();
@@ -2252,6 +2402,22 @@ export default function ChordsViewer({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [recording]);
+  // Računalnik: puščici ← / → = skladba 5 s nazaj / naprej (tudi v Sam Špili in
+  // med snemanjem). Ne med pisanjem v polje; drsnik (range) bi sicer sam
+  // premaknil za 1 s — preventDefault. Sledilec v Skupnem Jamu nima svojega
+  // predvajanja; brez zagnanega predvajalnika seekBy ne naredi nič.
+  useEffect(() => {
+    if (follower) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      if ((e.target as HTMLElement).closest?.('input:not([type="range"]),textarea,[contenteditable="true"]')) return;
+      e.preventDefault();
+      playerCtlRef.current?.seekBy(e.key === "ArrowLeft" ? -5 : 5);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [follower]);
 
   // Shema prijema ob prehodu z miško čez akord (na telefonu ob dotiku) —
   // kot na Ultimate Guitar. Vsak akord ima več različic (odprta, barre …),
@@ -2288,7 +2454,7 @@ export default function ChordsViewer({
     const r = el.getBoundingClientRect();
     loadChordDb().then((db) => {
       const own = descShapes.get(name);
-      const positions = [...(own ? [own] : []), ...findChordShapes(db, name)];
+      const positions = mergeShapes(own, findChordShapes(db, name));
       if (!positions.length) return setShapeTip(null);
       // Nad akordom (spodnji rob okna 6 px nad njim); pod njim samo, če zgoraj ni prostora.
       const above = r.top > 180;
@@ -2301,10 +2467,14 @@ export default function ChordsViewer({
     });
   };
   const shapeIndex = shapeTip ? Math.min(shapeChoice[shapeTip.name] ?? 0, shapeTip.positions.length - 1) : 0;
+  // Izbira različice za akord (okno ob akordu in "Pokaži akorde" si jo delita).
+  const stepShapeOf = (name: string, count: number, delta: number) =>
+    setShapeChoice((prev) => {
+      const cur = Math.min(prev[name] ?? 0, count - 1);
+      return { ...prev, [name]: (cur + delta + count) % count };
+    });
   const stepShape = (delta: number) => {
-    if (!shapeTip) return;
-    const n = shapeTip.positions.length;
-    setShapeChoice((prev) => ({ ...prev, [shapeTip.name]: (shapeIndex + delta + n) % n }));
+    if (shapeTip) stepShapeOf(shapeTip.name, shapeTip.positions.length, delta);
   };
   useEffect(() => {
     if (!shapeTip) return;
@@ -2508,6 +2678,7 @@ export default function ChordsViewer({
             }
             floatingHost={floatingPlayer && fullscreen ? rootEl : null}
             sliderHost={sliderHostEl}
+            sectionMarkers={sectionMarkers}
             onTime={onVideoTime}
             smartAvailable={smartAvailable}
             smartOn={smartOn}
@@ -3032,21 +3203,63 @@ export default function ChordsViewer({
                 </button>
               )}
             </div>
-            {/* "Pokaži akorde": prijemi vseh akordov (najprej iz opisa, sicer iz baze — izbrana različica). */}
-            {showShapes && songChords.length > 0 && (
-              <div className="flex flex-wrap gap-x-2 gap-y-2" aria-label="Akordi v skladbi">
-                {songChords.map((name) => {
+            {/* Prijemi akordov (najprej iz opisa, nato iz baze) — izbrana različica, ‹ › pod
+                akordom zamenja različico (enako kot v oknu ob akordu). Privzeto samo posebni
+                akordi; "Pokaži akorde" prikaže vse (posebni so označeni). */}
+            {shapeChords.length > 0 && (
+              <div
+                className={`rounded-xl border px-2.5 pb-1.5 pt-2 ${showShapes ? "border-(--cv-border)" : "border-orange-400/40 bg-orange-400/[0.05]"}`}
+                aria-label={showShapes ? "Akordi v skladbi" : "Posebni akordi"}
+              >
+                <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-(--cv-chord)">
+                  {showShapes ? "Akordi v skladbi" : "Posebni akordi"}
+                  {showShapes && specialChords.length > 0 && (
+                    <span className="font-normal normal-case tracking-normal text-(--cv-muted)">· posebni so obrobljeni</span>
+                  )}
+                </p>
+              <div className="flex flex-wrap gap-x-2 gap-y-2">
+                {shapeChords.map((name) => {
+                  const special = showShapes && specialChords.includes(name);
                   const own = descShapes.get(name);
-                  const positions = own ? [own] : chordDb ? findChordShapes(chordDb, name) : [];
-                  const position = own ?? positions[Math.min(shapeChoice[name] ?? 0, Math.max(0, positions.length - 1))];
+                  const positions = mergeShapes(own, chordDb ? findChordShapes(chordDb, name) : []);
+                  const index = Math.min(shapeChoice[name] ?? 0, Math.max(0, positions.length - 1));
+                  const position = positions[index];
                   return position ? (
-                    <ChordDiagram key={name} name={name} position={position} />
+                    <div key={name} className={`flex flex-col items-center ${special ? "rounded-lg ring-1 ring-orange-400/60" : ""}`}>
+                      <ChordDiagram name={name} position={position} />
+                      {positions.length > 1 && (
+                        <div className="flex w-full items-center justify-between font-sans">
+                          <button
+                            type="button"
+                            onClick={() => stepShapeOf(name, positions.length, -1)}
+                            aria-label={`Prejšnja različica prijema ${name}`}
+                            title="Prejšnja različica"
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none text-(--cv-chord) hover:bg-orange-400/15 active:scale-95"
+                          >
+                            ‹
+                          </button>
+                          <span className="text-[10px] tabular-nums text-(--cv-muted)">
+                            {index + 1}/{positions.length}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => stepShapeOf(name, positions.length, 1)}
+                            aria-label={`Naslednja različica prijema ${name}`}
+                            title="Naslednja različica"
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none text-(--cv-chord) hover:bg-orange-400/15 active:scale-95"
+                          >
+                            ›
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <span key={name} className="px-2 text-sm font-bold text-(--cv-chord)" title="Prijem ni znan">
                       {name}
                     </span>
                   );
                 })}
+              </div>
               </div>
             )}
             </div>
@@ -3175,7 +3388,17 @@ export default function ChordsViewer({
                 <div className="min-w-0 flex-1 rounded-xl border border-neutral-700 p-1 lg:order-3 lg:flex lg:min-h-0 lg:flex-col">
                   <p className="hidden px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 lg:block">Deli z akordi</p>
                   <div className="max-h-36 space-y-1 overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
-                    {recorder.sections.map((section) => {
+                    {/* Po vrstnem redu v skladbi (vrstica, nato čas prvega akorda); deli brez akordov na koncu. */}
+                    {[...recorder.sections]
+                      .map((section, order) => {
+                        const first = section.points.reduce<{ line: number; t: number } | null>(
+                          (m, p) => (!m || p.line < m.line || (p.line === m.line && p.t < m.t) ? { line: p.line, t: p.t } : m),
+                          null,
+                        );
+                        return { section, order, line: first?.line ?? Infinity, t: first?.t ?? Infinity };
+                      })
+                      .sort((a, b) => a.line - b.line || a.t - b.t || a.order - b.order)
+                      .map(({ section }) => {
                       const active = section.id === recorder.activeId;
                       const off = sectionOffset(section, isPhone);
                       const times = section.points.map((p) => p.t + off);
@@ -3183,13 +3406,15 @@ export default function ChordsViewer({
                       const to = times.length
                         ? (section.end != null ? section.end + off : Math.max(...times) + 4)
                         : null;
+                      const listOpen = openChordLists.has(section.id);
+                      // Akordi po času (indeks k = mesto v section.points, ki ga premik spremeni).
+                      const ordered = section.points.map((p, k) => ({ p, k })).sort((a, b) => a.p.t - b.p.t);
                       return (
                         <div
                           key={section.id}
-                          className={`flex items-center gap-1 rounded-lg border px-1.5 py-1 text-[11px] ${
-                            active ? "border-orange-400 bg-orange-400/10" : "border-transparent bg-neutral-900"
-                          }`}
+                          className={`rounded-lg border text-[11px] ${active ? "border-orange-400 bg-orange-400/10" : "border-transparent bg-neutral-900"}`}
                         >
+                        <div className="flex items-center gap-1 px-1.5 py-1">
                           {/* Prazen prostor desno od imena in vrstica pod njim del samo izbereta. */}
                           <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setRecorder({ ...recorder, activeId: section.id })}>
                             {renamingId === section.id ? (
@@ -3219,9 +3444,28 @@ export default function ChordsViewer({
                                 {section.name}
                               </button>
                             )}
-                            <span className="block truncate text-[10px] text-neutral-500">
-                              {from != null && to != null ? `${formatSec(from)}–${formatSec(to)} · ` : ""}
-                              {section.points.length} akordov
+                            <span className="flex min-w-0 items-center gap-1 text-[10px] text-neutral-500">
+                              {from != null && to != null && <span className="truncate">{`${formatSec(from)}–${formatSec(to)}`}</span>}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleChordList(section.id);
+                                }}
+                                disabled={!section.points.length}
+                                aria-expanded={listOpen}
+                                title={listOpen ? "Skrij akorde" : "Pokaži akorde — vsakemu posebej nastaviš čas"}
+                                className={`inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-px font-medium transition-colors disabled:opacity-40 ${
+                                  listOpen
+                                    ? "border-orange-400 bg-orange-400/15 text-amber-300"
+                                    : "border-neutral-600 text-neutral-300 hover:border-orange-400/70 hover:text-amber-300"
+                                }`}
+                              >
+                                {chordCountLabel(section.points.length)}
+                                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className={`h-2.5 w-2.5 transition-transform ${listOpen ? "rotate-180" : ""}`}>
+                                  <path d="m6 9 6 6 6-6" />
+                                </svg>
+                              </button>
                             </span>
                           </div>
                           <button
@@ -3270,6 +3514,57 @@ export default function ChordsViewer({
                             ✕
                           </button>
                         </div>
+                        {/* Akordi dela po vrsti: čas vsakega posebej (−/+), ▶ predvaja od 1,5 s pred njim.
+                            Zamik dela (zgoraj) se prišteje vsem — tu je prikazan končni čas. */}
+                        {listOpen && section.points.length > 0 && (
+                          <ol className="mx-1.5 mb-1.5 divide-y divide-neutral-800 overflow-hidden rounded-md border border-neutral-700 bg-neutral-950">
+                            {ordered.map(({ p, k }, n) => (
+                              <li key={k} className="flex items-center gap-1 px-1.5 py-1">
+                                <span className="w-4 shrink-0 text-right tabular-nums text-neutral-500">{n + 1}</span>
+                                <span className="min-w-[2.75rem] shrink-0 truncate font-mono font-bold text-amber-400">{chordNameAt(p.line, p.chord)}</span>
+                                <span className="flex-1 tabular-nums text-neutral-200">{formatSecFine(p.t + off)}</span>
+                                <div className="flex shrink-0 items-center gap-0.5">
+                                  {[
+                                    { d: -0.25, label: "−¼", title: "0,25 s prej" },
+                                    { d: -0.05, label: "−", title: "0,05 s prej" },
+                                    { d: 0.05, label: "+", title: "0,05 s kasneje" },
+                                    { d: 0.25, label: "+¼", title: "0,25 s kasneje" },
+                                  ].map((b) => (
+                                    <button
+                                      key={b.d}
+                                      type="button"
+                                      onClick={() => shiftChordPoint(section.id, k, b.d)}
+                                      title={b.title}
+                                      aria-label={`${chordNameAt(p.line, p.chord)} ${b.title}`}
+                                      className="h-6 min-w-[1.6rem] rounded border border-neutral-600 px-1 text-neutral-200 hover:border-orange-400 hover:text-amber-300 active:scale-95"
+                                    >
+                                      {b.label}
+                                    </button>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => previewChordAt(p.t + off)}
+                                    title="Predvajaj od 1,5 s pred tem akordom"
+                                    aria-label={`Predvajaj od ${chordNameAt(p.line, p.chord)}`}
+                                    className="ml-0.5 flex h-6 w-6 items-center justify-center rounded-full text-amber-400 hover:bg-orange-400/15 active:scale-95"
+                                  >
+                                    ▶
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeChordPoint(section.id, k)}
+                                    title="Odstrani ta akord (↶ ga vrne)"
+                                    aria-label={`Odstrani ${chordNameAt(p.line, p.chord)} pri ${formatSecFine(p.t + off)}`}
+                                    className="flex h-6 w-6 items-center justify-center rounded-full text-neutral-500 hover:bg-red-500/15 hover:text-red-400 active:scale-95"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                        </div>
                       );
                     })}
                   </div>
@@ -3315,7 +3610,8 @@ export default function ChordsViewer({
             if (e.pointerType === "mouse") scheduleHide();
           }}
           style={{ left: shapeTip.left, top: shapeTip.top, bottom: shapeTip.bottom }}
-          className="fixed z-20 rounded-xl border border-orange-400 bg-(--cv-panel) px-2 pb-1 pt-1.5 shadow-xl"
+          // Sam Špili: nad prekrivnim slojem (z-40), pod njegovim menijem ⚙ (z-50).
+          className={`fixed ${samSpili ? "z-[45]" : "z-20"} rounded-xl border border-orange-400 bg-(--cv-panel) px-2 pb-1 pt-1.5 shadow-xl`}
         >
           <ChordDiagram name={shapeTip.name} position={shapeTip.positions[shapeIndex]} />
           {shapeTip.positions.length > 1 && (

@@ -48,3 +48,5 @@ supabase/.temp
 next-env.d.ts
 
 certificates
+# Python (scripts/spedenaj/audio.py)
+__pycache__/

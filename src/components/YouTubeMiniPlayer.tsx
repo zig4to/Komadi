@@ -115,6 +115,7 @@ export default function YouTubeMiniPlayer({
   onPlaying,
   floatingHost,
   sliderHost,
+  sectionMarkers,
   onTime,
   smartAvailable = false,
   smartOn = false,
@@ -138,6 +139,9 @@ export default function YouTubeMiniPlayer({
   // Drsnik po skladbi (in čas) v lastni vrstici pod zgornjo (ChordsViewer) —
   // portal v ta element; brez njega ostane v vrstici s kontrolami.
   sliderHost?: HTMLElement | null;
+  // Računalnik: oznake delov skladbe (Intro, Verse 1 …) na drsniku v tej
+  // vrstici, t = čas v posnetku (ChordsViewer); klik skoči na začetek dela.
+  sectionMarkers?: { t: number; label: string }[];
   // "Pametni predvajalnik": trenutni čas in dolžina videa (ob predvajanju
   // vsakih 250 ms in ob preskoku z drsnikom/gumbi).
   onTime?: (seconds: number, duration: number, playing: boolean) => void;
@@ -519,23 +523,73 @@ export default function YouTubeMiniPlayer({
       <path d="M8 5v14l11-7-11-7z" />
     </svg>
   );
-  const seekBar = (
+  const seekTo = (t: number) => {
+    setCurrent(t);
+    playerRef.current?.seekTo(t, true);
+  };
+  // Oznake delov: napis samo, če je dovolj prostora od prejšnjega prikazanega
+  // (sicer le črtica z napisom v namigu) — širina drsnika iz ResizeObserverja.
+  const [trackEl, setTrackEl] = useState<HTMLDivElement | null>(null);
+  const [trackW, setTrackW] = useState(0);
+  useEffect(() => {
+    if (!trackEl) return;
+    const ro = new ResizeObserver(() => setTrackW(trackEl.clientWidth));
+    ro.observe(trackEl);
+    return () => ro.disconnect();
+  }, [trackEl]);
+  // Napisi v dveh vrstah: nad drsnikom, če je tam prostor, sicer pod njim;
+  // skrit (samo črtica + namig) šele, ko ni prostora v nobeni. Dolge oznake
+  // skrajšane (Interlude 6 → Inter. 6), da se manj prekrivajo.
+  const markerItems = (() => {
+    if (!sectionMarkers?.length || duration <= 0 || !trackW) return [];
+    const lastEnd = [-Infinity, -Infinity];
+    return sectionMarkers
+      .filter((m) => m.t < duration)
+      .map((m) => {
+        const x = (m.t / duration) * trackW;
+        const short = m.label.replace(/^Interlude/i, "Inter.").replace(/^Pre-?Chorus/i, "Pre-Ch.").replace(/^Instrumental/i, "Instr.");
+        // ~5,2 px na znak pri 9 px pisavi + razmik
+        const row = x >= lastEnd[0] ? 0 : x >= lastEnd[1] ? 1 : -1;
+        if (row >= 0) lastEnd[row] = x + short.length * 5.2 + 6;
+        return { ...m, short, left: (m.t / duration) * 100, row };
+      });
+  })();
+  const seekBar = (withMarkers: boolean) => (
     <>
-      <input
-        type="range"
-        min={0}
-        max={Math.max(1, Math.floor(duration))}
-        step={1}
-        value={Math.min(Math.floor(current), Math.floor(duration))}
-        onChange={(e) => {
-          const t = Number(e.target.value);
-          setCurrent(t);
-          playerRef.current?.seekTo(t, true);
-        }}
-        disabled={!ready || duration === 0}
-        aria-label="Položaj v skladbi"
-        className="h-1 min-w-0 flex-1 cursor-pointer accent-orange-400 disabled:opacity-40"
-      />
+      <div ref={withMarkers ? setTrackEl : undefined} className="relative flex min-w-0 flex-1 items-center">
+        <input
+          type="range"
+          min={0}
+          max={Math.max(1, Math.floor(duration))}
+          step={1}
+          value={Math.min(Math.floor(current), Math.floor(duration))}
+          onChange={(e) => seekTo(Number(e.target.value))}
+          disabled={!ready || duration === 0}
+          aria-label="Položaj v skladbi"
+          className="h-1 w-full min-w-0 cursor-pointer accent-orange-400 disabled:opacity-40"
+        />
+        {withMarkers &&
+          ready &&
+          markerItems.map((m, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => seekTo(m.t)}
+              title={`${m.label} · ${formatTime(m.t)}`}
+              style={{ left: `${m.left}%` }}
+              className="group absolute top-1/2 flex h-4 w-2 -translate-x-1/2 -translate-y-1/2 justify-center"
+            >
+              <span className="h-full w-px bg-neutral-300/60 group-hover:bg-amber-400" />
+              {m.row >= 0 && (
+                <span
+                  className={`absolute left-1/2 whitespace-nowrap text-[9px] leading-none text-neutral-400 group-hover:text-amber-400 ${m.row === 0 ? "bottom-full mb-px" : "top-full mt-px"}`}
+                >
+                  {m.short}
+                </span>
+              )}
+            </button>
+          ))}
+      </div>
       <span className="shrink-0 text-[11px] tabular-nums text-neutral-400">
         {formatTime(current)} / {formatTime(duration)}
       </span>
@@ -604,7 +658,7 @@ export default function YouTubeMiniPlayer({
           </button>
 
           {/* Računalnik: drsnik v tej vrstici; telefon: v lastni vrstici (sliderHost). */}
-          {sliderHost ? <div className="hidden min-w-0 flex-1 items-center gap-2 lg:flex">{seekBar}</div> : seekBar}
+          {sliderHost ? <div className="hidden min-w-0 flex-1 items-center gap-4 px-3 lg:flex">{seekBar(true)}</div> : seekBar(true)}
 
         </>
       )}
@@ -636,7 +690,7 @@ export default function YouTubeMiniPlayer({
 
       {sliderHost &&
         !failedAll &&
-        createPortal(<div className="flex w-full items-center gap-2">{seekBar}</div>, sliderHost)}
+        createPortal(<div className="flex w-full items-center gap-2">{seekBar(false)}</div>, sliderHost)}
 
       {floatingHost &&
         createPortal(

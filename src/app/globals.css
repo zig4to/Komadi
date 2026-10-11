@@ -21,9 +21,10 @@ body {
   caret-color: transparent;
 }
 
-input,
+/* Samo polja, v katera se piše — drsnik (range), kljukice ipd. ne: na drsniku
+   glasbe v akordih je sicer utripala navpična črtica. */
+input:not([type="range"], [type="checkbox"], [type="radio"], [type="button"], [type="submit"], [type="file"], [type="color"]),
 textarea,
-select,
 [contenteditable="true"] {
   caret-color: auto;
 }

@@ -66,9 +66,38 @@ function powerChordShapes(root: string): ChordPosition[] {
   return onE <= onA ? [shape(0, onE), shape(1, onA)] : [shape(1, onA), shape(0, onE)];
 }
 
+// Akordi z basom, ki jih baza nima (findChordShapes bi sicer vrnil prijem
+// brez basa) — prijemi kot na Ultimate Guitar (prva različica v njihovem
+// `applicature`), od E do e.
+const EXTRA_SHAPES: Record<string, ChordPosition[]> = {
+  "C/B": [{ frets: [-1, 2, 2, 0, 1, 0], fingers: [0, 2, 3, 0, 1, 0], barres: [], baseFret: 1 }],
+  "Am7/G": [{ frets: [3, 0, 2, 0, 1, 0], fingers: [3, 0, 2, 0, 1, 0], barres: [], baseFret: 1 }],
+  // Vseh 6 prijemov z jguitar.com/chordsearch/Fadd%2311 (Killing Me Softly);
+  // absolutni pragovi od E do e, prsti po guessFingers.
+  "Fadd#11": [
+    [1, 3, 3, 2, 0, -1],
+    [1, 0, 3, 2, 0, 1],
+    [-1, 8, 7, 10, 10, 7],
+    [13, 12, 15, 14, 12, -1],
+    [13, 12, 10, 10, 12, -1],
+    [-1, 20, 19, 22, 22, 19],
+  ].map(shapeFromFrets),
+  // Vseh 6 prijemov z jguitar.com/chordsearch?chordsearch=gsus4 (namesto baze).
+  Gsus4: [
+    [3, 3, 0, 0, 3, 3],
+    [3, 3, 5, 5, 3, 3],
+    [3, 5, 5, 5, 3, 3],
+    [3, 3, 0, 0, 1, 3],
+    [-1, -1, 5, 7, 8, 8],
+    [-1, 10, 10, 7, 8, 8],
+  ].map(shapeFromFrets),
+};
+
 // "Dm" → vse različice prijema po vrsti iz baze (prva = osnovna/odprta, nato
 // barre in višje lege, npr. Dm na 1. in barre na 5. pragu); neznan akord → [].
 export function findChordShapes(db: ChordDb, name: string): ChordPosition[] {
+  const extra = EXTRA_SHAPES[name.replace(/\*+$/, "").replace(/^H/, "B")];
+  if (extra) return extra;
   const m = name.replace(/\*+$/, "").match(/^([A-H])([#b]?)(.*)$/);
   if (!m) return [];
   const entries = db.chords[DB_KEY[m[1] + m[2]] ?? ""];
@@ -104,13 +133,27 @@ export function parseDescriptionShapes(content: string): Map<string, ChordPositi
     if (tokens.length !== 6) continue;
     const abs = tokens.map((t) => (/^[xX]$/.test(t) ? -1 : Number(t)));
     if (abs.some((f) => Number.isNaN(f) || f > 24)) continue;
-    const pressed = abs.filter((f) => f > 0);
-    const top = Math.max(0, ...pressed);
-    const baseFret = top <= 4 ? 1 : Math.min(...pressed);
-    const frets = abs.map((f) => (f <= 0 ? f : f - baseFret + 1));
-    shapes.set(m[1], { frets, ...guessFingers(frets), baseFret });
+    shapes.set(m[1], shapeFromFrets(abs));
   }
   return shapes;
+}
+
+// Prijem iz opisa skladbe (prvi) + prijemi iz baze/EXTRA_SHAPES brez podvojenih
+// (Dreamer: "Gsus4 330013" v opisu je tudi med prijemi z jguitar).
+export function mergeShapes(own: ChordPosition | undefined, list: ChordPosition[]): ChordPosition[] {
+  const key = (p: ChordPosition) => `${p.baseFret}:${p.frets.join(",")}`;
+  const seen = new Set<string>();
+  return [...(own ? [own] : []), ...list].filter((p) => !seen.has(key(p)) && !!seen.add(key(p)));
+}
+
+// Absolutni pragovi (-1 = x, 0 = prazna) → prijem: nad 4. pragom premaknjen
+// na baseFret = najnižji pritisnjen prag, prsti po guessFingers.
+function shapeFromFrets(abs: number[]): ChordPosition {
+  const pressed = abs.filter((f) => f > 0);
+  const top = Math.max(0, ...pressed);
+  const baseFret = top <= 4 ? 1 : Math.min(...pressed);
+  const frets = abs.map((f) => (f <= 0 ? f : f - baseFret + 1));
+  return { frets, ...guessFingers(frets), baseFret };
 }
 
 // Prsti za prijem iz opisa (opis jih ne pove): po pragovih navzgor, na istem
