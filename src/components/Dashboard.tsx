@@ -4153,27 +4153,39 @@ export default function Dashboard({ user }: { user: User }) {
                   Baza je še prazna — dodaj prvo skladbo.
                 </p>
               ) : (
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">
-                    Top 5
-                  </p>
-                  {mostPopular.slice(0, 5).map((song, i) => (
-                    <CompactRow
-                      key={song.id}
-                      song={song}
-                      rank={i + 1}
-                      onChordsClick={handleChordsClick}
-                      highlighted
-                    />
-                  ))}
-                  {mostPopular.slice(5).map((song, i) => (
-                    <CompactRow
-                      key={song.id}
-                      song={song}
-                      rank={i + 6}
-                      onChordsClick={handleChordsClick}
-                    />
-                  ))}
+                <div className="space-y-5">
+                  <div>
+                    <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-rose-600 dark:font-normal dark:text-rose-400">
+                      <FlameIcon className="h-4 w-4" />
+                      Top 5
+                    </p>
+                    <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+                      {mostPopular.slice(0, 5).map((song, i) => (
+                        <CompactRow
+                          key={song.id}
+                          song={song}
+                          rank={i + 1}
+                          onChordsClick={handleChordsClick}
+                          highlighted
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  {mostPopular.length > 5 && (
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-neutral-500 dark:font-normal">Ostale</p>
+                      <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                        {mostPopular.slice(5).map((song, i) => (
+                          <CompactRow
+                            key={song.id}
+                            song={song}
+                            rank={i + 6}
+                            onChordsClick={handleChordsClick}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -4550,6 +4562,16 @@ function CompactCard({
   );
 }
 
+function FlameIcon({ className }: { className: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+    </svg>
+  );
+}
+
+// Pogled Popularno: Top 5 (highlighted) = večja kartica z rožnato obrobo in
+// veliko tanko številko mesta; ostale = kompaktna steklena vrstica.
 function CompactRow({
   song,
   rank,
@@ -4563,45 +4585,38 @@ function CompactRow({
 }) {
   return (
     <div
-      className={`flex min-w-0 items-start gap-3 border p-3 transition hover:-translate-y-0.5 ${
+      className={`flex min-w-0 items-center gap-3 border transition ${
         highlighted
-          ? // Oblika trzalice (guitar pick): oster kot = konica, preostali
-            // trije zaobljeni = telo trzalice.
-            "rounded-tl-sm rounded-tr-3xl rounded-br-3xl rounded-bl-3xl border-orange-400 bg-orange-500/10 dark:border-orange-600"
-          : "rounded-xl border-neutral-200 bg-white dark:border-white/[0.08] dark:bg-white/[0.035]"
+          ? "rounded-[22px] border-rose-400/60 bg-rose-500/[0.06] px-4 py-3.5 hover:bg-rose-500/10 dark:border-rose-400/40 dark:bg-rose-500/[0.05] dark:hover:bg-rose-500/[0.09]"
+          : "rounded-2xl border-neutral-200 bg-white px-3.5 py-2.5 hover:bg-neutral-50 dark:rounded-[20px] dark:border-white/[0.08] dark:bg-white/[0.035] dark:hover:bg-white/[0.06]"
       }`}
     >
       <span
-        className={`w-5 shrink-0 text-right text-sm font-semibold ${
+        className={`shrink-0 text-right tabular-nums ${
           highlighted
-            ? "text-orange-600 dark:text-orange-400"
-            : "text-neutral-400 dark:text-neutral-600"
+            ? "w-10 text-3xl font-extralight leading-none text-rose-500 dark:text-rose-400"
+            : "w-6 text-sm text-neutral-400 dark:text-neutral-600"
         }`}
       >
-        {rank}
+        {highlighted ? String(rank).padStart(2, "0") : rank}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">
+        <p className={`truncate text-neutral-900 dark:text-white ${highlighted ? "text-base font-medium dark:font-normal" : "text-sm font-medium dark:font-normal"}`}>
           {song.title}
         </p>
-        <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">
-          {song.author}
-        </p>
+        <p className="truncate text-sm text-neutral-500 dark:text-neutral-400">{song.author}</p>
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <ChordsButtons
-          song={song}
-          onChordsClick={onChordsClick}
-          stacked
-          merged
-          menuAlign="right"
-        />
+      <div className="flex shrink-0 items-center gap-2.5">
         <span
           title="Kolikokrat je bila kliknjena povezava Ultimate Guitar, PDF akordi ali Zabrenkaj"
-          className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500"
+          className={`inline-flex items-center gap-1 text-xs tabular-nums ${
+            highlighted ? "text-rose-600 dark:text-rose-300" : "text-neutral-400 dark:text-neutral-500"
+          }`}
         >
-          {song.copy_count}×
+          <FlameIcon className="h-3.5 w-3.5" />
+          {song.copy_count}
         </span>
+        <ChordsButtons song={song} onChordsClick={onChordsClick} merged menuAlign="right" />
       </div>
     </div>
   );
