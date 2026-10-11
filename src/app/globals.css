@@ -106,6 +106,13 @@ textarea,
   }
 }
 
+/* Potujoča svetloba po vratu kitare (FretboardGlow) ob sistemski izbiri "manj animacij" ni prikazana. */
+@media (prefers-reduced-motion: reduce) {
+  .fret-glow {
+    display: none !important;
+  }
+}
+
 /* Izbira akordov pod kartico: razpre se navzdol. */
 @keyframes chords-drop {
   0% {

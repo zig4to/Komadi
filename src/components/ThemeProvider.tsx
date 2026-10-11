@@ -1,6 +1,6 @@
 "use client";
 
-import { BACKGROUND_COLORS, PatternSvg } from "@/lib/backgroundPatterns";
+import { BACKGROUND_COLORS, FretboardGlow, PatternSvg } from "@/lib/backgroundPatterns";
 import { useTheme } from "@/lib/useTheme";
 
 /**
@@ -29,6 +29,8 @@ export default function ThemeProvider() {
         }}
       />
       {pattern && <PatternSvg id={pattern} colors={BACKGROUND_COLORS} className="relative h-full w-full" />}
+      {/* Računalnik: mehka svetloba počasi potuje po vratu kitare (telefon miruje — baterija). */}
+      {pattern === "fretboard" && <FretboardGlow className="fret-glow absolute inset-0 hidden h-full w-full lg:block" />}
     </div>
   );
 }

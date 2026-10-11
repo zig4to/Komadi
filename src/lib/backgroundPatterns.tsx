@@ -79,13 +79,16 @@ function Topo({ line, accent }: Colors) {
 
 // Vrat kitare v perspektivi: 6 strun se zbliža proti desni, prečke se gostijo
 // kot na pravi kitari (12. koren iz 2), piki na 3., 5., 7. … prečki.
+// Višina strune i na x (vrat kitare v perspektivi) — skupno za vzorec in svetlobo.
+function fretStringY(i: number, x: number) {
+  const t = Math.min(1, Math.max(0, (x + 80) / (W + 160)));
+  const spread = 520 - 300 * t;
+  return H * 0.62 - spread / 2 + (spread / 5) * i - 120 * t;
+}
+
 function Fretboard({ line, accent }: Colors) {
   const fx = (n: number) => -80 + (W + 300) * (1 - Math.pow(2, -n / 12)) * 1.3;
-  const sy = (i: number, x: number) => {
-    const t = Math.min(1, Math.max(0, (x + 80) / (W + 160)));
-    const spread = 520 - 300 * t;
-    return H * 0.62 - spread / 2 + (spread / 5) * i - 120 * t;
-  };
+  const sy = fretStringY;
   return (
     <>
       {Array.from({ length: 6 }, (_, i) => (
@@ -177,5 +180,36 @@ function ChordDiagram(colors: Colors) {
       <ChordGrid x={860} y={140} s={460} rot={-10} dots={[[0, 3], [1, 2], [5, 3]]} marks="--ooo-" {...colors} />
       <ChordGrid x={120} y={560} s={240} rot={8} dots={[[3, 2], [2, 2], [4, 1]]} marks="xo---o" {...colors} />
     </>
+  );
+}
+
+// "Živo" ozadje za vzorec Vrat kitare (samo računalnik): mehka, široka lisa
+// svetlobe zelo počasi (30 s v eno smer, 30 s nazaj) potuje po vratu; strune,
+// prečke in pike pod njo rahlo zasvetijo. Svetlejša kopija vzorca, zakrita z
+// masko (radialni preliv), katere središče premika SMIL <animate> (deluje v
+// vseh brskalnikih). Ob prefers-reduced-motion skrito (.fret-glow v globals.css).
+export function FretboardGlow({ className }: { className?: string }) {
+  // Središče lise sledi sredini vratu (ta se proti desni dvigne).
+  const cy = (x: number) => (fretStringY(2, x) + fretStringY(3, x)) / 2;
+  const xs = [-300, W + 300, -300];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio={ALIGN.fretboard} className={className}>
+      <defs>
+        <radialGradient id="fret-glow-spot">
+          <stop offset="0" stopColor="white" stopOpacity="1" />
+          <stop offset="0.55" stopColor="white" stopOpacity="0.35" />
+          <stop offset="1" stopColor="white" stopOpacity="0" />
+        </radialGradient>
+        <mask id="fret-glow-mask" maskUnits="userSpaceOnUse" x={-400} y={-200} width={W + 800} height={H + 400}>
+          <ellipse cx={xs[0]} cy={cy(xs[0])} rx={340} ry={300} fill="url(#fret-glow-spot)">
+            <animate attributeName="cx" dur="60s" repeatCount="indefinite" values={xs.join(";")} calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" />
+            <animate attributeName="cy" dur="60s" repeatCount="indefinite" values={xs.map(cy).join(";")} calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" />
+          </ellipse>
+        </mask>
+      </defs>
+      <g mask="url(#fret-glow-mask)" fill="none" strokeWidth="1" vectorEffect="non-scaling-stroke">
+        <Fretboard line="rgba(255,255,255,0.13)" accent="rgba(52,211,153,0.3)" />
+      </g>
+    </svg>
   );
 }
