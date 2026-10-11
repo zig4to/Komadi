@@ -28,6 +28,7 @@ import ChordsTextEditor from "@/components/ChordsTextEditor";
 import { ImportHistory, ImportReports } from "@/components/ImportTabs";
 import { FavoritesArchive, FavoritesThisMonth, VerifiedSongs, favoriteArchiveMonths } from "@/components/FavoritesMonth";
 import { HomeAside, HomeGreeting, HomeStats } from "@/components/HomeDashboard";
+import MainNav, { type MainNavTab } from "@/components/MainNav";
 import { authorAccentHex } from "@/lib/authorColor";
 import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
 import { pickDailyFeatured } from "@/lib/dailyRandom";
@@ -1934,6 +1935,52 @@ export default function Dashboard({ user }: { user: User }) {
   // Skupni Jam: Nazaj vrne na osebni Jam.
   useBackableOpen(jamOpen && jamShared && !jamArchiveOpen, () => setJamShared(false));
   // Privat Jam / Skupni Jam (JamModeToggle): vedno je izbran eden; izbira zapre arhiv.
+  // Glavna navigacija (Domov · Jam · Playliste · Skupno). Druge celozaslonske
+  // strani (Mojih 20, Popravi, Pregled …) nimajo zavihka — takrat ni aktiven noben.
+  const activeNav: MainNavTab | null = jamOpen
+    ? "jam"
+    : playlistsOpen
+      ? "playlists"
+      : goalOpen || fixOpen || queueOpen || favArchiveOpen || reviewOpen
+        ? null
+        : sharedOn
+          ? "shared"
+          : "home";
+  function closeFullPages() {
+    setJamOpen(false);
+    setGoalOpen(false);
+    setFixOpen(false);
+    setQueueOpen(false);
+    setFavArchiveOpen(false);
+    setReviewOpen(false);
+    setPlaylistsOpen(false);
+  }
+  function handleMainNav(tab: MainNavTab) {
+    if (tab === "home") {
+      closeFullPages();
+      if (sharedOn) closeShared();
+      setActiveView("list");
+      window.scrollTo({ top: 0 });
+    } else if (tab === "jam") {
+      if (sharedOn) closeShared();
+      closeFullPages();
+      setJamOpen(true);
+      window.scrollTo({ top: 0 });
+    } else if (tab === "playlists") {
+      if (sharedOn) closeShared();
+      openPlaylists();
+    } else if (!sharedOn || activeNav !== "shared") {
+      closeFullPages();
+      setActiveView("list");
+      setSharedError(null);
+      if (!sharedOn) {
+        setSharedSongs(null);
+        setSharedOn(true);
+      }
+      window.scrollTo({ top: 0 });
+    }
+  }
+
   // Domača stran (statistika, desni stolpec): odpre Skupni Jam.
   function openSharedJam() {
     setGoalOpen(false);
@@ -2448,7 +2495,7 @@ export default function Dashboard({ user }: { user: User }) {
           </>
         ) : (
           <>
-            <div>
+            <div className="flex items-center gap-6">
               <h1>
                 <button
                   type="button"
@@ -2476,6 +2523,7 @@ export default function Dashboard({ user }: { user: User }) {
                   </span>
                 </button>
               </h1>
+              <MainNav active={activeNav} onSelect={handleMainNav} disabled={!isSupabaseConfigured} className="hidden lg:flex" />
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -2514,45 +2562,6 @@ export default function Dashboard({ user }: { user: User }) {
                 <span className="hidden text-sm font-medium lg:inline">
                   Dodaj nov komad
                 </span>
-              </button>
-              {/* "Skupno": skladbe drugih uporabnikov (uvoz v mojo knjižnico). */}
-              <button
-                type="button"
-                data-view-toggle
-                onClick={() => {
-                  if (sharedOn) {
-                    closeShared();
-                  } else {
-                    setActiveView("list");
-                    setSharedError(null);
-                    setSharedSongs(null);
-                    setSharedOn(true);
-                  }
-                }}
-                aria-pressed={sharedOn}
-                aria-label="Skupno"
-                title="Skupno — skladbe drugih uporabnikov, uvozi jih v svojo knjižnico"
-                className={`ml-1.5 inline-flex items-center justify-center rounded-full border border-sky-500/50 p-2.5 transition dark:border-white/10 ${
-                  sharedOn
-                    ? "bg-[linear-gradient(115deg,#0284c7_15%,#38bdf8_100%)] text-white"
-                    : "bg-transparent text-sky-600 hover:bg-sky-500/10 dark:bg-white/[0.05] dark:text-sky-300 dark:hover:bg-white/[0.1]"
-                }`}
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-[18px] w-[18px] shrink-0"
-                >
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
               </button>
               <div className="ml-1.5">
                 <SettingsMenu
@@ -2601,6 +2610,13 @@ export default function Dashboard({ user }: { user: User }) {
           </>
         )}
       </header>
+
+      <MainNav
+        active={activeNav}
+        onSelect={handleMainNav}
+        disabled={!isSupabaseConfigured}
+        className={`mt-3! w-full lg:w-fit ${activeNav === "home" || activeNav === "shared" ? "lg:hidden" : ""}`}
+      />
 
       {/* Napredni urejevalnik besedila z akordi (portal čez cel zaslon) — odpre ga
           "Uredi besedilo" na straneh Popravi skladbe in Pregled in odobritev. */}
@@ -3829,7 +3845,7 @@ export default function Dashboard({ user }: { user: User }) {
             <div className="flex items-center gap-2 lg:contents">
               <div
                 className={`relative lg:w-1/2 lg:max-w-xs lg:flex-none ${
-                  searchWide ? "min-w-0 flex-1" : "w-1/4"
+                  "min-w-0 flex-1"
                 }`}
               >
                 <svg
@@ -3909,71 +3925,6 @@ export default function Dashboard({ user }: { user: User }) {
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setJamOpen((v) => !v);
-                  setGoalOpen(false);
-                  setFixOpen(false);
-                  setQueueOpen(false);
-                  setFavArchiveOpen(false);
-                  setReviewOpen(false);
-                  setPlaylistsOpen(false);
-                }}
-                disabled={!isSupabaseConfigured}
-                aria-pressed={jamOpen}
-                aria-label="Jam"
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-fuchsia-500/40 py-2 ${searchWide ? "px-2.5 lg:px-4" : "px-4"} text-sm font-medium transition disabled:opacity-40 dark:border-white/10 ${
-                  jamOpen
-                    ? "bg-[linear-gradient(115deg,#a21caf_15%,#e879f9_100%)] text-white"
-                    : "bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(192,38,211,0.24)_15%,rgba(192,38,211,0.06)_95%)] dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
-                }`}
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={`h-4 w-4 shrink-0 ${jamOpen ? "text-white" : "text-fuchsia-600 dark:text-fuchsia-400"}`}
-                >
-                  <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
-                </svg>
-                <span className={searchWide ? "hidden lg:inline" : ""}>Jam</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={openPlaylists}
-                disabled={!isSupabaseConfigured}
-                aria-pressed={playlistsOpen}
-                aria-label="Playliste"
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-yellow-500/40 py-2 ${searchWide ? "px-2.5 lg:px-4" : "px-4"} text-sm font-medium transition disabled:opacity-40 dark:border-white/10 ${
-                  playlistsOpen
-                    ? "bg-[linear-gradient(115deg,#a16207_15%,#facc15_100%)] text-white"
-                    : "bg-[linear-gradient(115deg,rgba(202,138,4,0.14)_15%,rgba(202,138,4,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(202,138,4,0.24)_15%,rgba(202,138,4,0.06)_95%)] dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
-                }`}
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={`h-4 w-4 shrink-0 ${playlistsOpen ? "text-white" : "text-yellow-600 dark:text-yellow-400"}`}
-                >
-                  <path d="M16 6H3" />
-                  <path d="M12 12H3" />
-                  <path d="M12 18H3" />
-                  <path d="M21 15V6" />
-                  <circle cx="18.5" cy="15.5" r="2.5" />
-                </svg>
-                <span className={searchWide ? "hidden lg:inline" : ""}>Playliste</span>
-              </button>
             </div>
 
             {/* Telefon: med iskanjem (polje v fokusu) se vrstica Naključno/Delno/Novo/Popularno/Filtri
