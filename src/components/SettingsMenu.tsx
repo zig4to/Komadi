@@ -390,7 +390,7 @@ export default function SettingsMenu({
                   </div>
 
                   {/* Ozadje aplikacije — ista ozadja kot v Sam Špili (⚙ → Tema).
-                      Izbira nastavi tudi svetlo/temno temo; "Osnovna" = ozadje teme (privzeto je Antracit). */}
+                      Izbira nastavi tudi svetlo/temno temo; "Osnovna" = ozadje teme (privzeto). */}
                   <p className="mb-1.5 mt-2.5 text-xs font-medium text-neutral-500">Ozadje</p>
                   <div className="grid grid-cols-4 justify-items-center gap-y-2">
                     <button

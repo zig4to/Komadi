@@ -10,10 +10,9 @@ const KEY = "komadi:theme";
 const EVENT = "komadi-theme";
 // Ozadje aplikacije (⋮ → Nastavitve → Tema → Ozadje): indeks v BACKGROUNDS
 // (ista ozadja kot v pregledovalniku akordov / Sam Špili); "none" = osnovno
-// ozadje teme (izbira "Osnovna"). Brez shranjene vrednosti velja Antracit —
-// a samo pri temni temi (pri svetli bi bilo temno besedilo na temnem ozadju).
+// ozadje teme (izbira "Osnovna"). Brez shranjene vrednosti velja ozadje teme
+// (prenova videza: grafitno skoraj črno neutral-950 v temni temi; prej Antracit).
 const BG_KEY = "komadi:appBg";
-const DEFAULT_APP_BG = BACKGROUNDS.findIndex((b) => b.label === "Antracit");
 // Vzorec čez ozadje (⋮ → Nastavitve → Tema → Vzorec), samo v temni temi:
 // id iz PATTERNS ali "none"; brez shranjene vrednosti DEFAULT_PATTERN.
 const PATTERN_KEY = "komadi:appPattern";
@@ -43,7 +42,7 @@ function readAppBg(): number | null {
   try {
     const v = localStorage.getItem(BG_KEY);
     if (v === "none") return null;
-    if (v === null) return isDark(readTheme()) && DEFAULT_APP_BG >= 0 ? DEFAULT_APP_BG : null;
+    if (v === null) return null;
     const n = Number(v);
     return Number.isInteger(n) && BACKGROUNDS[n] ? n : null;
   } catch {
@@ -94,7 +93,7 @@ export function useTheme() {
   }, [appBg]);
 
   // bg: indeks, null = "Osnovna" (ozadje teme), "default" = brez izbire
-  // (pri temni temi Antracit, pri svetli ozadje teme).
+  // (ozadje teme).
   const store = (theme: Theme, bg: number | null | "default") => {
     try {
       localStorage.setItem(KEY, theme);
@@ -108,8 +107,7 @@ export function useTheme() {
     window.dispatchEvent(new Event(EVENT));
   };
 
-  // Ročna izbira teme vrne privzeto ozadje (Antracit pri temni, ozadje teme pri
-  // svetli) — svetlo ozadje pri temni temi bi dalo svetlo besedilo na svetlem.
+  // Ročna izbira teme vrne privzeto ozadje (ozadje teme) — svetlo ozadje pri temni temi bi dalo svetlo besedilo na svetlem.
   const setTheme = useCallback((next: Theme) => store(next, "default"), []);
 
   // Ozadje določi tudi temo: svetla ozadja (Bela, Siva) → svetla, ostala → temna.

@@ -4,8 +4,42 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --font-sans: var(--font-montserrat);
+  --font-sans: var(--font-geist);
   --font-mono: var(--font-geist-mono);
+}
+
+/* Prenova videza (temna tema): "neutral" je grafitna siva — ozadje skoraj
+   črno, plošče (neutral-900) ~ bela 3,5 % čez ozadje, obrobe (neutral-800)
+   ~ bela 8 %. Svetla tema ostane z Tailwindovo privzeto paleto. */
+.dark {
+  --color-neutral-50: #f6f6f7;
+  --color-neutral-100: #ececef;
+  --color-neutral-200: #dedee2;
+  --color-neutral-300: #c4c4ca;
+  --color-neutral-400: #9a9aa2;
+  --color-neutral-500: #6e6e76;
+  --color-neutral-600: #48484e;
+  --color-neutral-700: #2e2e33;
+  --color-neutral-800: #222225;
+  --color-neutral-900: #141416;
+  --color-neutral-950: #0a0a0b;
+}
+
+/* Skupni gradniki novega sloga — uporabljajo se z dark: (svetla tema ostane):
+   steklena kartica, steklena tabletka/gumb in steklen meni. */
+@utility glass {
+  background-color: rgb(255 255 255 / 0.035);
+  border-color: rgb(255 255 255 / 0.08);
+}
+@utility glass-pill {
+  background-color: rgb(255 255 255 / 0.05);
+  border-color: rgb(255 255 255 / 0.1);
+}
+@utility glass-menu {
+  background-color: rgb(20 20 22 / 0.78);
+  border-color: rgb(255 255 255 / 0.1);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 20px 50px -12px rgb(0 0 0 / 0.8);
 }
 
 html {

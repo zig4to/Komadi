@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Montserrat } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import RegisterServiceWorker from "@/components/RegisterServiceWorker";
 import ThemeProvider from "@/components/ThemeProvider";
 import "./globals.css";
 
-const montserrat = Montserrat({
-  variable: "--font-montserrat",
-  subsets: ["latin"],
+const geist = Geist({
+  variable: "--font-geist",
+  subsets: ["latin", "latin-ext"],
 });
 
 // latin-ext: š/č/ž, sicer pridejo iz nadomestne pisave z drugačno širino in
@@ -51,9 +51,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="sl"
       suppressHydrationWarning
-      className={`${montserrat.variable} ${geistMono.variable} dark h-full antialiased`}
+      className={`${geist.variable} ${geistMono.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100">
+      <body className="min-h-full flex flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
         <ThemeProvider />
         {children}
         <RegisterServiceWorker />
