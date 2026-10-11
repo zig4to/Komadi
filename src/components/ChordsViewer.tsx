@@ -867,6 +867,70 @@ export default function ChordsViewer({
   // Zgornji vrstici skrite: med samodejnim pomikanjem ali v celozaslonskem načinu.
   const barsHidden = fullscreen || isFullscreen || !!remote?.fullscreen;
 
+  // Drsenje s prstom / kolescem: zgornji vrstici sledita pomiku z isto hitrostjo
+  // (drsiš navzdol → gresta gor in se skrijeta, navzgor → se vrneta), kot vrstica
+  // brskalnika na telefonu. Negativen margin-top na prvi vrstici (brez transform —
+  // ta bi ujel fixed sličico YouTube videa), okvir (overflow-hidden) se skrči.
+  // Samo za uporabnikovo drsenje (zadnjih 800 ms dotik/kolesce), ne za samodejno
+  // pomikanje (Smart play, autoscroll). Ob koncu se dokonča do konca ali nazaj.
+  const barsItemRef = useRef<HTMLDivElement>(null);
+  const barsFirstRef = useRef<HTMLDivElement>(null);
+  const barsOffsetRef = useRef(0);
+  useEffect(() => {
+    const el = scrollRef.current;
+    const item = barsItemRef.current;
+    const first = barsFirstRef.current;
+    if (!el || !item || !first) return;
+    const setOffset = (o: number, animate: boolean) => {
+      const full = item.offsetHeight + barsOffsetRef.current;
+      const v = Math.max(0, Math.min(full, o));
+      barsOffsetRef.current = v;
+      first.style.transition = animate ? "margin-top 220ms ease-out" : "none";
+      first.style.marginTop = v ? `-${v}px` : "";
+    };
+    if (barsHidden || editing) {
+      setOffset(0, false);
+      return;
+    }
+    let last = el.scrollTop;
+    let lastUser = 0;
+    let snapTimer = 0;
+    const markUser = () => {
+      lastUser = performance.now();
+    };
+    const onScroll = () => {
+      const top = el.scrollTop;
+      const d = top - last;
+      last = top;
+      if (top <= 0) {
+        setOffset(0, true);
+        return;
+      }
+      if (performance.now() - lastUser > 800) return;
+      setOffset(barsOffsetRef.current + d, false);
+      window.clearTimeout(snapTimer);
+      snapTimer = window.setTimeout(() => {
+        const full = item.offsetHeight + barsOffsetRef.current;
+        const o = barsOffsetRef.current;
+        if (o > 0 && o < full) setOffset(o > full / 2 ? full : 0, true);
+      }, 180);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    el.addEventListener("touchstart", markUser, { passive: true });
+    el.addEventListener("touchmove", markUser, { passive: true });
+    el.addEventListener("touchend", markUser, { passive: true });
+    el.addEventListener("wheel", markUser, { passive: true });
+    return () => {
+      window.clearTimeout(snapTimer);
+      el.removeEventListener("scroll", onScroll);
+      el.removeEventListener("touchstart", markUser);
+      el.removeEventListener("touchmove", markUser);
+      el.removeEventListener("touchend", markUser);
+      el.removeEventListener("wheel", markUser);
+      setOffset(0, false);
+    };
+  }, [barsHidden, editing]);
+
   const shift = (d: number) => setSemitones((s) => wrap(s + d));
   const display = (name: string) => {
     const t = transposeChord(name, semitones);
@@ -2690,11 +2754,12 @@ export default function ChordsViewer({
         aria-hidden={barsHidden}
       >
       <div
+        ref={barsItemRef}
         className="min-h-0 overflow-hidden"
         // Brez transform: ta bi fixed sličico YouTube videa (znotraj vrstice) ujel v ta okvir.
         style={{ opacity: barsHidden ? 0 : 1, transition: `opacity ${BARS_TRANSITION}` }}
       >
-      <div className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 lg:px-16">
+      <div ref={barsFirstRef} className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 lg:px-16">
         {/* Tudi brez kandidatov: v izbirniku posnetka lahko prilepiš povezavo. */}
         <YouTubeMiniPlayer
             videoIds={offsetLocked && lockedVideo ? [lockedVideo] : videoIds}
