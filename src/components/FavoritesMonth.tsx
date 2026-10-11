@@ -631,7 +631,7 @@ export function VerifiedSongs({
   );
 
   return (
-    <section className="mb-5">
+    <section id="preverjeno-spila" className="mb-5 scroll-mt-4">
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <h2 className="flex items-center gap-1.5 text-lg font-semibold text-neutral-800 dark:font-light dark:text-white">
           <PlayCircleIcon className="h-[18px] w-[18px] text-orange-500 dark:text-orange-400" />

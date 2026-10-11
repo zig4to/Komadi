@@ -27,6 +27,7 @@ import AddChoiceIcons from "@/components/AddChoiceIcons";
 import ChordsTextEditor from "@/components/ChordsTextEditor";
 import { ImportHistory, ImportReports } from "@/components/ImportTabs";
 import { FavoritesArchive, FavoritesThisMonth, VerifiedSongs, favoriteArchiveMonths } from "@/components/FavoritesMonth";
+import { HomeAside, HomeGreeting, HomeStats } from "@/components/HomeDashboard";
 import { authorAccentHex } from "@/lib/authorColor";
 import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
 import { pickDailyFeatured } from "@/lib/dailyRandom";
@@ -1933,6 +1934,19 @@ export default function Dashboard({ user }: { user: User }) {
   // Skupni Jam: Nazaj vrne na osebni Jam.
   useBackableOpen(jamOpen && jamShared && !jamArchiveOpen, () => setJamShared(false));
   // Privat Jam / Skupni Jam (JamModeToggle): vedno je izbran eden; izbira zapre arhiv.
+  // Domača stran (statistika, desni stolpec): odpre Skupni Jam.
+  function openSharedJam() {
+    setGoalOpen(false);
+    setFixOpen(false);
+    setQueueOpen(false);
+    setFavArchiveOpen(false);
+    setReviewOpen(false);
+    setPlaylistsOpen(false);
+    selectJamMode(true);
+    setJamOpen(true);
+    window.scrollTo({ top: 0 });
+  }
+
   function selectJamMode(shared: boolean) {
     setJamArchiveOpen(false);
     setJamShared(shared);
@@ -4106,6 +4120,19 @@ export default function Dashboard({ user }: { user: User }) {
             !sharedOn &&
             !hasActiveFilters(filters) && (
               <div className={`mt-3! space-y-0 ${searchFocused ? "hidden lg:block" : ""}`}>
+                <HomeGreeting firstName={fullNameFor(user).split(" ")[0] ?? ""} songCount={songs.length} />
+                <HomeStats
+                  total={songs.length}
+                  verified={songs.filter((s) => s.verified_player_at).length}
+                  review={reviewSongs.length}
+                  jamCount={sharedJamItems.filter((x) => !x.played).length}
+                  onOpenVerified={() => document.getElementById("preverjeno-spila")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  onOpenReview={openReview}
+                  onOpenJam={openSharedJam}
+                />
+                {/* Računalnik: vsebina levo, desni stolpec (Skupni Jam, Za urediti, graf). */}
+                <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-6">
+                <div className="min-w-0">
                 <FavoritesThisMonth
                   songs={songs}
                   othersSongs={othersFavorites}
@@ -4145,6 +4172,18 @@ export default function Dashboard({ user }: { user: User }) {
                   images={authorImages}
                   accentForLabel={authorAccentHex}
                 />
+                </div>
+                <HomeAside
+                  className="hidden lg:block"
+                  jamItems={sharedJamItems}
+                  reviewCount={reviewSongs.length}
+                  reportCount={reportedSongIds.size}
+                  songs={songs}
+                  onOpenJam={openSharedJam}
+                  onOpenReview={openReview}
+                  onOpenFix={() => openFix()}
+                />
+                </div>
               </div>
             )}
 
