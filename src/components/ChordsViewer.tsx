@@ -2846,7 +2846,7 @@ export default function ChordsViewer({
       {/* Telefon: drsnik po skladbi čez celo širino, med zgornjo vrstico in orodji. */}
       <div ref={setSliderHost} className="flex shrink-0 items-center bg-neutral-900 px-4 pb-2 empty:hidden lg:hidden" />
 
-      <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900/80 px-3 py-1.5 lg:px-16">
+      <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 lg:px-16">
         <div
           className="flex items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5"
           role="group"
