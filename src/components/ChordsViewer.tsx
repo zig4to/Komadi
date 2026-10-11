@@ -867,75 +867,64 @@ export default function ChordsViewer({
   // Zgornji vrstici skrite: med samodejnim pomikanjem ali v celozaslonskem načinu.
   const barsHidden = fullscreen || isFullscreen || !!remote?.fullscreen;
 
-  // Drsenje s prstom / kolescem: zgornji vrstici sledita pomiku z isto hitrostjo
-  // (drsiš navzdol → gresta gor in se skrijeta, navzgor → se vrneta), kot vrstica
-  // brskalnika na telefonu. Negativen margin-top na prvi vrstici (brez transform —
-  // ta bi ujel fixed sličico YouTube videa), okvir (overflow-hidden) se skrči.
-  // Samo za uporabnikovo drsenje (zadnjih 800 ms dotik/kolesce), ne za samodejno
-  // pomikanje (Smart play, autoscroll). Ob koncu se dokonča do konca ali nazaj.
-  // Besedilo vrstici potiska: za kolikor se vrstici skrčita, se vrne pomik
-  // besedila (scrollTop), da se besedilo premika točno s prstom in ne zdrsne pod njiju.
+  // Drsenje s prstom / kolescem: zgornji vrstici lebdita nad besedilom (besedilo
+  // ima zgoraj prostor zanju, --bars-h) in se premikata natanko toliko kot
+  // besedilo — drsiš navzdol: besedilo ju potisne gor in skrije, navzgor: se
+  // vrneta, kot vrstica brskalnika na telefonu. Premik je `top` (ne transform —
+  // ta bi ujel fixed sličico YouTube videa); pomika besedila (scrollTop) se ne
+  // dotikamo, zato je drsenje gladko. Samo uporabnikovo drsenje (zadnjih 800 ms
+  // dotik/kolesce), ne samodejno (Smart play, autoscroll). Spust na pol poti se
+  // dokonča do konca ali nazaj.
+  const barsOuterRef = useRef<HTMLDivElement>(null);
   const barsItemRef = useRef<HTMLDivElement>(null);
-  const barsFirstRef = useRef<HTMLDivElement>(null);
   const barsOffsetRef = useRef(0);
+  // Višina vrstic → --bars-h na korenu (odmik besedila, snemalnika, urejevalnika);
+  // med zlaganjem (autoscroll, celozaslonsko) sledi višini sproti.
+  useEffect(() => {
+    const item = barsItemRef.current;
+    if (!item || !rootEl) return;
+    const apply = () => rootEl.style.setProperty("--bars-h", `${item.offsetHeight}px`);
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(item);
+    return () => ro.disconnect();
+  }, [rootEl]);
   useEffect(() => {
     const el = scrollRef.current;
     const item = barsItemRef.current;
-    const first = barsFirstRef.current;
-    if (!el || !item || !first) return;
-    let last = el.scrollTop;
-    let raf = 0;
-    // Nastavi zamik vrstic; z compensate besedilo ostane pod prstom (potisk).
-    const setOffset = (o: number, compensate: boolean) => {
-      const full = item.offsetHeight + barsOffsetRef.current;
-      const v = Math.max(0, Math.min(full, o));
-      const applied = v - barsOffsetRef.current;
+    const outer = barsOuterRef.current;
+    if (!el || !item || !outer) return;
+    const setOffset = (o: number, animate: boolean) => {
+      const v = Math.max(0, Math.min(item.offsetHeight, o));
       barsOffsetRef.current = v;
-      first.style.marginTop = v ? `-${v}px` : "";
-      if (compensate && applied !== 0) {
-        el.scrollTop -= applied;
-        last = el.scrollTop;
-      }
+      outer.style.transition = `grid-template-rows ${BARS_TRANSITION}${animate ? ", top 200ms ease-out" : ""}`;
+      outer.style.top = `calc(env(safe-area-inset-top) - ${v}px)`;
     };
     if (barsHidden || editing) {
       setOffset(0, false);
       return;
     }
-    // Dokončanje premika (spust na pol poti): kratka animacija, besedilo potuje zraven.
-    const animateTo = (target: number) => {
-      cancelAnimationFrame(raf);
-      const from = barsOffsetRef.current;
-      const t0 = performance.now();
-      const step = (now: number) => {
-        const k = Math.min(1, (now - t0) / 200);
-        const ease = 1 - (1 - k) * (1 - k);
-        setOffset(from + (target - from) * ease, true);
-        if (k < 1) raf = requestAnimationFrame(step);
-      };
-      raf = requestAnimationFrame(step);
-    };
+    let last = el.scrollTop;
     let lastUser = 0;
     let snapTimer = 0;
     const markUser = () => {
       lastUser = performance.now();
-      cancelAnimationFrame(raf);
     };
     const onScroll = () => {
       const top = el.scrollTop;
       const d = top - last;
       last = top;
-      if (d === 0) return;
       if (top <= 0) {
-        if (barsOffsetRef.current > 0) animateTo(0);
+        if (barsOffsetRef.current > 0) setOffset(0, true);
         return;
       }
       if (performance.now() - lastUser > 800) return;
-      setOffset(barsOffsetRef.current + d, true);
+      setOffset(barsOffsetRef.current + d, false);
       window.clearTimeout(snapTimer);
       snapTimer = window.setTimeout(() => {
-        const full = item.offsetHeight + barsOffsetRef.current;
+        const full = item.offsetHeight;
         const o = barsOffsetRef.current;
-        if (o > 0 && o < full) animateTo(o > full / 2 ? full : 0);
+        if (o > 0 && o < full) setOffset(o > full / 2 ? full : 0, true);
       }, 180);
     };
     el.addEventListener("scroll", onScroll, { passive: true });
@@ -945,7 +934,6 @@ export default function ChordsViewer({
     el.addEventListener("wheel", markUser, { passive: true });
     return () => {
       window.clearTimeout(snapTimer);
-      cancelAnimationFrame(raf);
       el.removeEventListener("scroll", onScroll);
       el.removeEventListener("touchstart", markUser);
       el.removeEventListener("touchmove", markUser);
@@ -2763,7 +2751,7 @@ export default function ChordsViewer({
     "flex h-7 min-w-7 items-center justify-center rounded-full text-sm font-medium text-neutral-200 hover:bg-neutral-800 hover:text-white disabled:opacity-40 active:scale-95";
 
   return createPortal(
-    <div ref={setRoot} data-view-portal onClick={(e) => e.stopPropagation()} style={themeVars} className="fixed inset-0 z-50 isolate flex flex-col bg-(--cv-bg) pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
+    <div ref={setRoot} data-view-portal onClick={(e) => e.stopPropagation()} style={themeVars} className="fixed inset-0 z-50 isolate flex flex-col overflow-hidden bg-(--cv-bg) pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
       {theme.pattern && (
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
           <PatternSvg id={theme.pattern} colors={BACKGROUND_COLORS} className="h-full w-full" />
@@ -2773,8 +2761,15 @@ export default function ChordsViewer({
           način), ob pavzi se vrneta. Skrito s CSS, ne odstranjeno — predvajalnik
           mora ostati, da glasba igra naprej. */}
       <div
-        className="grid shrink-0"
-        style={{ gridTemplateRows: barsHidden ? "0fr" : "1fr", transition: `grid-template-rows ${BARS_TRANSITION}` }}
+        ref={barsOuterRef}
+        className="absolute z-20 grid"
+        style={{
+          top: "env(safe-area-inset-top)",
+          left: "env(safe-area-inset-left)",
+          right: "env(safe-area-inset-right)",
+          gridTemplateRows: barsHidden ? "0fr" : "1fr",
+          transition: `grid-template-rows ${BARS_TRANSITION}`,
+        }}
         aria-hidden={barsHidden}
       >
       <div
@@ -2783,7 +2778,7 @@ export default function ChordsViewer({
         // Brez transform: ta bi fixed sličico YouTube videa (znotraj vrstice) ujel v ta okvir.
         style={{ opacity: barsHidden ? 0 : 1, transition: `opacity ${BARS_TRANSITION}` }}
       >
-      <div ref={barsFirstRef} className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 lg:px-16">
+      <div className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 lg:px-16">
         {/* Tudi brez kandidatov: v izbirniku posnetka lahko prilepiš povezavo. */}
         <YouTubeMiniPlayer
             videoIds={offsetLocked && lockedVideo ? [lockedVideo] : videoIds}
@@ -3255,7 +3250,7 @@ export default function ChordsViewer({
       )}
 
       {editing && (
-        <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3 pt-2">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 px-3 pb-3" style={{ paddingTop: "calc(var(--bars-h, 0px) + 0.5rem)" }}>
           <div className="flex flex-wrap items-center gap-2">
             <p className="min-w-0 flex-1 text-xs text-(--cv-muted)">
               Akorde piši v svojo vrstico nad besedilo, razdelke kot [Refren].
@@ -3294,7 +3289,7 @@ export default function ChordsViewer({
 
       {/* Besedilo in (računalnik) snemalnik časov kot stolpec desno. */}
       <div className={`flex min-h-0 flex-1 flex-col lg:flex-row ${editing ? "hidden" : ""}`}>
-        <div ref={scrollRef} className={`min-h-0 flex-1 overflow-auto px-4 pb-32 pt-4 [scrollbar-width:none] lg:px-16 [&::-webkit-scrollbar]:hidden ${editing ? "hidden" : ""}`}>
+        <div ref={scrollRef} style={{ paddingTop: "calc(var(--bars-h, 0px) + 1rem)" }} className={`min-h-0 flex-1 overflow-auto px-4 pb-32 [scrollbar-width:none] lg:px-16 [&::-webkit-scrollbar]:hidden ${editing ? "hidden" : ""}`}>
           <div className="font-mono leading-snug text-(--cv-text)" style={{ fontSize }}>
             <div className="mb-4 flex flex-wrap items-start gap-x-8 gap-y-3 font-sans">
             <div className="shrink-0">
@@ -3430,7 +3425,7 @@ export default function ChordsViewer({
             (se drsijo), spodaj Prekliči / Shrani. */}
         {recorder && (
           <div
-            className="relative z-30 shrink-0 border-t border-orange-400 bg-neutral-950/95 px-3 pt-2 font-sans text-neutral-100 backdrop-blur lg:flex lg:w-[22rem] lg:flex-col lg:overflow-hidden lg:border-l lg:border-t-0 lg:pt-3"
+            className="relative z-30 shrink-0 border-t border-orange-400 bg-neutral-950/95 px-3 pt-2 font-sans text-neutral-100 backdrop-blur lg:flex lg:w-[22rem] lg:flex-col lg:overflow-hidden lg:border-l lg:border-t-0 lg:pt-[calc(var(--bars-h,0px)+0.75rem)]"
             style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
           >
             <div className="mx-auto max-w-2xl lg:mx-0 lg:flex lg:min-h-0 lg:max-w-none lg:flex-1 lg:flex-col">
