@@ -157,8 +157,7 @@ export default function ChordsButtons({
       : 0;
     const wide = panelWidth >= 300;
     return (
-      <div ref={rootRef} className={stacked ? "flex shrink-0 items-center gap-1" : "mt-1 flex items-center gap-1"}>
-        <ListenButton song={song} menuAlign={menuAlign} />
+      <span ref={rootRef} hidden>
 
         {menuOpen &&
           menuPos &&
@@ -171,9 +170,6 @@ export default function ChordsButtons({
               style={{ top: menuPos.bottom + 6, left: panelLeft, width: panelWidth }}
               className="fixed z-50 origin-top animate-chords-drop rounded-2xl border border-amber-400 bg-white p-1.5 shadow-xl dark:border-white/10 dark:glass-menu"
             >
-              <p className="truncate px-2 pb-1 pt-0.5 text-[11px] text-neutral-500">
-                Akordi · {song.title}
-              </p>
               <div className={wide ? "grid grid-cols-2 gap-0.5" : "space-y-0.5"}>
               {hasSamSpili(song) && (
                 <button
@@ -403,7 +399,7 @@ export default function ChordsButtons({
             </div>,
             document.body,
           )}
-      </div>
+      </span>
     );
   }
 

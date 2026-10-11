@@ -3121,12 +3121,8 @@ export default function Dashboard({ user }: { user: User }) {
                         <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">
                           {item.author}
                         </p>
-                        {/* Naslov in avtor zgoraj, Akordi + Poslušaj pod njima. */}
-                        {item.kind === "song" && (
-                          <div className="mt-1.5">
-                            <ChordsButtons song={item.song} onChordsClick={handleChordsClick} merged />
-                          </div>
-                        )}
+                        {/* Klik na vrstico odpre izbiro akordov (ChordsButtons, data-chords-card). */}
+                        {item.kind === "song" && <ChordsButtons song={item.song} onChordsClick={handleChordsClick} merged />}
                       </div>
                       <button
                         type="button"

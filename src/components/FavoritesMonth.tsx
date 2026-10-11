@@ -1,6 +1,5 @@
 "use client";
 
-import JamTargetMenu from "@/components/JamTargetMenu";
 import { useEffect, useRef, useState } from "react";
 import ChordsButtons from "@/components/ChordsButtons";
 import { authorAccentHex } from "@/lib/authorColor";
@@ -86,7 +85,7 @@ function StarIcon({ filled, className, strokeWidth = 1.8 }: { filled: boolean; c
 
 // Strnjena kartica priljubljene skladbe (ena vrstica): majhna slika avtorja
 // levo (brez slike: kvadrat v barvi avtorja z začetnico), naslov/avtor/datum
-// in pod njima gumba Akordi/Poslušaj na sredini, okrasna zvezda desno.
+// (klik na kartico odpre izbiro akordov s Poslušaj in Jam), okrasna zvezda desno.
 export function FavoriteCard({
   song,
   authorImage,
@@ -111,24 +110,6 @@ export function FavoriteCard({
   const dateIso = variant === "verified" ? song.verified_player_at : song.favorited_at;
   const date = dateIso ? new Date(dateIso).toLocaleDateString("sl-SI", { day: "numeric", month: "short" }) : null;
 
-  // Kratek vizualni znak (kljukica namesto strele), da je jasno, da je klik
-  // na "Dodaj v Jam" nekaj naredil — enak vzorec kot na SongCard.tsx.
-  const [jamAdded, setJamAdded] = useState(false);
-  // Izbira privat / Skupni Jam (JamTargetMenu), pod gumbom.
-  const [jamMenuAnchor, setJamMenuAnchor] = useState<DOMRect | null>(null);
-  const jamAddedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (jamAddedTimer.current) clearTimeout(jamAddedTimer.current);
-    },
-    [],
-  );
-
-  const showJamAdded = () => {
-    setJamAdded(true);
-    if (jamAddedTimer.current) clearTimeout(jamAddedTimer.current);
-    jamAddedTimer.current = setTimeout(() => setJamAdded(false), 1400);
-  };
 
   return (
     <div
@@ -176,55 +157,8 @@ export function FavoriteCard({
           </button>
           {date && <span className="shrink-0">· {date}</span>}
         </p>
-        <span className="mt-1 inline-flex items-center gap-1">
+        <span className="contents">
           <ChordsButtons song={song} onChordsClick={onChordsClick} merged onAddToJam={onAddToJam} onAddToSharedJam={onAddToSharedJam} />
-          {onAddToJam && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onAddToSharedJam) {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setJamMenuAnchor((open) => (open ? null : rect));
-                  return;
-                }
-                onAddToJam(song);
-                showJamAdded();
-              }}
-              aria-label={jamAdded ? "Dodano v Jam" : "Dodaj v Jam"}
-              title={jamAdded ? "Dodano v Jam" : "Dodaj v Jam"}
-              className={`inline-flex shrink-0 items-center p-0.5 transition ${
-                jamAdded
-                  ? "text-emerald-500 dark:text-emerald-400"
-                  : "text-fuchsia-500 hover:text-fuchsia-600 dark:text-fuchsia-400 dark:hover:text-fuchsia-300"
-              }`}
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-[15px] w-[15px] shrink-0"
-              >
-                {jamAdded ? <path d="M20 6 9 17l-5-5" /> : <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />}
-              </svg>
-            </button>
-          )}
-          {jamMenuAnchor && onAddToJam && onAddToSharedJam && (
-            <JamTargetMenu
-              anchor={jamMenuAnchor}
-              onClose={() => setJamMenuAnchor(null)}
-              onPick={(target) => {
-                setJamMenuAnchor(null);
-                if (target === "private") onAddToJam(song);
-                else onAddToSharedJam(song);
-                showJamAdded();
-              }}
-            />
-          )}
         </span>
       </div>
 
