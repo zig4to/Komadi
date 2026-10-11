@@ -91,6 +91,7 @@ function ActionCard({
   onClick,
   disabled,
   viewToggle,
+  row = false,
   className = "",
 }: {
   label: string;
@@ -101,6 +102,8 @@ function ActionCard({
   onClick: () => void;
   disabled?: boolean;
   viewToggle?: boolean;
+  // Vodoravna (nizka) kartica: ikona, besedilo in puščica v eni vrsti.
+  row?: boolean;
   className?: string;
 }) {
   return (
@@ -110,7 +113,9 @@ function ActionCard({
       disabled={disabled}
       aria-pressed={active}
       {...(viewToggle ? { "data-view-toggle": true } : {})}
-      className={`${CARD} group flex min-w-0 flex-col justify-between gap-3 p-3.5 text-left transition disabled:opacity-40 lg:p-4 ${
+      className={`${CARD} group flex min-w-0 gap-3 p-3.5 text-left transition disabled:opacity-40 lg:p-4 ${
+        row ? "flex-row items-center" : "flex-col justify-between"
+      } ${
         active ? `ring-2 ${tone.ring} ${tone.tint}` : "hover:bg-neutral-50 dark:hover:bg-white/[0.06]"
       } ${className}`}
     >
@@ -119,23 +124,25 @@ function ActionCard({
           {icon}
         </svg>
       </span>
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="block truncate text-[15px] text-neutral-900 dark:text-white">{label}</span>
         <span className="block truncate text-xs text-neutral-500">{hint}</span>
       </span>
+      {row && <ArrowUpRight className="h-4 w-4 shrink-0 text-neutral-400 dark:text-neutral-600" />}
     </button>
   );
 }
 
 // Barve novih kartic se ne ponavljajo s statistiko (siva, oranžna, turkizna,
 // fuksija): Naključno vijolična, Delno limetina, Novo smaragdna, Popularno
-// rožnata, Filtri modra.
+// rožnata, Filtri modra, Uglaševalec jantarna.
 const TONES = {
   violet: { text: "text-violet-600 dark:text-violet-400", ring: "ring-violet-500/50", tint: "bg-violet-500/[0.06]" },
   lime: { text: "text-lime-600 dark:text-lime-400", ring: "ring-lime-500/50", tint: "bg-lime-500/[0.06]" },
   emerald: { text: "text-emerald-600 dark:text-emerald-400", ring: "ring-emerald-500/50", tint: "bg-emerald-500/[0.06]" },
   rose: { text: "text-rose-600 dark:text-rose-400", ring: "ring-rose-500/50", tint: "bg-rose-500/[0.06]" },
   blue: { text: "text-blue-600 dark:text-blue-400", ring: "ring-blue-500/50", tint: "bg-blue-500/[0.06]" },
+  amber: { text: "text-amber-600 dark:text-amber-400", ring: "ring-amber-500/50", tint: "bg-amber-500/[0.06]" },
 };
 
 function filterCountLabel(n: number) {
@@ -166,6 +173,7 @@ export function HomeBento({
   filtersOpen,
   activeFilterCount,
   onToggleFilters,
+  onOpenTuner,
   disabled,
   className = "",
 }: {
@@ -186,6 +194,7 @@ export function HomeBento({
   filtersOpen: boolean;
   activeFilterCount: number;
   onToggleFilters: () => void;
+  onOpenTuner: () => void;
   disabled?: boolean;
   className?: string;
 }) {
@@ -269,6 +278,22 @@ export function HomeBento({
         active={filtersOpen}
         onClick={onToggleFilters}
         icon={<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />}
+      />
+      <ActionCard
+        className="col-span-6 lg:col-span-12"
+        row
+        label="Uglaševalec"
+        hint="uglasi kitaro z mikrofonom"
+        tone={TONES.amber}
+        onClick={onOpenTuner}
+        icon={
+          <>
+            <path d="M4.5 16a8 8 0 1 1 15 0" />
+            <path d="M12 12l3.5-4" />
+            <circle cx="12" cy="12" r="1.5" />
+            <path d="M5 20h14" />
+          </>
+        }
       />
     </div>
   );

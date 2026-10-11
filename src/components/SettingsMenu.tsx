@@ -2,7 +2,6 @@
 
 import type { User } from "@supabase/supabase-js";
 import UserMenuSection from "@/components/UserAvatar";
-import Tuner from "@/components/Tuner";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { runBackup, shareBackup } from "@/lib/backup";
@@ -141,7 +140,6 @@ export default function SettingsMenu({
   // Sistemski gumb "Nazaj" (Android) naj meni zapre enako kot klik zunaj njega ali Escape.
   useBackableOpen(menuOpen, () => setMenuOpen(false));
   // Uglaševalec (celozaslonski portal, svoj useBackableOpen).
-  const [tunerOpen, setTunerOpen] = useState(false);
 
   const [backupBusy, setBackupBusy] = useState<"save" | "share" | null>(null);
   const [backupMessage, setBackupMessage] = useState<{
@@ -1077,35 +1075,9 @@ export default function SettingsMenu({
             Mojih 20 skladb
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setMenuOpen(false);
-              setTunerOpen(true);
-            }}
-            className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-medium text-neutral-700 dark:text-neutral-200 transition-colors hover:bg-(--menu-hover) active:bg-(--menu-active) aria-expanded:bg-(--menu-hover)"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-[18px] w-[18px] shrink-0"
-            >
-              <path d="M4.5 16a8 8 0 1 1 15 0" />
-              <path d="M12 12l3.5-4" />
-              <circle cx="12" cy="12" r="1.5" />
-              <path d="M5 20h14" />
-            </svg>
-            Uglaševalec
-          </button>
           </MenuSection>
         </div>
       )}
-      {tunerOpen && <Tuner onClose={() => setTunerOpen(false)} />}
     </div>
   );
 }

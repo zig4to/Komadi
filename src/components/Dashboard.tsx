@@ -29,6 +29,7 @@ import { ImportHistory, ImportReports } from "@/components/ImportTabs";
 import { FavoritesArchive, FavoritesThisMonth, VerifiedSongs, favoriteArchiveMonths } from "@/components/FavoritesMonth";
 import { HomeAside, HomeBento, HomeGreeting } from "@/components/HomeDashboard";
 import MainNav, { type MainNavTab } from "@/components/MainNav";
+import Tuner from "@/components/Tuner";
 import { authorAccentHex } from "@/lib/authorColor";
 import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
 import { pickDailyFeatured } from "@/lib/dailyRandom";
@@ -343,6 +344,8 @@ export default function Dashboard({ user }: { user: User }) {
     SONG_SORTS,
   );
   const [goalPickerOpen, setGoalPickerOpen] = useState(false);
+  // Uglaševalec (kartica na domači strani; prej v meniju ⋮).
+  const [tunerOpen, setTunerOpen] = useState(false);
   const [goalPickerQuery, setGoalPickerQuery] = useState("");
   const [goalExtras, setGoalExtras] = useState<GoalExtra[]>([]);
   const [goalQuickAddOpen, setGoalQuickAddOpen] = useState(false);
@@ -3994,9 +3997,11 @@ export default function Dashboard({ user }: { user: User }) {
               filtersOpen={filtersOpen}
               activeFilterCount={activeFilterCount}
               onToggleFilters={() => setFiltersOpen((v) => !v)}
+              onOpenTuner={() => setTunerOpen(true)}
               disabled={!isSupabaseConfigured}
             />
           </div>
+          {tunerOpen && <Tuner onClose={() => setTunerOpen(false)} />}
 
           <Filters
             filters={filters}
