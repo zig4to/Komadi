@@ -468,7 +468,7 @@ export default function SettingsMenu({
                             {id && (
                               <PatternSvg
                                 id={id}
-                                colors={{ line: "rgba(255,255,255,0.35)", accent: "rgba(52,211,153,0.85)", birds: 0.95 }}
+                                colors={{ line: "rgba(255,255,255,0.35)", accent: "rgba(52,211,153,0.85)" }}
                                 className="h-full w-full"
                               />
                             )}
