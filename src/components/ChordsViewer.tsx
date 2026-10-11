@@ -3253,8 +3253,11 @@ export default function ChordsViewer({
                   className={`flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-(--cv-chord) ${shapesOpen ? "mb-1.5" : ""}`}
                 >
                   {showShapes ? "Akordi v skladbi" : "Posebni akordi"}
+                  {/* Zaprto okno: seznam akordov samo, če jih je največ 5 (sicer le število). */}
                   {!shapesOpen && (
-                    <span className="truncate font-normal normal-case tracking-normal text-(--cv-muted)">· {shapeChords.join(", ")}</span>
+                    <span className="truncate font-normal normal-case tracking-normal text-(--cv-muted)">
+                      · {shapeChords.length <= 5 ? shapeChords.join(", ") : `${shapeChords.length} akordov`}
+                    </span>
                   )}
                   {shapesOpen && showShapes && specialChords.length > 0 && (
                     <span className="font-normal normal-case tracking-normal text-(--cv-muted)">· posebni so obrobljeni</span>
