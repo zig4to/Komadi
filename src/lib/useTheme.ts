@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { BACKGROUNDS } from "@/lib/backgrounds";
+import { DEFAULT_PATTERN, isPatternId, type PatternId } from "@/lib/backgroundPatterns";
 
 export type Theme = "system" | "light" | "dark";
 
@@ -13,6 +14,9 @@ const EVENT = "komadi-theme";
 // a samo pri temni temi (pri svetli bi bilo temno besedilo na temnem ozadju).
 const BG_KEY = "komadi:appBg";
 const DEFAULT_APP_BG = BACKGROUNDS.findIndex((b) => b.label === "Antracit");
+// Vzorec čez ozadje (⋮ → Nastavitve → Tema → Vzorec), samo v temni temi:
+// id iz PATTERNS ali "none"; brez shranjene vrednosti DEFAULT_PATTERN.
+const PATTERN_KEY = "komadi:appPattern";
 
 function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", isDark(theme));
@@ -47,6 +51,16 @@ function readAppBg(): number | null {
   }
 }
 
+function readPattern(): PatternId | null {
+  try {
+    const v = localStorage.getItem(PATTERN_KEY);
+    if (v === "none") return null;
+    return isPatternId(v) ? v : DEFAULT_PATTERN;
+  } catch {
+    return DEFAULT_PATTERN;
+  }
+}
+
 /**
  * Bere in nastavlja temo aplikacije (svetla / temna / sistemska) in ozadje
  * aplikacije. Vrednosti se shranijo v localStorage in ostanejo po osvežitvi.
@@ -63,6 +77,7 @@ export function useTheme() {
     () => "dark" as Theme,
   );
   const appBg = useSyncExternalStore(subscribe, readAppBg, () => null);
+  const pattern = useSyncExternalStore(subscribe, readPattern, () => null);
 
   // Poskrbi, da se razred .dark ujema z izbiro tudi ob spremembi sistemske
   // nastavitve (ko je izbrana "sistemska").
@@ -104,5 +119,15 @@ export function useTheme() {
     else store(BACKGROUNDS[index].light ? "light" : "dark", index);
   }, []);
 
-  return { theme, setTheme, appBg, setAppBg };
+  // null = brez vzorca.
+  const setPattern = useCallback((next: PatternId | null) => {
+    try {
+      localStorage.setItem(PATTERN_KEY, next ?? "none");
+    } catch {
+      // localStorage ni na voljo — izbira se ne bo ohranila
+    }
+    window.dispatchEvent(new Event(EVENT));
+  }, []);
+
+  return { theme, setTheme, appBg, setAppBg, pattern, setPattern };
 }

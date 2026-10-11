@@ -10,6 +10,7 @@ import { parseImportJson, parseImportText, type ParsedImport } from "@/lib/impor
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { BACKGROUNDS, BACKGROUND_ORDER } from "@/lib/backgrounds";
+import { PATTERNS, PatternSvg, type PatternId } from "@/lib/backgroundPatterns";
 import { useTheme, type Theme } from "@/lib/useTheme";
 import type { QueuedSong, Song, SongReport } from "@/types/song";
 
@@ -120,7 +121,7 @@ export default function SettingsMenu({
   const [backupOpen, setBackupOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const { theme, setTheme, appBg, setAppBg } = useTheme();
+  const { theme, setTheme, appBg, setAppBg, pattern, setPattern } = useTheme();
 
   // Sistemski gumb "Nazaj" (Android) naj meni zapre enako kot klik zunaj njega ali Escape.
   useBackableOpen(menuOpen, () => setMenuOpen(false));
@@ -424,6 +425,42 @@ export default function SettingsMenu({
                             }`}
                           />
                           {b.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Vzorec čez ozadje (tanke črte), samo v temni temi. */}
+                  <p className="mb-1.5 mt-3 text-xs font-medium text-neutral-500">
+                    Vzorec{theme === "light" && <span className="font-normal"> — viden samo v temni temi</span>}
+                  </p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {([null, ...PATTERNS.map((pt) => pt.id)] as (PatternId | null)[]).map((id) => {
+                      const label = id === null ? "Brez" : PATTERNS.find((pt) => pt.id === id)!.label;
+                      const active = pattern === id;
+                      return (
+                        <button
+                          key={id ?? "none"}
+                          type="button"
+                          onClick={() => setPattern(id)}
+                          aria-pressed={active}
+                          title={label}
+                          className="flex flex-col items-center gap-1 text-center text-[10px] leading-tight text-neutral-600 dark:text-neutral-300"
+                        >
+                          <span
+                            className={`block h-9 w-full overflow-hidden rounded-md border border-neutral-400 bg-[#181818] dark:border-neutral-600 ${
+                              active ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900" : ""
+                            }`}
+                          >
+                            {id && (
+                              <PatternSvg
+                                id={id}
+                                colors={{ line: "rgba(255,255,255,0.35)", accent: "rgba(52,211,153,0.85)" }}
+                                className="h-full w-full"
+                              />
+                            )}
+                          </span>
+                          {label}
                         </button>
                       );
                     })}
