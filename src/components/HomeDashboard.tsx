@@ -47,6 +47,7 @@ function StatCard({
   dot,
   pulse,
   onClick,
+  className = "",
 }: {
   label: string;
   value: number;
@@ -54,6 +55,7 @@ function StatCard({
   dot: string;
   pulse?: boolean;
   onClick?: () => void;
+  className?: string;
 }) {
   const body = (
     <>
@@ -68,7 +70,7 @@ function StatCard({
       {onClick && <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-neutral-400 dark:text-neutral-600" />}
     </>
   );
-  const cls = `${CARD} relative block p-4 text-left`;
+  const cls = `${CARD} relative block p-4 text-left ${className}`;
   return onClick ? (
     <button type="button" onClick={onClick} className={`${cls} transition hover:bg-neutral-50 dark:hover:bg-white/[0.06]`}>
       {body}
@@ -78,7 +80,76 @@ function StatCard({
   );
 }
 
-export function HomeStats({
+// Kartica-dejanje (Naključno, Novo, Filtri …): barvna ikona, naslov, opis;
+// aktivna (odprt pogled / panel) je poudarjena z obrobo v barvi ikone.
+function ActionCard({
+  label,
+  hint,
+  icon,
+  tone,
+  active,
+  onClick,
+  disabled,
+  viewToggle,
+  className = "",
+}: {
+  label: string;
+  hint: string;
+  icon: React.ReactNode;
+  tone: { text: string; ring: string; tint: string };
+  active?: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+  viewToggle?: boolean;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
+      {...(viewToggle ? { "data-view-toggle": true } : {})}
+      className={`${CARD} group flex min-w-0 flex-col justify-between gap-3 p-3.5 text-left transition disabled:opacity-40 lg:p-4 ${
+        active ? `ring-2 ${tone.ring} ${tone.tint}` : "hover:bg-neutral-50 dark:hover:bg-white/[0.06]"
+      } ${className}`}
+    >
+      <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-100 dark:bg-white/[0.06] ${tone.text}`}>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
+          {icon}
+        </svg>
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-[15px] text-neutral-900 dark:text-white">{label}</span>
+        <span className="block truncate text-xs text-neutral-500">{hint}</span>
+      </span>
+    </button>
+  );
+}
+
+// Barve novih kartic se ne ponavljajo s statistiko (siva, oranžna, turkizna,
+// fuksija): Naključno vijolična, Delno limetina, Novo smaragdna, Popularno
+// rožnata, Filtri modra.
+const TONES = {
+  violet: { text: "text-violet-600 dark:text-violet-400", ring: "ring-violet-500/50", tint: "bg-violet-500/[0.06]" },
+  lime: { text: "text-lime-600 dark:text-lime-400", ring: "ring-lime-500/50", tint: "bg-lime-500/[0.06]" },
+  emerald: { text: "text-emerald-600 dark:text-emerald-400", ring: "ring-emerald-500/50", tint: "bg-emerald-500/[0.06]" },
+  rose: { text: "text-rose-600 dark:text-rose-400", ring: "ring-rose-500/50", tint: "bg-rose-500/[0.06]" },
+  blue: { text: "text-blue-600 dark:text-blue-400", ring: "ring-blue-500/50", tint: "bg-blue-500/[0.06]" },
+};
+
+function filterCountLabel(n: number) {
+  if (n === 1) return "1 aktiven";
+  if (n === 2) return "2 aktivna";
+  if (n < 5) return `${n} aktivni`;
+  return `${n} aktivnih`;
+}
+
+// Mreža kartic domače strani: zgoraj 4 statistične (enake širine), spodaj
+// dejanja različnih širin — računalnik 12 stolpcev (3·3·2·2·2), telefon 6
+// (Naključno + Delno po pol, Novo / Popularno / Filtri po tretjino).
+export function HomeBento({
+  showStats,
   total,
   verified,
   review,
@@ -86,7 +157,19 @@ export function HomeStats({
   onOpenVerified,
   onOpenReview,
   onOpenJam,
+  onRandom,
+  onPartial,
+  newestActive,
+  popularActive,
+  onToggleNewest,
+  onTogglePopular,
+  filtersOpen,
+  activeFilterCount,
+  onToggleFilters,
+  disabled,
+  className = "",
 }: {
+  showStats: boolean;
   total: number;
   verified: number;
   review: number;
@@ -94,13 +177,99 @@ export function HomeStats({
   onOpenVerified: () => void;
   onOpenReview: () => void;
   onOpenJam: () => void;
+  onRandom: () => void;
+  onPartial: () => void;
+  newestActive: boolean;
+  popularActive: boolean;
+  onToggleNewest: () => void;
+  onTogglePopular: () => void;
+  filtersOpen: boolean;
+  activeFilterCount: number;
+  onToggleFilters: () => void;
+  disabled?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <StatCard label="Vse skladbe" value={total} dot="bg-neutral-400" />
-      <StatCard label="Preverjeno špila" value={verified} suffix={`/${total}`} dot="bg-orange-400" onClick={onOpenVerified} />
-      <StatCard label="V pregledu" value={review} dot="bg-teal-400" onClick={onOpenReview} />
-      <StatCard label="V Skupnem Jamu" value={jamCount} dot="bg-fuchsia-400" pulse={jamCount > 0} onClick={onOpenJam} />
+    <div className={`grid grid-cols-6 gap-3 lg:grid-cols-12 ${className}`}>
+      {showStats && (
+        <>
+          <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" />
+          <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={`/${total}`} dot="bg-orange-400" onClick={onOpenVerified} />
+          <StatCard className="col-span-3" label="V pregledu" value={review} dot="bg-teal-400" onClick={onOpenReview} />
+          <StatCard className="col-span-3" label="V Skupnem Jamu" value={jamCount} dot="bg-fuchsia-400" pulse={jamCount > 0} onClick={onOpenJam} />
+        </>
+      )}
+      <ActionCard
+        className="col-span-3"
+        label="Naključno"
+        hint="ena skladba iz knjižnice"
+        tone={TONES.violet}
+        onClick={onRandom}
+        disabled={disabled}
+        icon={
+          <>
+            <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+            <path d="M16 8h.01" />
+            <path d="M8 8h.01" />
+            <path d="M8 16h.01" />
+            <path d="M16 16h.01" />
+            <path d="M12 12h.01" />
+          </>
+        }
+      />
+      <ActionCard
+        className="col-span-3"
+        label="Delno naključno"
+        hint="po žanru, avtorju, obdobju …"
+        tone={TONES.lime}
+        onClick={onPartial}
+        disabled={disabled}
+        icon={
+          <>
+            <path d="m18 14 4 4-4 4" />
+            <path d="m18 2 4 4-4 4" />
+            <path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" />
+            <path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" />
+            <path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" />
+          </>
+        }
+      />
+      <ActionCard
+        className="col-span-2"
+        label="Novo"
+        hint="zadnje dodane"
+        tone={TONES.emerald}
+        active={newestActive}
+        onClick={onToggleNewest}
+        disabled={disabled}
+        viewToggle
+        icon={
+          <>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3.5 2" />
+          </>
+        }
+      />
+      <ActionCard
+        className="col-span-2"
+        label="Popularno"
+        hint="največkrat odprte"
+        tone={TONES.rose}
+        active={popularActive}
+        onClick={onTogglePopular}
+        disabled={disabled}
+        viewToggle
+        icon={<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />}
+      />
+      <ActionCard
+        className="col-span-2"
+        label="Filtri"
+        hint={activeFilterCount ? filterCountLabel(activeFilterCount) : "žanr, obdobje …"}
+        tone={TONES.blue}
+        active={filtersOpen}
+        onClick={onToggleFilters}
+        icon={<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />}
+      />
     </div>
   );
 }

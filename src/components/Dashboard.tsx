@@ -8,7 +8,7 @@ import JamSettingsMenu from "@/components/JamSettingsMenu";
 import { fullNameFor, initialsOf } from "@/lib/userName";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { dedupeShared, importSharedSongs, songMatchKey } from "@/lib/importShared";
-import Filters, { FiltersToggle } from "@/components/Filters";
+import Filters from "@/components/Filters";
 import FeaturedArtists from "@/components/FeaturedArtists";
 import HomeHighlights, {
   ACCENTS,
@@ -27,7 +27,7 @@ import AddChoiceIcons from "@/components/AddChoiceIcons";
 import ChordsTextEditor from "@/components/ChordsTextEditor";
 import { ImportHistory, ImportReports } from "@/components/ImportTabs";
 import { FavoritesArchive, FavoritesThisMonth, VerifiedSongs, favoriteArchiveMonths } from "@/components/FavoritesMonth";
-import { HomeAside, HomeGreeting, HomeStats } from "@/components/HomeDashboard";
+import { HomeAside, HomeBento, HomeGreeting } from "@/components/HomeDashboard";
 import MainNav, { type MainNavTab } from "@/components/MainNav";
 import { authorAccentHex } from "@/lib/authorColor";
 import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
@@ -334,7 +334,7 @@ export default function Dashboard({ user }: { user: User }) {
   const [playlistsOpen, setPlaylistsOpen] = usePersistentBool("komadi:playlists:open", false);
   // Isti localStorage ključ kot FiltersToggle/Filters v Filters.tsx — da lahko
   // "Počisti filtre" (glej handleBackFromFilter) zapre tudi panel s filtri.
-  const [, setFiltersOpen] = usePersistentBool("komadi:filters:open", false);
+  const [filtersOpen, setFiltersOpen] = usePersistentBool("komadi:filters:open", false);
   // Vrstni red seznama "Vsi Komadi" (gumb "Filter" desno od naslova, glej
   // SortMenu.tsx). Zapomnjeno čez osvežitev.
   const [songSort, setSongSort] = usePersistentString(
@@ -2092,6 +2092,13 @@ export default function Dashboard({ user }: { user: User }) {
       window.scrollTo({ top: 0 });
     }
   }
+
+  // Kartice statistike in pozdrav: na domači strani brez filtrov (tudi med
+  // pogledom Novo/Popularno, da se mreža ne premika).
+  const showHomeStats =
+    isSupabaseConfigured && !loading && !loadError && !sharedOn && !authorFilter && !hasActiveFilters(filters);
+  const activeFilterCount =
+    filters.genres.length + filters.eras.length + filters.moods.length + filters.origins.length + (filters.favoriteOnly ? 1 : 0);
 
   // Domača stran (statistika, desni stolpec): odpre Skupni Jam.
   function openSharedJam() {
@@ -3951,139 +3958,42 @@ export default function Dashboard({ user }: { user: User }) {
             </div>
           )}
 
-          <div className="space-y-2.5 lg:flex lg:flex-wrap lg:items-center lg:gap-2 lg:space-y-0">
-            <div className="flex items-center gap-2 lg:contents">
-              {!isDesktop && renderSearchBox("relative min-w-0 flex-1")}
-            </div>
+          {!isDesktop && (
+            <div className="flex items-center gap-2">{renderSearchBox("relative min-w-0 flex-1")}</div>
+          )}
 
-            {/* Telefon: med iskanjem (polje v fokusu) se vrstica Naključno/Delno/Novo/Popularno/Filtri
-                pomakne gor in izgine, ob zaprtju iskanja se vrne. Na računalniku (lg:contents) brez učinka. */}
-            <div
-              className={`flex flex-nowrap items-center gap-2 overflow-x-auto transition-all duration-300 ease-out lg:contents ${
-                searchFocused ? "pointer-events-none mb-0! max-h-0 -translate-y-2 opacity-0 lg:pointer-events-auto" : "max-h-16 opacity-100"
-              }`}
-            >
-              <button
-                type="button"
-                onClick={pickRandom}
-                disabled={!isSupabaseConfigured}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-violet-500/40 bg-[linear-gradient(115deg,rgba(124,58,237,0.14)_15%,rgba(124,58,237,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(124,58,237,0.24)_15%,rgba(124,58,237,0.06)_95%)] disabled:opacity-40 dark:border-white/10 dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400"
-                >
-                  <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-                  <path d="M16 8h.01" />
-                  <path d="M8 8h.01" />
-                  <path d="M8 16h.01" />
-                  <path d="M16 16h.01" />
-                  <path d="M12 12h.01" />
-                </svg>
-                Naključno
-              </button>
-              <button
-                type="button"
-                onClick={handlePartialStart}
-                disabled={!isSupabaseConfigured}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-cyan-600/40 bg-[linear-gradient(115deg,rgba(8,145,178,0.14)_15%,rgba(8,145,178,0.03)_95%)] px-4 py-2 text-sm font-medium text-neutral-800 transition hover:bg-[linear-gradient(115deg,rgba(8,145,178,0.24)_15%,rgba(8,145,178,0.06)_95%)] disabled:opacity-40 dark:border-white/10 dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4 shrink-0 text-cyan-700 dark:text-cyan-400"
-                >
-                  <path d="m18 14 4 4-4 4" />
-                  <path d="m18 2 4 4-4 4" />
-                  <path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" />
-                  <path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" />
-                  <path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" />
-                </svg>
-                Delno naključno
-              </button>
-            </div>
-
-            <div
-              className={`flex flex-nowrap items-center gap-2 overflow-x-auto transition-all duration-300 ease-out lg:contents ${
-                searchFocused ? "pointer-events-none mb-0! max-h-0 -translate-y-2 opacity-0 lg:pointer-events-auto" : "max-h-16 opacity-100"
-              }`}
-            >
-              <button
-                type="button"
-                data-view-toggle
-                onClick={() =>
-                  setActiveView((v) => (v === "newest" ? "list" : "newest"))
-                }
-                disabled={!isSupabaseConfigured}
-                aria-pressed={activeView === "newest"}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/50 px-4 py-2 text-sm font-medium transition disabled:opacity-40 dark:border-white/10 ${
-                  activeView === "newest"
-                    ? "bg-[linear-gradient(115deg,#059669_15%,#34d399_100%)] text-white"
-                    : "bg-[linear-gradient(115deg,rgba(16,185,129,0.14)_15%,rgba(16,185,129,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(16,185,129,0.24)_15%,rgba(16,185,129,0.06)_95%)] dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
-                }`}
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={`h-4 w-4 shrink-0 ${
-                    activeView === "newest"
-                      ? "text-white"
-                      : "text-emerald-600 dark:text-emerald-400"
-                  }`}
-                >
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M12 7v5l3.5 2" />
-                </svg>
-                Novo
-              </button>
-              <button
-                type="button"
-                data-view-toggle
-                onClick={() =>
-                  setActiveView((v) => (v === "popular" ? "list" : "popular"))
-                }
-                disabled={!isSupabaseConfigured}
-                aria-pressed={activeView === "popular"}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-orange-500/50 px-4 py-2 text-sm font-medium transition disabled:opacity-40 dark:border-white/10 ${
-                  activeView === "popular"
-                    ? "bg-[linear-gradient(115deg,#ea580c_15%,#fb923c_100%)] text-white"
-                    : "bg-[linear-gradient(115deg,rgba(249,115,22,0.14)_15%,rgba(249,115,22,0.03)_95%)] text-neutral-800 hover:bg-[linear-gradient(115deg,rgba(249,115,22,0.24)_15%,rgba(249,115,22,0.06)_95%)] dark:text-neutral-200 dark:bg-none dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
-                }`}
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={`h-4 w-4 shrink-0 ${
-                    activeView === "popular" ? "text-white" : "text-orange-500"
-                  }`}
-                >
-                  <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
-                </svg>
-                Popularno
-              </button>
-              <FiltersToggle />
-            </div>
+          {/* Pozdrav + kartice: statistika (samo na domači strani brez filtrov) in
+              dejanja Naključno / Delno / Novo / Popularno / Filtri (vedno). Telefon:
+              med iskanjem se skrijejo, ob zaprtju iskanja se vrnejo. */}
+          <div
+            className={`transition-all duration-300 ease-out ${
+              searchFocused ? "pointer-events-none mb-0! max-h-0 -translate-y-2 overflow-hidden opacity-0 lg:pointer-events-auto lg:max-h-none lg:translate-y-0 lg:overflow-visible lg:opacity-100" : ""
+            }`}
+          >
+            {showHomeStats && <HomeGreeting firstName={fullNameFor(user).split(" ")[0] ?? ""} songCount={songs.length} />}
+            <HomeBento
+              showStats={showHomeStats}
+              total={songs.length}
+              verified={songs.filter((s) => s.verified_player_at).length}
+              review={reviewSongs.length}
+              jamCount={sharedJamItems.filter((x) => !x.played).length}
+              onOpenVerified={() => {
+                setActiveView("list");
+                setTimeout(() => document.getElementById("preverjeno-spila")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+              }}
+              onOpenReview={openReview}
+              onOpenJam={openSharedJam}
+              onRandom={pickRandom}
+              onPartial={handlePartialStart}
+              newestActive={activeView === "newest"}
+              popularActive={activeView === "popular"}
+              onToggleNewest={() => setActiveView((v) => (v === "newest" ? "list" : "newest"))}
+              onTogglePopular={() => setActiveView((v) => (v === "popular" ? "list" : "popular"))}
+              filtersOpen={filtersOpen}
+              activeFilterCount={activeFilterCount}
+              onToggleFilters={() => setFiltersOpen((v) => !v)}
+              disabled={!isSupabaseConfigured}
+            />
           </div>
 
           <Filters
@@ -4100,16 +4010,6 @@ export default function Dashboard({ user }: { user: User }) {
             !sharedOn &&
             !hasActiveFilters(filters) && (
               <div className={`mt-3! space-y-0 ${searchFocused ? "hidden lg:block" : ""}`}>
-                <HomeGreeting firstName={fullNameFor(user).split(" ")[0] ?? ""} songCount={songs.length} />
-                <HomeStats
-                  total={songs.length}
-                  verified={songs.filter((s) => s.verified_player_at).length}
-                  review={reviewSongs.length}
-                  jamCount={sharedJamItems.filter((x) => !x.played).length}
-                  onOpenVerified={() => document.getElementById("preverjeno-spila")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  onOpenReview={openReview}
-                  onOpenJam={openSharedJam}
-                />
                 {/* Računalnik: vsebina levo, desni stolpec (Skupni Jam, Za urediti, graf). */}
                 <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-6">
                 <div className="min-w-0">
