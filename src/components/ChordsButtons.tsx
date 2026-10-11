@@ -151,11 +151,11 @@ export default function ChordsButtons({
   // Izbira akordov (Sam Špili, Akordi v aplikaciji, UG, Zabrenkaj, druga stran,
   // PDF, Spletno iskanje) se odpre s klikom na kartico; v kartici ostane samo ♪.
   if (merged) {
-    const panelWidth = menuPos ? Math.max(220, Math.min(menuPos.width, 460)) : 220;
+    const panelWidth = menuPos ? Math.max(240, Math.min(menuPos.width, 480)) : 240;
     const panelLeft = menuPos
       ? Math.min(Math.max(8, menuAlign === "right" ? menuPos.left + menuPos.width - panelWidth : menuPos.left), window.innerWidth - panelWidth - 8)
       : 0;
-    const wide = panelWidth >= 300;
+    const wide = panelWidth >= 340;
     return (
       <span ref={rootRef} hidden>
 
@@ -180,7 +180,7 @@ export default function ChordsButtons({
                     openChordsViewer(song.id, "samspili");
                     onChordsClick?.(song);
                   }}
-                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
+                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
                 >
                   <svg
                     aria-hidden="true"
@@ -190,7 +190,7 @@ export default function ChordsButtons({
                     strokeWidth={1.8}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="h-[13px] w-[13px] shrink-0 text-orange-500"
+                    className="h-4 w-4 shrink-0 text-orange-500"
                   >
                     <circle cx="12" cy="12" r="10" />
                     <path d="M10 8.5v7l5.5-3.5z" />
@@ -206,7 +206,7 @@ export default function ChordsButtons({
                     openChordsViewer(song.id);
                     onChordsClick?.(song);
                   }}
-                  className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
+                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
                 >
                   <svg
                     aria-hidden="true"
@@ -216,7 +216,7 @@ export default function ChordsButtons({
                     strokeWidth={1.8}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="h-[13px] w-[13px] shrink-0 text-amber-500"
+                    className="h-4 w-4 shrink-0 text-amber-500"
                   >
                     <path d="M9 18V5l12-2v13" />
                     <circle cx="6" cy="18" r="3" />
@@ -234,7 +234,7 @@ export default function ChordsButtons({
                   setMenuOpen(false);
                   onChordsClick?.(song);
                 }}
-                className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
+                className="flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
               >
                 <svg
                   aria-hidden="true"
@@ -244,7 +244,7 @@ export default function ChordsButtons({
                   strokeWidth={1.8}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="h-[13px] w-[13px] shrink-0 text-orange-500"
+                  className="h-4 w-4 shrink-0 text-orange-500"
                 >
                   <path d="M18.1 6.9A8 8 0 1 0 20 12h-7" />
                 </svg>
@@ -260,9 +260,9 @@ export default function ChordsButtons({
                     setMenuOpen(false);
                     onChordsClick?.(song);
                   }}
-                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
+                  className="flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
                 >
-                  <GuitarIcon className="h-[13px] w-[13px] shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <GuitarIcon className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                   Zabrenkaj.si
                 </a>
               )}
@@ -276,9 +276,9 @@ export default function ChordsButtons({
                     onChordsClick?.(song);
                   }}
                   title={`Akordi na ${otherLabel}`}
-                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
+                  className="flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
                 >
-                  <SongbookIcon className="h-[13px] w-[13px] shrink-0 text-violet-600 dark:text-violet-400" />
+                  <SongbookIcon className="h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
                   <span className="truncate">{otherLabel}</span>
                 </a>
               )}
@@ -290,7 +290,7 @@ export default function ChordsButtons({
                   setPdfOpen(true);
                   onChordsClick?.(song);
                 }}
-                className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
+                className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
               >
                 <svg
                   aria-hidden="true"
@@ -300,7 +300,7 @@ export default function ChordsButtons({
                   strokeWidth={1.8}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="h-[13px] w-[13px] shrink-0 text-red-500"
+                  className="h-4 w-4 shrink-0 text-red-500"
                 >
                   <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
                   <path d="M14 2v4a2 2 0 0 0 2 2h4" />
