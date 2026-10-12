@@ -20,7 +20,7 @@ const PATTERN_KEY = "komadi:appPattern";
 const PATTERN_OPACITY_KEY = "komadi:appPatternOpacity";
 // Delci v ozadju (ozadja z `particles`): "0" = izklopljeni, privzeto vklopljeni.
 const PARTICLES_KEY = "komadi:appParticles";
-// Svetlost ozadja (drsnik pod "Ozadje"): BRIGHTNESS_MIN (−2 = −200 %) … +0,5, 0 = brez spremembe
+// Svetlost ozadja (drsnik pod "Ozadje"): BRIGHTNESS_MIN (−2 = −200 %) … BRIGHTNESS_MAX (+2 = +200 %), 0 = brez spremembe
 // (ThemeProvider: črna tančica pod 0, bela nad 0).
 const BRIGHTNESS_KEY = "komadi:appBrightness";
 
@@ -53,6 +53,11 @@ function isPhone() {
 }
 const PHONE_DEFAULT_BG = BACKGROUNDS.findIndex((b) => b.label === "Dim");
 export const BRIGHTNESS_MIN = -2;
+export const BRIGHTNESS_MAX = 2;
+// Prosojnost bele tančice za svetlost > 0: postopno (0,2 na 100 %), do 0,4 pri +200 %.
+export function lightVeilAlpha(b: number) {
+  return Math.min(0.4, b * 0.2);
+}
 export function defaultBrightness() {
   return isPhone() ? -0.5 : 0;
 }
@@ -91,7 +96,7 @@ function readPattern(): PatternId | null {
 function readBrightness(): number {
   try {
     const n = Number(localStorage.getItem(BRIGHTNESS_KEY) ?? defaultBrightness());
-    return Number.isFinite(n) ? Math.min(0.5, Math.max(BRIGHTNESS_MIN, n)) : 0;
+    return Number.isFinite(n) ? Math.min(BRIGHTNESS_MAX, Math.max(BRIGHTNESS_MIN, n)) : 0;
   } catch {
     return 0;
   }
@@ -205,7 +210,7 @@ export function useTheme() {
 
   const setBrightness = useCallback((next: number) => {
     try {
-      localStorage.setItem(BRIGHTNESS_KEY, String(Math.min(0.5, Math.max(BRIGHTNESS_MIN, next))));
+      localStorage.setItem(BRIGHTNESS_KEY, String(Math.min(BRIGHTNESS_MAX, Math.max(BRIGHTNESS_MIN, next))));
     } catch {
       // localStorage ni na voljo — izbira se ne bo ohranila
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { FretNotes, LIGHT_BACKGROUND_COLORS, PatternSvg, scaledBackgroundColors } from "@/lib/backgroundPatterns";
-import { darkVeilAlpha, useTheme } from "@/lib/useTheme";
+import { darkVeilAlpha, lightVeilAlpha, useTheme } from "@/lib/useTheme";
 import AmbientParticles from "@/components/AmbientParticles";
 import { BACKGROUNDS } from "@/lib/backgrounds";
 
@@ -20,7 +20,7 @@ export default function ThemeProvider() {
     brightness === 0 ? null : (
       <div
         className="absolute inset-0"
-        style={{ backgroundColor: brightness < 0 ? `rgba(0,0,0,${darkVeilAlpha(brightness)})` : `rgba(255,255,255,${brightness * 0.7})` }}
+        style={{ backgroundColor: brightness < 0 ? `rgba(0,0,0,${darkVeilAlpha(brightness)})` : `rgba(255,255,255,${lightVeilAlpha(brightness)})` }}
       />
     );
   // Ozadje s prelivom (Morska megla, Jutranji grafit, Polnočno modra): preliv in
