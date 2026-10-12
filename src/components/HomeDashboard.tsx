@@ -233,7 +233,7 @@ export function HomeBento({
       {showStats && (
         <>
           <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} decor={<TopoCorner hover="deco:text-neutral-400/40 dark:deco:text-neutral-400/40" />} />
-          <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={`/${total}`} dot="bg-orange-400" onClick={onOpenVerified} decor={<VerifiedCorner hover="deco:text-orange-400/40 dark:deco:text-orange-400/40" />} />
+          <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={verified <= total ? `/${total}` : undefined} dot="bg-orange-400" onClick={onOpenVerified} decor={<VerifiedCorner hover="deco:text-orange-400/40 dark:deco:text-orange-400/40" />} />
           <StatCard className="col-span-3" label="V pregledu" value={review} dot="bg-teal-400" onClick={onOpenReview} decor={<ChecklistCorner />} />
           <StatCard className="col-span-3" label="Playliste" value={playlistCount} dot="bg-yellow-400" onClick={onOpenPlaylists} decor={<PlaylistCorner />} />
         </>

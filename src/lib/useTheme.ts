@@ -20,7 +20,7 @@ const PATTERN_KEY = "komadi:appPattern";
 const PATTERN_OPACITY_KEY = "komadi:appPatternOpacity";
 // Delci v ozadju (ozadja z `particles`): "0" = izklopljeni, privzeto vklopljeni.
 const PARTICLES_KEY = "komadi:appParticles";
-// Svetlost ozadja (drsnik pod "Ozadje"): -0,5 … +0,5, 0 = brez spremembe
+// Svetlost ozadja (drsnik pod "Ozadje"): BRIGHTNESS_MIN (−2 = −200 %) … +0,5, 0 = brez spremembe
 // (ThemeProvider: črna tančica pod 0, bela nad 0).
 const BRIGHTNESS_KEY = "komadi:appBrightness";
 
@@ -46,14 +46,21 @@ function isDark(theme: Theme) {
 }
 
 // Privzete vrednosti na telefonu (dokler uporabnik nastavitve ne spremeni):
-// ozadje Dim (v temni temi), svetlost −35 %, vzorec Vrat kitare na 200 %.
+// ozadje Dim (v temni temi), svetlost −50 %, vzorec Vrat kitare na 200 %.
 // Računalnik: ozadje teme, 0 %, 100 %.
 function isPhone() {
   return typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
 }
 const PHONE_DEFAULT_BG = BACKGROUNDS.findIndex((b) => b.label === "Dim");
+export const BRIGHTNESS_MIN = -2;
 export function defaultBrightness() {
-  return isPhone() ? -0.35 : 0;
+  return isPhone() ? -0.5 : 0;
+}
+// Prosojnost črne tančice za svetlost < 0: do −50 % enako kot prej (−b), naprej
+// postopoma do 0,95 pri −200 % (ozadje skoraj črno, vsebina ostane berljiva).
+export function darkVeilAlpha(b: number) {
+  const d = -b;
+  return d <= 0.5 ? d : Math.min(0.95, 0.5 + ((d - 0.5) / 1.5) * 0.45);
 }
 export function defaultPatternOpacity() {
   return isPhone() ? 2 : 1;
@@ -84,7 +91,7 @@ function readPattern(): PatternId | null {
 function readBrightness(): number {
   try {
     const n = Number(localStorage.getItem(BRIGHTNESS_KEY) ?? defaultBrightness());
-    return Number.isFinite(n) ? Math.min(0.5, Math.max(-0.5, n)) : 0;
+    return Number.isFinite(n) ? Math.min(0.5, Math.max(BRIGHTNESS_MIN, n)) : 0;
   } catch {
     return 0;
   }
@@ -198,7 +205,7 @@ export function useTheme() {
 
   const setBrightness = useCallback((next: number) => {
     try {
-      localStorage.setItem(BRIGHTNESS_KEY, String(Math.min(0.5, Math.max(-0.5, next))));
+      localStorage.setItem(BRIGHTNESS_KEY, String(Math.min(0.5, Math.max(BRIGHTNESS_MIN, next))));
     } catch {
       // localStorage ni na voljo — izbira se ne bo ohranila
     }

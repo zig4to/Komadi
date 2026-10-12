@@ -8,6 +8,11 @@ export const ERAS = [
   "2020s",
 ] as const;
 
+// Ena skupna knjižnica (0038_shared_library.sql): vse skladbe so vrstice admina
+// (ziga.skater); vsi jih vidijo in urejajo, nove gredo vedno vanjo. Osebno ima
+// vsak samo priljubljene (song_favorites) in playliste.
+export const LIBRARY_OWNER_ID = "a14ed5f4-8ae8-497e-a4fc-0ad6c82f38c9";
+
 export const GENRES = [
   "Rock",
   "Hard rock",

@@ -33,7 +33,7 @@ import MainNav, { type MainNavTab } from "@/components/MainNav";
 import Tuner from "@/components/Tuner";
 import Scales from "@/components/Scales";
 import { authorAccentHex } from "@/lib/authorColor";
-import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
+import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES, LIBRARY_OWNER_ID } from "@/lib/constants";
 import { pickDailyFeatured } from "@/lib/dailyRandom";
 import {
   emptyFilters,
@@ -65,9 +65,8 @@ import type {
   SharedJamItem,
 } from "@/types/song";
 
-// Lastnik "kanonskih" preverjenih skladb (ziga.skater): njegova kopija ima v
-// Preverjeno špila prednost za vse uporabnike.
-const VERIFIED_CANON_USER_ID = "a14ed5f4-8ae8-497e-a4fc-0ad6c82f38c9";
+// Skupna knjižnica (0038): vrstice LIBRARY_OWNER_ID (admin) so knjižnica vseh.
+const VERIFIED_CANON_USER_ID = LIBRARY_OWNER_ID;
 
 const QUEUE_TABS = ["queue", "reports", "history"] as const;
 const SONGS_VISIBLE_VALUES = ["unset", "1", "0"] as const;
@@ -129,8 +128,28 @@ export default function Dashboard({ user }: { user: User }) {
   // s prijavo napake, 0037_shared_workshop.sql — vsi vidijo in urejajo isto kot
   // admin); `songs` (knjižnica, vsi ostali pogledi) samo moje, brez tistih, ki
   // še čakajo na "Pregled in odobritev". setSongs vedno dela na allSongs.
-  const [allSongs, setSongs] = useState<Song[]>([]);
-  const songs = useMemo(() => allSongs.filter((s) => !s.review_pending && s.user_id === user.id), [allSongs, user.id]);
+  const [rawSongs, setSongs] = useState<Song[]>([]);
+  // Osebne priljubljene (song_favorites, 0038): song_id → favorited_at. Stolpca
+  // songs.favorite/favorited_at se ne uporabljata več — favorite in favorited_at
+  // v allSongs sta prekrita s temi (vsak vidi svoje).
+  const [myFavorites, setMyFavorites] = useState<Map<string, string>>(new Map());
+  // Moj privat Jam (private_jam, 0039): song_id → { added_at, played }; prekrije
+  // songs.jam_added_at / jam_played (stolpca na skupni vrstici se ne uporabljata več).
+  const [myJam, setMyJam] = useState<Map<string, { added_at: string; played: boolean }>>(new Map());
+  const allSongs = useMemo(
+    () =>
+      rawSongs.map((s) => {
+        const at = myFavorites.get(s.id) ?? null;
+        const j = myJam.get(s.id);
+        const jamAt = j?.added_at ?? null;
+        const jamPlayed = j?.played ?? false;
+        return s.favorite === !!at && s.favorited_at === at && s.jam_added_at === jamAt && s.jam_played === jamPlayed
+          ? s
+          : { ...s, favorite: !!at, favorited_at: at, jam_added_at: jamAt, jam_played: jamPlayed };
+      }),
+    [rawSongs, myFavorites, myJam],
+  );
+  const songs = useMemo(() => allSongs.filter((s) => !s.review_pending && s.user_id === LIBRARY_OWNER_ID), [allSongs]);
   const reviewSongs = useMemo(
     () =>
       allSongs
@@ -306,14 +325,20 @@ export default function Dashboard({ user }: { user: User }) {
   const [ownerNames, setOwnerNames] = useState<Record<string, string>>({});
   useEffect(() => {
     let cancelled = false;
+    // Priljubljene drugih (song_favorites): skladba iz skupne knjižnice, user_id =
+    // oseba (za stolpce po osebah), favorited_at njen.
     supabase
-      .from("songs")
-      .select("*")
-      .eq("favorite", true)
-      .eq("review_pending", false)
+      .from("song_favorites")
+      .select("user_id, favorited_at, song:songs(*)")
       .neq("user_id", user.id)
       .then(({ data }) => {
-        if (!cancelled && data) setOthersFavorites(data as Song[]);
+        if (cancelled || !data) return;
+        const rows = data as unknown as { user_id: string; favorited_at: string; song: Song | null }[];
+        setOthersFavorites(
+          rows
+            .filter((r) => r.song && !r.song.review_pending)
+            .map((r) => ({ ...(r.song as Song), user_id: r.user_id, favorite: true, favorited_at: r.favorited_at })),
+        );
       });
     supabase.rpc("song_owner_names").then(({ data }) => {
       if (cancelled || !data) return;
@@ -331,12 +356,12 @@ export default function Dashboard({ user }: { user: User }) {
   // jih on nima preverjenih, ostanejo (ena kopija). Lastne pridejo iz songs (sproti).
   const verifiedSongs = useMemo(() => {
     const own = songs.filter((s) => s.verified_player_at);
-    const all = [...own, ...verifiedAll.filter((s) => s.user_id !== user.id)];
+    const all = [...own, ...verifiedAll.filter((s) => s.user_id !== LIBRARY_OWNER_ID)];
     const canon = all.filter((s) => s.user_id === VERIFIED_CANON_USER_ID);
     const canonKeys = new Set(canon.map((s) => songMatchKey(s)));
     const rest = dedupeShared(all.filter((s) => s.user_id !== VERIFIED_CANON_USER_ID && !canonKeys.has(songMatchKey(s))));
     return [...canon, ...rest];
-  }, [songs, verifiedAll, user.id]);
+  }, [songs, verifiedAll]);
   const [sharedJamError, setSharedJamError] = useState<string | null>(null);
   // "Mojih 20 skladb": osebni seznam za naučit do konca leta — isti vzorec
   // kot Jam (persist odprtost, iskalni izbirnik, "Skladbe ni" hitri vnos),
@@ -429,13 +454,13 @@ export default function Dashboard({ user }: { user: User }) {
       const { data, error } = await supabase
         .from("songs")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", LIBRARY_OWNER_ID)
         .order("created_at", { ascending: false });
       if (cancelled) return;
       if (error) {
         setLoadError(error.message);
       } else {
-        setSongs((prev) => [...(data as Song[]), ...prev.filter((x) => x.user_id !== user.id)]);
+        setSongs((prev) => [...(data as Song[]), ...prev.filter((x) => x.user_id !== LIBRARY_OWNER_ID)]);
       }
       setLoading(false);
     })();
@@ -456,15 +481,86 @@ export default function Dashboard({ user }: { user: User }) {
       const { data, error } = await supabase
         .from("songs")
         .select("*")
-        .neq("user_id", user.id)
+        .neq("user_id", LIBRARY_OWNER_ID)
         .or(ids.length ? `review_pending.eq.true,id.in.(${ids.join(",")})` : "review_pending.eq.true");
       if (cancelled || error || !data) return;
-      setSongs((prev) => [...prev.filter((x) => x.user_id === user.id), ...(data as Song[])]);
+      setSongs((prev) => [...prev.filter((x) => x.user_id === LIBRARY_OWNER_ID), ...(data as Song[])]);
     })();
     return () => {
       cancelled = true;
     };
   }, [user.id, reportedIdsKey, reviewOpen, fixOpen]);
+
+  // Moje priljubljene (song_favorites): ob zagonu in sproti (druge naprave).
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+    supabase
+      .from("song_favorites")
+      .select("song_id, favorited_at")
+      .eq("user_id", user.id)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        setMyFavorites(new Map((data as { song_id: string; favorited_at: string }[]).map((r) => [r.song_id, r.favorited_at])));
+      });
+    const channel = supabase
+      .channel(`favorites-${user.id}`)
+      .on<{ song_id: string; favorited_at: string; user_id: string }>(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "song_favorites", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          setMyFavorites((m) => {
+            const n = new Map(m);
+            if (payload.eventType === "DELETE") {
+              const id = (payload.old as { song_id?: string }).song_id;
+              if (id) n.delete(id);
+            } else n.set(payload.new.song_id, payload.new.favorited_at);
+            return n;
+          });
+        },
+      )
+      .subscribe();
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [user.id]);
+
+  // Moj privat Jam (private_jam): ob zagonu in sproti (druge naprave).
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+    type Row = { song_id: string; added_at: string; played: boolean };
+    supabase
+      .from("private_jam")
+      .select("song_id, added_at, played")
+      .eq("user_id", user.id)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        setMyJam(new Map((data as Row[]).map((r) => [r.song_id, { added_at: r.added_at, played: r.played }])));
+      });
+    const channel = supabase
+      .channel(`private-jam-${user.id}`)
+      .on<Row & { user_id: string }>(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "private_jam", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          setMyJam((m) => {
+            const n = new Map(m);
+            if (payload.eventType === "DELETE") {
+              const id = (payload.old as { song_id?: string }).song_id;
+              if (id) n.delete(id);
+            } else n.set(payload.new.song_id, { added_at: payload.new.added_at, played: payload.new.played });
+            return n;
+          });
+        },
+      )
+      .subscribe();
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [user.id]);
 
   useEffect(() => {
     if (!sharedOn || sharedSongs) return;
@@ -595,7 +691,7 @@ export default function Dashboard({ user }: { user: User }) {
       .on<Song>(
         "postgres_changes",
         // Samo lastne skladbe — RLS bi sicer pošiljal spremembe vseh uporabnikov.
-        { event: "*", schema: "public", table: "songs", filter: `user_id=eq.${user.id}` },
+        { event: "*", schema: "public", table: "songs", filter: `user_id=eq.${LIBRARY_OWNER_ID}` },
         (payload) => {
           if (payload.eventType === "INSERT") {
             const song = payload.new;
@@ -834,12 +930,12 @@ export default function Dashboard({ user }: { user: User }) {
   const myLibraryKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const s of allSongs) {
-      if (s.user_id !== user.id) continue;
+      if (s.user_id !== LIBRARY_OWNER_ID) continue;
       keys.add(songMatchKey(s));
       if (s.imported_from) keys.add(s.imported_from);
     }
     return keys;
-  }, [allSongs, user.id]);
+  }, [allSongs]);
   const inMyLibrary = (s: Song) => myLibraryKeys.has(s.id) || myLibraryKeys.has(songMatchKey(s));
 
   function closeShared() {
@@ -1040,6 +1136,7 @@ export default function Dashboard({ user }: { user: User }) {
   );
 
   function handleSaved(saved: Song, mode: "insert" | "update") {
+    if (saved.favorite !== myFavorites.has(saved.id)) void setFavorite(saved.id, saved.favorite);
     if (mode === "insert") {
       setSongs((prev) => [saved, ...prev]);
       // Dodano iz čakalne vrste — vnos je obdelan, odstrani ga.
@@ -1413,36 +1510,55 @@ export default function Dashboard({ user }: { user: User }) {
 
   // "Priljubljena" v meniju kartice (SongCard.tsx) — preklopi song.favorite
   // takoj lokalno, nato v bazi; ob napaki vrne prejšnjo vrednost.
-  async function handleToggleFavorite(song: Song) {
-    // favorited_at določa mesec v "Priljubljeno ta mesec" / arhivu.
-    const next = { favorite: !song.favorite, favorited_at: song.favorite ? null : new Date().toISOString() };
-    const prev = { favorite: song.favorite, favorited_at: song.favorited_at };
-    const apply = (value: typeof next) => {
-      setSongs((list) => list.map((x) => (x.id === song.id ? { ...x, ...value } : x)));
-      setRandomPick((p) => (p?.id === song.id ? { ...p, ...value } : p));
-      setRandomFive((list) => list?.map((x) => (x.id === song.id ? { ...x, ...value } : x)) ?? null);
+  // Priljubljena je osebna (song_favorites); favorited_at določa mesec v
+  // "Priljubljeno ta mesec" / arhivu.
+  async function setFavorite(songId: string, on: boolean) {
+    const at = new Date().toISOString();
+    const prevAt = myFavorites.get(songId);
+    const apply = (value: string | undefined) => {
+      setMyFavorites((m) => {
+        const n = new Map(m);
+        if (value) n.set(songId, value);
+        else n.delete(songId);
+        return n;
+      });
+      const patch = { favorite: !!value, favorited_at: value ?? null };
+      setRandomPick((p) => (p?.id === songId ? { ...p, ...patch } : p));
+      setRandomFive((list) => list?.map((x) => (x.id === songId ? { ...x, ...patch } : x)) ?? null);
     };
-    apply(next);
-    const { error } = await supabase.from("songs").update(next).eq("id", song.id);
+    apply(on ? (prevAt ?? at) : undefined);
+    const { error } = on
+      ? await supabase.from("song_favorites").upsert({ user_id: user.id, song_id: songId, favorited_at: prevAt ?? at })
+      : await supabase.from("song_favorites").delete().eq("user_id", user.id).eq("song_id", songId);
     if (error) {
-      apply(prev);
+      apply(prevAt);
       alert("Napaka pri shranjevanju priljubljene: " + error.message);
     }
   }
+  async function handleToggleFavorite(song: Song) {
+    await setFavorite(song.id, !myFavorites.has(song.id));
+  }
 
+  // Privat Jam je oseben (private_jam); ob napaki se vrne prejšnje stanje.
+  function patchMyJam(songId: string, value: { added_at: string; played: boolean } | undefined) {
+    setMyJam((m) => {
+      const n = new Map(m);
+      if (value) n.set(songId, value);
+      else n.delete(songId);
+      return n;
+    });
+  }
   async function handleAddToJam(song: Song) {
     const jamAddedAt = new Date().toISOString();
-    setSongs((s) =>
-      s.map((x) =>
-        x.id === song.id
-          ? { ...x, jam_added_at: jamAddedAt, jam_played: false }
-          : x,
-      ),
-    );
-    await supabase
-      .from("songs")
-      .update({ jam_added_at: jamAddedAt, jam_played: false })
-      .eq("id", song.id);
+    const prev = myJam.get(song.id);
+    patchMyJam(song.id, { added_at: jamAddedAt, played: false });
+    const { error } = await supabase
+      .from("private_jam")
+      .upsert({ user_id: user.id, song_id: song.id, added_at: jamAddedAt, played: false });
+    if (error) {
+      patchMyJam(song.id, prev);
+      return;
+    }
     recordJamHistory({ song_id: song.id, title: song.title, author: song.author, added_at: jamAddedAt });
   }
 
@@ -1469,26 +1585,22 @@ export default function Dashboard({ user }: { user: User }) {
   }
 
   async function handleToggleJamPlayed(song: Song) {
-    const nextPlayed = !song.jam_played;
-    setSongs((s) =>
-      s.map((x) => (x.id === song.id ? { ...x, jam_played: nextPlayed } : x)),
-    );
-    await supabase
-      .from("songs")
-      .update({ jam_played: nextPlayed })
-      .eq("id", song.id);
+    const prev = myJam.get(song.id);
+    if (!prev) return;
+    patchMyJam(song.id, { ...prev, played: !prev.played });
+    const { error } = await supabase
+      .from("private_jam")
+      .update({ played: !prev.played })
+      .eq("user_id", user.id)
+      .eq("song_id", song.id);
+    if (error) patchMyJam(song.id, prev);
   }
 
   async function handleRemoveFromJam(song: Song) {
-    setSongs((s) =>
-      s.map((x) =>
-        x.id === song.id ? { ...x, jam_added_at: null, jam_played: false } : x,
-      ),
-    );
-    await supabase
-      .from("songs")
-      .update({ jam_added_at: null, jam_played: false })
-      .eq("id", song.id);
+    const prev = myJam.get(song.id);
+    patchMyJam(song.id, undefined);
+    const { error } = await supabase.from("private_jam").delete().eq("user_id", user.id).eq("song_id", song.id);
+    if (error) patchMyJam(song.id, prev);
   }
 
   // "Skladbe ni" — hiter vnos naslova/avtorja, ki gre samo v Jam (ločena
@@ -1894,18 +2006,25 @@ export default function Dashboard({ user }: { user: User }) {
       delta,
     );
     if (!changes.length) return;
-    const prevSongs = allSongs;
+    const prevJam = myJam;
     const prevExtras = jamExtras;
     const songTimes = new Map(changes.filter((c) => c.key.startsWith("song:")).map((c) => [c.key.slice(5), c.addedAt]));
     const extraTimes = new Map(changes.filter((c) => c.key.startsWith("extra:")).map((c) => [c.key.slice(6), c.addedAt]));
-    setSongs((prev) => prev.map((s) => (songTimes.has(s.id) ? { ...s, jam_added_at: songTimes.get(s.id)! } : s)));
+    setMyJam((m) => {
+      const n = new Map(m);
+      for (const [id, t] of songTimes) {
+        const cur = n.get(id);
+        if (cur) n.set(id, { ...cur, added_at: t });
+      }
+      return n;
+    });
     setJamExtras((prev) => prev.map((x) => (extraTimes.has(x.id) ? { ...x, added_at: extraTimes.get(x.id)! } : x)));
     const results = await Promise.all([
-      ...[...songTimes].map(([id, t]) => supabase.from("songs").update({ jam_added_at: t }).eq("id", id)),
+      ...[...songTimes].map(([id, t]) => supabase.from("private_jam").update({ added_at: t }).eq("user_id", user.id).eq("song_id", id)),
       ...[...extraTimes].map(([id, t]) => supabase.from("jam_extras").update({ added_at: t }).eq("id", id)),
     ]);
     if (results.some((r) => r.error)) {
-      setSongs(prevSongs);
+      setMyJam(prevJam);
       setJamExtras(prevExtras);
     }
   }
@@ -2928,7 +3047,8 @@ export default function Dashboard({ user }: { user: User }) {
                     window.scrollTo({ top: 0 });
                   }}
                   favArchiveMonthCount={favoriteArchiveMonths(songs).length}
-                  onOpenShared={() => handleMainNav("shared")}
+                  // "Skupno" skrit: ena skupna knjižnica za vse (0038).
+                  onOpenShared={undefined}
                   sharedOn={sharedOn}
                 />
               </div>
@@ -3065,7 +3185,7 @@ export default function Dashboard({ user }: { user: User }) {
                 onReorderDone={() => setJamReorder(false)}
                 // Popularnost (copy_count) samo za lastne skladbe.
                 onChordsClick={(song) => {
-                  if (song.user_id === user.id) handleChordsClick(song);
+                  if (song.user_id === LIBRARY_OWNER_ID) handleChordsClick(song);
                 }}
                 showAddedBy
               />
@@ -3368,10 +3488,10 @@ export default function Dashboard({ user }: { user: User }) {
           <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
           {(() => {
             const byDate = (a: Song, b: Song) => (b.verified_player_at ?? "").localeCompare(a.verified_player_at ?? "");
-            const mine = verifiedSongs.filter((x) => x.user_id === user.id).sort(byDate);
-            const others = verifiedSongs.filter((x) => x.user_id !== user.id).sort(byDate);
+            const mine = verifiedSongs.filter((x) => x.user_id === LIBRARY_OWNER_ID).sort(byDate);
+            const others = verifiedSongs.filter((x) => x.user_id !== LIBRARY_OWNER_ID).sort(byDate);
             const groups = [
-              { title: "Moje skladbe", list: mine, own: true },
+              { title: "Skladbe", list: mine, own: true },
               { title: "Skladbe drugih", list: others, own: false },
             ];
             return groups.map((g) =>
@@ -3410,21 +3530,7 @@ export default function Dashboard({ user }: { user: User }) {
                               />
                               {renderEditForm(song)}
                             </>
-                          ) : (
-                            <SongCard
-                              hideVerifiedBadges
-                              song={song}
-                              authorImage={authorImages[song.author] ?? null}
-                              onFilterAuthor={(author) => {
-                                setVerifiedOpen(false);
-                                setAllSongsOpen(false);
-                                handleFilterByAuthor(author);
-                              }}
-                              onEdit={() => {}}
-                              onImport={(x) => handleImportShared([x])}
-                              inLibrary={inMyLibrary(song)}
-                            />
-                          )}
+                          ) : null}
                         </div>
                       ))}
                     </div>
@@ -4420,7 +4526,8 @@ export default function Dashboard({ user }: { user: User }) {
             <HomeBento
               showStats={showHomeStats}
               total={songs.length}
-              verified={songs.filter((s) => s.verified_player_at).length}
+              // Isti (skupni) seznam kot Preverjeno špila — ne samo lastne skladbe.
+              verified={verifiedSongs.length}
               review={reviewSongs.length}
               playlistCount={playlistCount}
               onOpenVerified={openVerified}
@@ -4473,7 +4580,7 @@ export default function Dashboard({ user }: { user: User }) {
                 />
                 <VerifiedSongs
                   songs={verifiedSongs}
-                  isOwn={(s) => s.user_id === user.id}
+                  isOwn={() => true}
                   authorImages={authorImages}
                   onFilterAuthor={handleFilterByAuthor}
                   onChordsClick={handleChordsClick}
@@ -4508,7 +4615,7 @@ export default function Dashboard({ user }: { user: User }) {
                   jamItems={sharedJamItems}
                   reviewCount={reviewSongs.length}
                   reportCount={reportedSongIds.size}
-                  songs={songs}
+                  songs={verifiedSongs}
                   onOpenJam={openSharedJam}
                   onOpenReview={openReview}
                   onOpenFix={() => openFix()}
@@ -4908,7 +5015,7 @@ export default function Dashboard({ user }: { user: User }) {
             inFix={reportedSongIds.has(chordsSong.id)}
             onOpenEditor={
               // Lastne skladbe in skladbe skupne delavnice (v pregledu ali s prijavo).
-              chordsSong.user_id === user.id || chordsSong.review_pending || reportedSongIds.has(chordsSong.id)
+              chordsSong.user_id === LIBRARY_OWNER_ID || chordsSong.review_pending || reportedSongIds.has(chordsSong.id)
                 ? () => {
                     setEditorFromViewer(true);
                     setChordsEditSong(chordsSong);

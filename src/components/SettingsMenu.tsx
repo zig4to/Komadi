@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { BACKGROUNDS, BACKGROUND_ORDER } from "@/lib/backgrounds";
 import { PATTERNS, PATTERN_OPACITY_MAX, PatternSvg, type PatternId } from "@/lib/backgroundPatterns";
-import { defaultBrightness, defaultPatternOpacity, useTheme, type Theme } from "@/lib/useTheme";
+import { BRIGHTNESS_MIN, defaultBrightness, defaultPatternOpacity, useTheme, type Theme } from "@/lib/useTheme";
 import type { QueuedSong, Song, SongReport } from "@/types/song";
 
 // Oddelek menija ⋮: rahlo obarvano ozadje in barvni naslov (Delavnica,
@@ -458,7 +458,7 @@ export default function SettingsMenu({
                     <input
                       id="app-brightness"
                       type="range"
-                      min={-0.5}
+                      min={BRIGHTNESS_MIN}
                       max={0.5}
                       step={0.05}
                       value={brightness}

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { compressImage } from "@/lib/compressImage";
-import { ERAS, GENRES } from "@/lib/constants";
+import { ERAS, GENRES, LIBRARY_OWNER_ID } from "@/lib/constants";
 import { supabase } from "@/lib/supabaseClient";
 import type { NewSong, Song } from "@/types/song";
 
@@ -183,7 +183,7 @@ export default function SongForm({
 
     const { data, error: dbError } = initial
       ? await supabase.from("songs").update(payload).eq("id", initial.id).select().single()
-      : await supabase.from("songs").insert(payload).select().single();
+      : await supabase.from("songs").insert({ ...payload, user_id: LIBRARY_OWNER_ID }).select().single();
 
     setSaving(false);
 
