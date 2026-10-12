@@ -45,11 +45,25 @@ function isDark(theme: Theme) {
   return theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 }
 
+// Privzete vrednosti na telefonu (dokler uporabnik nastavitve ne spremeni):
+// ozadje Dim (v temni temi), svetlost −35 %, vzorec Vrat kitare na 200 %.
+// Računalnik: ozadje teme, 0 %, 100 %.
+function isPhone() {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
+}
+const PHONE_DEFAULT_BG = BACKGROUNDS.findIndex((b) => b.label === "Dim");
+export function defaultBrightness() {
+  return isPhone() ? -0.35 : 0;
+}
+export function defaultPatternOpacity() {
+  return isPhone() ? 2 : 1;
+}
+
 function readAppBg(): number | null {
   try {
     const v = localStorage.getItem(BG_KEY);
     if (v === "none") return null;
-    if (v === null) return null;
+    if (v === null) return isPhone() && PHONE_DEFAULT_BG >= 0 && isDark(readTheme()) ? PHONE_DEFAULT_BG : null;
     const n = Number(v);
     return Number.isInteger(n) && BACKGROUNDS[n] ? n : null;
   } catch {
@@ -69,7 +83,7 @@ function readPattern(): PatternId | null {
 
 function readBrightness(): number {
   try {
-    const n = Number(localStorage.getItem(BRIGHTNESS_KEY) ?? 0);
+    const n = Number(localStorage.getItem(BRIGHTNESS_KEY) ?? defaultBrightness());
     return Number.isFinite(n) ? Math.min(0.5, Math.max(-0.5, n)) : 0;
   } catch {
     return 0;
@@ -87,10 +101,10 @@ function readParticles(): boolean {
 function readPatternOpacity(): number {
   try {
     const v = localStorage.getItem(PATTERN_OPACITY_KEY);
-    const n = v === null ? 1 : Number(v);
-    return Number.isFinite(n) ? Math.min(PATTERN_OPACITY_MAX, Math.max(0, n)) : 1;
+    const n = v === null ? defaultPatternOpacity() : Number(v);
+    return Number.isFinite(n) ? Math.min(PATTERN_OPACITY_MAX, Math.max(0, n)) : defaultPatternOpacity();
   } catch {
-    return 1;
+    return defaultPatternOpacity();
   }
 }
 

@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { BACKGROUNDS, BACKGROUND_ORDER } from "@/lib/backgrounds";
 import { PATTERNS, PATTERN_OPACITY_MAX, PatternSvg, type PatternId } from "@/lib/backgroundPatterns";
-import { useTheme, type Theme } from "@/lib/useTheme";
+import { defaultBrightness, defaultPatternOpacity, useTheme, type Theme } from "@/lib/useTheme";
 import type { QueuedSong, Song, SongReport } from "@/types/song";
 
 // Oddelek menija ⋮: rahlo obarvano ozadje in barvni naslov (Delavnica,
@@ -466,10 +466,10 @@ export default function SettingsMenu({
                       className="h-1.5 min-w-0 flex-1 cursor-pointer accent-emerald-500"
                     />
                     <span aria-hidden="true" className="text-[10px] text-neutral-500">Svetleje</span>
-                    {brightness !== 0 && (
+                    {brightness !== defaultBrightness() && (
                       <button
                         type="button"
-                        onClick={() => setBrightness(0)}
+                        onClick={() => setBrightness(defaultBrightness())}
                         className="shrink-0 rounded-full border border-neutral-300 px-2 py-0.5 text-[10px] text-neutral-600 hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:text-neutral-300 dark:hover:text-emerald-400"
                       >
                         0
@@ -542,10 +542,10 @@ export default function SettingsMenu({
                       onChange={(e) => setPatternOpacity(Number(e.target.value))}
                       className="h-1.5 min-w-0 flex-1 cursor-pointer accent-emerald-500 disabled:cursor-default disabled:opacity-40"
                     />
-                    {patternOpacity !== 1 && (
+                    {patternOpacity !== defaultPatternOpacity() && (
                       <button
                         type="button"
-                        onClick={() => setPatternOpacity(1)}
+                        onClick={() => setPatternOpacity(defaultPatternOpacity())}
                         className="shrink-0 rounded-full border border-neutral-300 px-2 py-0.5 text-[10px] text-neutral-600 hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:text-neutral-300 dark:hover:text-emerald-400"
                       >
                         Privzeto

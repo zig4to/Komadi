@@ -6,17 +6,8 @@ import { createPortal } from "react-dom";
 import JamTargetMenu from "@/components/JamTargetMenu";
 import ListenButton from "@/components/ListenButton";
 import PdfViewer from "@/components/PdfViewer";
-import { enterLandscapeFullscreen, openChordsViewer } from "@/lib/openChords";
+import { enterLandscapeFullscreen, hasSamSpili, openChordsViewer } from "@/lib/openChords";
 
-// "Sam Špili" (celozaslonski pogled s 3 vrsticami, ChordsViewer samSpili):
-// skladbe v Pregledu in odobritvi (da se tam preveri, ali dela in lepo
-// izgleda) in skladbe s preverjenim predvajalnikom — "Odobri" zahteva
-// preverjen predvajalnik, zato ga vsaka skladba, ki gre skozi pregled,
-// obdrži tudi po odobritvi. Plus prvotne testne skladbe.
-const SAM_SPILI_TEST_TITLES = ["ti si mi u krvi", "water witch", "happy xmas (war is over)"];
-const hasSamSpili = (song: Song) =>
-  !!song.chords_text &&
-  (song.review_pending || !!song.verified_player_at || SAM_SPILI_TEST_TITLES.includes(song.title.trim().toLowerCase()));
 import type { Song } from "@/types/song";
 
 // Kliki na te elemente v kartici ne odprejo izbire akordov (imajo svojo akcijo).

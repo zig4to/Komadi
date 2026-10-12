@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import AutoScrollControl from "@/components/AutoScrollControl";
 import ChordDiagram from "@/components/ChordDiagram";
 import YouTubeMiniPlayer, { youTubeVideoId, type PlayerController } from "@/components/YouTubeMiniPlayer";
-import { enterLandscapeFullscreen, canBrowserFullscreen, isAppFullscreen } from "@/lib/openChords";
+import { enterLandscapeFullscreen, canBrowserFullscreen, hasSamSpili, isAppFullscreen, openChordsViewer } from "@/lib/openChords";
 import {
   applyEditedText,
   findCapo,
@@ -2378,8 +2378,9 @@ export default function ChordsViewer({
   }, [isFollower, song.id, setFollowAnchor]);
   // Velikost pisave (enkrat za skladbo in ob spremembi velikosti zaslona):
   // najdaljša vrstica zapolni širino (do črte), po višini pa gredo ~3 vrstice. Merjeno
-  // pri 20 px in linearno povečano; nastavljeno neposredno na element. Nobena
-  // vrstica se ne prelomi.
+  // pri 20 px in linearno povečano; nastavljeno neposredno na element. Pri 100 % se
+  // nobena vrstica ne prelomi; ko jo povečava (− / + ali pinch) potisne čez desni
+  // rob, blok dobi širino okvirja in akordi z besedilom se prelomijo v novo vrstico.
   useEffect(() => {
     const box = ssBoxRef.current;
     const inner = ssLinesRef.current;
@@ -2390,6 +2391,7 @@ export default function ChordsViewer({
       const cs = getComputedStyle(box);
       const availW = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
       const availH = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      inner.style.width = "";
       inner.style.fontSize = "20px";
       const w = inner.scrollWidth;
       const rows = [...inner.querySelectorAll<HTMLElement>("[data-ss-line]")];
@@ -2404,14 +2406,18 @@ export default function ChordsViewer({
         size -= 1;
         inner.style.fontSize = `${size}px`;
       }
-      // Ročni popravek (gumba − / +): nad 100 % lahko najdaljša vrstica gleda čez.
+      // Ročni popravek (gumba − / +, pinch): kar bi gledalo čez desni rob, se prelomi.
       if (ssScale !== 1) inner.style.fontSize = `${Math.round(size * ssScale)}px`;
+      // Ležeče: ob povečavi se prelomi malo prej (7 % pred desnim robom), da besedilo
+      // ne sega čisto do gumbov ob robu.
+      const wrapW = ssScale > 1 && !portrait ? Math.floor(availW * 0.93) : availW;
+      if (inner.scrollWidth > wrapW) inner.style.width = `${wrapW}px`;
     };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(box);
     return () => ro.disconnect();
-  }, [samSpili, ssLines, ssShowLines, ssScale]);
+  }, [samSpili, ssLines, ssShowLines, ssScale, portrait]);
   // Zanka pomikanja: cilj = trenutna vrstica v 2. vrstici + napredek proti
   // naslednji. Vsako sličico: čas posnetka interpoliran od zadnjega onTime,
   // vrstica/napredek izračunana sproti, premik s transform (podpiksli, brez
@@ -3489,6 +3495,26 @@ export default function ChordsViewer({
       <div ref={setSliderHost} className="flex shrink-0 items-center px-4 pb-2 empty:hidden lg:hidden" />
 
       <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 max-lg:border-white/10 max-lg:bg-transparent lg:px-16">
+        {/* Neposredno v Sam Špili (iste skladbe kot v meniju Akordi, ne med snemanjem
+            in ne za sledilca). Celozaslonsko + ležeče v istem kliku, kot iz menija. */}
+        {hasSamSpili(song) && !recorder && !follower && (
+          <button
+            type="button"
+            onClick={() => {
+              closeThemeMenu();
+              enterLandscapeFullscreen();
+              openChordsViewer(song.id, "samspili");
+            }}
+            title="Sam Špili"
+            className="flex items-center gap-1.5 rounded-full border border-orange-400 py-1 pl-2 pr-2.5 text-xs font-medium text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-orange-400">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M10 8.5v7l5.5-3.5z" />
+            </svg>
+            Sam Špili
+          </button>
+        )}
         <div
           className="flex items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5"
           role="group"
