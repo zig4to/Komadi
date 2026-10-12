@@ -1516,6 +1516,16 @@ export default function ChordsViewer({
   const [ssHlLine, setSsHlLine] = useState(-1);
   // "Sam Špili": drsnik čez celo skladbo (spodaj), odpre ga gumb v stolpcu.
   const [ssSeekOpen, setSsSeekOpen] = useState(false);
+  // Oznake delov na drsniku "Prevrtavanje" (Sam Špili): širina drsnika za
+  // razporeditev napisov v dve vrsti (nad / pod drsnikom), kot v YouTubeMiniPlayer.
+  const [ssTrackEl, setSsTrackEl] = useState<HTMLDivElement | null>(null);
+  const [ssTrackW, setSsTrackW] = useState(0);
+  useEffect(() => {
+    if (!ssTrackEl) return;
+    const ro = new ResizeObserver(() => setSsTrackW(ssTrackEl.clientWidth));
+    ro.observe(ssTrackEl);
+    return () => ro.disconnect();
+  }, [ssTrackEl]);
   const [ssTime, setSsTime] = useState(0);
   // Sledilec (Skupni Jam) vidi vrstice, ko vodja v Sam Špili že igra.
   const ssShowLines = samSpili && (follower ? !!remote?.ss : ssHasPlayed);
@@ -3083,6 +3093,25 @@ export default function ChordsViewer({
   const toneButton =
     "flex h-7 min-w-7 items-center justify-center rounded-full text-sm font-medium text-neutral-200 hover:bg-neutral-800 hover:text-white disabled:opacity-40 active:scale-95";
 
+  // Oznake delov na drsniku "Prevrtavanje": napis v vrsti nad drsnikom, pri gneči
+  // pod njim, sicer samo črtica (row −1). ~5,2 px na znak pri 9 px pisavi.
+  const ssMarkerItems: { t: number; label: string; short: string; left: number; row: number }[] = [];
+  if (videoDuration > 0 && ssTrackW > 0) {
+    const lastEnd = [-Infinity, -Infinity];
+    for (const m of sectionMarkers) {
+      if (m.t >= videoDuration) continue;
+      const x = (m.t / videoDuration) * ssTrackW;
+      const short = m.label.replace(/^Interlude/i, "Inter.").replace(/^Pre-?Chorus/i, "Pre-Ch.").replace(/^Instrumental/i, "Instr.");
+      const row = x >= lastEnd[0] ? 0 : x >= lastEnd[1] ? 1 : -1;
+      if (row >= 0) lastEnd[row] = x + short.length * 5.2 + 6;
+      ssMarkerItems.push({ ...m, short, left: (m.t / videoDuration) * 100, row });
+    }
+  }
+  const ssSeekToTime = (t: number) => {
+    setSsTime(t);
+    if (playerCtlRef.current?.seekAndPlay(t)) setSsActive(true);
+  };
+
   return createPortal(
     <div ref={setRoot} data-view-portal onClick={(e) => e.stopPropagation()} style={rootStyle} className="fixed inset-0 z-50 isolate flex flex-col overflow-hidden bg-(--cv-bg) pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
       {theme.pattern && (
@@ -4373,21 +4402,44 @@ export default function ChordsViewer({
                   }}
                 >
                   <span className="shrink-0 text-sm tabular-nums opacity-70">{fmtClock(ssTime)}</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={Math.max(1, Math.floor(videoDuration))}
-                    step={1}
-                    value={Math.min(Math.floor(ssTime), Math.floor(videoDuration))}
-                    onChange={(e) => {
-                      const t = Number(e.target.value);
-                      setSsTime(t);
-                      if (playerCtlRef.current?.seekAndPlay(t)) setSsActive(true);
-                    }}
-                    disabled={!videoDuration}
-                    aria-label="Položaj v skladbi"
-                    className="h-2 min-w-0 flex-1 cursor-pointer accent-orange-400 disabled:opacity-40"
-                  />
+                  {/* Drsnik z majhnimi oznakami delov (Intro, Verse 1, Chorus …): napis nad
+                      drsnikom, pri gneči pod njim, sicer samo črtica; dotik skoči na del. */}
+                  <div ref={setSsTrackEl} className="relative flex min-w-0 flex-1 items-center py-4">
+                    <input
+                      type="range"
+                      min={0}
+                      max={Math.max(1, Math.floor(videoDuration))}
+                      step={1}
+                      value={Math.min(Math.floor(ssTime), Math.floor(videoDuration))}
+                      onChange={(e) => {
+                        const t = Number(e.target.value);
+                        setSsTime(t);
+                        if (playerCtlRef.current?.seekAndPlay(t)) setSsActive(true);
+                      }}
+                      disabled={!videoDuration}
+                      aria-label="Položaj v skladbi"
+                      className="h-2 w-full min-w-0 cursor-pointer accent-orange-400 disabled:opacity-40"
+                    />
+                    {ssMarkerItems.map((m, k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => ssSeekToTime(m.t)}
+                        title={`${m.label} · ${fmtClock(m.t)}`}
+                        style={{ left: `${m.left}%` }}
+                        className="absolute top-1/2 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 justify-center"
+                      >
+                        <span className="h-full w-px bg-(--cv-text) opacity-40" />
+                        {m.row >= 0 && (
+                          <span
+                            className={`pointer-events-none absolute left-1/2 whitespace-nowrap text-[9px] leading-none text-(--cv-section) ${m.row === 0 ? "bottom-full mb-0.5" : "top-full mt-0.5"}`}
+                          >
+                            {m.short}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
                   <span className="shrink-0 text-sm tabular-nums opacity-70">{fmtClock(videoDuration)}</span>
                   <button
                     type="button"
