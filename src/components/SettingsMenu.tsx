@@ -9,7 +9,7 @@ import { parseImportJson, parseImportText, type ParsedImport } from "@/lib/impor
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { BACKGROUNDS, BACKGROUND_ORDER } from "@/lib/backgrounds";
-import { PATTERNS, PatternSvg, type PatternId } from "@/lib/backgroundPatterns";
+import { PATTERNS, PATTERN_OPACITY_MAX, PatternSvg, type PatternId } from "@/lib/backgroundPatterns";
 import { useTheme, type Theme } from "@/lib/useTheme";
 import type { QueuedSong, Song, SongReport } from "@/types/song";
 
@@ -135,7 +135,7 @@ export default function SettingsMenu({
   const [backupOpen, setBackupOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const { theme, setTheme, appBg, setAppBg, pattern, setPattern } = useTheme();
+  const { theme, setTheme, appBg, setAppBg, pattern, setPattern, patternOpacity, setPatternOpacity } = useTheme();
 
   // Sistemski gumb "Nazaj" (Android) naj meni zapre enako kot klik zunaj njega ali Escape.
   useBackableOpen(menuOpen, () => setMenuOpen(false));
@@ -477,6 +477,34 @@ export default function SettingsMenu({
                         </button>
                       );
                     })}
+                  </div>
+
+                  {/* Vidnost vzorca: 0 … 600 %, 100 % = privzeto. */}
+                  <label htmlFor="pattern-opacity" className="mb-1 mt-3 flex items-center justify-between text-xs font-medium text-neutral-500">
+                    <span>Vidnost vzorca</span>
+                    <span className="tabular-nums text-neutral-700 dark:text-neutral-300">{Math.round(patternOpacity * 100)} %</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="pattern-opacity"
+                      type="range"
+                      min={0}
+                      max={PATTERN_OPACITY_MAX}
+                      step={0.05}
+                      value={patternOpacity}
+                      disabled={pattern === null}
+                      onChange={(e) => setPatternOpacity(Number(e.target.value))}
+                      className="h-1.5 min-w-0 flex-1 cursor-pointer accent-emerald-500 disabled:cursor-default disabled:opacity-40"
+                    />
+                    {patternOpacity !== 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setPatternOpacity(1)}
+                        className="shrink-0 rounded-full border border-neutral-300 px-2 py-0.5 text-[10px] text-neutral-600 hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:text-neutral-300 dark:hover:text-emerald-400"
+                      >
+                        Privzeto
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

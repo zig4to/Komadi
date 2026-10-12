@@ -2,6 +2,8 @@
 // statične, narisane v SVG (ostre na vsakem zaslonu, brez slik). Vidni samo v
 // temni temi — izriše jih ThemeProvider za vso vsebino.
 
+import { useEffect, useRef, useState } from "react";
+
 export const PATTERNS = [
   { id: "topo", label: "Plastnice" },
   { id: "fretboard", label: "Vrat kitare" },
@@ -25,6 +27,14 @@ type Colors = { line: string; accent: string; inlay?: string };
 
 // Ozadje: zelo temne črte (3 % bele) z redkimi smaragdnimi poudarki.
 export const BACKGROUND_COLORS: Colors = { line: "rgba(255,255,255,0.03)", accent: "rgba(52,211,153,0.08)", inlay: "rgba(255,255,255,0.11)" };
+
+// Vidnost vzorca (⋮ → Nastavitve → Tema → drsnik): k = 0 … 6, 1 = privzeto.
+// Pomnoži prosojnost barv (nad 1 so črte izrazitejše, ne le manj prosojne).
+export const PATTERN_OPACITY_MAX = 6;
+export function scaledBackgroundColors(k: number): Colors {
+  const scale = (c: string) => c.replace(/([\d.]+)\)$/, (_, a: string) => `${Math.min(1, Number(a) * k).toFixed(3)})`);
+  return { line: scale(BACKGROUND_COLORS.line), accent: scale(BACKGROUND_COLORS.accent), inlay: scale(BACKGROUND_COLORS.inlay!) };
+}
 
 // Na ozkem (pokončnem) zaslonu se vidi samo del širine; poravnava pove, kateri
 // del — pri zvočniku in diagramu desni, kjer sta narisana.
@@ -87,8 +97,11 @@ function fretStringY(i: number, x: number) {
   return H * 0.62 - spread / 2 + (spread / 5) * i - 120 * t;
 }
 
+// Položaj n-te prečke (0 = sedlo) na vratu kitare.
+const fretX = (n: number) => -80 + (W + 300) * (1 - Math.pow(2, -n / 12)) * 1.3;
+
 function Fretboard({ line, accent, inlay }: Colors) {
-  const fx = (n: number) => -80 + (W + 300) * (1 - Math.pow(2, -n / 12)) * 1.3;
+  const fx = fretX;
   const sy = fretStringY;
   return (
     <>
@@ -185,33 +198,60 @@ function ChordDiagram(colors: Colors) {
   );
 }
 
-// "Živo" ozadje za vzorec Vrat kitare (samo računalnik): mehka, široka lisa
-// svetlobe zelo počasi (30 s v eno smer, 30 s nazaj) potuje po vratu; strune,
-// prečke in pike pod njo rahlo zasvetijo. Svetlejša kopija vzorca, zakrita z
-// masko (radialni preliv), katere središče premika SMIL <animate> (deluje v
-// vseh brskalnikih). Ob prefers-reduced-motion skrito (.fret-glow v globals.css).
-export function FretboardGlow({ className }: { className?: string }) {
-  // Središče lise sledi sredini vratu (ta se proti desni dvigne).
-  const cy = (x: number) => (fretStringY(2, x) + fretStringY(3, x)) / 2;
-  const xs = [-300, W + 300, -300];
+// "Zaigrane note" na vzorcu Vrat kitare: vsakih nekaj sekund (naključno 2,5–6 s)
+// se na naključnem polju (med dvema prečkama, na struni) mehko prižge in
+// ugasne blag krogec (.fret-note v globals.css, 3,6 s). Občasno dva hkrati, kot
+// dvoglasje. Ob prefers-reduced-motion in v skritem zavihku nič ne nastaja.
+const NOTE_LIFE_MS = 3600;
+type FretNote = { id: number; x: number; y: number };
+
+export function FretNotes({ className }: { className?: string }) {
+  const [notes, setNotes] = useState<FretNote[]>([]);
+  const idRef = useRef(0);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    const later = (fn: () => void, ms: number) => {
+      const t = setTimeout(() => {
+        timers.delete(t);
+        fn();
+      }, ms);
+      timers.add(t);
+    };
+    const spawn = () => {
+      const fret = 1 + Math.floor(Math.random() * 14);
+      const x = (fretX(fret - 1) + fretX(fret)) / 2;
+      if (x < 40 || x > W - 40) return;
+      const string = Math.floor(Math.random() * 6);
+      const note = { id: ++idRef.current, x, y: fretStringY(string, x) };
+      setNotes((prev) => [...prev, note]);
+      later(() => setNotes((prev) => prev.filter((n) => n.id !== note.id)), NOTE_LIFE_MS);
+    };
+    const tick = () => {
+      if (!document.hidden) {
+        spawn();
+        if (Math.random() < 0.25) later(spawn, 180 + Math.random() * 260);
+      }
+      later(tick, 2500 + Math.random() * 3500);
+    };
+    later(tick, 1200);
+    return () => timers.forEach(clearTimeout);
+  }, []);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio={ALIGN.fretboard} className={className}>
       <defs>
-        <radialGradient id="fret-glow-spot">
-          <stop offset="0" stopColor="white" stopOpacity="1" />
-          <stop offset="0.55" stopColor="white" stopOpacity="0.35" />
-          <stop offset="1" stopColor="white" stopOpacity="0" />
+        <radialGradient id="fret-note-glow">
+          <stop offset="0" stopColor="rgb(52 211 153)" stopOpacity="0.55" />
+          <stop offset="0.45" stopColor="rgb(52 211 153)" stopOpacity="0.18" />
+          <stop offset="1" stopColor="rgb(52 211 153)" stopOpacity="0" />
         </radialGradient>
-        <mask id="fret-glow-mask" maskUnits="userSpaceOnUse" x={-400} y={-200} width={W + 800} height={H + 400}>
-          <ellipse cx={xs[0]} cy={cy(xs[0])} rx={340} ry={300} fill="url(#fret-glow-spot)">
-            <animate attributeName="cx" dur="60s" repeatCount="indefinite" values={xs.join(";")} calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" />
-            <animate attributeName="cy" dur="60s" repeatCount="indefinite" values={xs.map(cy).join(";")} calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" />
-          </ellipse>
-        </mask>
       </defs>
-      <g mask="url(#fret-glow-mask)" fill="none" strokeWidth="1" vectorEffect="non-scaling-stroke">
-        <Fretboard line="rgba(255,255,255,0.13)" accent="rgba(52,211,153,0.15)" />
-      </g>
+      {notes.map((n) => (
+        <g key={n.id} className="fret-note" style={{ transformOrigin: `${n.x}px ${n.y}px` }}>
+          <circle cx={n.x} cy={n.y} r={34} fill="url(#fret-note-glow)" />
+          <circle cx={n.x} cy={n.y} r={9} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        </g>
+      ))}
     </svg>
   );
 }

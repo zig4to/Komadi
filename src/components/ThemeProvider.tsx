@@ -1,6 +1,6 @@
 "use client";
 
-import { BACKGROUND_COLORS, FretboardGlow, PatternSvg } from "@/lib/backgroundPatterns";
+import { FretNotes, PatternSvg, scaledBackgroundColors } from "@/lib/backgroundPatterns";
 import { useTheme } from "@/lib/useTheme";
 
 /**
@@ -10,7 +10,7 @@ import { useTheme } from "@/lib/useTheme";
  * desnem in zelen v spodnjem levem kotu ter izbrani vzorec.
  */
 export default function ThemeProvider() {
-  const { pattern } = useTheme();
+  const { pattern, patternOpacity } = useTheme();
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 hidden overflow-hidden dark:block">
       {/* Telefon: blažji sij (manjši zaslon, isti krogi pokrijejo več). */}
@@ -29,9 +29,13 @@ export default function ThemeProvider() {
         }}
       />
       {/* Telefon: vrat kitare malo manj viden (opacity 60 %). */}
-      {pattern && <PatternSvg id={pattern} colors={BACKGROUND_COLORS} className={`relative h-full w-full ${pattern === "fretboard" ? "max-lg:opacity-60" : ""}`} />}
-      {/* Računalnik: mehka svetloba počasi potuje po vratu kitare (telefon miruje — baterija). */}
-      {pattern === "fretboard" && <FretboardGlow className="fret-glow absolute inset-0 hidden h-full w-full lg:block" />}
+      {pattern && <PatternSvg id={pattern} colors={scaledBackgroundColors(patternOpacity)} className={`relative h-full w-full ${pattern === "fretboard" ? "max-lg:opacity-60" : ""}`} />}
+      {/* Vrat kitare: občasno blago zasveti "zaigrana nota" na naključnem polju. */}
+      {pattern === "fretboard" && patternOpacity > 0 && (
+        <div className="absolute inset-0" style={{ opacity: Math.min(1, patternOpacity) }}>
+          <FretNotes className="absolute inset-0 h-full w-full max-lg:opacity-60" />
+        </div>
+      )}
     </div>
   );
 }

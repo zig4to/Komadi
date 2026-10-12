@@ -4460,6 +4460,8 @@ export default function Dashboard({ user }: { user: User }) {
                   onSelect={handleFilterByAuthor}
                   images={authorImages}
                   accentForLabel={authorAccentHex}
+                  variant="stat"
+                  labelClassName="line-clamp-2! break-words text-base leading-tight! lg:text-lg"
                 />
                 </div>
                 <HomeAside

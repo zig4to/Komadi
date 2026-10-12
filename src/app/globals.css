@@ -106,11 +106,23 @@ textarea,
   }
 }
 
-/* Potujoča svetloba po vratu kitare (FretboardGlow) ob sistemski izbiri "manj animacij" ni prikazana. */
-@media (prefers-reduced-motion: reduce) {
-  .fret-glow {
-    display: none !important;
+/* Vzorec Vrat kitare: "zaigrana nota" (FretNotes) — blag krogec se razširi in ugasne. */
+@keyframes fret-note {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
   }
+  25% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+.fret-note {
+  animation: fret-note 3.6s ease-out forwards;
 }
 
 /* Naključno izbrana skladba (SongCard highlighted): rob rahlo utripa vijolično;

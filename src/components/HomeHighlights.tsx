@@ -5,117 +5,163 @@ import type { JSX } from "react";
 import HomeSectionHeading, { homeSectionBodyClass, useHomeSectionOpen } from "@/components/HomeSectionHeading";
 import { ERA_IMAGES, PORTRAIT_FOCUS_Y } from "@/lib/constants";
 
-// Ena preprosta, polnobarvna (solid) ikona na žanr — črne barve, prikazana
-// pod ločilno črto na kartici. Ključi se morajo ujemati z GENRES v
-// src/lib/constants.ts.
-const GENRE_ICONS: Record<string, JSX.Element> = {
-  Rock: (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <rect x="7.8" y="0.5" width="3.6" height="2.2" rx="0.8" />
-      <rect x="8.6" y="1.5" width="2" height="9.5" rx="1" />
-      <ellipse cx="9.4" cy="11.2" rx="3.6" ry="3" />
-      <ellipse cx="9.4" cy="17" rx="5.4" ry="4.2" />
-    </svg>
-  ),
-  "Klasični rock": (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 11a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"
-      />
-    </svg>
-  ),
+// Črtni motiv na žanr (kartice Žanri, varianta "stat"): v spodnjem desnem kotu,
+// v barvi žanra, ponazarja zvok/značaj žanra namesto ikone. viewBox 160×120,
+// risano v desni spodnji del. Ključi se morajo ujemati z GENRES v
+// src/lib/constants.ts; žanr brez motiva dobi preprost val.
+const MW = 160;
+
+// Krivulja y = base + f(x) od x0 do MW, vzorčena na 2 px.
+function curve(f: (x: number) => number, base: number, x0 = 40) {
+  let d = "";
+  for (let x = x0; x <= MW + 2; x += 2) d += `${d ? "L" : "M"}${x} ${(base + f(x)).toFixed(1)}`;
+  return d;
+}
+const sine = (amp: number, period: number, phase = 0) => (x: number) => amp * Math.sin(((x + phase) / period) * Math.PI * 2);
+// Deterministično "naključje" (enak motiv ob vsakem izrisu).
+const rand = (i: number) => {
+  const v = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
+  return v - Math.floor(v);
+};
+
+function paths(...d: string[]) {
+  return d.map((p, i) => <path key={i} d={p} />);
+}
+
+const GENRE_MOTIFS: Record<string, JSX.Element> = {
+  // Rock: "nasičen" val (zaobljen pravokotnik) — distorzija ojačevalca.
+  Rock: <>{paths(curve((x) => 14 * Math.tanh(3 * Math.sin((x / 34) * Math.PI * 2)), 84), curve((x) => 9 * Math.tanh(3 * Math.sin(((x + 9) / 34) * Math.PI * 2)), 104))}</>,
+  // Hard rock: žagast val, večja amplituda.
   "Hard rock": (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" />
-    </svg>
+    <>
+      {paths(
+        curve((x) => 18 * (((x / 26) % 1) * 2 - 1), 82),
+        curve((x) => 10 * ((((x + 13) / 26) % 1) * 2 - 1), 106),
+      )}
+    </>
   ),
+  // Yugo rock: reflektor — loki iz kota (oder).
   "Yugo rock": (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <rect x="9" y="0.5" width="4" height="1.8" rx="0.6" />
-      <rect x="10.2" y="1.8" width="1.6" height="8.5" rx="0.8" />
-      <polygon points="12,9 20,19 17,21 12,13 7,21 4,19" />
-    </svg>
+    <>
+      {[22, 40, 58, 76, 94].map((r) => (
+        <path key={r} d={`M${MW - r} 120 A${r} ${r} 0 0 1 ${MW} ${120 - r}`} />
+      ))}
+    </>
   ),
+  // Punk: raztrgan cikcak.
   Punk: (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <path d="M3 20h18l-3-9-3 5-3-11-3 11-3-5-3 9z" />
-    </svg>
+    <>
+      {paths(
+        Array.from({ length: 16 }, (_, i) => `${i ? "L" : "M"}${44 + i * 8} ${(62 + rand(i) * 46).toFixed(1)}`).join(""),
+      )}
+    </>
   ),
+  // Metal: ostre konice.
   Metal: (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M12 3c-4.4 0-7 3-7 7 0 2.6 1.3 4.3 2.6 5.4-.3.9-.6 2.1-.6 2.6a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1c0-.5-.3-1.7-.6-2.6C17.7 14.3 19 12.6 19 10c0-4-2.6-7-7-7zm-2.2 8a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6zm4.4 0a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6z"
-      />
-    </svg>
+    <>
+      {paths(
+        Array.from({ length: 10 }, (_, i) => `${i ? "L" : "M"}${46 + i * 12} ${i % 2 ? 118 : 118 - 22 - rand(i + 3) * 36}`).join("") + `L${MW} 118`,
+      )}
+    </>
   ),
+  // Pop: mehurčki.
   Pop: (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 13a3 3 0 0 0 3-3V4a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a1 1 0 1 0-2 0 3 3 0 0 1-6 0 1 1 0 1 0-2 0 5 5 0 0 0 4 4.9V17H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.1A5 5 0 0 0 17 10z" />
-    </svg>
+    <>
+      {[
+        [128, 88, 22],
+        [94, 102, 12],
+        [148, 50, 9],
+        [104, 68, 6],
+        [70, 110, 5],
+      ].map(([cx, cy, r]) => (
+        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={r} />
+      ))}
+    </>
   ),
+  // Pop rock: mehurčki na valu.
   "Pop rock": (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <circle cx="7" cy="18" r="3" />
-      <circle cx="17" cy="16" r="3" />
-      <path d="M9 18V6.5l9-2v9.5h-1.6V6.3l-5.8 1.3V18H9z" />
-    </svg>
+    <>
+      {paths(curve(sine(8, 44), 100))}
+      {[
+        [126, 70, 14],
+        [92, 76, 7],
+        [150, 44, 6],
+      ].map(([cx, cy, r]) => (
+        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={r} />
+      ))}
+    </>
   ),
+  // Indie: ohlapna spirala (kot narisana z roko).
   Indie: (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6zm5 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm8 0a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM8 10.5A1.5 1.5 0 1 1 8 13.5 1.5 1.5 0 0 1 8 10.5zm8 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z"
-      />
-    </svg>
+    <>
+      {paths(
+        Array.from({ length: 90 }, (_, i) => {
+          const t = i / 10;
+          const r = 4 + t * 5.2;
+          return `${i ? "L" : "M"}${(122 + r * Math.cos(t)).toFixed(1)} ${(84 + r * Math.sin(t) * 0.9).toFixed(1)}`;
+        }).join(""),
+      )}
+    </>
   ),
-  Blues: (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 2C9 6.5 6 10 6 14a6 6 0 0 0 12 0c0-4-3-7.5-6-12z" />
-    </svg>
-  ),
+  // Blues: počasni valovi, trije drug pod drugim.
+  Blues: <>{paths(curve(sine(7, 70), 74), curve(sine(7, 70, 12), 92), curve(sine(7, 70, 24), 110))}</>,
+  // Country: valoviti griči.
   Country: (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <ellipse cx="12" cy="13" rx="10" ry="2.6" />
-      <path d="M8 12c-.6-3 .5-8 4-8s4.6 5 4 8H8z" />
-    </svg>
+    <>
+      {paths(
+        `M40 112 Q70 86 100 108 T160 100`,
+        `M60 120 Q96 92 128 112 T172 108`,
+        `M86 96 Q112 70 140 90 T176 84`,
+      )}
+    </>
   ),
+  // Reggae: poudarki na "off-beat" — visoki taktni drogovi na vsakem drugem.
   Reggae: (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <circle cx="12" cy="12" r="4" />
-      <rect x="11" y="1" width="2" height="4" rx="1" />
-      <rect x="11" y="19" width="2" height="4" rx="1" />
-      <rect x="1" y="11" width="4" height="2" rx="1" />
-      <rect x="19" y="11" width="4" height="2" rx="1" />
-      <rect x="4" y="3.5" width="2" height="4" rx="1" transform="rotate(45 5 5.5)" />
-      <rect x="18" y="16.5" width="2" height="4" rx="1" transform="rotate(45 19 18.5)" />
-      <rect x="16.5" y="4" width="2" height="4" rx="1" transform="rotate(-45 17.5 6)" />
-      <rect x="3.5" y="16" width="2" height="4" rx="1" transform="rotate(-45 4.5 18)" />
-    </svg>
+    <>
+      {Array.from({ length: 12 }, (_, i) => {
+        const x = 54 + i * 9;
+        const h = i % 2 ? 38 + rand(i) * 18 : 10;
+        return <path key={i} d={`M${x} 116 V${116 - h}`} />;
+      })}
+    </>
   ),
+  // Rap: ekvalizator (stolpci različnih višin, zaobljeni).
+  Rap: (
+    <>
+      {Array.from({ length: 9 }, (_, i) => {
+        const x = 62 + i * 11;
+        const h = 14 + rand(i + 7) * 58;
+        return <rect key={i} x={x} y={116 - h} width={6} height={h} rx={3} />;
+      })}
+    </>
+  ),
+  // Balada / akustika: resonančna odprtina kitare in strune.
   "Balada / akustika": (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 21s-7.5-4.6-10-9.3C.3 8.2 2 4.5 5.6 4c2-.3 3.7.7 4.4 2.2C10.7 4.7 12.4 3.7 14.4 4c3.6.5 5.3 4.2 3.6 7.7C15.5 16.4 12 21 12 21z" />
-    </svg>
+    <>
+      <circle cx={124} cy={88} r={26} />
+      <circle cx={124} cy={88} r={32} />
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <path key={i} d={`M40 ${73 + i * 6} H${MW}`} />
+      ))}
+    </>
   ),
+  // Dalmatinske: morski valovi (luske v vrstah).
   Dalmatinske: (
-    <svg viewBox="0 0 24 24" fill="currentColor">
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M12 1a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm0 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"
-      />
-      <rect x="11" y="6" width="2" height="12" />
-      <rect x="6" y="10" width="12" height="2" />
-      <path d="M4 14a1 1 0 0 1 2 0 6 6 0 0 0 5 5.9V22a1 1 0 1 1-2 0v-.2A8 8 0 0 1 4 14zM20 14a1 1 0 0 0-2 0 6 6 0 0 1-5 5.9V22a1 1 0 1 0 2 0v-.2a8 8 0 0 0 5-7.8z"
-      />
-    </svg>
+    <>
+      {[0, 1, 2].map((row) => (
+        <path
+          key={row}
+          d={Array.from({ length: 9 }, (_, i) => {
+            const x = 46 + i * 14 + (row % 2) * 7;
+            const y = 84 + row * 14;
+            return `M${x} ${y} a7 7 0 0 1 14 0`;
+          }).join("")}
+        />
+      ))}
+    </>
   ),
 };
+const DEFAULT_MOTIF = <>{paths(curve(sine(10, 50), 92))}</>;
 
 // "Dark neon" slog: skoraj črna kartica + en poudarjen (neonski) odtenek na
 // kartico za žarenje v vogalu, rob in senco. Barve ponovno uporabljajo
@@ -180,6 +226,8 @@ export function HighlightRow({
   shadowAlpha = "40",
   glowAlpha = "26",
   imageOpacityClassName = "opacity-80",
+  variant = "classic",
+  motifs,
 }: {
   title: string;
   items: HighlightItem[];
@@ -203,6 +251,12 @@ export function HighlightRow({
   // Prosojnost slike v ozadju kartice (ko je `images` nastavljen) — ločeno
   // od `shadowAlpha`/`glowAlpha`, ki krmilita sij okoli/pod kartico.
   imageOpacityClassName?: string;
+  // "stat": v slogu statističnih kartic domače strani (HomeDashboard StatCard) —
+  // pikica v barvi + "N skladb" zgoraj, ↗, spodaj velika tanka oznaka; slika le
+  // kot barven, prosojen sloj, ki se proti levi zlije s kartico.
+  variant?: "classic" | "stat";
+  // Varianta "stat": črtni motiv v kotu po nalepki (žanri), v barvi kartice.
+  motifs?: Record<string, JSX.Element>;
 }) {
   // "Povleci za drsenje" z miško (na dotik že deluje naravno prek
   // overflow-x-auto). `moved` loči vlečenje od navadnega klika, da klik na
@@ -290,6 +344,53 @@ export function HighlightRow({
           const icon = icons?.[item.label];
           const imageUrl = images?.[item.label];
           const image = imageUrl && loadedImages.has(imageUrl) ? imageUrl : undefined;
+          if (variant === "stat") {
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={(e) => handleCardClick(e, item.label)}
+                className={`group relative isolate flex ${cardSizeClassName} shrink-0 flex-col justify-between overflow-hidden rounded-2xl border border-neutral-200 bg-white p-3.5 text-left transition hover:bg-neutral-50 active:scale-[0.97] lg:p-4 dark:rounded-[26px] dark:border-white/[0.08] dark:bg-white/[0.035] dark:hover:bg-white/[0.06]`}
+              >
+                {image && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-0 -z-10 opacity-[0.35] transition duration-300 group-hover:opacity-50 dark:opacity-[0.3] dark:group-hover:opacity-[0.45]"
+                    style={{
+                      backgroundImage: `url(${image})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: portraitImages.has(image) ? `center ${PORTRAIT_FOCUS_Y}` : "center",
+                      maskImage: "linear-gradient(to left, #000 25%, transparent 95%)",
+                      WebkitMaskImage: "linear-gradient(to left, #000 25%, transparent 95%)",
+                    }}
+                  />
+                )}
+                {motifs && (
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 160 120"
+                    preserveAspectRatio="xMaxYMax meet"
+                    style={{ color: accent }}
+                    className="pointer-events-none absolute -right-[18%] bottom-0 -z-10 h-full w-[85%] opacity-20 transition-opacity duration-300 group-hover:opacity-80 dark:opacity-[0.15] dark:group-hover:opacity-70"
+                  >
+                    <g fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+                      {motifs[item.label] ?? DEFAULT_MOTIF}
+                    </g>
+                  </svg>
+                )}
+                <span className="flex min-w-0 items-center gap-2 pr-5 text-xs text-neutral-500 lg:text-sm dark:text-neutral-400">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: accent }} />
+                  <span className="truncate">{skladbeLabel(item.count)}</span>
+                </span>
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="absolute right-3.5 top-3.5 h-4 w-4 text-neutral-400 lg:right-4 lg:top-4 dark:text-neutral-600">
+                  <path d="M7 17 17 7M7 7h10v10" />
+                </svg>
+                <span className={`${labelClassName} block leading-none font-light tabular-nums text-neutral-900 dark:font-extralight dark:text-white`}>
+                  {formatLabel(item.label)}
+                </span>
+              </button>
+            );
+          }
           return (
             <button
               key={item.label}
@@ -381,14 +482,11 @@ export default function HomeHighlights({
         colorOrder={ERA_COLOR_ORDER}
         onSelect={onSelectEra}
         formatLabel={formatEraLabel}
-        labelClassName="text-4xl lg:text-6xl"
+        labelClassName="text-4xl lg:text-5xl"
         cardSizeClassName="h-28 w-36 lg:h-36 lg:w-48"
         gapClassName="gap-3 lg:gap-4"
-        labelStroke
         images={ERA_IMAGES}
-        shadowAlpha="20"
-        glowAlpha="14"
-        imageOpacityClassName="opacity-70 lg:opacity-80"
+        variant="stat"
       />
       <div className="mt-3">
         <HighlightRow
@@ -396,12 +494,11 @@ export default function HomeHighlights({
           items={genres}
           colorOrder={GENRE_COLOR_ORDER}
           onSelect={onSelectGenre}
-          labelClassName="text-lg lg:text-2xl"
+          labelClassName="text-xl leading-tight! lg:text-3xl"
           cardSizeClassName="h-28 w-36 lg:h-36 lg:w-48"
           gapClassName="gap-3 lg:gap-4"
-          icons={GENRE_ICONS}
-          shadowAlpha="20"
-          glowAlpha="14"
+          variant="stat"
+          motifs={GENRE_MOTIFS}
         />
       </div>
     </div>

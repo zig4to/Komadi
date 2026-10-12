@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { BACKGROUNDS } from "@/lib/backgrounds";
-import { DEFAULT_PATTERN, isPatternId, type PatternId } from "@/lib/backgroundPatterns";
+import { DEFAULT_PATTERN, PATTERN_OPACITY_MAX, isPatternId, type PatternId } from "@/lib/backgroundPatterns";
 
 export type Theme = "system" | "light" | "dark";
 
@@ -16,6 +16,8 @@ const BG_KEY = "komadi:appBg";
 // Vzorec čez ozadje (⋮ → Nastavitve → Tema → Vzorec), samo v temni temi:
 // id iz PATTERNS ali "none"; brez shranjene vrednosti DEFAULT_PATTERN.
 const PATTERN_KEY = "komadi:appPattern";
+// Vidnost vzorca (drsnik pod "Vzorec"): 0 … PATTERN_OPACITY_MAX, privzeto 1.
+const PATTERN_OPACITY_KEY = "komadi:appPatternOpacity";
 
 function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", isDark(theme));
@@ -60,6 +62,16 @@ function readPattern(): PatternId | null {
   }
 }
 
+function readPatternOpacity(): number {
+  try {
+    const v = localStorage.getItem(PATTERN_OPACITY_KEY);
+    const n = v === null ? 1 : Number(v);
+    return Number.isFinite(n) ? Math.min(PATTERN_OPACITY_MAX, Math.max(0, n)) : 1;
+  } catch {
+    return 1;
+  }
+}
+
 /**
  * Bere in nastavlja temo aplikacije (svetla / temna / sistemska) in ozadje
  * aplikacije. Vrednosti se shranijo v localStorage in ostanejo po osvežitvi.
@@ -77,6 +89,7 @@ export function useTheme() {
   );
   const appBg = useSyncExternalStore(subscribe, readAppBg, () => null);
   const pattern = useSyncExternalStore(subscribe, readPattern, () => null);
+  const patternOpacity = useSyncExternalStore(subscribe, readPatternOpacity, () => 1);
 
   // Poskrbi, da se razred .dark ujema z izbiro tudi ob spremembi sistemske
   // nastavitve (ko je izbrana "sistemska").
@@ -127,5 +140,14 @@ export function useTheme() {
     window.dispatchEvent(new Event(EVENT));
   }, []);
 
-  return { theme, setTheme, appBg, setAppBg, pattern, setPattern };
+  const setPatternOpacity = useCallback((next: number) => {
+    try {
+      localStorage.setItem(PATTERN_OPACITY_KEY, String(Math.min(PATTERN_OPACITY_MAX, Math.max(0, next))));
+    } catch {
+      // localStorage ni na voljo — izbira se ne bo ohranila
+    }
+    window.dispatchEvent(new Event(EVENT));
+  }, []);
+
+  return { theme, setTheme, appBg, setAppBg, pattern, setPattern, patternOpacity, setPatternOpacity };
 }

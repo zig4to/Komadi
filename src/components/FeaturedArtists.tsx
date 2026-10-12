@@ -7,33 +7,37 @@ import { authorAccentHex } from "@/lib/authorColor";
 import type { FeaturedGroup } from "@/lib/dailyRandom";
 import type { Song } from "@/types/song";
 
+// Slovensko sklanjanje: 1 skladba, 2 skladbi, 3-4 skladbe, 5+ skladb.
+function skladbe(n: number) {
+  const m = n % 100;
+  if (m === 1) return `${n} skladba`;
+  if (m === 2) return `${n} skladbi`;
+  if (m === 3 || m === 4) return `${n} skladbe`;
+  return `${n} skladb`;
+}
+
 function SongRow({
   song,
   index,
-  accent,
   onChordsClick,
 }: {
   song: Song;
   index: number;
-  accent: string;
   onChordsClick?: (song: Song) => void;
 }) {
   return (
-    <div data-chords-card className="flex w-full items-center gap-2.5 rounded-lg py-1.5 pr-2.5 pl-1 text-sm text-neutral-700 transition hover:bg-neutral-100 dark:text-white/85 dark:hover:bg-white/[0.05]">
-      <span
-        style={{ backgroundColor: `${accent}26`, color: accent }}
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[12px] font-bold"
-      >
-        {index}
+    <div data-chords-card className="flex w-full items-center gap-3 py-2 text-sm">
+      <span className="w-5 shrink-0 font-mono text-xs tabular-nums text-neutral-400 dark:text-neutral-500">
+        {String(index).padStart(2, "0")}
       </span>
-      <div className="min-w-0 flex-1">
-        <span className="block truncate text-base lg:text-sm">{song.title}</span>
-      </div>
+      <span className="min-w-0 flex-1 truncate text-base text-neutral-800 lg:text-sm dark:text-white/85">{song.title}</span>
       <ChordsButtons song={song} onChordsClick={onChordsClick} stacked merged menuAlign="right" />
     </div>
   );
 }
 
+// Kartica avtorja v slogu domače strani (kot StatCard v HomeDashboard): pikica v
+// barvi avtorja + število skladb, ↗, ime s tanko pisavo, skladbe ločene s tankimi črtami.
 function AuthorCard({
   group,
   accent,
@@ -49,24 +53,28 @@ function AuthorCard({
 }) {
   return (
     <div
-      style={{
-        backgroundImage: `radial-gradient(120% 90% at 0% 0%, ${accent}26 0%, transparent 60%)`,
-        borderColor: `${accent}38`,
-        boxShadow: `0 8px 18px -12px ${accent}30, 0 2px 8px -4px rgb(0 0 0 / 0.15)`,
-      }}
-      className={`rounded-2xl border bg-white p-3.5 dark:rounded-[26px] dark:border-white/[0.08]! dark:bg-white/[0.035] dark:bg-none! dark:shadow-none! ${className}`}
+      className={`rounded-2xl border border-neutral-200 bg-white p-4 dark:rounded-[26px] dark:border-white/[0.08] dark:bg-white/[0.035] ${className}`}
     >
       <button
         type="button"
         onClick={() => onFilterAuthor(group.author)}
-        style={{ color: accent }}
-        className="mb-2 block text-left text-lg leading-tight font-bold hover:underline lg:text-xl dark:font-light"
+        title={`Prikaži vse skladbe izvajalca ${group.author}`}
+        className="group relative mb-2 block w-full text-left"
       >
-        {group.author}
+        <span className="flex items-center gap-2 pr-6 text-sm text-neutral-500 dark:text-neutral-400">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: accent }} />
+          <span className="truncate">{skladbe(group.songs.length)}</span>
+        </span>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="absolute right-0 top-0 h-4 w-4 text-neutral-400 transition group-hover:text-neutral-700 dark:text-neutral-600 dark:group-hover:text-neutral-300">
+          <path d="M7 17 17 7M7 7h10v10" />
+        </svg>
+        <span className="mt-1.5 line-clamp-2 block text-xl leading-tight font-light break-words text-neutral-900 lg:text-lg dark:font-extralight dark:text-white">
+          {group.author}
+        </span>
       </button>
-      <div className="space-y-0.5">
+      <div className="divide-y divide-neutral-200 dark:divide-white/[0.06]">
         {group.songs.map((song, songIndex) => (
-          <SongRow key={song.id} song={song} index={songIndex + 1} accent={accent} onChordsClick={onChordsClick} />
+          <SongRow key={song.id} song={song} index={songIndex + 1} onChordsClick={onChordsClick} />
         ))}
       </div>
     </div>

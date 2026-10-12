@@ -1,6 +1,6 @@
 "use client";
 
-import { BACKGROUND_COLORS, PatternSvg } from "@/lib/backgroundPatterns";
+import { PATTERN_OPACITY_MAX, PatternSvg, scaledBackgroundColors } from "@/lib/backgroundPatterns";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import AutoScrollControl from "@/components/AutoScrollControl";
@@ -63,6 +63,12 @@ const SHOW_SHAPES_KEY = "komadi:chords:showShapes";
 // Okvir s prijemi (Posebni akordi / Akordi v skladbi) razprt (1) ali zložen (0) — globalno.
 const SHAPES_OPEN_KEY = "komadi:chords:shapesOpen";
 const BG_KEY = "komadi:chords:bg";
+// "Sam Špili" ima svoje ozadje (privzeto Akordni diagram), ločeno od navadnega pogleda.
+const SS_BG_KEY = "komadi:chords:ssBg";
+// Vidnost vzorca ozadja (Plastnice, Vrat kitare …) v pregledovalniku in Sam Špili.
+// Nov ključ (…2), da privzetih 350 % velja za vse, tudi za že shranjene izbire.
+const PATTERN_OPACITY_KEY = "komadi:chords:patternOpacity2";
+const DEFAULT_PATTERN_OPACITY = 3.5;
 const CHORD_COLOR_KEY = "komadi:chords:chordColor";
 const TEXT_COLOR_KEY = "komadi:chords:textColor";
 const SECTION_COLOR_KEY = "komadi:chords:sectionColor";
@@ -137,6 +143,8 @@ const BARS_TRANSITION = "550ms cubic-bezier(0.65, 0, 0.35, 1)";
 // Ozadja (BACKGROUNDS, BACKGROUND_ORDER) so v src/lib/backgrounds.ts — ista
 // izbira je tudi ozadje aplikacije (⋮ → Nastavitve → Tema).
 const DEFAULT_BG = 3;
+// Indeks "Akordni diagram" v BACKGROUNDS.
+const DEFAULT_SS_BG = 15;
 // Barve besedila: "Samodejna" = barva, ki pripada ozadju (BACKGROUNDS.text);
 // ostale imajo svetlo različico za temna ozadja in temno za svetla.
 const TEXT_COLORS: { label: string; dark: string | null; light: string | null }[] = [
@@ -424,9 +432,17 @@ export default function ChordsViewer({
   }, [showShapes, hasSpecialChords, chordDb]);
 
   // "Tema": ozadje vsebine in barva akordov — ena nastavitev za vse skladbe.
-  const [bgIndex, setBgIndex] = useState(() => readNumber(BG_KEY, DEFAULT_BG));
+  const [normalBgIndex, setNormalBgIndex] = useState(() => readNumber(BG_KEY, DEFAULT_BG));
+  const [ssBgIndex, setSsBgIndex] = useState(() => readNumber(SS_BG_KEY, DEFAULT_SS_BG));
+  useEffect(() => writeNumber(SS_BG_KEY, ssBgIndex), [ssBgIndex]);
+  // V Sam Špili velja (in se nastavlja) ozadje Sam Špili, sicer navadno.
+  const bgIndex = samSpili ? ssBgIndex : normalBgIndex;
+  const setBgIndex = samSpili ? setSsBgIndex : setNormalBgIndex;
+  const [patternOpacity, setPatternOpacity] = useState(() => readNumber(PATTERN_OPACITY_KEY, DEFAULT_PATTERN_OPACITY));
+  useEffect(() => writeNumber(PATTERN_OPACITY_KEY, patternOpacity), [patternOpacity]);
+  const patternColors = scaledBackgroundColors(patternOpacity);
   const [chordColorIndex, setChordColorIndex] = useState(() => readNumber(CHORD_COLOR_KEY, 0));
-  useEffect(() => writeNumber(BG_KEY, bgIndex), [bgIndex]);
+  useEffect(() => writeNumber(BG_KEY, normalBgIndex), [normalBgIndex]);
   useEffect(() => writeNumber(CHORD_COLOR_KEY, chordColorIndex), [chordColorIndex]);
   const [textColorIndex, setTextColorIndex] = useState(() => readNumber(TEXT_COLOR_KEY, 0));
   useEffect(() => writeNumber(TEXT_COLOR_KEY, textColorIndex), [textColorIndex]);
@@ -557,6 +573,38 @@ export default function ChordsViewer({
             );
           })}
         </div>
+        )}
+        {bgPickerOpen && (
+          // Vidnost vzorca (samo ozadja z vzorcem): 0 … 600 %, privzeto 350 %.
+          <div className="mt-3">
+            <label htmlFor="cv-pattern-opacity" className="mb-1 flex items-center justify-between text-[11px] text-neutral-400">
+              <span>Vidnost vzorca</span>
+              <span className="tabular-nums text-neutral-200">{Math.round(patternOpacity * 100)} %</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="cv-pattern-opacity"
+                type="range"
+                min={0}
+                max={PATTERN_OPACITY_MAX}
+                step={0.05}
+                value={patternOpacity}
+                disabled={!theme.pattern}
+                onChange={(e) => setPatternOpacity(Number(e.target.value))}
+                className="h-1.5 min-w-0 flex-1 cursor-pointer accent-orange-400 disabled:cursor-default disabled:opacity-40"
+              />
+              {patternOpacity !== DEFAULT_PATTERN_OPACITY && (
+                <button
+                  type="button"
+                  onClick={() => setPatternOpacity(DEFAULT_PATTERN_OPACITY)}
+                  className="shrink-0 rounded-full border border-neutral-600 px-2 py-0.5 text-[10px] text-neutral-300 hover:border-orange-400 hover:text-orange-300"
+                >
+                  Privzeto
+                </button>
+              )}
+            </div>
+            {!theme.pattern && <p className="mt-1 text-[10px] text-neutral-500">Izberi ozadje z vzorcem (Plastnice, Vrat kitare, Zvočnik, Akordni diagram).</p>}
+          </div>
         )}
       </div>
       <div>
@@ -2902,7 +2950,7 @@ export default function ChordsViewer({
     <div ref={setRoot} data-view-portal onClick={(e) => e.stopPropagation()} style={rootStyle} className="fixed inset-0 z-50 isolate flex flex-col overflow-hidden bg-(--cv-bg) pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
       {theme.pattern && (
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          <PatternSvg id={theme.pattern} colors={BACKGROUND_COLORS} className="h-full w-full" />
+          <PatternSvg id={theme.pattern} colors={patternColors} className="h-full w-full" />
         </div>
       )}
 
@@ -3982,12 +4030,12 @@ export default function ChordsViewer({
       {/* "Sam Špili": prekrije pregledovalnik (predvajalnik ostane spodaj in igra). */}
       {samSpili && (
         <div
-          className="absolute inset-0 z-40 isolate flex flex-col overflow-hidden bg-(--cv-bg) text-(--cv-text)"
+          className="absolute inset-0 z-40 isolate flex flex-col overflow-hidden bg-(--cv-bg) text-(--cv-text) [--ss-btn:2.25rem] lg:[--ss-btn:3rem]"
           onClick={follower ? ssFollowerFullscreen : undefined}
         >
           {theme.pattern && (
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-              <PatternSvg id={theme.pattern} colors={BACKGROUND_COLORS} className="h-full w-full" />
+              <PatternSvg id={theme.pattern} colors={patternColors} className="h-full w-full" />
             </div>
           )}
           {ssShowLines ? (
@@ -3997,7 +4045,7 @@ export default function ChordsViewer({
               <div
                 aria-hidden="true"
                 className={`pointer-events-none absolute inset-y-0 z-10 w-px bg-(--cv-text) transition-opacity duration-300 ${ssSidebarOpen ? "opacity-15" : "opacity-0"}`}
-                style={{ right: "calc(max(0.75rem, env(safe-area-inset-right)) + 2.25rem + 0.625rem)" }}
+                style={{ right: "calc(max(0.75rem, env(safe-area-inset-right)) + var(--ss-btn) + 0.625rem)" }}
               />
               {/* Desno zgoraj: gumb Meni in pod njim ✕ (oba vedno vidna), pod njima
                   stranska vrstica (pavza/play, na začetek, ±5 s, prevrtavanje,
@@ -4012,9 +4060,9 @@ export default function ChordsViewer({
                 aria-label={ssSidebarOpen ? "Skrij meni" : "Pokaži meni"}
                 title={ssSidebarOpen ? "Skrij meni" : "Pokaži meni"}
                 aria-expanded={ssSidebarOpen}
-                className={`flex h-9 w-9 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${ssSidebarOpen ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
+                className={`flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${ssSidebarOpen ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
                   <path d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
@@ -4024,9 +4072,9 @@ export default function ChordsViewer({
                 onClick={onClose}
                 aria-label="Zapri"
                 title="Zapri"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
               </button>
@@ -4045,15 +4093,15 @@ export default function ChordsViewer({
                 disabled={!ssActive && ssRequested}
                 aria-label={ssActive ? "Pavza" : "Predvajaj"}
                 title={ssActive ? "Pavza" : "Predvajaj"}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
                 {ssActive ? (
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 lg:h-5 lg:w-5">
                     <rect x="6" y="5" width="4" height="14" rx="1" />
                     <rect x="14" y="5" width="4" height="14" rx="1" />
                   </svg>
                 ) : (
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 h-4 w-4">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 h-4 w-4 lg:h-5 lg:w-5">
                     <path d="M7 5v14l12-7z" />
                   </svg>
                 )}
@@ -4065,9 +4113,9 @@ export default function ChordsViewer({
                 }}
                 aria-label="Na začetek"
                 title="Na začetek"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
                   <path d="M6 5v14" />
                   <path d="M18 19 9 12l9-7z" fill="currentColor" />
                 </svg>
@@ -4077,9 +4125,9 @@ export default function ChordsViewer({
                 onClick={() => playerCtlRef.current?.seekBy(5)}
                 aria-label="5 s naprej"
                 title="5 s naprej"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
                   <path d="M13 19l7-7-7-7" /><path d="M5 19l7-7-7-7" />
                 </svg>
               </button>
@@ -4088,9 +4136,9 @@ export default function ChordsViewer({
                 onClick={() => playerCtlRef.current?.seekBy(-5)}
                 aria-label="5 s nazaj"
                 title="5 s nazaj"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
                   <path d="M11 19l-7-7 7-7" /><path d="M19 19l-7-7 7-7" />
                 </svg>
               </button>
@@ -4100,9 +4148,9 @@ export default function ChordsViewer({
                 aria-label="Prevrtavanje"
                 title="Prevrtavanje"
                 aria-pressed={ssSeekOpen}
-                className={`flex h-9 w-9 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${ssSeekOpen ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
+                className={`flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${ssSeekOpen ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
                   <path d="M3 12h4M13 12h8" /><circle cx="10" cy="12" r="3" />
                 </svg>
               </button>
@@ -4116,9 +4164,9 @@ export default function ChordsViewer({
                 aria-label="Nastavitve"
                 title="Nastavitve"
                 aria-expanded={themeMenuPos !== null}
-                className={`flex h-9 w-9 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${themeMenuPos ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
+                className={`flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${themeMenuPos ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
                   <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
                   <circle cx="12" cy="12" r="3" />
                 </svg>
@@ -4206,7 +4254,7 @@ export default function ChordsViewer({
                   // Zaprta stranska vrstica: besedilo dobi njen prostor (do gumba
                   // Meni, ki plava v kotu); ResizeObserver pisavo prilagodi.
                   paddingRight: ssSidebarOpen
-                    ? "calc(max(0.75rem, env(safe-area-inset-right)) + 3.125rem)"
+                    ? "calc(max(0.75rem, env(safe-area-inset-right)) + var(--ss-btn) + 0.875rem)"
                     : "calc(max(0.75rem, env(safe-area-inset-right)) + 0.5rem)",
                   paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
                   paddingLeft: "max(2.5rem, calc(env(safe-area-inset-left) + 1.25rem), 3vw)",
@@ -4242,9 +4290,9 @@ export default function ChordsViewer({
             </>
           ) : (
             <div className="relative isolate flex flex-1 flex-col items-center justify-center gap-6 bg-[#0a0a0b] px-6 text-center text-white">
-              {/* Začetni zaslon Sam Špili: isto ozadje kot aplikacija (vzorec Vrat kitare). */}
+              {/* Začetni zaslon Sam Špili: vzorec izbranega ozadja Sam Špili (privzeto Akordni diagram). */}
               <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-                <PatternSvg id="fretboard" colors={BACKGROUND_COLORS} className="h-full w-full" />
+                {theme.pattern && <PatternSvg id={theme.pattern} colors={patternColors} className="h-full w-full" />}
                 <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_45%,rgba(255,255,255,0.04),transparent_70%)]" />
               </div>
               <button
