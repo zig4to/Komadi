@@ -4499,12 +4499,10 @@ export default function ChordsViewer({
               </div>
             </>
           ) : (
-            <div className="relative isolate flex flex-1 flex-col items-center justify-center gap-6 bg-[#0a0a0b] px-6 text-center text-white">
-              {/* Začetni zaslon Sam Špili: vzorec izbranega ozadja Sam Špili (privzeto Akordni diagram). */}
-              <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-                {theme.pattern && <PatternSvg id={theme.pattern} colors={patternColors} className="h-full w-full" />}
-                <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_45%,rgba(255,255,255,0.04),transparent_70%)]" />
-              </div>
+            <div className="relative isolate flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center text-(--cv-text)">
+              {/* Začetni zaslon Sam Špili: isto ozadje kot med igranjem (barva, preliv in
+                  vzorec izbranega ozadja riše ovoj Sam Špili); tu samo blag sij v sredini. */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_50%_45%,rgba(255,255,255,0.04),transparent_70%)]" />
               {/* Desno zgoraj, kot med predvajanjem: ✕, pod njim Meni (odpre meni ⚙ z
                   nastavitvami in predefiniranimi temami) in celozaslonsko. */}
               <div
@@ -4545,11 +4543,11 @@ export default function ChordsViewer({
               </div>
               <div>
                 <p className="text-4xl font-light leading-tight tracking-tight sm:text-6xl">{song.title}</p>
-                <p className="mt-2 text-xl font-light text-neutral-400 sm:text-3xl">{song.author}</p>
+                <p className="mt-2 text-xl font-light text-(--cv-muted) sm:text-3xl">{song.author}</p>
               </div>
               {follower ? (
                 <div className="flex flex-col items-center gap-4">
-                  <p className="text-base text-neutral-400">Čakaš, da {follower.leaderName} zažene skladbo …</p>
+                  <p className="text-base text-(--cv-muted)">Čakaš, da {follower.leaderName} zažene skladbo …</p>
                   {!ssIsFullscreen && canBrowserFullscreen() && (
                     <button
                       type="button"
@@ -4570,7 +4568,7 @@ export default function ChordsViewer({
                 disabled={ssRequested}
                 aria-label="Predvajaj"
                 title="Predvajaj"
-                className="group relative flex h-24 w-24 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-xl transition hover:scale-105 hover:border-white/25 hover:bg-white/[0.1] active:scale-95 disabled:opacity-70 sm:h-28 sm:w-28"
+                className="group relative flex h-24 w-24 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_15%,transparent)] bg-[color-mix(in_srgb,var(--cv-text)_6%,transparent)] text-(--cv-text) shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-xl transition hover:scale-105 hover:border-[color-mix(in_srgb,var(--cv-text)_25%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)] active:scale-95 disabled:opacity-70 sm:h-28 sm:w-28"
               >
                 {/* Nežen obroč okrog gumba */}
                 <span aria-hidden="true" className="pointer-events-none absolute -inset-3 rounded-full border border-white/[0.06] transition group-hover:-inset-4 group-hover:border-white/10" />
@@ -4584,9 +4582,9 @@ export default function ChordsViewer({
               </button>
               )}
               {!smartAvailable && (
-                <p className="text-sm text-neutral-400">Za to skladbo še ni besedila s časi — Smart play ne bo sledil petju.</p>
+                <p className="text-sm text-(--cv-muted)">Za to skladbo še ni besedila s časi — Smart play ne bo sledil petju.</p>
               )}
-              <p className="hidden text-sm text-neutral-500 portrait:block">Za večje vrstice obrni telefon v ležeči položaj.</p>
+              <p className="hidden text-sm text-(--cv-muted) portrait:block">Za večje vrstice obrni telefon v ležeči položaj.</p>
             </div>
           )}
         </div>
