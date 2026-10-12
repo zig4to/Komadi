@@ -73,6 +73,9 @@ const CHORD_COLOR_KEY = "komadi:chords:chordColor";
 const TEXT_COLOR_KEY = "komadi:chords:textColor";
 const SECTION_COLOR_KEY = "komadi:chords:sectionColor";
 const MARK_FILL_KEY = "komadi:chords:markFill";
+// Barva črte ob trenutni vrstici (Smart play) in sij akordov — nastavita jih predefinirane teme.
+const LINE_COLOR_KEY = "komadi:chords:lineColor";
+const CHORD_GLOW_KEY = "komadi:chords:chordGlow";
 const MARK_BORDER_KEY = "komadi:chords:markBorder";
 const MARK_SHAPE_KEY = "komadi:chords:markShape";
 const MARK_WIDTH_KEY = "komadi:chords:markWidth";
@@ -218,6 +221,43 @@ const CHORD_COLORS = [
   { label: "Vijolična", dark: "#c4b5fd", light: "#6d28d9" },
   { label: "Turkizna", dark: "#5eead4", light: "#0f766e" },
   { label: "Limeta", dark: "#bef264", light: "#4d7c0f" },
+  // Za predefinirane teme (Globoka noč …).
+  { label: "Ledeno modra", dark: "#7dd3fc", light: "#0369a1" },
+  { label: "Smaragdna", dark: "#6ee7b7", light: "#047857" },
+  { label: "Breskev", dark: "#fdba74", light: "#c2410c" },
+];
+
+// Predefinirane teme (⚙ → Tema → Predefinirane teme): en dotik nastavi ozadje,
+// barvo besedila, akordov in pripisov, oznako igranega akorda, barvo črte
+// trenutne vrstice in sij akordov. Barve so po imenu (label) iz seznamov zgoraj.
+type ThemePreset = {
+  label: string;
+  bg: string;
+  // Ozadje v Sam Špili, če je drugačno od navadnega pogleda (Default: Akordni diagram).
+  ssBg?: string;
+  // Ponastavi vidnost vzorca na privzeto (Default).
+  resetPattern?: boolean;
+  text: string;
+  chord: string;
+  section: string;
+  markFill: string;
+  markBorder: string;
+  markShape: number;
+  markWidth: number;
+  line: string;
+  glow: boolean;
+};
+const THEME_PRESETS: ThemePreset[] = [
+  // Privzeti videz (kot ob prvem odprtju): navaden pogled Črna, Sam Špili Akordni diagram.
+  { label: "Default", bg: "Črna", ssBg: "Akordni diagram", resetPattern: true, text: "Samodejna", chord: "Rumena", section: "Samodejna", markFill: "Oranžna", markBorder: "Kot ozadje", markShape: 1, markWidth: 1, line: "#fb923c", glow: false },
+  { label: "Globoka noč", bg: "Globoka noč", text: "Hladna", chord: "Ledeno modra", section: "Vijolična", markFill: "Brez", markBorder: "Modra", markShape: 3, markWidth: 0, line: "#7dd3fc", glow: true },
+  { label: "Globoka noč zelena", bg: "Globoka noč zelena", text: "Samodejna", chord: "Smaragdna", section: "Zelena", markFill: "Brez", markBorder: "Zelena", markShape: 3, markWidth: 0, line: "#6ee7b7", glow: true },
+  { label: "Globoka noč vijolična", bg: "Globoka noč vijolična", text: "Samodejna", chord: "Vijolična", section: "Vijolična", markFill: "Brez", markBorder: "Vijolična", markShape: 3, markWidth: 0, line: "#c4b5fd", glow: true },
+  { label: "Globoka noč oranžna", bg: "Globoka noč oranžna", text: "Topla", chord: "Breskev", section: "Oranžna", markFill: "Brez", markBorder: "Oranžna", markShape: 3, markWidth: 0, line: "#fdba74", glow: true },
+  { label: "Mirno jeklo", bg: "Mirno jeklo", text: "Hladna", chord: "Turkizna", section: "Siva", markFill: "Turkizna", markBorder: "Kot ozadje", markShape: 2, markWidth: 1, line: "#5eead4", glow: false },
+  { label: "Mirni dim", bg: "Mirni dim", text: "Siva", chord: "Kremna", section: "Siva", markFill: "Rumena", markBorder: "Kot ozadje", markShape: 2, markWidth: 1, line: "#fde68a", glow: false },
+  { label: "Mirni gozd", bg: "Mirni gozd", text: "Samodejna", chord: "Limeta", section: "Zelena", markFill: "Zelena", markBorder: "Kot ozadje", markShape: 2, markWidth: 1, line: "#bef264", glow: false },
+  { label: "Mirna globina", bg: "Mirna globina", text: "Hladna", chord: "Ledeno modra", section: "Modra", markFill: "Modra", markBorder: "Kot ozadje", markShape: 2, markWidth: 1, line: "#7dd3fc", glow: false },
 ];
 
 function readNumber(key: string, fallback: number) {
@@ -456,6 +496,20 @@ export default function ChordsViewer({
   useEffect(() => writeNumber(MARK_SHAPE_KEY, markShapeIndex), [markShapeIndex]);
   const [markWidthIndex, setMarkWidthIndex] = useState(() => readNumber(MARK_WIDTH_KEY, DEFAULT_MARK_WIDTH));
   useEffect(() => writeNumber(MARK_WIDTH_KEY, markWidthIndex), [markWidthIndex]);
+  const [lineColor, setLineColor] = useState(() => {
+    try {
+      return window.localStorage.getItem(LINE_COLOR_KEY) ?? "#fb923c";
+    } catch {
+      return "#fb923c";
+    }
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LINE_COLOR_KEY, lineColor);
+    } catch {}
+  }, [lineColor]);
+  const [chordGlow, setChordGlow] = useState(() => readNumber(CHORD_GLOW_KEY, 0) === 1);
+  useEffect(() => writeNumber(CHORD_GLOW_KEY, chordGlow ? 1 : 0), [chordGlow]);
   const theme = BACKGROUNDS[bgIndex] ?? BACKGROUNDS[DEFAULT_BG];
   const chordColor = CHORD_COLORS[chordColorIndex] ?? CHORD_COLORS[0];
   const textColorFor = (c: (typeof TEXT_COLORS)[number]) => (theme.light ? c.light : c.dark) ?? theme.text;
@@ -489,10 +543,40 @@ export default function ChordsViewer({
     "--cv-mark-border": markBorder,
     "--cv-mark-radius": markRadius,
     "--cv-mark-width": markWidth,
+    // Črta ob trenutni vrstici in (po želji) mehak sij akordov (globals.css: [data-chord-name]).
+    "--cv-line": lineColor,
+    "--cv-chord-glow": chordGlow ? `0 0 10px color-mix(in srgb, ${shownChordColor} 55%, transparent)` : "none",
   } as CSSProperties;
+  // Uporabi predefinirano temo (ozadje velja za trenutni način: navaden pogled ali Sam Špili).
+  const applyPreset = (p: ThemePreset) => {
+    const idx = <T extends { label: string }>(list: T[], label: string, fallback: number) => {
+      const i = list.findIndex((x) => x.label === label);
+      return i >= 0 ? i : fallback;
+    };
+    setBgIndex(idx(BACKGROUNDS, samSpili && p.ssBg ? p.ssBg : p.bg, samSpili ? DEFAULT_SS_BG : DEFAULT_BG));
+    if (p.resetPattern) setPatternOpacity(DEFAULT_PATTERN_OPACITY);
+    setTextColorIndex(idx(TEXT_COLORS, p.text, 0));
+    setChordColorIndex(idx(CHORD_COLORS, p.chord, 0));
+    setSectionColorIndex(idx(SECTION_COLORS, p.section, 0));
+    setMarkFillIndex(idx(MARK_FILLS, p.markFill, 0));
+    setMarkBorderIndex(idx(MARK_BORDERS, p.markBorder, 0));
+    setMarkShapeIndex(p.markShape);
+    setMarkWidthIndex(p.markWidth);
+    setLineColor(p.line);
+    setChordGlow(p.glow);
+  };
+  const activePreset = THEME_PRESETS.find(
+    (p) =>
+      BACKGROUNDS[bgIndex]?.label === (samSpili && p.ssBg ? p.ssBg : p.bg) &&
+      CHORD_COLORS[chordColorIndex]?.label === p.chord &&
+      MARK_FILLS[markFillIndex]?.label === p.markFill &&
+      lineColor === p.line &&
+      chordGlow === p.glow,
+  )?.label;
   // Izbira barv (ozadje, besedilo, akordi, pripisi) — v meniju ⚙ (v "Sam Špili" pod "Tema").
   // Oba razdelka sta ob odprtju menija strnjena.
   const [bgPickerOpen, setBgPickerOpen] = useState(false);
+  const [presetsOpen, setPresetsOpen] = useState(true);
   const [chordPickerOpen, setChordPickerOpen] = useState(false);
   const [textPickerOpen, setTextPickerOpen] = useState(false);
   const [sectionPickerOpen, setSectionPickerOpen] = useState(false);
@@ -547,6 +631,37 @@ export default function ChordsViewer({
   );
   const themePickers = (
     <>
+      <div>
+        {pickerHeader("Predefinirane teme", presetsOpen, () => setPresetsOpen((v) => !v))}
+        {presetsOpen && (
+          <div className="grid grid-cols-3 gap-2">
+            {THEME_PRESETS.map((p) => {
+              const b = BACKGROUNDS.find((x) => x.label === (samSpili && p.ssBg ? p.ssBg : p.bg)) ?? BACKGROUNDS[DEFAULT_BG];
+              const c = CHORD_COLORS.find((x) => x.label === p.chord) ?? CHORD_COLORS[0];
+              const on = activePreset === p.label;
+              return (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => applyPreset(p)}
+                  aria-pressed={on}
+                  title={p.label}
+                  className="flex min-w-0 flex-col items-center gap-1 text-[10px] leading-tight text-neutral-300"
+                >
+                  <span
+                    style={{ backgroundColor: b.bg, backgroundImage: "gradient" in b ? b.gradient : undefined, borderColor: on ? p.line : undefined }}
+                    className={`flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border font-mono text-[13px] font-bold ${on ? "border-2" : "border-neutral-600"}`}
+                  >
+                    <span style={{ color: c.dark, textShadow: p.glow ? `0 0 8px ${c.dark}` : undefined }}>Am</span>
+                    <span aria-hidden="true" className="h-3 w-0.5 rounded-full" style={{ backgroundColor: p.line }} />
+                  </span>
+                  <span className="w-full truncate text-center">{p.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
       <div>
         {pickerHeader("Barva ozadja", bgPickerOpen, () => setBgPickerOpen((v) => !v))}
         {bgPickerOpen && (
@@ -812,6 +927,8 @@ export default function ChordsViewer({
   useEffect(() => writeNumber(FLOATING_PLAYER_KEY, floatingPlayer ? 1 : 0), [floatingPlayer]);
   const themeButtonRef = useRef<HTMLButtonElement>(null);
   const ssSettingsRef = useRef<HTMLButtonElement>(null);
+  // Začetni zaslon Sam Špili: gumb Meni odpre isti meni ⚙ (stranske vrstice tam ni).
+  const ssStartMenuRef = useRef<HTMLButtonElement>(null);
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const closeThemeMenu = () => setThemeMenuPos(null);
   const toggleThemeMenu = () => {
@@ -831,12 +948,18 @@ export default function ChordsViewer({
     if (!r) return;
     setThemeMenuPos({ bottom: window.innerHeight - r.bottom, left: Math.max(8, r.left - 12 - 288), maxHeight: r.bottom - 8 });
   };
+  const toggleSsStartMenu = () => {
+    if (themeMenuPos) return closeThemeMenu();
+    const r = ssStartMenuRef.current?.getBoundingClientRect();
+    if (!r) return;
+    setThemeMenuPos({ top: r.top, left: Math.max(8, r.left - 12 - 288), maxHeight: window.innerHeight - r.top - 8 });
+  };
   useBackableOpen(themeMenuPos !== null, closeThemeMenu);
   useEffect(() => {
     if (!themeMenuPos) return;
     const onDown = (e: PointerEvent) => {
       const t = e.target as Node;
-      if (themeMenuRef.current?.contains(t) || themeButtonRef.current?.contains(t) || ssSettingsRef.current?.contains(t)) return;
+      if (themeMenuRef.current?.contains(t) || themeButtonRef.current?.contains(t) || ssSettingsRef.current?.contains(t) || ssStartMenuRef.current?.contains(t)) return;
       setThemeMenuPos(null);
     };
     document.addEventListener("pointerdown", onDown);
@@ -923,6 +1046,18 @@ export default function ChordsViewer({
   const [rotateOn, setRotateOn] = useState(false);
   const [rotateLocked, setRotateLocked] = useState(false);
   const [portrait, setPortrait] = useState(() => typeof window !== "undefined" && window.matchMedia("(orientation: portrait)").matches);
+  // Sam Špili (telefon): gumb pod Meni zasuka zaslon v pokončni ali nazaj v ležeči
+  // način — zaklenitev usmeritve, ki jo brskalnik dovoli le v celozaslonskem načinu
+  // (requestFullscreen mora biti v istem dotiku); kjer zaklepanja ni (iPhone), ne naredi nič.
+  const ssToggleOrientation = () => {
+    const o = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+    const lock = () => o?.lock?.(portrait ? "landscape" : "portrait").catch(() => {});
+    if (canBrowserFullscreen() && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(lock, () => {});
+    } else {
+      lock();
+    }
+  };
   const rotateFsRef = useRef(false);
   useEffect(() => {
     const mq = window.matchMedia("(orientation: portrait)");
@@ -3249,11 +3384,14 @@ export default function ChordsViewer({
       >
       <div
         ref={barsItemRef}
-        className="min-h-0 overflow-hidden"
+        className="relative isolate min-h-0 overflow-hidden"
         // Brez transform: ta bi fixed sličico YouTube videa (znotraj vrstice) ujel v ta okvir.
         style={{ opacity: barsHidden ? 0 : 1, transition: `opacity ${BARS_TRANSITION}` }}
       >
-      <div className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 lg:px-16">
+      {/* Telefon: steklena podlaga obeh vrstic — zameglitev je na tem ločenem sloju,
+          ne na vrsticah (backdrop-filter bi kot transform ujel fixed sličico videa). */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-neutral-900/55 backdrop-blur-xl backdrop-saturate-150 lg:hidden" />
+      <div className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 max-lg:bg-transparent lg:px-16">
         {/* Tudi brez kandidatov: v izbirniku posnetka lahko prilepiš povezavo. */}
         <YouTubeMiniPlayer
             videoIds={offsetLocked && lockedVideo ? [lockedVideo] : videoIds}
@@ -3319,9 +3457,9 @@ export default function ChordsViewer({
       </div>
 
       {/* Telefon: drsnik po skladbi čez celo širino, med zgornjo vrstico in orodji. */}
-      <div ref={setSliderHost} className="flex shrink-0 items-center bg-neutral-900 px-4 pb-2 empty:hidden lg:hidden" />
+      <div ref={setSliderHost} className="flex shrink-0 items-center px-4 pb-2 empty:hidden lg:hidden" />
 
-      <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 lg:px-16">
+      <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 max-lg:border-white/10 max-lg:bg-transparent lg:px-16">
         <div
           className="flex items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5"
           role="group"
@@ -3625,7 +3763,7 @@ export default function ChordsViewer({
                 onClick={(e) => seekToLine(i, e)}
                 className={
                   i === shownLine || i === recorderCursor
-                    ? "-ml-2 -mr-1 rounded-r-md bg-[color-mix(in_srgb,var(--cv-text)_8%,transparent)] pl-2 pr-1 shadow-[inset_1.5px_0_0_#fb923c] lg:w-fit lg:shadow-[inset_2px_0_0_#fb923c]"
+                    ? "-ml-2 -mr-1 rounded-r-md bg-[color-mix(in_srgb,var(--cv-text)_8%,transparent)] pl-2 pr-1 shadow-[inset_1.5px_0_0_var(--cv-line)] lg:w-fit lg:shadow-[inset_2px_0_0_var(--cv-line)]"
                     : "-ml-2 -mr-1 pl-2 pr-1 lg:w-fit"
                 }
               >
@@ -4050,13 +4188,26 @@ export default function ChordsViewer({
                 className={`pointer-events-none absolute inset-y-0 z-10 w-px bg-(--cv-text) transition-opacity duration-300 ${ssSidebarOpen ? "opacity-15" : "opacity-0"}`}
                 style={{ right: "calc(max(0.75rem, env(safe-area-inset-right)) + var(--ss-btn) + 0.625rem)" }}
               />
-              {/* Desno zgoraj: gumb Meni in pod njim ✕ (oba vedno vidna), pod njima
+              {/* Desno zgoraj: ✕ in pod njim gumb Meni (oba vedno vidna, enako kot na
+                  začetnem zaslonu), pod njima
                   stranska vrstica (pavza/play, na začetek, ±5 s, prevrtavanje,
                   nastavitve), ki se skrije desno čez rob. Stekleni gumbi v barvah teme. */}
               <div
                 style={{ top: "max(0.75rem, env(safe-area-inset-top))", right: "max(0.75rem, env(safe-area-inset-right))" }}
                 className="absolute z-10 flex flex-col gap-2"
               >
+              {/* Izhod: vedno viden, na vrhu (nad gumbom Meni). */}
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Zapri"
+                title="Zapri"
+                className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
               <button
                 type="button"
                 onClick={toggleSsSidebar}
@@ -4069,18 +4220,21 @@ export default function ChordsViewer({
                   <path d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
-              {/* Izhod: vedno viden, takoj pod gumbom Meni. */}
+              {/* Telefon: zasuk v pokončni / ležeči način (pod gumbom Meni; skrit, ko je meni odprt). */}
+              {!ssSidebarOpen && (
               <button
                 type="button"
-                onClick={onClose}
-                aria-label="Zapri"
-                title="Zapri"
-                className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                onClick={ssToggleOrientation}
+                aria-label={portrait ? "Ležeče" : "Pokončno"}
+                title={portrait ? "Zasukaj v ležeči način" : "Zasukaj v pokončni način"}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)] lg:hidden"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
-                  <path d="M18 6 6 18M6 6l12 12" />
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={`h-4 w-4 transition-transform duration-300 ${portrait ? "rotate-90" : ""}`}>
+                  <rect x="7" y="2" width="10" height="20" rx="2.2" />
+                  <path d="M11 18h2" />
                 </svg>
               </button>
+              )}
               <div
                 aria-hidden={!ssSidebarOpen}
                 inert={!ssSidebarOpen}
@@ -4260,7 +4414,8 @@ export default function ChordsViewer({
                     ? "calc(max(0.75rem, env(safe-area-inset-right)) + var(--ss-btn) + 0.875rem)"
                     : "calc(max(0.75rem, env(safe-area-inset-right)) + 0.5rem)",
                   paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
-                  paddingLeft: "max(2.5rem, calc(env(safe-area-inset-left) + 1.25rem), 3vw)",
+                  // Pokončno (telefon): besedilo bolj levo, da ozek zaslon dobi več širine.
+                  paddingLeft: portrait ? "max(0.9rem, calc(env(safe-area-inset-left) + 0.5rem))" : "max(2.5rem, calc(env(safe-area-inset-left) + 1.25rem), 3vw)",
                 }}
               >
                 {/* relative: offsetTop vrstic je glede na ta blok; spodnji odmik, da se tudi
@@ -4280,7 +4435,7 @@ export default function ChordsViewer({
                       onClick={(e) => !follower && ssSeekToLine(i, e)}
                       className={
                         i === ssHlLine
-                          ? "-mr-1 rounded-r-md bg-[color-mix(in_srgb,var(--cv-text)_8%,transparent)] pr-1 shadow-[inset_2px_0_0_#fb923c]"
+                          ? "-mr-1 rounded-r-md bg-[color-mix(in_srgb,var(--cv-text)_8%,transparent)] pr-1 shadow-[inset_2px_0_0_var(--cv-line)]"
                           : "-mr-1 pr-1"
                       }
                     >
@@ -4298,30 +4453,44 @@ export default function ChordsViewer({
                 {theme.pattern && <PatternSvg id={theme.pattern} colors={patternColors} className="h-full w-full" />}
                 <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_45%,rgba(255,255,255,0.04),transparent_70%)]" />
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Zapri"
-                title="Zapri"
-                className="absolute right-3 top-3 p-1.5 text-neutral-400 hover:text-white"
+              {/* Desno zgoraj, kot med predvajanjem: ✕, pod njim Meni (odpre meni ⚙ z
+                  nastavitvami in predefiniranimi temami) in celozaslonsko. */}
+              <div
+                style={{ top: "max(0.75rem, env(safe-area-inset-top))", right: "max(0.75rem, env(safe-area-inset-right))" }}
+                className="absolute z-10 flex flex-col gap-2"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-              {!ssIsFullscreen && (
-                <button
-                  type="button"
-                  onClick={follower ? ssFollowerFullscreen : enterLandscapeFullscreen}
-                  aria-label="Celozaslonsko"
-                  title={follower ? "Celozaslonsko" : "Celozaslonsko (ležeče)"}
-                  className="absolute right-12 top-3 p-1.5 text-neutral-400 hover:text-white"
-                >
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                    <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+                <button type="button" onClick={onClose} aria-label="Zapri" title="Zapri" className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                    <path d="M18 6 6 18M6 6l12 12" />
                   </svg>
                 </button>
-              )}
+                <button
+                  ref={ssStartMenuRef}
+                  type="button"
+                  onClick={toggleSsStartMenu}
+                  aria-label="Meni"
+                  title="Meni (nastavitve in teme)"
+                  aria-expanded={themeMenuPos !== null}
+                  className={`flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${themeMenuPos ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                    <path d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+                {!ssIsFullscreen && (
+                  <button
+                    type="button"
+                    onClick={follower ? ssFollowerFullscreen : enterLandscapeFullscreen}
+                    aria-label="Celozaslonsko"
+                    title={follower ? "Celozaslonsko" : "Celozaslonsko (ležeče)"}
+                    className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                      <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+                    </svg>
+                  </button>
+                )}
+              </div>
               <div>
                 <p className="text-4xl font-light leading-tight tracking-tight sm:text-6xl">{song.title}</p>
                 <p className="mt-2 text-xl font-light text-neutral-400 sm:text-3xl">{song.author}</p>

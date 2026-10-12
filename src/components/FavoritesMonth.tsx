@@ -155,7 +155,8 @@ export function FavoriteCard({
           >
             {song.author}
           </button>
-          {date && <span className="shrink-0">· {date}</span>}
+          {/* Datum samo pri priljubljenih (pri Preverjeno špila zaenkrat skrit). */}
+          {date && variant !== "verified" && <span className="shrink-0">· {date}</span>}
         </p>
         <span className="contents">
           <ChordsButtons song={song} onChordsClick={onChordsClick} merged onAddToJam={onAddToJam} onAddToSharedJam={onAddToSharedJam} />

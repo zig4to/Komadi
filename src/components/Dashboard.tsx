@@ -3336,8 +3336,6 @@ export default function Dashboard({ user }: { user: User }) {
             const byDate = (a: Song, b: Song) => (b.verified_player_at ?? "").localeCompare(a.verified_player_at ?? "");
             const mine = verifiedSongs.filter((x) => x.user_id === user.id).sort(byDate);
             const others = verifiedSongs.filter((x) => x.user_id !== user.id).sort(byDate);
-            const dateOf = (x: Song) =>
-              x.verified_player_at ? new Date(x.verified_player_at).toLocaleDateString("sl-SI", { day: "numeric", month: "short", year: "numeric" }) : "";
             const groups = [
               { title: "Moje skladbe", list: mine, own: true },
               { title: "Skladbe drugih", list: others, own: false },
@@ -3357,7 +3355,6 @@ export default function Dashboard({ user }: { user: User }) {
                     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                       {g.list.map((song) => (
                         <div key={song.id}>
-                          <p className="mb-1 px-1 text-xs text-neutral-500">Preverjeno {dateOf(song)}</p>
                           {g.own ? (
                             <>
                               <SongCard

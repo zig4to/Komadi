@@ -172,6 +172,12 @@ textarea,
   .bg-blob { animation: none !important; }
 }
 
+/* Pregledovalnik akordov: mehak sij imen akordov (predefinirane teme Globoka noč);
+   --cv-chord-glow je "none", ko je sij izklopljen. */
+[data-chord-name] {
+  text-shadow: var(--cv-chord-glow, none);
+}
+
 /* Naključno izbrana skladba (SongCard highlighted): rob rahlo utripa vijolično;
    delno naključno izbrana limetino in malo manj izrazito. */
 @keyframes random-pick-pulse {
