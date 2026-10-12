@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 
-// Uglaševalec (⋮ meni → Uglaševalec): mikrofon prek Web Audio, višina tona z
+// Tuner (kartica na domači strani, prej "Uglaševalec"): mikrofon prek Web Audio, višina tona z
 // algoritmom YIN, kazalec v centih glede na najbližjo struno izbrane uglasitve
 // (ali na struno, ki jo uporabnik izbere s tapom).
 
@@ -297,7 +297,7 @@ export default function Tuner({ onClose }: { onClose: () => void }) {
           <circle cx="12" cy="12" r="1.5" />
           <path d="M5 19h14" />
         </svg>
-        <h2 className="flex-1 text-base font-semibold">Uglaševalec</h2>
+        <h2 className="flex-1 text-base font-semibold">Tuner</h2>
         <button
           type="button"
           onClick={onClose}

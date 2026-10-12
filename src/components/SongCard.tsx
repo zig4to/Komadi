@@ -261,7 +261,8 @@ export default function SongCard({
       style={cardStyle}
       className={`relative isolate overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] px-4 py-3 transition duration-200 hover:-translate-y-0.5 dark:rounded-[26px] dark:bg-none dark:bg-white/[0.035] dark:shadow-none! lg:min-h-[112px] ${
         highlighted
-          ? `${highlightTone === "lime" ? "partial-pick-pulse" : "random-pick-pulse"} dark:bg-white/[0.055]`
+          ? // Naključno izbrana: višja kartica (gumbi spodaj), večji naslov.
+            `${highlightTone === "lime" ? "partial-pick-pulse" : "random-pick-pulse"} flex min-h-[148px] flex-col py-3.5 lg:min-h-[148px] lg:px-5 dark:bg-white/[0.055]`
           : "border-neutral-200 dark:border-white/[0.08]!"
       }`}
     >
@@ -314,14 +315,20 @@ export default function SongCard({
       )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-medium text-neutral-900 lg:text-base dark:font-normal dark:text-white">
+          <p
+            className={`truncate text-neutral-900 dark:text-white ${
+              highlighted ? "text-xl font-normal lg:text-2xl dark:font-light" : "text-lg font-medium lg:text-base dark:font-normal"
+            }`}
+          >
             {song.title}
           </p>
           <button
             type="button"
             onClick={() => onFilterAuthor?.(song.author)}
             title={`Prikaži vse skladbe izvajalca ${song.author}`}
-            className="block max-w-full truncate text-left text-sm text-neutral-500 hover:text-emerald-600 hover:underline dark:text-neutral-400 dark:hover:text-emerald-400"
+            className={`block max-w-full truncate text-left text-neutral-500 hover:text-emerald-600 hover:underline dark:text-neutral-400 dark:hover:text-emerald-400 ${
+              highlighted ? "mt-0.5 text-base" : "text-sm"
+            }`}
           >
             {song.author}
           </button>
@@ -647,7 +654,7 @@ export default function SongCard({
         {song.origin && <Badge>{song.origin}</Badge>}
       </div>
 
-      <div className="mt-1 flex w-full min-w-0 flex-wrap items-center gap-1.5 text-xs">
+      <div className={`flex w-full min-w-0 flex-wrap items-center gap-1.5 text-xs ${highlighted ? "mt-auto pt-3" : "mt-1"}`}>
         <ChordsButtons song={song} onChordsClick={onChordsClick} merged onAddToJam={onAddToJam} onAddToSharedJam={onAddToSharedJam} />
       </div>
 

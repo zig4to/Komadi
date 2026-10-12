@@ -28,7 +28,8 @@ export default function ThemeProvider() {
             "radial-gradient(55rem 38rem at 100% 0%, rgba(139,92,246,0.13), transparent 65%), radial-gradient(50rem 36rem at 0% 100%, rgba(16,185,129,0.10), transparent 65%)",
         }}
       />
-      {pattern && <PatternSvg id={pattern} colors={BACKGROUND_COLORS} className="relative h-full w-full" />}
+      {/* Telefon: vrat kitare malo manj viden (opacity 60 %). */}
+      {pattern && <PatternSvg id={pattern} colors={BACKGROUND_COLORS} className={`relative h-full w-full ${pattern === "fretboard" ? "max-lg:opacity-60" : ""}`} />}
       {/* Računalnik: mehka svetloba počasi potuje po vratu kitare (telefon miruje — baterija). */}
       {pattern === "fretboard" && <FretboardGlow className="fret-glow absolute inset-0 hidden h-full w-full lg:block" />}
     </div>

@@ -1,46 +1,38 @@
 "use client";
 
-// Izbira načina dodajanja po kliku na "+" (Dashboard.tsx): trije gumbi, kjer
-// je obroba sama oblika ikone (mikrofon, strela, telefon), ime pa je napisano
-// znotraj nje. Oblike so nekoliko razširjene, da besedilo sede notri.
+// Izbira načina dodajanja po kliku na "+" (Dashboard.tsx): tri kartice v slogu
+// domače strani (ikona v barvnem kvadratku, naslov, opis, puščica) —
+// Glasovno, Hitro, Prek telefona (celoten obrazec).
 
-const SHAPE = {
-  fill: "currentColor",
-  fillOpacity: 0.07,
-  stroke: "currentColor",
-  strokeWidth: 2.2,
-  strokeLinejoin: "round" as const,
-  strokeLinecap: "round" as const,
-};
+const CARD =
+  "group flex min-w-0 items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-3.5 text-left transition hover:bg-neutral-50 lg:p-4 dark:rounded-[22px] dark:border-white/[0.08] dark:bg-white/[0.035] dark:hover:bg-white/[0.06]";
 
-const LABEL = {
-  fill: "currentColor",
-  textAnchor: "middle" as const,
-  fontWeight: 600,
-  fontFamily: "inherit",
-};
-
-function ChoiceButton({
+function ChoiceCard({
   label,
+  hint,
   colorClass,
   onClick,
   children,
 }: {
   label: string;
+  hint: string;
   colorClass: string;
   onClick: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className={`group shrink-0 rounded-2xl p-1 transition duration-200 hover:scale-105 focus-visible:outline-2 ${colorClass}`}
-    >
-      <svg viewBox="0 0 120 136" className="h-32 w-28 lg:h-36 lg:w-32" aria-hidden="true">
-        {children}
+    <button type="button" onClick={onClick} className={CARD}>
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neutral-100 dark:bg-white/[0.06] ${colorClass}`}>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
+          {children}
+        </svg>
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] text-neutral-900 dark:text-white">{label}</span>
+        <span className="block truncate text-xs text-neutral-500">{hint}</span>
+      </span>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-neutral-400 dark:text-neutral-600">
+        <path d="M7 17 17 7M7 7h10v10" />
       </svg>
     </button>
   );
@@ -56,38 +48,19 @@ export default function AddChoiceIcons({
   onPhone: () => void;
 }) {
   return (
-    // Piramida: "Glasovno" zgoraj na sredini, spodaj "Prek telefona" in "Hitro".
-    <div className="flex flex-col items-center gap-2">
-      {/* Mikrofon: širša glava (kapsula), da gre "Glasovno" noter. */}
-      <ChoiceButton label="Glasovno" colorClass="text-sky-600 dark:text-sky-400" onClick={onVoice}>
-        <rect x="14" y="4" width="92" height="84" rx="42" {...SHAPE} />
-        <path d="M6 70a54 54 0 0 0 108 0" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
-        <path d="M60 124v-12M42 130h36" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
-        <text x="60" y="51" fontSize="15" {...LABEL}>
-          Glasovno
-        </text>
-      </ChoiceButton>
-
-      <div className="flex items-end justify-center gap-6 sm:gap-12">
-        {/* Telefon: "Prek telefona" v dveh vrsticah na zaslonu. */}
-        <ChoiceButton label="Prek telefona" colorClass="text-emerald-600 dark:text-emerald-400" onClick={onPhone}>
-          <rect x="24" y="4" width="72" height="128" rx="12" {...SHAPE} />
-          <path d="M52 120h16" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
-          <text x="60" y="62" fontSize="15" {...LABEL}>
-            Prek
-          </text>
-          <text x="60" y="80" fontSize="15" {...LABEL}>
-            telefona
-          </text>
-        </ChoiceButton>
-        {/* Strela: razširjena na sredini, kjer je "Hitro". */}
-        <ChoiceButton label="Hitro" colorClass="text-fuchsia-600 dark:text-fuchsia-400" onClick={onQuick}>
-          <path d="M80 4 12 80h46l-12 52 64-80H64z" {...SHAPE} />
-          <text x="58" y="72" fontSize="17" {...LABEL}>
-            Hitro
-          </text>
-        </ChoiceButton>
-      </div>
+    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
+      <ChoiceCard label="Glasovno" hint="nareki izvajalca in naslov" colorClass="text-sky-600 dark:text-sky-400" onClick={onVoice}>
+        <rect x="9" y="2" width="6" height="12" rx="3" />
+        <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+        <path d="M12 18v4" />
+      </ChoiceCard>
+      <ChoiceCard label="Hitro" hint="naslov in izvajalec v čakalno vrsto" colorClass="text-fuchsia-600 dark:text-fuchsia-400" onClick={onQuick}>
+        <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+      </ChoiceCard>
+      <ChoiceCard label="Prek telefona" hint="celoten obrazec z vsemi podatki" colorClass="text-emerald-600 dark:text-emerald-400" onClick={onPhone}>
+        <rect x="6" y="2" width="12" height="20" rx="2.5" />
+        <path d="M11 18h2" />
+      </ChoiceCard>
     </div>
   );
 }

@@ -9,6 +9,7 @@ export default function AutoScrollControl({
   scrollRef,
   speedFactor = 1,
   onPlayingChange,
+  above,
 }: {
   scrollRef: React.RefObject<HTMLElement | null>;
   // Množitelj hitrosti (1 = PDF). Besedilo akordov je gostejše od PDF strani,
@@ -16,6 +17,9 @@ export default function AutoScrollControl({
   speedFactor?: number;
   // Ali samodejno pomikanje teče — ChordsViewer med njim skrije zgornji vrstici.
   onPlayingChange?: (playing: boolean) => void;
+  // Dodatni gumbi nad kontrolo, v istem plavajočem vogalu (ChordsViewer: velikost
+  // pisave v ležečem načinu).
+  above?: React.ReactNode;
 }) {
   // Samodejno pomikanje: "autoScrollStarted" je enosmerno stikalo (krogec ->
   // kontrolna vrstica), "isPlaying" pa dvosmerni play/pause preklop znotraj
@@ -190,8 +194,16 @@ export default function AutoScrollControl({
     };
   }, [isPlaying, scrollRef, speedFactor]);
 
+  // Plavajoči vogal (spodaj desno): neobvezni gumbi `above`, pod njimi kontrola.
+  const corner = (control: React.ReactNode) => (
+    <div style={cornerStyle} className="fixed bottom-4 right-4 z-10 flex flex-col items-center gap-2">
+      {above}
+      {control}
+    </div>
+  );
+
   if (!autoScrollStarted) {
-    return (
+    return corner(
       <button
         type="button"
         onClick={() => {
@@ -200,8 +212,7 @@ export default function AutoScrollControl({
         }}
         aria-label="Zaženi samodejno pomikanje"
         title="Zaženi samodejno pomikanje"
-        style={cornerStyle}
-        className="fixed bottom-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-900/90 border-2 border-amber-400 text-amber-400 shadow-lg hover:bg-neutral-800 hover:text-amber-300 active:scale-95"
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-900/90 border-2 border-amber-400 text-amber-400 shadow-lg hover:bg-neutral-800 hover:text-amber-300 active:scale-95"
       >
         <svg
           aria-hidden="true"
@@ -216,16 +227,15 @@ export default function AutoScrollControl({
           <circle cx="12" cy="12" r="9" />
           <path d="M10 8.5v7l6-3.5-6-3.5z" fill="currentColor" stroke="none" />
         </svg>
-      </button>
+      </button>,
     );
   }
 
   // Na telefonu navpično (zraste navzgor iz krogca: + na vrhu, predvajaj/
   // premor spodaj), na računalniku vodoravno v izvornem vrstnem redu.
-  return (
+  return corner(
     <div
-      style={cornerStyle}
-      className="fixed bottom-4 right-4 z-10 flex flex-col items-center gap-0.5 rounded-full bg-neutral-900/90 px-1 py-1 border-2 border-amber-400 text-neutral-200 shadow-lg lg:flex-row"
+      className="flex flex-col items-center gap-0.5 rounded-full bg-neutral-900/90 px-1 py-1 border-2 border-amber-400 text-neutral-200 shadow-lg lg:flex-row"
     >
       <button
         type="button"
@@ -301,6 +311,6 @@ export default function AutoScrollControl({
           </svg>
         )}
       </button>
-    </div>
+    </div>,
   );
 }

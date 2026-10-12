@@ -110,6 +110,7 @@ function ActionCard({
   disabled,
   viewToggle,
   row = false,
+  small = false,
   className = "",
   decor,
 }: {
@@ -123,6 +124,8 @@ function ActionCard({
   viewToggle?: boolean;
   // Vodoravna (nizka) kartica: ikona, besedilo in puščica v eni vrsti.
   row?: boolean;
+  // Manjše besedilo in ikona (polovični kartici Tuner / Lestvice na telefonu).
+  small?: boolean;
   className?: string;
   // Okras v ozadju kartice (blag vzorec v spodnjem desnem kotu).
   decor?: React.ReactNode;
@@ -134,30 +137,30 @@ function ActionCard({
       disabled={disabled}
       aria-pressed={active}
       {...(viewToggle ? { "data-view-toggle": true } : {})}
-      className={`${CARD} group relative isolate flex min-w-0 gap-3 overflow-hidden p-3.5 text-left transition disabled:opacity-40 lg:p-4 ${
+      className={`${CARD} group relative isolate flex min-w-0 overflow-hidden text-left ${small ? "gap-2.5 p-3 lg:gap-3 lg:p-4" : "gap-3 p-3.5"} transition disabled:opacity-40 lg:p-4 ${
         row ? "flex-row items-center" : "flex-col justify-between"
       } ${
         active ? `ring-2 ${tone.ring} ${tone.tint}` : "hover:bg-neutral-50 dark:hover:bg-white/[0.06]"
       } ${className}`}
     >
       {decor}
-      <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-100 dark:bg-white/[0.06] ${tone.text}`}>
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
+      <span className={`flex shrink-0 items-center justify-center rounded-xl bg-neutral-100 dark:bg-white/[0.06] ${small ? "h-8 w-8 lg:h-9 lg:w-9" : "h-9 w-9"} ${tone.text}`}>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={small ? "h-4 w-4 lg:h-[18px] lg:w-[18px]" : "h-[18px] w-[18px]"}>
           {icon}
         </svg>
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15px] text-neutral-900 dark:text-white">{label}</span>
-        <span className="block truncate text-xs text-neutral-500">{hint}</span>
+        <span className={`block truncate text-neutral-900 dark:text-white ${small ? "text-sm lg:text-[15px]" : "text-[15px]"}`}>{label}</span>
+        <span className={`block truncate text-neutral-500 ${small ? "text-[11px] lg:text-xs" : "text-xs"}`}>{hint}</span>
       </span>
-      {row && <ArrowUpRight className="h-4 w-4 shrink-0 text-neutral-400 dark:text-neutral-600" />}
+      {row && <ArrowUpRight className={`shrink-0 text-neutral-400 dark:text-neutral-600 ${small ? "h-3.5 w-3.5 lg:h-4 lg:w-4" : "h-4 w-4"}`} />}
     </button>
   );
 }
 
 // Barve novih kartic se ne ponavljajo s statistiko (siva, oranžna, turkizna,
 // fuksija): Naključno vijolična, Delno limetina (pikica), Novo smaragdna, Popularno
-// rožnata, Filtri modra, Uglaševalec jantarna.
+// rožnata, Filtri modra, Tuner jantarna, Lestvice indigo.
 const TONES = {
   violet: { text: "text-violet-600 dark:text-violet-400", ring: "ring-violet-500/50", tint: "bg-violet-500/[0.06]" },
   lime: { text: "text-lime-600 dark:text-lime-400", ring: "ring-lime-500/50", tint: "bg-lime-500/[0.06]" },
@@ -165,6 +168,7 @@ const TONES = {
   rose: { text: "text-rose-600 dark:text-rose-400", ring: "ring-rose-500/50", tint: "bg-rose-500/[0.06]" },
   blue: { text: "text-blue-600 dark:text-blue-400", ring: "ring-blue-500/50", tint: "bg-blue-500/[0.06]" },
   amber: { text: "text-amber-600 dark:text-amber-400", ring: "ring-amber-500/50", tint: "bg-amber-500/[0.06]" },
+  indigo: { text: "text-indigo-600 dark:text-indigo-400", ring: "ring-indigo-500/50", tint: "bg-indigo-500/[0.06]" },
 };
 
 function filterCountLabel(n: number) {
@@ -197,6 +201,7 @@ export function HomeBento({
   activeFilterCount,
   onToggleFilters,
   onOpenTuner,
+  onOpenScales,
   disabled,
   className = "",
 }: {
@@ -219,6 +224,7 @@ export function HomeBento({
   activeFilterCount: number;
   onToggleFilters: () => void;
   onOpenTuner: () => void;
+  onOpenScales: () => void;
   disabled?: boolean;
   className?: string;
 }) {
@@ -306,9 +312,10 @@ export function HomeBento({
         icon={<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />}
       />
       <ActionCard
-        className="col-span-6 lg:col-span-12"
+        className="col-span-3 lg:col-span-6"
         row
-        label="Uglaševalec"
+        small
+        label="Tuner"
         hint="uglasi kitaro z mikrofonom"
         tone={TONES.amber}
         onClick={onOpenTuner}
@@ -318,6 +325,23 @@ export function HomeBento({
             <path d="M12 12l3.5-4" />
             <circle cx="12" cy="12" r="1.5" />
             <path d="M5 20h14" />
+          </>
+        }
+      />
+      <ActionCard
+        className="col-span-3 lg:col-span-6"
+        row
+        small
+        label="Lestvice"
+        hint="pentatonike in lestvice"
+        tone={TONES.indigo}
+        onClick={onOpenScales}
+        icon={
+          <>
+            <path d="M3 6h18M3 10h18M3 14h18M3 18h18" />
+            <circle cx="7" cy="8" r="1.4" fill="currentColor" />
+            <circle cx="12" cy="12" r="1.4" fill="currentColor" />
+            <circle cx="17" cy="16" r="1.4" fill="currentColor" />
           </>
         }
       />

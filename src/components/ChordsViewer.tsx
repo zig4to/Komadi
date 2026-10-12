@@ -864,6 +864,159 @@ export default function ChordsViewer({
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   };
   useBackableOpen(isFullscreen, exitFullscreen);
+
+  // "Zasukaj zaslon" (telefon): pregledovalnik v ležečem načinu, tudi ko je telefon
+  // pokončen. Najprej prava zaklenitev usmeritve (Android: v nameščeni aplikaciji
+  // takoj, v brskalniku po celozaslonskem načinu, ki ga zahteva); kjer je ni
+  // (iPhone), koren pregledovalnika zasučemo s CSS za 90°. Ponoven dotik, Android
+  // Nazaj ali izhod iz celozaslonskega načina vrne pokončno.
+  const [rotateOn, setRotateOn] = useState(false);
+  const [rotateLocked, setRotateLocked] = useState(false);
+  const [portrait, setPortrait] = useState(() => typeof window !== "undefined" && window.matchMedia("(orientation: portrait)").matches);
+  const rotateFsRef = useRef(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(orientation: portrait)");
+    const onChange = () => setPortrait(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  const lockLandscape = () => {
+    const o = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+    return o?.lock ? o.lock("landscape").then(() => true, () => false) : Promise.resolve(false);
+  };
+  const exitRotate = () => {
+    setRotateOn(false);
+    setRotateLocked(false);
+    try {
+      screen.orientation?.unlock?.();
+    } catch {}
+    if (rotateFsRef.current && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    rotateFsRef.current = false;
+  };
+  const enterRotate = () => {
+    closeThemeMenu();
+    setRotateOn(true);
+    // requestFullscreen mora biti v istem dotiku (porabi dovoljenje klika).
+    if (canBrowserFullscreen() && !document.fullscreenElement) {
+      document.documentElement
+        .requestFullscreen()
+        .then(() => {
+          rotateFsRef.current = true;
+          return lockLandscape();
+        })
+        .then((ok) => setRotateLocked(ok), () => setRotateLocked(false));
+    } else {
+      lockLandscape().then(setRotateLocked);
+    }
+  };
+  useEffect(() => {
+    const onChange = () => {
+      if (!document.fullscreenElement && rotateFsRef.current) {
+        rotateFsRef.current = false;
+        setRotateOn(false);
+        setRotateLocked(false);
+      }
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      try {
+        screen.orientation?.unlock?.();
+      } catch {}
+    };
+  }, []);
+  useBackableOpen(rotateOn, exitRotate);
+  // Ležeči način na telefonu (zasukano z gumbom ali telefon obrnjen): nad
+  // autoscrollom gumba + / − za pisavo, pinch z dvema prstoma jo spreminja.
+  const [coarse, setCoarse] = useState(() => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(pointer: coarse)");
+    const onChange = () => setCoarse(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  const landscapeMode = rotateOn || (!portrait && coarse);
+  const fontSizeRef = useRef(fontSize);
+  useEffect(() => {
+    fontSizeRef.current = fontSize;
+  });
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !landscapeMode) return;
+    let startDist = 0;
+    let startFont = 0;
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      startDist = dist(e.touches);
+      startFont = fontSizeRef.current;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2 || !startDist) return;
+      e.preventDefault();
+      const next = Math.round(((startFont * dist(e.touches)) / startDist) / FONT_STEP) * FONT_STEP;
+      setFontSize(Math.max(MIN_FONT, Math.min(MAX_FONT, next)));
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) startDist = 0;
+    };
+    // Brskalnikov pinch-zoom tu izklopljen, da pinch spreminja samo pisavo.
+    const prevTouchAction = el.style.touchAction;
+    el.style.touchAction = "pan-x pan-y";
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onEnd);
+    return () => {
+      el.style.touchAction = prevTouchAction;
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+  }, [landscapeMode]);
+  const fontButtons = landscapeMode ? (
+    <div className="flex flex-col items-center gap-0.5 rounded-full border-2 border-amber-400 bg-neutral-900/90 px-1 py-1 text-neutral-200 shadow-lg">
+      <button
+        type="button"
+        onClick={() => setFontSize((f) => Math.min(MAX_FONT, f + FONT_STEP))}
+        disabled={fontSize >= MAX_FONT}
+        aria-label="Večja pisava"
+        title="Večja pisava"
+        className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-neutral-800 hover:text-white disabled:opacity-40 active:scale-95"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" className="h-4 w-4">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        onClick={() => setFontSize((f) => Math.max(MIN_FONT, f - FONT_STEP))}
+        disabled={fontSize <= MIN_FONT}
+        aria-label="Manjša pisava"
+        title="Manjša pisava"
+        className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-neutral-800 hover:text-white disabled:opacity-40 active:scale-95"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" className="h-4 w-4">
+          <path d="M5 12h14" />
+        </svg>
+      </button>
+    </div>
+  ) : null;
+  // CSS zasuk samo, ko prave zaklenitve ni in je telefon še pokončen.
+  const cssRotate = rotateOn && !rotateLocked && portrait;
+  const rootStyle: CSSProperties = cssRotate
+    ? {
+        ...themeVars,
+        inset: "auto",
+        top: 0,
+        left: "100vw",
+        width: "100dvh",
+        height: "100vw",
+        transform: "rotate(90deg)",
+        transformOrigin: "top left",
+      }
+    : themeVars;
   // Zgornji vrstici skrite: med samodejnim pomikanjem ali v celozaslonskem načinu.
   const barsHidden = fullscreen || isFullscreen || !!remote?.fullscreen;
 
@@ -2745,7 +2898,7 @@ export default function ChordsViewer({
     "flex h-7 min-w-7 items-center justify-center rounded-full text-sm font-medium text-neutral-200 hover:bg-neutral-800 hover:text-white disabled:opacity-40 active:scale-95";
 
   return createPortal(
-    <div ref={setRoot} data-view-portal onClick={(e) => e.stopPropagation()} style={themeVars} className="fixed inset-0 z-50 isolate flex flex-col overflow-hidden bg-(--cv-bg) pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
+    <div ref={setRoot} data-view-portal onClick={(e) => e.stopPropagation()} style={rootStyle} className="fixed inset-0 z-50 isolate flex flex-col overflow-hidden bg-(--cv-bg) pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
       {theme.pattern && (
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
           <PatternSvg id={theme.pattern} colors={BACKGROUND_COLORS} className="h-full w-full" />
@@ -3268,6 +3421,22 @@ export default function ChordsViewer({
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
             <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={rotateOn ? exitRotate : enterRotate}
+          aria-pressed={rotateOn}
+          aria-label={rotateOn ? "Nazaj pokončno" : "Zasukaj zaslon"}
+          title={rotateOn ? "Nazaj pokončno" : "Zasukaj zaslon (ležeče)"}
+          className={`flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 transition active:scale-95 lg:hidden ${
+            rotateOn ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
+          }`}
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+            <rect x="3" y="9" width="14" height="10" rx="1.8" />
+            <path d="M7 5.5A6 6 0 0 1 17.5 4" />
+            <path d="m16 2 1.6 2.1L15.4 5.6" />
           </svg>
         </button>
         <button
@@ -3801,7 +3970,13 @@ export default function ChordsViewer({
       )}
 
       {/* Med pametnim sledenjem ni ročnega autoscrolla — ne bi se smela tepsti. */}
-      {!editing && !smartActive && !recorder && !follower && !samSpili && <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} onPlayingChange={setFullscreen} />}
+      {!editing && !smartActive && !recorder && !follower && !samSpili ? (
+        <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} onPlayingChange={setFullscreen} above={fontButtons} />
+      ) : (
+        !editing &&
+        !samSpili &&
+        fontButtons && <div className="fixed right-4 bottom-4 z-10">{fontButtons}</div>
+      )}
 
       {/* "Sam Špili": prekrije pregledovalnik (predvajalnik ostane spodaj in igra). */}
       {samSpili && (

@@ -31,6 +31,7 @@ import { FavoritesArchive, FavoritesThisMonth, VerifiedSongs, favoriteArchiveMon
 import { HomeAside, HomeBento, HomeGreeting } from "@/components/HomeDashboard";
 import MainNav, { type MainNavTab } from "@/components/MainNav";
 import Tuner from "@/components/Tuner";
+import Scales from "@/components/Scales";
 import { authorAccentHex } from "@/lib/authorColor";
 import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES } from "@/lib/constants";
 import { pickDailyFeatured } from "@/lib/dailyRandom";
@@ -355,6 +356,7 @@ export default function Dashboard({ user }: { user: User }) {
   const [goalPickerOpen, setGoalPickerOpen] = useState(false);
   // Uglaševalec (kartica na domači strani; prej v meniju ⋮).
   const [tunerOpen, setTunerOpen] = useState(false);
+  const [scalesOpen, setScalesOpen] = useState(false);
   const [goalPickerQuery, setGoalPickerQuery] = useState("");
   const [goalExtras, setGoalExtras] = useState<GoalExtra[]>([]);
   const [goalQuickAddOpen, setGoalQuickAddOpen] = useState(false);
@@ -4181,15 +4183,22 @@ export default function Dashboard({ user }: { user: User }) {
           )}
 
           {addChoiceOpen && (
-            <div className="rounded-xl border border-neutral-200 bg-white p-5 space-y-4 dark:border-white/[0.08] dark:bg-white/[0.035]">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Dodaj skladbo</h2>
+            <div className="rounded-2xl border border-neutral-200 bg-white p-4 lg:p-5 dark:rounded-[26px] dark:border-white/[0.08] dark:bg-white/[0.035]">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <p className="flex min-w-0 items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                  <span className="truncate">Dodaj skladbo</span>
+                </p>
                 <button
                   type="button"
                   onClick={() => setAddChoiceOpen(false)}
-                  className="text-sm text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+                  aria-label="Zapri"
+                  title="Zapri"
+                  className="-m-1.5 shrink-0 rounded-full p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-500 dark:hover:bg-white/[0.06] dark:hover:text-neutral-200"
                 >
-                  Zapri ✕
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
               <AddChoiceIcons
@@ -4315,10 +4324,12 @@ export default function Dashboard({ user }: { user: User }) {
               activeFilterCount={activeFilterCount}
               onToggleFilters={() => setFiltersOpen((v) => !v)}
               onOpenTuner={() => setTunerOpen(true)}
+              onOpenScales={() => setScalesOpen(true)}
               disabled={!isSupabaseConfigured}
             />
           </div>
           {tunerOpen && <Tuner onClose={() => setTunerOpen(false)} />}
+          {scalesOpen && <Scales onClose={() => setScalesOpen(false)} />}
 
           <Filters
             filters={filters}
