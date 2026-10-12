@@ -31,6 +31,9 @@ export default function JamBoard({
   onRemove,
   onChordsClick,
   showAddedBy = false,
+  reorder = false,
+  onMove,
+  onReorderDone,
 }: {
   items: JamBoardItem[];
   librarySongs: Song[];
@@ -43,6 +46,10 @@ export default function JamBoard({
   onRemove: (item: JamBoardItem) => void;
   onChordsClick?: (song: Song) => void;
   showAddedBy?: boolean;
+  // "Preuredi seznam" (nastavitve Jama): puščici ↑ ↓ namesto kljukice, akordov in ✕.
+  reorder?: boolean;
+  onMove?: (key: string, delta: -1 | 1) => void;
+  onReorderDone?: () => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
@@ -134,6 +141,18 @@ export default function JamBoard({
 
   return (
     <div className="space-y-4">
+      {reorder ? (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-fuchsia-500/40 bg-fuchsia-500/[0.06] px-4 py-2.5 dark:border-fuchsia-400/30">
+          <p className="min-w-0 text-sm text-neutral-700 dark:text-neutral-200">Preurejanje — premikaj skladbe s puščicama.</p>
+          <button
+            type="button"
+            onClick={onReorderDone}
+            className="shrink-0 rounded-full bg-fuchsia-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-fuchsia-500"
+          >
+            Končano
+          </button>
+        </div>
+      ) : (
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -166,8 +185,9 @@ export default function JamBoard({
           Skladbe ni
         </button>
       </div>
+      )}
 
-      {quickAddOpen && (
+      {quickAddOpen && !reorder && (
         <div className="space-y-2 rounded-lg border border-fuchsia-500/40 bg-[linear-gradient(115deg,rgba(192,38,211,0.14)_15%,rgba(192,38,211,0.03)_95%)] p-3 dark:border-white/10">
           <input
             autoFocus
@@ -244,12 +264,14 @@ export default function JamBoard({
                 >
                   {i + 1}
                 </span>
-                <input
-                  type="checkbox"
-                  checked={item.played}
-                  onChange={() => onTogglePlayed(item)}
-                  className="h-4 w-4 shrink-0 rounded border-neutral-300 text-fuchsia-600 focus:ring-fuchsia-500 dark:border-white/10 dark:bg-white/[0.04]"
-                />
+                {!reorder && (
+                  <input
+                    type="checkbox"
+                    checked={item.played}
+                    onChange={() => onTogglePlayed(item)}
+                    className="h-4 w-4 shrink-0 rounded border-neutral-300 text-fuchsia-600 focus:ring-fuchsia-500 dark:border-white/10 dark:bg-white/[0.04]"
+                  />
+                )}
                 <div className="min-w-0 flex-1">
                   <p
                     className={`truncate text-sm font-medium ${
@@ -264,6 +286,26 @@ export default function JamBoard({
                   </p>
                   <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{item.author}</p>
                 </div>
+                {reorder ? (
+                  <div className="flex shrink-0 items-center gap-1">
+                    {([-1, 1] as const).map((delta) => (
+                      <button
+                        key={delta}
+                        type="button"
+                        onClick={() => onMove?.(item.key, delta)}
+                        disabled={delta === -1 ? i === 0 : i === items.length - 1}
+                        aria-label={delta === -1 ? "Premakni gor" : "Premakni dol"}
+                        title={delta === -1 ? "Premakni gor" : "Premakni dol"}
+                        className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition hover:border-fuchsia-500 hover:text-fuchsia-600 disabled:opacity-30 disabled:hover:border-neutral-200 disabled:hover:text-neutral-600 active:scale-95 dark:border-white/[0.1] dark:text-neutral-300 dark:hover:border-fuchsia-400 dark:hover:text-fuchsia-400"
+                      >
+                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                          {delta === -1 ? <path d="m18 15-6-6-6 6" /> : <path d="m6 9 6 6 6-6" />}
+                        </svg>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                <>
                 {item.song && (
                   <ChordsButtons song={item.song} onChordsClick={onChordsClick} stacked merged menuAlign="right" />
                 )}
@@ -287,6 +329,8 @@ export default function JamBoard({
                     <path d="M18 6 6 18M6 6l12 12" />
                   </svg>
                 </button>
+                </>
+                )}
                 {showAddedBy && (
                   // Kdo je skladbo dodal v Skupni Jam: začetnici, barva po imenu.
                   <span

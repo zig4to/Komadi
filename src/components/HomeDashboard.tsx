@@ -186,11 +186,11 @@ export function HomeBento({
   total,
   verified,
   review,
-  jamCount,
+  playlistCount,
   onOpenVerified,
   onOpenAll,
   onOpenReview,
-  onOpenJam,
+  onOpenPlaylists,
   onRandom,
   onPartial,
   newestActive,
@@ -209,11 +209,11 @@ export function HomeBento({
   total: number;
   verified: number;
   review: number;
-  jamCount: number;
+  playlistCount: number;
   onOpenVerified: () => void;
   onOpenAll: () => void;
   onOpenReview: () => void;
-  onOpenJam: () => void;
+  onOpenPlaylists: () => void;
   onRandom: () => void;
   onPartial: () => void;
   newestActive: boolean;
@@ -235,7 +235,7 @@ export function HomeBento({
           <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} decor={<TopoCorner hover="deco:text-neutral-400/40 dark:deco:text-neutral-400/40" />} />
           <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={`/${total}`} dot="bg-orange-400" onClick={onOpenVerified} decor={<VerifiedCorner hover="deco:text-orange-400/40 dark:deco:text-orange-400/40" />} />
           <StatCard className="col-span-3" label="V pregledu" value={review} dot="bg-teal-400" onClick={onOpenReview} decor={<ChecklistCorner />} />
-          <StatCard className="col-span-3" label="V Skupnem Jamu" value={jamCount} dot="bg-fuchsia-400" pulse={jamCount > 0} onClick={onOpenJam} decor={<CirclesCorner />} />
+          <StatCard className="col-span-3" label="Playliste" value={playlistCount} dot="bg-yellow-400" onClick={onOpenPlaylists} decor={<PlaylistCorner />} />
         </>
       )}
       <StatCard
@@ -548,28 +548,21 @@ function ChecklistCorner() {
   );
 }
 
-// V Skupnem Jamu: skupina prekrivajočih se krogov (ljudje, ki igrajo skupaj);
-// ob prehodu izmenično fuksija in bela.
-const JAM_CIRCLES = [
-  { cx: 150, cy: 112, r: 46 },
-  { cx: 112, cy: 120, r: 34 },
-  { cx: 132, cy: 76, r: 28 },
-  { cx: 92, cy: 92, r: 20 },
-];
-function CirclesCorner() {
+// Playliste: velika ikona playliste (ista kot v glavni navigaciji) v kotu;
+// ob prehodu vrstice bele, nota rumena.
+function PlaylistCorner() {
   return (
     <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:hidden text-neutral-900/[0.05] dark:text-white/[0.045]">
-      <g fill="none" strokeWidth="1" vectorEffect="non-scaling-stroke">
-        {JAM_CIRCLES.map((c, i) => (
-          <circle
-            key={i}
-            cx={c.cx}
-            cy={c.cy}
-            r={c.r}
-            stroke="currentColor"
-            className={`transition-colors duration-300 ${i % 2 ? "deco:text-neutral-900/20 dark:deco:text-white/25" : "deco:text-fuchsia-400/45"}`}
-          />
-        ))}
+      <g transform="translate(66 22) scale(4.4)" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+        <g className="transition-colors duration-300 deco:text-neutral-900/20 dark:deco:text-white/25">
+          <path d="M16 6H3" vectorEffect="non-scaling-stroke" />
+          <path d="M12 12H3" vectorEffect="non-scaling-stroke" />
+          <path d="M12 18H3" vectorEffect="non-scaling-stroke" />
+        </g>
+        <g className="transition-colors duration-300 deco:text-yellow-400/50">
+          <path d="M21 15V6" vectorEffect="non-scaling-stroke" />
+          <circle cx="18.5" cy="15.5" r="2.5" vectorEffect="non-scaling-stroke" />
+        </g>
       </g>
     </svg>
   );

@@ -927,7 +927,8 @@ export default function ChordsViewer({
   }, []);
   useBackableOpen(rotateOn, exitRotate);
   // Ležeči način na telefonu (zasukano z gumbom ali telefon obrnjen): nad
-  // autoscrollom gumba + / − za pisavo, pinch z dvema prstoma jo spreminja.
+  // autoscrollom gumba + / − za pisavo. Pinch z dvema prstoma jo spreminja na
+  // vsaki napravi na dotik, pokončno in ležeče.
   const [coarse, setCoarse] = useState(() => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches);
   useEffect(() => {
     const mq = window.matchMedia("(pointer: coarse)");
@@ -942,7 +943,7 @@ export default function ChordsViewer({
   });
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el || !landscapeMode) return;
+    if (!el || !(coarse || rotateOn)) return;
     let startDist = 0;
     let startFont = 0;
     const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
@@ -974,7 +975,7 @@ export default function ChordsViewer({
       el.removeEventListener("touchend", onEnd);
       el.removeEventListener("touchcancel", onEnd);
     };
-  }, [landscapeMode]);
+  }, [coarse, rotateOn]);
   const fontButtons = landscapeMode ? (
     <div className="flex flex-col items-center gap-0.5 rounded-full border-2 border-amber-400 bg-neutral-900/90 px-1 py-1 text-neutral-200 shadow-lg">
       <button

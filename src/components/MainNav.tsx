@@ -1,11 +1,12 @@
 "use client";
 
-// Glavna navigacija (tabletke): Domov · Jam · Playliste · Skupno. Na
+// Glavna navigacija (tabletke): Domov · Jam · Skupno. Na
 // računalniku v glavi domače strani, na telefonu (in na računalniku na
 // celozaslonskih straneh) kot vrstica pod glavo. Skupno je na telefonu v
 // meniju ⋮ (oddelek "Skupno" pod Uporabnikom), ne v vrstici. Ikone obdržijo barvo
-// funkcije, aktivna tabletka je poudarjena. Telefon: desno od Playlist ikona
-// za iskanje (onSearch), ki odpre iskalno vrstico pod glavo.
+// funkcije, aktivna tabletka je poudarjena. Telefon: na koncu ikona za iskanje
+// (onSearch), ki odpre iskalno vrstico pod glavo. Playliste nimajo zavihka —
+// odpre jih kartica na domači strani ("playlists" ostane v tipu za handleMainNav).
 
 export type MainNavTab = "home" | "jam" | "playlists" | "shared";
 
@@ -26,20 +27,6 @@ const TABS: { id: MainNavTab; label: string; color: string; icon: React.ReactNod
     label: "Jam",
     color: "text-fuchsia-600 dark:text-fuchsia-400",
     icon: <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />,
-  },
-  {
-    id: "playlists",
-    label: "Playliste",
-    color: "text-yellow-600 dark:text-yellow-400",
-    icon: (
-      <>
-        <path d="M16 6H3" />
-        <path d="M12 12H3" />
-        <path d="M12 18H3" />
-        <path d="M21 15V6" />
-        <circle cx="18.5" cy="15.5" r="2.5" />
-      </>
-    ),
   },
   {
     id: "shared",

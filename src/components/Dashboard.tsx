@@ -248,7 +248,7 @@ export default function Dashboard({ user }: { user: User }) {
   const listHeadingRef = useRef<HTMLDivElement>(null);
   const searchWide = searchFocused || filters.search !== "";
   // Telefon: iskalna vrstica pod glavo je skrita, odpre jo ikona v glavni
-  // navigaciji (desno od Playlist); vidna ostane, dokler je kaj vpisano.
+  // navigaciji (desno od Jama); vidna ostane, dokler je kaj vpisano.
   const [searchOpen, setSearchOpen] = useState(false);
   // "Akordi v aplikaciji": odprta skladba je v localStorage (src/lib/openChords.ts),
   // da po osvežitvi ostane odprta; pregledovalnik se izriše samo tu.
@@ -273,6 +273,8 @@ export default function Dashboard({ user }: { user: User }) {
   // "Skupni Jam" (tabela shared_jam_items): ena vrsta za vse uporabnike, zavihek
   // levo od "Arhiv". sharedJamSongs = skladbe drugih uporabnikov, na katere kaže.
   const [jamShared, setJamShared] = usePersistentBool("komadi:jam:shared", false);
+  // "Preuredi seznam" (nastavitve Jama): puščici ↑ ↓ v seznamu trenutnega Jama.
+  const [jamReorder, setJamReorder] = useState(false);
   const [sharedJamItems, setSharedJamItems] = useState<SharedJamItem[]>([]);
   const [sharedJamSongs, setSharedJamSongs] = useState<Record<string, Song>>({});
   // "Preverjeno špila" (domača stran) je za vse enak: preverjene, odobrene
@@ -343,6 +345,22 @@ export default function Dashboard({ user }: { user: User }) {
   const [favArchiveOpen, setFavArchiveOpen] = usePersistentBool("komadi:favarchive:open", false);
   // "Playliste": poimenovani seznami skladb (Playlists.tsx, tabeli playlists/playlist_songs).
   const [playlistsOpen, setPlaylistsOpen] = usePersistentBool("komadi:playlists:open", false);
+  // Število playlist za kartico na domači strani — naloži se ob zagonu in vsakič,
+  // ko se stran Playliste zapre (tam se lahko ustvarijo/izbrišejo).
+  const [playlistCount, setPlaylistCount] = useState(0);
+  useEffect(() => {
+    if (playlistsOpen || !isSupabaseConfigured) return;
+    let cancelled = false;
+    supabase
+      .from("playlists")
+      .select("id", { count: "exact", head: true })
+      .then(({ count }) => {
+        if (!cancelled && count != null) setPlaylistCount(count);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [playlistsOpen]);
   // Isti localStorage ključ kot FiltersToggle/Filters v Filters.tsx — da lahko
   // "Počisti filtre" (glej handleBackFromFilter) zapre tudi panel s filtri.
   const [filtersOpen, setFiltersOpen] = usePersistentBool("komadi:filters:open", false);
@@ -1497,7 +1515,8 @@ export default function Dashboard({ user }: { user: User }) {
     id ? (allSongs.find((s) => s.id === id) ?? sharedJamSongs[id] ?? null) : null;
   // Ime za krogec z začetnicami pri drugih uporabnikih.
   const myDisplayName = fullNameFor(user) || user.email || null;
-  const sharedBoardItems: JamBoardItem[] = sharedJamItems.map((item) => ({
+  const sortedSharedJamItems = [...sharedJamItems].sort((a, b) => a.added_at.localeCompare(b.added_at));
+  const sharedBoardItems: JamBoardItem[] = sortedSharedJamItems.map((item) => ({
     key: item.id,
     title: item.title,
     author: item.author,
@@ -1817,6 +1836,54 @@ export default function Dashboard({ user }: { user: User }) {
     const { error } = await supabase.from("shared_jam_items").update({ played }).eq("id", id);
     if (error) setSharedJamItems((prev) => prev.map((x) => (x.id === id ? { ...x, played: item.played } : x)));
   }
+  // "Preuredi seznam": vrstni red Jama je čas dodajanja (jam_added_at / added_at),
+  // zato premik skladbe le prerazporedi te čase — nova razporeditev dobi iste
+  // čase v novem vrstnem redu (enaki časi razmaknjeni za 1 ms). Posodobijo se
+  // samo vrstice, ki so se spremenile; drugi jih dobijo prek realtime.
+  function reorderTimes(list: { key: string; addedAt: string }[], key: string, delta: -1 | 1) {
+    const from = list.findIndex((x) => x.key === key);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= list.length) return [];
+    const order = list.slice();
+    const [moved] = order.splice(from, 1);
+    order.splice(to, 0, moved);
+    const times = list.map((x) => new Date(x.addedAt || 0).getTime()).sort((a, b) => a - b);
+    for (let k = 1; k < times.length; k++) if (times[k] <= times[k - 1]) times[k] = times[k - 1] + 1;
+    return order
+      .map((x, k) => ({ key: x.key, addedAt: new Date(times[k]).toISOString() }))
+      .filter((_, k) => new Date(order[k].addedAt || 0).getTime() !== times[k]);
+  }
+  async function handleMovePrivateJam(key: string, delta: -1 | 1) {
+    const changes = reorderTimes(
+      jamItems.map((x) => ({ key: x.key, addedAt: x.kind === "song" ? (x.song.jam_added_at ?? "") : x.extra.added_at })),
+      key,
+      delta,
+    );
+    if (!changes.length) return;
+    const prevSongs = allSongs;
+    const prevExtras = jamExtras;
+    const songTimes = new Map(changes.filter((c) => c.key.startsWith("song:")).map((c) => [c.key.slice(5), c.addedAt]));
+    const extraTimes = new Map(changes.filter((c) => c.key.startsWith("extra:")).map((c) => [c.key.slice(6), c.addedAt]));
+    setSongs((prev) => prev.map((s) => (songTimes.has(s.id) ? { ...s, jam_added_at: songTimes.get(s.id)! } : s)));
+    setJamExtras((prev) => prev.map((x) => (extraTimes.has(x.id) ? { ...x, added_at: extraTimes.get(x.id)! } : x)));
+    const results = await Promise.all([
+      ...[...songTimes].map(([id, t]) => supabase.from("songs").update({ jam_added_at: t }).eq("id", id)),
+      ...[...extraTimes].map(([id, t]) => supabase.from("jam_extras").update({ added_at: t }).eq("id", id)),
+    ]);
+    if (results.some((r) => r.error)) {
+      setSongs(prevSongs);
+      setJamExtras(prevExtras);
+    }
+  }
+  async function handleMoveSharedJam(id: string, delta: -1 | 1) {
+    const changes = reorderTimes(sortedSharedJamItems.map((x) => ({ key: x.id, addedAt: x.added_at })), id, delta);
+    if (!changes.length) return;
+    const prev = sharedJamItems;
+    const times = new Map(changes.map((c) => [c.key, c.addedAt]));
+    setSharedJamItems((cur) => cur.map((x) => (times.has(x.id) ? { ...x, added_at: times.get(x.id)! } : x)));
+    const results = await Promise.all([...times].map(([itemId, t]) => supabase.from("shared_jam_items").update({ added_at: t }).eq("id", itemId)));
+    if (results.some((r) => r.error)) setSharedJamItems(prev);
+  }
   async function handleRemoveSharedJam(id: string) {
     const prev = sharedJamItems;
     setSharedJamItems((items) => items.filter((x) => x.id !== id));
@@ -1934,6 +2001,7 @@ export default function Dashboard({ user }: { user: User }) {
   useBackableOpen(jamOpen && jamArchiveOpen, () => setJamArchiveOpen(false));
   // Skupni Jam: Nazaj vrne na osebni Jam.
   useBackableOpen(jamOpen && jamShared && !jamArchiveOpen, () => setJamShared(false));
+  useBackableOpen(jamOpen && jamReorder, () => setJamReorder(false));
   // Privat Jam / Skupni Jam (JamModeToggle): vedno je izbran eden; izbira zapre arhiv.
   // Računalnik (lg): iskanje je v glavi (kot na predogledu), na telefonu v
   // vrstici pod njo — vedno samo eno polje, da searchInputRef kaže nanj.
@@ -2051,7 +2119,7 @@ export default function Dashboard({ user }: { user: User }) {
     );
   }
 
-  // Glavna navigacija (Domov · Jam · Playliste · Skupno). Druge celozaslonske
+  // Glavna navigacija (Domov · Jam · Skupno; Playliste prek kartice na domači strani). Druge celozaslonske
   // strani (Mojih 20, Popravi, Pregled …) nimajo zavihka — takrat ni aktiven noben.
   const activeNav: MainNavTab | null = jamOpen
     ? "jam"
@@ -2409,7 +2477,7 @@ export default function Dashboard({ user }: { user: User }) {
                 </svg>
                 Nazaj
               </button>
-              <JamSettingsMenu />
+              <JamSettingsMenu onReorder={jamArchiveOpen ? undefined : () => setJamReorder(true)} />
             </div>
           </>
         ) : goalOpen ? (
@@ -2950,6 +3018,9 @@ export default function Dashboard({ user }: { user: User }) {
                 onQuickAdd={(title, author) => addToSharedJam(null, title, author)}
                 onTogglePlayed={(item) => handleToggleSharedJamPlayed(item.key)}
                 onRemove={(item) => handleRemoveSharedJam(item.key)}
+                reorder={jamReorder}
+                onMove={handleMoveSharedJam}
+                onReorderDone={() => setJamReorder(false)}
                 // Popularnost (copy_count) samo za lastne skladbe.
                 onChordsClick={(song) => {
                   if (song.user_id === user.id) handleChordsClick(song);
@@ -2977,6 +3048,9 @@ export default function Dashboard({ user }: { user: User }) {
                 else handleRemoveJamExtra(item.extra);
               }}
               onChordsClick={handleChordsClick}
+              reorder={jamReorder}
+              onMove={handleMovePrivateJam}
+              onReorderDone={() => setJamReorder(false)}
             />
           )}
           </>
@@ -4309,11 +4383,11 @@ export default function Dashboard({ user }: { user: User }) {
               total={songs.length}
               verified={songs.filter((s) => s.verified_player_at).length}
               review={reviewSongs.length}
-              jamCount={sharedJamItems.filter((x) => !x.played).length}
+              playlistCount={playlistCount}
               onOpenVerified={openVerified}
               onOpenAll={openAllSongs}
               onOpenReview={openReview}
-              onOpenJam={openSharedJam}
+              onOpenPlaylists={() => handleMainNav("playlists")}
               onRandom={pickRandom}
               onPartial={handlePartialStart}
               newestActive={activeView === "newest"}

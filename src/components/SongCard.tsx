@@ -259,7 +259,7 @@ export default function SongCard({
     <div
       data-chords-card
       style={cardStyle}
-      className={`relative isolate overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] px-4 py-3 transition duration-200 hover:-translate-y-0.5 dark:rounded-[26px] dark:bg-none dark:bg-white/[0.035] dark:shadow-none! lg:min-h-[112px] ${
+      className={`relative isolate overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] px-4 py-3.5 transition duration-200 hover:-translate-y-0.5 dark:rounded-[26px] dark:bg-none dark:bg-white/[0.035] dark:shadow-none! lg:min-h-[124px] ${
         highlighted
           ? // Naključno izbrana: višja kartica (gumbi spodaj), večji naslov.
             `${highlightTone === "lime" ? "partial-pick-pulse" : "random-pick-pulse"} flex min-h-[148px] flex-col py-3.5 lg:min-h-[148px] lg:px-5 dark:bg-white/[0.055]`
