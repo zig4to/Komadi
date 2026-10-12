@@ -9,11 +9,14 @@ import { PORTRAIT_FOCUS_Y } from "@/lib/constants";
 import { supabase } from "@/lib/supabaseClient";
 import type { Playlist, SimilarSong, Song, SongReport } from "@/types/song";
 
-// Diagonalna "zagozda" s sliko na desni strani kartice — enak pristop kot
-// eventCard/eventCardImage v projektu masCajt (styles.js): clip-path izreže
-// nagnjen štirikotnik (širši zgoraj, ožji spodaj), opacity pa sliko "potopi"
-// v barvo kartice namesto da bi bila prilepljena na vrhu.
-const IMAGE_CLIP_PATH = "polygon(20% 0, 100% 0, 100% 100%, 10% 100%)";
+// Slika avtorja na desni strani kartice. Svetla tema: zaobljen kvadrat znotraj
+// kartice (10 px od zgornjega, spodnjega in desnega roba). Temna tema: diagonalna "zagozda" (širša
+// zgoraj, ožja spodaj), opacity jo "potopi" v barvo kartice; rob ni ostro
+// odrezan (clip-path je pri bolj vidnih slikah s temnim ozadjem dal temno
+// poševno črto), ampak ozko pojema: maska pod kotom 100° ima izohipse
+// vzporedne s prejšnjim rezom (zgoraj ~20 %, spodaj ~10 % širine slike).
+const IMAGE_CLASS =
+  "top-2.5 right-2.5 h-[calc(100%-1.25rem)] aspect-square w-auto rounded-xl dark:top-0 dark:-right-8 dark:h-full dark:rounded-none dark:aspect-auto dark:w-[63%] dark:[mask-image:linear-gradient(100deg,transparent_16%,#000_21%)] dark:[-webkit-mask-image:linear-gradient(100deg,transparent_16%,#000_21%)]";
 
 export default function SongCard({
   song,
@@ -236,34 +239,29 @@ export default function SongCard({
   //   if (similarSongs.length === 0) fetchSimilar([]);
   // }
 
-  // Stabilna barva (h/s/l) iz imena avtorja — tako imajo vse skladbe istega
-  // avtorja enako barvno shemo (isto barvo uporabimo tudi za obrobo/senco
-  // spodaj in za delni gradient ozadja, glej className). Obroba je manj
-  // nasičena/temnejša od osnovne barve, da ne "kriči" enako glasno.
+  // Stabilna barva (h/s/l) iz imena avtorja — vse skladbe istega avtorja imajo
+  // isto barvo. Svetla tema (prenova): prosojna kartica z nevtralno obrobo in
+  // senco, barva avtorja samo kot pikica pred imenom (in v senci izpostavljene
+  // kartice). V temni temi kartica nima sence (dark:shadow-none!).
   const { h, s, l } = authorAccentHsl(song.author);
-  const borderS = Math.max(s - 35, 0);
-  const borderL = Math.max(l - 13, 12);
+  const accentDot = `hsl(${h} ${s}% ${l}%)`;
   const cardStyle = {
     // Izpostavljena (naključno izbrana) kartica: rob rahlo utripa v barvi
     // highlightTone (.random-pick-pulse / .partial-pick-pulse v globals.css).
     boxShadow: highlighted
-      ? `0 18px 40px -18px hsl(${h} ${s}% ${l}% / 0.22), 0 4px 12px -6px rgb(0 0 0 / 0.28)`
-      : `0 12px 36px -20px hsl(${h} ${s}% ${l}% / 0.13), 0 2px 8px -7px rgb(0 0 0 / 0.32)`,
-    borderColor: highlighted ? undefined : `hsl(${h} ${borderS}% ${borderL}% / 0.4)`,
-    "--hue": h,
-    "--s": `${s}%`,
-    "--l": `${l}%`,
+      ? `0 18px 40px -18px hsl(${h} ${s}% ${l}% / 0.22), 0 4px 12px -6px rgb(0 0 0 / 0.18)`
+      : "0 1px 2px rgb(24 24 32 / 0.05), 0 12px 28px -18px rgb(24 24 32 / 0.22)",
   } as React.CSSProperties;
 
   return (
     <div
       data-chords-card
       style={cardStyle}
-      className={`relative isolate overflow-hidden rounded-xl border bg-[linear-gradient(135deg,hsl(var(--hue)_var(--s)_var(--l)/0.10),transparent_60%)] px-4 py-3.5 transition duration-200 hover:-translate-y-0.5 dark:rounded-[26px] dark:bg-none dark:bg-white/[0.035] dark:shadow-none! lg:min-h-[124px] ${
+      className={`relative isolate overflow-hidden rounded-2xl border px-4 py-3.5 transition duration-200 hover:-translate-y-0.5 dark:rounded-[26px] dark:bg-white/[0.035] dark:shadow-none! lg:min-h-[124px] ${
         highlighted
           ? // Naključno izbrana: višja kartica (gumbi spodaj), večji naslov.
             `${highlightTone === "lime" ? "partial-pick-pulse" : "random-pick-pulse"} flex min-h-[148px] flex-col py-3.5 lg:min-h-[148px] lg:px-5 dark:bg-white/[0.055]`
-          : "border-neutral-200 dark:border-white/[0.08]!"
+          : "border-neutral-300 hover:border-neutral-400 dark:border-white/[0.08]! dark:hover:border-white/[0.08]!"
       }`}
     >
       {/* Odobrena skladba, ročno preverjena: dve kljukici desno spodaj — rumena
@@ -305,9 +303,8 @@ export default function SongCard({
             const img = e.currentTarget;
             if (img.naturalHeight > img.naturalWidth) setPortraitSrc(authorImage);
           }}
-          className="pointer-events-none absolute inset-y-0 -right-8 h-full w-[63%] object-cover opacity-60 lg:opacity-20 dark:opacity-45 dark:grayscale-[35%] dark:lg:opacity-25"
+          className={`pointer-events-none absolute object-cover opacity-95 lg:opacity-90 dark:opacity-75 dark:grayscale-[10%] dark:lg:opacity-55 ${IMAGE_CLASS}`}
           style={{
-            clipPath: IMAGE_CLIP_PATH,
             zIndex: -1,
             objectPosition: portraitSrc === authorImage ? `right ${PORTRAIT_FOCUS_Y}` : "right center",
           }}
@@ -317,7 +314,9 @@ export default function SongCard({
         <div className="min-w-0 flex-1">
           <p
             className={`truncate text-neutral-900 dark:text-white ${
-              highlighted ? "text-xl font-normal lg:text-2xl dark:font-light" : "text-lg font-medium lg:text-base dark:font-normal"
+              highlighted
+                ? "text-xl font-semibold tracking-tight lg:text-2xl dark:font-light dark:tracking-normal"
+                : "text-lg font-semibold tracking-[-0.01em] lg:text-base dark:font-normal dark:tracking-normal"
             }`}
           >
             {song.title}
@@ -326,11 +325,12 @@ export default function SongCard({
             type="button"
             onClick={() => onFilterAuthor?.(song.author)}
             title={`Prikaži vse skladbe izvajalca ${song.author}`}
-            className={`block max-w-full truncate text-left text-neutral-500 hover:text-emerald-600 hover:underline dark:text-neutral-400 dark:hover:text-emerald-400 ${
+            className={`flex max-w-full items-center gap-1.5 text-left text-neutral-500 hover:text-emerald-600 dark:text-neutral-400 dark:hover:text-emerald-400 ${
               highlighted ? "mt-0.5 text-base" : "text-sm"
             }`}
           >
-            {song.author}
+            <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full dark:hidden" style={{ backgroundColor: accentDot }} />
+            <span className="truncate hover:underline">{song.author}</span>
           </button>
           {/* Podobno — začasno onemogočeno.
           <div className="mt-0.5 flex w-full min-w-0 flex-wrap items-center gap-1.5 text-xs">
@@ -851,7 +851,7 @@ export default function SongCard({
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="shrink-0 rounded-full border border-neutral-300 px-1.5 py-0.5 text-[11px] leading-none text-neutral-500 dark:border-white/10 dark:text-neutral-400 lg:border-neutral-400 dark:lg:border-neutral-500">
+    <span className="shrink-0 rounded-full border border-transparent bg-neutral-100 px-2 py-0.5 text-[11px] leading-none text-neutral-600 dark:border-white/10 dark:bg-transparent dark:text-neutral-400 dark:lg:border-neutral-500">
       {children}
     </span>
   );

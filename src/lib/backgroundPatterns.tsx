@@ -31,10 +31,12 @@ export const BACKGROUND_COLORS: Colors = { line: "rgba(255,255,255,0.03)", accen
 // Vidnost vzorca (⋮ → Nastavitve → Tema → drsnik): k = 0 … 6, 1 = privzeto.
 // Pomnoži prosojnost barv (nad 1 so črte izrazitejše, ne le manj prosojne).
 export const PATTERN_OPACITY_MAX = 6;
-export function scaledBackgroundColors(k: number): Colors {
+export function scaledBackgroundColors(k: number, base: Colors = BACKGROUND_COLORS): Colors {
   const scale = (c: string) => c.replace(/([\d.]+)\)$/, (_, a: string) => `${Math.min(1, Number(a) * k).toFixed(3)})`);
-  return { line: scale(BACKGROUND_COLORS.line), accent: scale(BACKGROUND_COLORS.accent), inlay: scale(BACKGROUND_COLORS.inlay!) };
+  return { line: scale(base.line), accent: scale(base.accent), inlay: scale(base.inlay ?? base.accent) };
 }
+// Svetla tema: temne črte na svetlem ozadju (nekoliko močnejše, svetlo ozadje jih "poje").
+export const LIGHT_BACKGROUND_COLORS: Colors = { line: "rgba(24,24,32,0.045)", accent: "rgba(16,185,129,0.14)", inlay: "rgba(24,24,32,0.12)" };
 
 // Na ozkem (pokončnem) zaslonu se vidi samo del širine; poravnava pove, kateri
 // del — pri zvočniku in diagramu desni, kjer sta narisana.

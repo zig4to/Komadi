@@ -19,6 +19,32 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Svetla tema: "neutral" je rahlo hladna siva (blizu Tailwindove zinc) — ozadje
+   neutral-50 je nežno sivo-modrikasto, da bele kartice izstopijo. Temna tema
+   spodaj (.dark) te vrednosti prepiše. */
+:root {
+  --color-neutral-50: #f3f3f6;
+  --color-neutral-100: #ececf0;
+  --color-neutral-200: #e2e2e8;
+  --color-neutral-300: #cbcbd3;
+  --color-neutral-400: #9f9fa9;
+  --color-neutral-500: #71717b;
+  --color-neutral-600: #52525b;
+  --color-neutral-700: #3f3f46;
+  --color-neutral-800: #27272a;
+  --color-neutral-900: #18181b;
+  --color-neutral-950: #0b0b0d;
+}
+
+/* Svetla tema: bele kartice novega sloga (rounded-2xl + obroba + bela) dobijo
+   nežno senco, da se ločijo od ozadja. V temni temi so steklene, brez sence.
+   Kartice z lastno (inline) senco, npr. SongCard, ostanejo kot so. */
+html:not(.dark) .rounded-2xl.border.bg-white {
+  box-shadow:
+    0 1px 2px rgb(24 24 32 / 0.04),
+    0 10px 28px -16px rgb(24 24 32 / 0.16);
+}
+
 /* Prenova videza (temna tema): "neutral" je grafitna siva — ozadje skoraj
    črno, plošče (neutral-900) ~ bela 3,5 % čez ozadje, obrobe (neutral-800)
    ~ bela 8 %. Svetla tema ostane z Tailwindovo privzeto paleto. */

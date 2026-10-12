@@ -10,11 +10,13 @@
 
 export type MainNavTab = "home" | "jam" | "playlists" | "shared";
 
-const TABS: { id: MainNavTab; label: string; color: string; icon: React.ReactNode }[] = [
+// ring: obroba izbranega zavihka v svetli temi (barva zavihka, brez polnila).
+const TABS: { id: MainNavTab; label: string; color: string; ring: string; icon: React.ReactNode }[] = [
   {
     id: "home",
     label: "Domov",
     color: "text-emerald-600 dark:text-emerald-400",
+    ring: "ring-emerald-500/70",
     icon: (
       <>
         <path d="M3 10.5 12 3l9 7.5" />
@@ -26,12 +28,14 @@ const TABS: { id: MainNavTab; label: string; color: string; icon: React.ReactNod
     id: "jam",
     label: "Jam",
     color: "text-fuchsia-600 dark:text-fuchsia-400",
+    ring: "ring-fuchsia-500/70",
     icon: <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />,
   },
   {
     id: "shared",
     label: "Skupno",
     color: "text-sky-600 dark:text-sky-400",
+    ring: "ring-sky-500/70",
     icon: (
       <>
         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -77,7 +81,7 @@ export default function MainNav({
               t.id === "shared" ? "hidden lg:inline-flex" : "inline-flex"
             } ${
               on
-                ? "bg-neutral-900 font-medium text-white dark:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                ? `font-medium text-neutral-900 ring-[1.5px] ring-inset ${t.ring} dark:text-white dark:ring-0 dark:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]`
                 : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-white/[0.05] dark:hover:text-neutral-200"
             }`}
           >
@@ -110,7 +114,7 @@ export default function MainNav({
           title="Išči"
           className={`inline-flex shrink-0 items-center justify-center rounded-full px-3 py-1.5 transition disabled:opacity-40 lg:hidden ${
             searchActive
-              ? "bg-neutral-900 text-white dark:bg-white/[0.12]"
+              ? "text-neutral-900 ring-[1.5px] ring-inset ring-rose-500/70 dark:text-white dark:ring-0 dark:bg-white/[0.12]"
               : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-white/[0.05]"
           }`}
         >

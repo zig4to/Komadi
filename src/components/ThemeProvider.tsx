@@ -1,17 +1,30 @@
 "use client";
 
-import { FretNotes, PatternSvg, scaledBackgroundColors } from "@/lib/backgroundPatterns";
+import { FretNotes, LIGHT_BACKGROUND_COLORS, PatternSvg, scaledBackgroundColors } from "@/lib/backgroundPatterns";
 import { useTheme } from "@/lib/useTheme";
 
 /**
  * Ob nalaganju uveljavi shranjeno izbiro teme (svetla / temna / sistemska)
  * in se odziva na spremembe sistemske nastavitve. Izriše še ozadje aplikacije
- * v temni temi (fiksna plast za vso vsebino): blag vijoličen sij v zgornjem
- * desnem in zelen v spodnjem levem kotu ter izbrani vzorec.
+ * (fiksna plast za vso vsebino) v obeh temah: blag vijoličen sij v zgornjem
+ * desnem in zelen v spodnjem levem kotu ter izbrani vzorec (svetla tema: temne
+ * črte LIGHT_BACKGROUND_COLORS, temna: svetle; "zaigrane note" samo v temni).
  */
 export default function ThemeProvider() {
   const { pattern, patternOpacity } = useTheme();
   return (
+    <>
+    {/* Svetla tema: zelo blag vijoličen in zelen sij ter vzorec s temnimi črtami. */}
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden dark:hidden">
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage:
+            "radial-gradient(48rem 34rem at 100% 0%, rgba(139,92,246,0.07), transparent 65%), radial-gradient(44rem 32rem at 0% 100%, rgba(16,185,129,0.06), transparent 65%)",
+        }}
+      />
+      {pattern && <PatternSvg id={pattern} colors={scaledBackgroundColors(patternOpacity, LIGHT_BACKGROUND_COLORS)} className={`relative h-full w-full ${pattern === "fretboard" ? "max-lg:opacity-60" : ""}`} />}
+    </div>
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 hidden overflow-hidden dark:block">
       {/* Telefon: blažji sij (manjši zaslon, isti krogi pokrijejo več). */}
       <div
@@ -37,5 +50,6 @@ export default function ThemeProvider() {
         </div>
       )}
     </div>
+    </>
   );
 }

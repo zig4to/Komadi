@@ -2397,6 +2397,19 @@ export default function Dashboard({ user }: { user: User }) {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pt-3 pb-8 space-y-6 lg:max-w-6xl lg:pt-5">
       <header className="relative flex items-center justify-between">
+        {/* Računalnik: glavna navigacija na sredini med naslovom "Bitne Tabs" in
+            iskanjem — desni del glave je širši od naslova, zato je zamaknjena levo
+            od sredine strani (5 rem pri lg, kjer je iskanje w-56; 7 rem pri xl, w-72).
+            Enaka pozicija na straneh Domov, Jam in Skupno; na drugih
+            celozaslonskih straneh je pod glavo. */}
+        {(activeNav === "home" || activeNav === "shared" || activeNav === "jam") && (
+          <MainNav
+            active={activeNav}
+            onSelect={handleMainNav}
+            disabled={!isSupabaseConfigured}
+            className="absolute left-1/2 z-10 hidden -translate-x-[calc(50%+5rem)] lg:flex xl:-translate-x-[calc(50%+7rem)]"
+          />
+        )}
         {jamOpen ? (
           <>
             <h1 className="flex items-center gap-2">
@@ -2416,43 +2429,6 @@ export default function Dashboard({ user }: { user: User }) {
                 {jamShared && !jamArchiveOpen ? "Bitne Jam!" : "Privat Jam!"}
               </span>
             </h1>
-            <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-2 lg:flex">
-            <JamModeToggle shared={jamShared && !jamArchiveOpen} onSelect={selectJamMode} />
-            <button
-              type="button"
-              onClick={() => (jamArchiveOpen ? setJamArchiveOpen(false) : openJamArchive())}
-              aria-pressed={jamArchiveOpen}
-              title={jamArchiveOpen ? "Nazaj na trenutni Jam" : "Arhiv preteklih Jamov"}
-              className={`inline-flex items-center gap-1.5 rounded-full border border-fuchsia-500/40 px-4 py-1.5 text-sm font-medium transition ${
-                jamArchiveOpen
-                  ? "bg-fuchsia-600 text-white"
-                  : "text-neutral-600 hover:bg-fuchsia-500/10 hover:text-fuchsia-600 dark:text-neutral-300 dark:hover:text-fuchsia-400"
-              }`}
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4 shrink-0"
-              >
-                <rect width="20" height="5" x="2" y="3" rx="1" />
-                <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
-                <path d="M10 12h4" />
-              </svg>
-              Arhiv
-            </button>
-            {/* Kdo ima trenutno odprt Skupni Jam (Presence). */}
-            {presenceDots && (
-              <div className="ml-1 flex items-center gap-2 whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400">
-                Trenutno v Jamu:
-                {presenceDots}
-              </div>
-            )}
-            </div>
             {/* Desno: Nazaj in zobnik z nastavitvami Jama. */}
             <div className="flex items-center gap-2">
               <button
@@ -2836,10 +2812,9 @@ export default function Dashboard({ user }: { user: User }) {
                   </span>
                 </button>
               </h1>
-              <MainNav active={activeNav} onSelect={handleMainNav} disabled={!isSupabaseConfigured} className="hidden lg:flex" />
             </div>
             <div className="flex items-center gap-2">
-              {isDesktop && renderSearchBox("relative w-64 xl:w-72")}
+              {isDesktop && renderSearchBox("relative w-56 xl:w-72")}
               <button
                 onClick={() => {
                   if (voiceAddOpen) {
@@ -2934,7 +2909,7 @@ export default function Dashboard({ user }: { user: User }) {
         disabled={!isSupabaseConfigured}
         onSearch={handlePhoneSearch}
         searchActive={phoneSearchShown && (activeNav === "home" || activeNav === "shared")}
-        className={`mt-3! w-full lg:w-fit ${activeNav === "home" || activeNav === "shared" ? "lg:hidden" : ""}`}
+        className={`mt-3! w-full lg:w-fit ${activeNav === "home" || activeNav === "shared" || activeNav === "jam" ? "lg:hidden" : ""}`}
       />
 
       {/* Napredni urejevalnik besedila z akordi (portal čez cel zaslon) — odpre ga
@@ -2959,9 +2934,42 @@ export default function Dashboard({ user }: { user: User }) {
 
       {jamOpen ? (
         <div className="mt-3! space-y-4">
-          <div className="flex items-center gap-2 lg:hidden">
+          {/* Privat/Skupni Jam, Arhiv (računalnik) in kdo je v Skupnem Jamu (Presence). */}
+          <div className="flex flex-wrap items-center gap-2">
             <JamModeToggle shared={jamShared && !jamArchiveOpen} onSelect={selectJamMode} />
-            {presenceDots}
+            <button
+              type="button"
+              onClick={() => (jamArchiveOpen ? setJamArchiveOpen(false) : openJamArchive())}
+              aria-pressed={jamArchiveOpen}
+              title={jamArchiveOpen ? "Nazaj na trenutni Jam" : "Arhiv preteklih Jamov"}
+              className={`hidden items-center gap-1.5 rounded-full lg:inline-flex border border-fuchsia-500/40 px-4 py-1.5 text-sm font-medium transition ${
+                jamArchiveOpen
+                  ? "bg-fuchsia-600 text-white"
+                  : "text-neutral-600 hover:bg-fuchsia-500/10 hover:text-fuchsia-600 dark:text-neutral-300 dark:hover:text-fuchsia-400"
+              }`}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4 shrink-0"
+              >
+                <rect width="20" height="5" x="2" y="3" rx="1" />
+                <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+                <path d="M10 12h4" />
+              </svg>
+              Arhiv
+            </button>
+            {presenceDots && (
+              <div className="ml-1 flex items-center gap-2 whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400">
+                <span className="hidden lg:inline">Trenutno v Jamu:</span>
+                {presenceDots}
+              </div>
+            )}
           </div>
           <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
 

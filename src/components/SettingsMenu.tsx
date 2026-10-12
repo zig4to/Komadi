@@ -443,10 +443,8 @@ export default function SettingsMenu({
                     })}
                   </div>
 
-                  {/* Vzorec čez ozadje (tanke črte), samo v temni temi. */}
-                  <p className="mb-1.5 mt-3 text-xs font-medium text-neutral-500">
-                    Vzorec{theme === "light" && <span className="font-normal"> — viden samo v temni temi</span>}
-                  </p>
+                  {/* Vzorec čez ozadje (tanke črte), v svetli in temni temi. */}
+                  <p className="mb-1.5 mt-3 text-xs font-medium text-neutral-500">Vzorec</p>
                   <div className="grid grid-cols-3 gap-1.5">
                     {([null, ...PATTERNS.map((pt) => pt.id)] as (PatternId | null)[]).map((id) => {
                       const label = id === null ? "Brez" : PATTERNS.find((pt) => pt.id === id)!.label;

@@ -161,22 +161,6 @@ export function FavoriteCard({
           <ChordsButtons song={song} onChordsClick={onChordsClick} merged onAddToJam={onAddToJam} onAddToSharedJam={onAddToSharedJam} />
         </span>
       </div>
-
-      {/* Velika obrobna zvezda kot okrasna ikona v ozadju, ki jo desni rob
-          kartice odreže (overflow-hidden). Ni klikljiva — iz priljubljenih se
-          skladba odstrani samo v meniju SongCard (Priljubljena). */}
-      <span
-        aria-hidden="true"
-        className={`pointer-events-none absolute -right-5 top-1/2 -z-10 -translate-y-1/2 opacity-20 dark:hidden ${
-          variant === "verified" ? "text-orange-500 dark:text-orange-400" : "text-amber-500 dark:text-amber-400"
-        }`}
-      >
-        {variant === "verified" ? (
-          <CheckIcon strokeWidth={1} className="h-14 w-14" />
-        ) : (
-          <StarIcon filled={false} strokeWidth={1} className="h-14 w-14" />
-        )}
-      </span>
     </div>
   );
 }
