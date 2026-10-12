@@ -15,11 +15,16 @@ description: "Obdelaj skladbe iz čakalne vrste (Supabase tabela queued_songs) v
   berejo prek `node --env-file=.env.local ...`.
 - `queued_songs` (stolpci `title`, `author`, `user_id`, poleg `id`/`added_at`)
   drži hitre predloge, dodane prek gumba "Hitro" v aplikaciji — SAMO naslov
-  in avtor, brez ostalih podatkov. `user_id` pove, v čigavo knjižnico gre
-  skladba: vsak zapis, ki ga iz nje narediš (`songs`, `import_batches`),
-  MORA dobiti isti `user_id` (service role ključ nima `auth.uid()`, zato
-  default ne deluje). Preverjanje, ali skladba že obstaja (korak 3), delaj
-  samo med skladbami istega `user_id`.
+  in avtor, brez ostalih podatkov. Čakalna vrsta je od 2026-10-12 SKUPNA
+  (`0037_shared_workshop.sql`): predlog lahko doda kdorkoli, `user_id` vrstice
+  pove samo, KDO jo je predlagal. Skladbe dodaja samo admin prek tega skilla,
+  zato gre VSAKA nova skladba v knjižnico admina (ziga.skater):
+  `ADMIN_USER_ID = a14ed5f4-8ae8-497e-a4fc-0ad6c82f38c9` (isti kot
+  `VERIFIED_CANON_USER_ID` v `src/components/Dashboard.tsx`). Vsak zapis, ki ga
+  narediš (`songs`, `import_batches`), MORA dobiti `user_id: ADMIN_USER_ID`
+  (service role ključ nima `auth.uid()`, zato default ne deluje) — NE
+  `user_id` vrstice iz `queued_songs`. Preverjanje, ali skladba že obstaja
+  (korak 3), delaj med skladbami admina.
 - Stolpci `songs`: id, title, author, genre, era, favorite, mood, origin,
   image_url, chords_url, chords_source_url, zabrenkaj_url, chords_text, youtube_url,
   other_chords_url, spotify_url, youtube_music_url, youtube_embed_ids, import_batch_id, copy_count, jam_added_at,
@@ -247,9 +252,8 @@ Za vsako skladbo razišči (splet, če nisi prepričan — ne ugibaj):
 
 ### 5b. Ustvari uvoz (batch)
 Vsak zagon tega skilla je EN uvoz. Tik pred vstavljanjem ustvari vrstico v
-`import_batches` (`POST /rest/v1/import_batches`, telo `{ "user_id": <user_id iz queued_songs> }`
-— če izbrane skladbe pripadajo različnim uporabnikom, en batch na uporabnika,
-`Prefer: return=representation`) in si zapomni njen `id`. Tabelo doda
+`import_batches` (`POST /rest/v1/import_batches`, telo `{ "user_id": ADMIN_USER_ID }` — en batch
+na zagon, ne glede na to, kdo je skladbe predlagal, `Prefer: return=representation`) in si zapomni njen `id`. Tabelo doda
 migracija `supabase/migrations/0021_add_import_batches.sql` — če ne obstaja
 (napaka "relation ... does not exist"), uporabnika prosi, naj jo zažene, in
 nadaljuj brez batcha (`import_batch_id` izpusti), poročilo pa samo izpiši.
@@ -260,7 +264,7 @@ izpuščenih je prav tako koristno.
 En skupen insert v `songs` (`Prefer: return=representation`, da dobiš
 `id`-je nazaj): `review_pending: true` (OBVEZNO — skladba gre najprej na
 stran "Pregled in odobritev" v aplikaciji in je v knjižnici šele, ko jo
-uporabnik odobri; `0030_add_review_pending.sql`), `user_id: <user_id vrstice iz queued_songs>`, `import_batch_id: <id iz koraka 5b>`, `title`, `author` (iz queued_songs, po možnosti poravnano na
+uporabnik odobri; `0030_add_review_pending.sql`), `user_id: ADMIN_USER_ID` (glej zgoraj; ne `user_id` iz queued_songs), `import_batch_id: <id iz koraka 5b>`, `title`, `author` (iz queued_songs, po možnosti poravnano na
 obstoječi zapis avtorja v bazi, če je bil najden pri koraku 3), `genre`,
 `era`, `favorite: false`, `mood`, `origin`, `image_url: null`,
 `chords_url: null`, `chords_source_url: <UG link>`,

@@ -13,10 +13,10 @@ import type { Playlist, SimilarSong, Song, SongReport } from "@/types/song";
 // kartice (10 px od zgornjega, spodnjega in desnega roba). Temna tema: diagonalna "zagozda" (širša
 // zgoraj, ožja spodaj), opacity jo "potopi" v barvo kartice; rob ni ostro
 // odrezan (clip-path je pri bolj vidnih slikah s temnim ozadjem dal temno
-// poševno črto), ampak ozko pojema: maska pod kotom 100° ima izohipse
+// poševno črto), ampak mehko pojema (široko, ~1/3 širine slike): maska pod kotom 100° ima izohipse
 // vzporedne s prejšnjim rezom (zgoraj ~20 %, spodaj ~10 % širine slike).
 const IMAGE_CLASS =
-  "top-2.5 right-2.5 h-[calc(100%-1.25rem)] aspect-square w-auto rounded-xl dark:top-0 dark:-right-8 dark:h-full dark:rounded-none dark:aspect-auto dark:w-[63%] dark:[mask-image:linear-gradient(100deg,transparent_16%,#000_21%)] dark:[-webkit-mask-image:linear-gradient(100deg,transparent_16%,#000_21%)]";
+  "top-2.5 right-2.5 h-[calc(100%-1.25rem)] aspect-square w-auto rounded-xl dark:top-0 dark:-right-8 dark:h-full dark:rounded-none dark:aspect-auto dark:w-[63%] dark:[mask-image:linear-gradient(100deg,transparent_4%,#000_36%)] dark:[-webkit-mask-image:linear-gradient(100deg,transparent_4%,#000_36%)]";
 
 export default function SongCard({
   song,

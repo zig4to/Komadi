@@ -65,6 +65,10 @@ import type {
   SharedJamItem,
 } from "@/types/song";
 
+// Lastnik "kanonskih" preverjenih skladb (ziga.skater): njegova kopija ima v
+// Preverjeno špila prednost za vse uporabnike.
+const VERIFIED_CANON_USER_ID = "a14ed5f4-8ae8-497e-a4fc-0ad6c82f38c9";
+
 const QUEUE_TABS = ["queue", "reports", "history"] as const;
 const SONGS_VISIBLE_VALUES = ["unset", "1", "0"] as const;
 // Največ toliko zadetkov iskanja/filtrov naenkrat (glej visibleResults).
@@ -121,11 +125,12 @@ const REVIEW_BTN =
   "inline-flex h-8 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-medium leading-none transition disabled:opacity-50";
 
 export default function Dashboard({ user }: { user: User }) {
-  // allSongs = vse moje vrstice; `songs` (knjižnica, vsi ostali pogledi) brez
-  // tistih, ki še čakajo na "Pregled in odobritev" (review_pending, dodal jih
-  // je skill dodaj-iz-cakalne-vrste). setSongs vedno dela na allSongs.
+  // allSongs = vse moje vrstice + tuje skladbe skupne "Delavnice" (v pregledu ali
+  // s prijavo napake, 0037_shared_workshop.sql — vsi vidijo in urejajo isto kot
+  // admin); `songs` (knjižnica, vsi ostali pogledi) samo moje, brez tistih, ki
+  // še čakajo na "Pregled in odobritev". setSongs vedno dela na allSongs.
   const [allSongs, setSongs] = useState<Song[]>([]);
-  const songs = useMemo(() => allSongs.filter((s) => !s.review_pending), [allSongs]);
+  const songs = useMemo(() => allSongs.filter((s) => !s.review_pending && s.user_id === user.id), [allSongs, user.id]);
   const reviewSongs = useMemo(
     () =>
       allSongs
@@ -195,10 +200,10 @@ export default function Dashboard({ user }: { user: User }) {
     for (const r of reports)
       bySong.set(r.song_id, [...(bySong.get(r.song_id) ?? []), r]);
     return [...bySong].flatMap(([songId, songReports]) => {
-      const song = songs.find((s) => s.id === songId);
+      const song = allSongs.find((s) => s.id === songId);
       return song ? [{ song, songReports }] : [];
     });
-  }, [reports, songs]);
+  }, [reports, allSongs]);
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -320,11 +325,17 @@ export default function Dashboard({ user }: { user: User }) {
       cancelled = true;
     };
   }, [user.id]);
+  // Preverjeno špila je za vse uporabnike enak seznam kot pri Žigi
+  // (VERIFIED_CANON_USER_ID): če je ista skladba preverjena pri več uporabnikih,
+  // vedno zmaga njegova kopija (njegovi zamrznjeni časi), ne lastna; skladbe, ki
+  // jih on nima preverjenih, ostanejo (ena kopija). Lastne pridejo iz songs (sproti).
   const verifiedSongs = useMemo(() => {
     const own = songs.filter((s) => s.verified_player_at);
-    const ownKeys = new Set(own.map((s) => songMatchKey(s)));
-    const foreign = dedupeShared(verifiedAll.filter((s) => s.user_id !== user.id && !ownKeys.has(songMatchKey(s))));
-    return [...own, ...foreign];
+    const all = [...own, ...verifiedAll.filter((s) => s.user_id !== user.id)];
+    const canon = all.filter((s) => s.user_id === VERIFIED_CANON_USER_ID);
+    const canonKeys = new Set(canon.map((s) => songMatchKey(s)));
+    const rest = dedupeShared(all.filter((s) => s.user_id !== VERIFIED_CANON_USER_ID && !canonKeys.has(songMatchKey(s))));
+    return [...canon, ...rest];
   }, [songs, verifiedAll, user.id]);
   const [sharedJamError, setSharedJamError] = useState<string | null>(null);
   // "Mojih 20 skladb": osebni seznam za naučit do konca leta — isti vzorec
@@ -424,7 +435,7 @@ export default function Dashboard({ user }: { user: User }) {
       if (error) {
         setLoadError(error.message);
       } else {
-        setSongs(data as Song[]);
+        setSongs((prev) => [...(data as Song[]), ...prev.filter((x) => x.user_id !== user.id)]);
       }
       setLoading(false);
     })();
@@ -432,6 +443,28 @@ export default function Dashboard({ user }: { user: User }) {
       cancelled = true;
     };
   }, [user.id]);
+
+  // Skupna "Delavnica": tuje skladbe v pregledu (review_pending) in s prijavo napake
+  // (naložene ob zagonu, ob spremembi prijav in ob vsakem odprtju Pregleda / Popravi;
+  // realtime na songs je filtriran na moje vrstice). V allSongs, a ne v knjižnici.
+  const reportedIdsKey = useMemo(() => [...new Set(reports.map((r) => r.song_id))].sort().join(","), [reports]);
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+    (async () => {
+      const ids = reportedIdsKey ? reportedIdsKey.split(",") : [];
+      const { data, error } = await supabase
+        .from("songs")
+        .select("*")
+        .neq("user_id", user.id)
+        .or(ids.length ? `review_pending.eq.true,id.in.(${ids.join(",")})` : "review_pending.eq.true");
+      if (cancelled || error || !data) return;
+      setSongs((prev) => [...prev.filter((x) => x.user_id === user.id), ...(data as Song[])]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id, reportedIdsKey, reviewOpen, fixOpen]);
 
   useEffect(() => {
     if (!sharedOn || sharedSongs) return;
@@ -801,11 +834,12 @@ export default function Dashboard({ user }: { user: User }) {
   const myLibraryKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const s of allSongs) {
+      if (s.user_id !== user.id) continue;
       keys.add(songMatchKey(s));
       if (s.imported_from) keys.add(s.imported_from);
     }
     return keys;
-  }, [allSongs]);
+  }, [allSongs, user.id]);
   const inMyLibrary = (s: Song) => myLibraryKeys.has(s.id) || myLibraryKeys.has(songMatchKey(s));
 
   function closeShared() {
@@ -4873,7 +4907,8 @@ export default function Dashboard({ user }: { user: User }) {
             autoRecord={openChordsMode === "record"}
             inFix={reportedSongIds.has(chordsSong.id)}
             onOpenEditor={
-              chordsSong.user_id === user.id
+              // Lastne skladbe in skladbe skupne delavnice (v pregledu ali s prijavo).
+              chordsSong.user_id === user.id || chordsSong.review_pending || reportedSongIds.has(chordsSong.id)
                 ? () => {
                     setEditorFromViewer(true);
                     setChordsEditSong(chordsSong);
