@@ -135,7 +135,9 @@ export default function SettingsMenu({
   const [backupOpen, setBackupOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const { theme, setTheme, appBg, setAppBg, pattern, setPattern, patternOpacity, setPatternOpacity } = useTheme();
+  const { theme, setTheme, appBg, setAppBg, pattern, setPattern, patternOpacity, setPatternOpacity, particles, setParticles, brightness, setBrightness } = useTheme();
+  const appBgEntry = appBg !== null ? BACKGROUNDS[appBg] : undefined;
+  const appBgHasParticles = !!appBgEntry && "particles" in appBgEntry && !!appBgEntry.particles;
 
   // Sistemski gumb "Nazaj" (Android) naj meni zapre enako kot klik zunaj njega ali Escape.
   useBackableOpen(menuOpen, () => setMenuOpen(false));
@@ -432,7 +434,7 @@ export default function SettingsMenu({
                           className="flex w-full flex-col items-center gap-1 text-center text-[10px] leading-tight text-neutral-600 dark:text-neutral-300"
                         >
                           <span
-                            style={{ backgroundColor: b.bg }}
+                            style={{ backgroundColor: b.bg, backgroundImage: "gradient" in b ? b.gradient : undefined }}
                             className={`h-6 w-6 rounded-full border border-neutral-400 dark:border-neutral-600 ${
                               appBg === i ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900" : ""
                             }`}
@@ -442,6 +444,52 @@ export default function SettingsMenu({
                       );
                     })}
                   </div>
+
+                  {/* Svetlost ozadja: -50 … +50 %, 0 = brez spremembe. */}
+                  <label htmlFor="app-brightness" className="mb-1 mt-3 flex items-center justify-between text-xs font-medium text-neutral-500">
+                    <span>Svetlost ozadja</span>
+                    <span className="tabular-nums text-neutral-700 dark:text-neutral-300">
+                      {brightness > 0 ? "+" : ""}
+                      {Math.round(brightness * 100)} %
+                    </span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span aria-hidden="true" className="text-[10px] text-neutral-500">Temneje</span>
+                    <input
+                      id="app-brightness"
+                      type="range"
+                      min={-0.5}
+                      max={0.5}
+                      step={0.05}
+                      value={brightness}
+                      onChange={(e) => setBrightness(Number(e.target.value))}
+                      className="h-1.5 min-w-0 flex-1 cursor-pointer accent-emerald-500"
+                    />
+                    <span aria-hidden="true" className="text-[10px] text-neutral-500">Svetleje</span>
+                    {brightness !== 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setBrightness(0)}
+                        className="shrink-0 rounded-full border border-neutral-300 px-2 py-0.5 text-[10px] text-neutral-600 hover:border-emerald-500 hover:text-emerald-600 dark:border-white/10 dark:text-neutral-300 dark:hover:text-emerald-400"
+                      >
+                        0
+                      </button>
+                    )}
+                  </div>
+
+                  {appBgHasParticles && (
+                    // Ozadja s prelivom imajo žive delce (AmbientParticles) — stikalo.
+                    <label className="mt-2.5 flex cursor-pointer items-center justify-between gap-2 text-xs font-medium text-neutral-500">
+                      <span>Gibanje v ozadju</span>
+                      <input
+                        id="app-particles"
+                        type="checkbox"
+                        checked={particles}
+                        onChange={(e) => setParticles(e.target.checked)}
+                        className="h-4 w-4 accent-emerald-500"
+                      />
+                    </label>
+                  )}
 
                   {/* Vzorec čez ozadje (tanke črte), v svetli in temni temi. */}
                   <p className="mb-1.5 mt-3 text-xs font-medium text-neutral-500">Vzorec</p>

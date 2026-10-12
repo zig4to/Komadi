@@ -18,6 +18,11 @@ const BG_KEY = "komadi:appBg";
 const PATTERN_KEY = "komadi:appPattern";
 // Vidnost vzorca (drsnik pod "Vzorec"): 0 … PATTERN_OPACITY_MAX, privzeto 1.
 const PATTERN_OPACITY_KEY = "komadi:appPatternOpacity";
+// Delci v ozadju (ozadja z `particles`): "0" = izklopljeni, privzeto vklopljeni.
+const PARTICLES_KEY = "komadi:appParticles";
+// Svetlost ozadja (drsnik pod "Ozadje"): -0,5 … +0,5, 0 = brez spremembe
+// (ThemeProvider: črna tančica pod 0, bela nad 0).
+const BRIGHTNESS_KEY = "komadi:appBrightness";
 
 function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", isDark(theme));
@@ -62,6 +67,23 @@ function readPattern(): PatternId | null {
   }
 }
 
+function readBrightness(): number {
+  try {
+    const n = Number(localStorage.getItem(BRIGHTNESS_KEY) ?? 0);
+    return Number.isFinite(n) ? Math.min(0.5, Math.max(-0.5, n)) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function readParticles(): boolean {
+  try {
+    return localStorage.getItem(PARTICLES_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
 function readPatternOpacity(): number {
   try {
     const v = localStorage.getItem(PATTERN_OPACITY_KEY);
@@ -90,6 +112,8 @@ export function useTheme() {
   const appBg = useSyncExternalStore(subscribe, readAppBg, () => null);
   const pattern = useSyncExternalStore(subscribe, readPattern, () => null);
   const patternOpacity = useSyncExternalStore(subscribe, readPatternOpacity, () => 1);
+  const particles = useSyncExternalStore(subscribe, readParticles, () => true);
+  const brightness = useSyncExternalStore(subscribe, readBrightness, () => 0);
 
   // Poskrbi, da se razred .dark ujema z izbiro tudi ob spremembi sistemske
   // nastavitve (ko je izbrana "sistemska").
@@ -149,5 +173,23 @@ export function useTheme() {
     window.dispatchEvent(new Event(EVENT));
   }, []);
 
-  return { theme, setTheme, appBg, setAppBg, pattern, setPattern, patternOpacity, setPatternOpacity };
+  const setParticles = useCallback((on: boolean) => {
+    try {
+      localStorage.setItem(PARTICLES_KEY, on ? "1" : "0");
+    } catch {
+      // localStorage ni na voljo — izbira se ne bo ohranila
+    }
+    window.dispatchEvent(new Event(EVENT));
+  }, []);
+
+  const setBrightness = useCallback((next: number) => {
+    try {
+      localStorage.setItem(BRIGHTNESS_KEY, String(Math.min(0.5, Math.max(-0.5, next))));
+    } catch {
+      // localStorage ni na voljo — izbira se ne bo ohranila
+    }
+    window.dispatchEvent(new Event(EVENT));
+  }, []);
+
+  return { theme, setTheme, appBg, setAppBg, pattern, setPattern, patternOpacity, setPatternOpacity, particles, setParticles, brightness, setBrightness };
 }

@@ -471,6 +471,8 @@ export default function ChordsViewer({
   const markWidth = `${MARK_WIDTHS[markWidthIndex] ?? MARK_WIDTHS[DEFAULT_MARK_WIDTH]}px`;
   const shownChordColor = theme.light ? chordColor.light : chordColor.dark;
   const themeVars = {
+    // Ozadja s prelivom (Morska megla …): preliv čez osnovno barvo (brez delcev).
+    backgroundImage: "gradient" in theme ? theme.gradient : undefined,
     "--cv-bg": theme.bg,
     "--cv-text": textColor,
     "--cv-title": theme.title,
@@ -4031,6 +4033,7 @@ export default function ChordsViewer({
       {samSpili && (
         <div
           className="absolute inset-0 z-40 isolate flex flex-col overflow-hidden bg-(--cv-bg) text-(--cv-text) [--ss-btn:2.25rem] lg:[--ss-btn:3rem]"
+          style={{ backgroundImage: "gradient" in theme ? theme.gradient : undefined }}
           onClick={follower ? ssFollowerFullscreen : undefined}
         >
           {theme.pattern && (

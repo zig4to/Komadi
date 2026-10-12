@@ -151,6 +151,27 @@ textarea,
   animation: fret-note 3.6s ease-out forwards;
 }
 
+/* Ozadja temne serije (BACKGROUNDS[].blobs): zamegljene barvne lise se počasi
+   premikajo in spreminjajo velikost (ThemeProvider). */
+@keyframes bg-blob-0 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(6%, 8%) scale(1.12); }
+}
+@keyframes bg-blob-1 {
+  0%, 100% { transform: translate(0, 0) scale(1.05); }
+  50% { transform: translate(-7%, -5%) scale(0.92); }
+}
+@keyframes bg-blob-2 {
+  0%, 100% { transform: translate(0, 0) scale(0.95); }
+  50% { transform: translate(5%, -8%) scale(1.1); }
+}
+.bg-blob-0 { animation: bg-blob-0 26s ease-in-out infinite; }
+.bg-blob-1 { animation: bg-blob-1 32s ease-in-out infinite; }
+.bg-blob-2 { animation: bg-blob-2 38s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .bg-blob { animation: none !important; }
+}
+
 /* Naključno izbrana skladba (SongCard highlighted): rob rahlo utripa vijolično;
    delno naključno izbrana limetino in malo manj izrazito. */
 @keyframes random-pick-pulse {
