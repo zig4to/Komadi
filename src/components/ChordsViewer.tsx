@@ -3500,252 +3500,288 @@ export default function ChordsViewer({
       <div ref={setSliderHost} className="flex shrink-0 items-center px-4 pb-2 empty:hidden lg:hidden" />
 
       {/* Računalnik: orodna vrstica povečana (zoom), pri 100 % je bila premajhna. */}
-      <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 max-lg:border-white/10 max-lg:bg-transparent lg:px-12 lg:[zoom:1.35]">
-        {/* Neposredno v Sam Špili (iste skladbe kot v meniju Akordi, ne med snemanjem
-            in ne za sledilca). Celozaslonsko + ležeče v istem kliku, kot iz menija. */}
-        {hasSamSpili(song) && !recorder && !follower && (
-          <button
-            type="button"
-            onClick={() => {
-              closeThemeMenu();
-              enterLandscapeFullscreen();
-              openChordsViewer(song.id, "samspili");
-            }}
-            title="Sam Špili"
-            className="flex items-center gap-1.5 rounded-full border border-orange-400 py-1 pl-2 pr-2.5 text-xs font-medium text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 lg:order-1"
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-orange-400">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M10 8.5v7l5.5-3.5z" />
-            </svg>
-            Sam Špili
-          </button>
+      <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 max-lg:border-white/10 max-lg:bg-transparent lg:items-end lg:gap-3 lg:px-12 lg:[zoom:1.35]">
+        {/* Računalnik: skupine z napisom (Povezave, Prilagajanje, Urejanje, Funkcije,
+            Nastavitve); telefon: "contents" + max-lg:order — en tok gumbov kot prej. */}
+        {((hasSamSpili(song) && !recorder && !follower) || (!!song.chords_source_url && /ultimate-guitar.com/.test(song.chords_source_url))) && (
+            <div className="contents lg:flex lg:flex-col lg:gap-1">
+              <span className="hidden px-1 text-[9px] font-medium uppercase tracking-[0.08em] text-orange-400 lg:block">Povezave</span>
+              <div className="contents lg:flex lg:items-center lg:gap-2">
+                {/* Neposredno v Sam Špili (iste skladbe kot v meniju Akordi, ne med snemanjem
+                    in ne za sledilca). Celozaslonsko + ležeče v istem kliku, kot iz menija. */}
+                {hasSamSpili(song) && !recorder && !follower && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeThemeMenu();
+                      enterLandscapeFullscreen();
+                      openChordsViewer(song.id, "samspili");
+                    }}
+                    title="Sam Špili"
+                    className="flex items-center gap-1.5 rounded-full border border-orange-400 py-1 pl-2 pr-2.5 text-xs font-medium text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 max-lg:order-1"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-orange-400">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M10 8.5v7l5.5-3.5z" />
+                    </svg>
+                    Sam Špili
+                  </button>
+                )}
+                {/* Računalnik: povezava na Ultimate Guitar (skupina Povezave). */}
+                {song.chords_source_url && /ultimate-guitar.com/.test(song.chords_source_url) && (
+                  <a
+                    href={song.chords_source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Odpri na Ultimate Guitar"
+                    className="hidden items-center gap-1.5 rounded-full border border-orange-400 py-1 pl-2 pr-2.5 text-xs font-medium text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 lg:flex"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-orange-500">
+                      <path d="M18.1 6.9A8 8 0 1 0 20 12h-7" />
+                    </svg>
+                    Ultimate Guitar
+                  </a>
+                )}
+              </div>
+            </div>
         )}
-        {/* Računalnik: povezava na Ultimate Guitar (skupina Povezave). */}
-        {song.chords_source_url && /ultimate-guitar.com/.test(song.chords_source_url) && (
-          <a
-            href={song.chords_source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Odpri na Ultimate Guitar"
-            className="hidden items-center gap-1.5 rounded-full border border-orange-400 py-1 pl-2 pr-2.5 text-xs font-medium text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 lg:order-2 lg:flex"
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-orange-500">
-              <path d="M18.1 6.9A8 8 0 1 0 20 12h-7" />
-            </svg>
-            Ultimate Guitar
-          </a>
-        )}
-        {/* Računalnik: ločila med skupinami orodne vrstice. */}
-        {[3, 7, 12, 16].map((o) => (
-          <span key={o} aria-hidden="true" style={{ order: o }} className="mx-1 hidden h-6 w-px bg-white/15 lg:block" />
-        ))}
-        <div
-          className="flex items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5 lg:order-4"
-          role="group"
-          aria-label="Transpozicija"
-        >
-          <span className="mr-0.5 text-xs text-neutral-400">Ton</span>
-          <button type="button" onClick={() => shift(-1)} aria-label="Pol tona nižje" title="Pol tona nižje" className={toneButton}>
-            −
-          </button>
-          <button
-            type="button"
-            onClick={() => setSemitones(0)}
-            title="Izvirna tonaliteta"
-            className={`${toneButton} w-7 tabular-nums ${semitones !== 0 ? "text-amber-400" : ""}`}
-          >
-            {semitones > 0 ? `+${semitones}` : semitones}
-          </button>
-          <button type="button" onClick={() => shift(1)} aria-label="Pol tona višje" title="Pol tona višje" className={toneButton}>
-            +
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={() => setSimplify((v) => !v)}
-          aria-pressed={simplify}
-          title="Poenostavi akorde (D7 → D, Am7 → Am)"
-          className={`flex h-8 items-center lg:order-14 rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
-            simplify ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
-          }`}
-        >
-          Simpl
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowShapes((v) => !v)}
-          aria-pressed={showShapes}
-          title="Pokaži prijeme vseh akordov skladbe"
-          className={`flex h-8 items-center lg:order-15 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
-            showShapes ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
-          }`}
-        >
-          Pokaži akorde
-        </button>
-        <button
-          type="button"
-          onClick={() => setImproOpen((v) => !v)}
-          aria-pressed={improOpen}
-          title="Lestvice za improvizacijo v tonaliteti skladbe"
-          className={`flex h-8 items-center lg:order-13 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
-            improOpen ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
-          }`}
-        >
-          Impro
-        </button>
-        <div className="flex items-center rounded-full border border-orange-400 dark:border-white/15 p-0.5 lg:order-5" role="group" aria-label="Velikost pisave">
-          <button
-            type="button"
-            onClick={() => setFontSize((f) => Math.max(MIN_FONT, f - FONT_STEP))}
-            disabled={fontSize <= MIN_FONT}
-            aria-label="Manjša pisava"
-            title="Manjša pisava"
-            className={`${toneButton} px-1.5 text-xs`}
-          >
-            A−
-          </button>
-          <button
-            type="button"
-            onClick={() => setFontSize((f) => Math.min(MAX_FONT, f + FONT_STEP))}
-            disabled={fontSize >= MAX_FONT}
-            aria-label="Večja pisava"
-            title="Večja pisava"
-            className={`${toneButton} px-1.5 text-base`}
-          >
-            A+
-          </button>
-        </div>
-        {/* Računalnik: zamik Smart playa v vrstici (na telefonu v ⚙ → Napredne nastavitve). */}
-        {smartAvailable && (
-          <div
-            className="hidden items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5 lg:order-10 lg:flex"
-            role="group"
-            aria-label="Zamik besedila"
-            title={playingVideo ? "Zamik besedila za posnetek, ki igra" : "Zamik besedila za posnetek, ki zaigra ob ▶"}
-          >
+        <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3">
+          <span className="hidden px-1 text-[9px] font-medium uppercase tracking-[0.08em] text-orange-400 lg:block">Prilagajanje</span>
+          <div className="contents lg:flex lg:items-center lg:gap-2">
+            <div
+              className="flex items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5 max-lg:order-2"
+              role="group"
+              aria-label="Transpozicija"
+            >
+              <span className="mr-0.5 text-xs text-neutral-400">Ton</span>
+              <button type="button" onClick={() => shift(-1)} aria-label="Pol tona nižje" title="Pol tona nižje" className={toneButton}>
+                −
+              </button>
+              <button
+                type="button"
+                onClick={() => setSemitones(0)}
+                title="Izvirna tonaliteta"
+                className={`${toneButton} w-7 tabular-nums ${semitones !== 0 ? "text-amber-400" : ""}`}
+              >
+                {semitones > 0 ? `+${semitones}` : semitones}
+              </button>
+              <button type="button" onClick={() => shift(1)} aria-label="Pol tona višje" title="Pol tona višje" className={toneButton}>
+                +
+              </button>
+            </div>
+            <div className="flex items-center rounded-full border border-orange-400 dark:border-white/15 p-0.5 max-lg:order-6" role="group" aria-label="Velikost pisave">
+              <button
+                type="button"
+                onClick={() => setFontSize((f) => Math.max(MIN_FONT, f - FONT_STEP))}
+                disabled={fontSize <= MIN_FONT}
+                aria-label="Manjša pisava"
+                title="Manjša pisava"
+                className={`${toneButton} px-1.5 text-xs`}
+              >
+                A−
+              </button>
+              <button
+                type="button"
+                onClick={() => setFontSize((f) => Math.min(MAX_FONT, f + FONT_STEP))}
+                disabled={fontSize >= MAX_FONT}
+                aria-label="Večja pisava"
+                title="Večja pisava"
+                className={`${toneButton} px-1.5 text-base`}
+              >
+                A+
+              </button>
+            </div>
             <button
               type="button"
-              onClick={() => setOffsetOpen((v) => !v)}
-              aria-expanded={offsetOpen}
-              title={offsetLocked ? "Zamik je zaklenjen — skladba je preverjena (spremeniš ga prek Popravi skladbe)" : undefined}
-              className={`mr-0.5 flex h-7 items-center text-xs ${offsetOpen ? "text-neutral-400" : "pr-2 text-neutral-200 hover:text-white"}`}
+              onClick={enterFullscreen}
+              aria-label="Celozaslonski način"
+              title="Celozaslonski način"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-neutral-200 transition hover:text-white active:scale-95 max-lg:order-13"
             >
-              Zamik
-              {!offsetOpen && lrcOffset !== 0 && (
-                <span className="ml-1 tabular-nums text-amber-400">
-                  {lrcOffset > 0 ? "+" : ""}
-                  {lrcOffset.toFixed(2).replace(".", ",")}
-                </span>
-              )}
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+              </svg>
             </button>
-            {offsetOpen && (
-              <>
-                <button type="button" onClick={() => changeLrcOffset(-LRC_OFFSET_STEP)} disabled={!offsetVideo || offsetLocked} aria-label="Besedilo 0,25 s prej" title="Besedilo 0,25 s prej" className={toneButton}>
-                  −
-                </button>
-                <OffsetValue
-                  value={lrcOffset}
-                  disabled={!offsetVideo || offsetLocked}
-                  onSet={setLrcOffset}
-                  className="w-12 text-center text-xs tabular-nums text-neutral-200"
-                />
-                <button type="button" onClick={() => changeLrcOffset(LRC_OFFSET_STEP)} disabled={!offsetVideo || offsetLocked} aria-label="Besedilo 0,25 s pozneje" title="Besedilo 0,25 s pozneje" className={toneButton}>
-                  +
-                </button>
-              </>
-            )}
           </div>
-        )}
-        {/* Računalnik: zamik podčrtanih akordov (na telefonu v ⚙ → Pametni predvajalnik). */}
-        {underlineSung && syncedChords && (
-          <div
-            className="hidden items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5 lg:order-11 lg:flex"
-            role="group"
-            aria-label="Zamik akordov"
-            title="Zamik podčrtanih akordov v zapetih vrsticah (intro in solo ostaneta)"
-          >
+        </div>
+        <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3">
+          <span className="hidden px-1 text-[9px] font-medium uppercase tracking-[0.08em] text-orange-400 lg:block">Urejanje</span>
+          <div className="contents lg:flex lg:items-center lg:gap-2">
+            {/* Računalnik: napredni urejevalnik besedila (isti kot na straneh Pregled
+                in odobritev / Popravi skladbe). */}
+            {onOpenEditor && (
+              <button
+                type="button"
+                onClick={onOpenEditor}
+                disabled={!!recorder}
+                title="Napredni urejevalnik besedila z akordi in tablatur"
+                className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-orange-400 dark:border-white/15 px-3 text-xs text-neutral-200 transition hover:text-white disabled:opacity-40 active:scale-95 max-lg:order-9"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-amber-400">
+                  <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
+                </svg>
+                Urejevalnik
+              </button>
+            )}
+            {/* Računalnik: "Posnemi čase" v vrstici (na telefonu v ⚙ → Napredne nastavitve). */}
             <button
               type="button"
-              onClick={() => setSungOffsetOpen((v) => !v)}
-              aria-expanded={sungOffsetOpen}
-              title={offsetLocked ? "Zamik je zaklenjen — skladba je preverjena (spremeniš ga prek Popravi skladbe)" : undefined}
-              className={`mr-0.5 flex h-7 items-center whitespace-nowrap text-xs ${sungOffsetOpen ? "text-neutral-400" : "pr-2 text-neutral-200 hover:text-white"}`}
+              onClick={recorder ? cancelRecorder : startRecorder}
+              aria-pressed={!!recorder}
+              title={recorder ? "Prekliči snemanje časov" : "Posnemi čase vrstic in akordov za Smart play"}
+              className={`hidden h-8 items-center gap-1.5 rounded-full border border-orange-400 dark:border-white/15 px-3 text-xs transition active:scale-95 max-lg:order-10 lg:flex ${
+                recorder ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
+              }`}
             >
-              Zamik akordov
-              {!sungOffsetOpen && sungOffset !== 0 && (
-                <span className="ml-1 tabular-nums text-amber-400">
-                  {sungOffset > 0 ? "+" : ""}
-                  {sungOffset.toFixed(2).replace(".", ",")}
-                </span>
-              )}
+              <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-500" />
+              {recorder ? "Prekliči snemanje" : syncedLines || syncedChords ? "Nadaljuj snemanje" : "Posnemi čase"}
             </button>
-            {sungOffsetOpen && (
-              <>
-                <button type="button" onClick={() => changeSungOffset(-LRC_OFFSET_STEP)} disabled={offsetLocked} aria-label="Akordi 0,25 s prej" title="Akordi 0,25 s prej" className={toneButton}>
-                  −
+            {/* Računalnik: zamik Smart playa v vrstici (na telefonu v ⚙ → Napredne nastavitve). */}
+            {smartAvailable && (
+              <div
+                className="hidden items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5 max-lg:order-7 lg:flex"
+                role="group"
+                aria-label="Zamik besedila"
+                title={playingVideo ? "Zamik besedila za posnetek, ki igra" : "Zamik besedila za posnetek, ki zaigra ob ▶"}
+              >
+                <button
+                  type="button"
+                  onClick={() => setOffsetOpen((v) => !v)}
+                  aria-expanded={offsetOpen}
+                  title={offsetLocked ? "Zamik je zaklenjen — skladba je preverjena (spremeniš ga prek Popravi skladbe)" : undefined}
+                  className={`mr-0.5 flex h-7 items-center text-xs ${offsetOpen ? "text-neutral-400" : "pr-2 text-neutral-200 hover:text-white"}`}
+                >
+                  Zamik
+                  {!offsetOpen && lrcOffset !== 0 && (
+                    <span className="ml-1 tabular-nums text-amber-400">
+                      {lrcOffset > 0 ? "+" : ""}
+                      {lrcOffset.toFixed(2).replace(".", ",")}
+                    </span>
+                  )}
                 </button>
-                <OffsetValue value={sungOffset} disabled={offsetLocked} onSet={setSungOffset} className="w-12 text-center text-xs tabular-nums text-neutral-200" />
-                <button type="button" onClick={() => changeSungOffset(LRC_OFFSET_STEP)} disabled={offsetLocked} aria-label="Akordi 0,25 s pozneje" title="Akordi 0,25 s pozneje" className={toneButton}>
-                  +
+                {offsetOpen && (
+                  <>
+                    <button type="button" onClick={() => changeLrcOffset(-LRC_OFFSET_STEP)} disabled={!offsetVideo || offsetLocked} aria-label="Besedilo 0,25 s prej" title="Besedilo 0,25 s prej" className={toneButton}>
+                      −
+                    </button>
+                    <OffsetValue
+                      value={lrcOffset}
+                      disabled={!offsetVideo || offsetLocked}
+                      onSet={setLrcOffset}
+                      className="w-12 text-center text-xs tabular-nums text-neutral-200"
+                    />
+                    <button type="button" onClick={() => changeLrcOffset(LRC_OFFSET_STEP)} disabled={!offsetVideo || offsetLocked} aria-label="Besedilo 0,25 s pozneje" title="Besedilo 0,25 s pozneje" className={toneButton}>
+                      +
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            {/* Računalnik: zamik podčrtanih akordov (na telefonu v ⚙ → Pametni predvajalnik). */}
+            {underlineSung && syncedChords && (
+              <div
+                className="hidden items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5 max-lg:order-8 lg:flex"
+                role="group"
+                aria-label="Zamik akordov"
+                title="Zamik podčrtanih akordov v zapetih vrsticah (intro in solo ostaneta)"
+              >
+                <button
+                  type="button"
+                  onClick={() => setSungOffsetOpen((v) => !v)}
+                  aria-expanded={sungOffsetOpen}
+                  title={offsetLocked ? "Zamik je zaklenjen — skladba je preverjena (spremeniš ga prek Popravi skladbe)" : undefined}
+                  className={`mr-0.5 flex h-7 items-center whitespace-nowrap text-xs ${sungOffsetOpen ? "text-neutral-400" : "pr-2 text-neutral-200 hover:text-white"}`}
+                >
+                  Zamik akordov
+                  {!sungOffsetOpen && sungOffset !== 0 && (
+                    <span className="ml-1 tabular-nums text-amber-400">
+                      {sungOffset > 0 ? "+" : ""}
+                      {sungOffset.toFixed(2).replace(".", ",")}
+                    </span>
+                  )}
                 </button>
-              </>
+                {sungOffsetOpen && (
+                  <>
+                    <button type="button" onClick={() => changeSungOffset(-LRC_OFFSET_STEP)} disabled={offsetLocked} aria-label="Akordi 0,25 s prej" title="Akordi 0,25 s prej" className={toneButton}>
+                      −
+                    </button>
+                    <OffsetValue value={sungOffset} disabled={offsetLocked} onSet={setSungOffset} className="w-12 text-center text-xs tabular-nums text-neutral-200" />
+                    <button type="button" onClick={() => changeSungOffset(LRC_OFFSET_STEP)} disabled={offsetLocked} aria-label="Akordi 0,25 s pozneje" title="Akordi 0,25 s pozneje" className={toneButton}>
+                      +
+                    </button>
+                  </>
+                )}
+              </div>
             )}
           </div>
-        )}
-        {/* Računalnik: napredni urejevalnik besedila (isti kot na straneh Pregled
-            in odobritev / Popravi skladbe). */}
-        {onOpenEditor && (
-          <button
-            type="button"
-            onClick={onOpenEditor}
-            disabled={!!recorder}
-            title="Napredni urejevalnik besedila z akordi in tablatur"
-            className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-orange-400 dark:border-white/15 px-3 text-xs text-neutral-200 transition hover:text-white disabled:opacity-40 active:scale-95 lg:order-8"
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-amber-400">
-              <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
-            </svg>
-            Urejevalnik
-          </button>
-        )}
-        {/* Računalnik: "Posnemi čase" v vrstici (na telefonu v ⚙ → Napredne nastavitve). */}
-        <button
-          type="button"
-          onClick={recorder ? cancelRecorder : startRecorder}
-          aria-pressed={!!recorder}
-          title={recorder ? "Prekliči snemanje časov" : "Posnemi čase vrstic in akordov za Smart play"}
-          className={`hidden h-8 items-center gap-1.5 rounded-full border border-orange-400 dark:border-white/15 px-3 text-xs transition active:scale-95 lg:order-9 lg:flex ${
-            recorder ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
-          }`}
-        >
-          <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-500" />
-          {recorder ? "Prekliči snemanje" : syncedLines || syncedChords ? "Nadaljuj snemanje" : "Posnemi čase"}
-        </button>
-        <button
-          ref={themeButtonRef}
-          type="button"
-          onClick={toggleThemeMenu}
-          aria-expanded={themeMenuPos !== null}
-          aria-label="Nastavitve"
-          title="Nastavitve"
-          className={`flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 transition active:scale-95 lg:order-17 ${
-            themeMenuPos ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
-          }`}
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-        </button>
+        </div>
+        <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3">
+          <span className="hidden px-1 text-[9px] font-medium uppercase tracking-[0.08em] text-orange-400 lg:block">Funkcije</span>
+          <div className="contents lg:flex lg:items-center lg:gap-2">
+            <button
+              type="button"
+              onClick={() => setImproOpen((v) => !v)}
+              aria-pressed={improOpen}
+              title="Lestvice za improvizacijo v tonaliteti skladbe"
+              className={`flex h-8 items-center max-lg:order-5 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
+                improOpen ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
+              }`}
+            >
+              Impro
+            </button>
+            <button
+              type="button"
+              onClick={() => setSimplify((v) => !v)}
+              aria-pressed={simplify}
+              title="Poenostavi akorde (D7 → D, Am7 → Am)"
+              className={`flex h-8 items-center max-lg:order-3 rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
+                simplify ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
+              }`}
+            >
+              Simpl
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowShapes((v) => !v)}
+              aria-pressed={showShapes}
+              title="Pokaži prijeme vseh akordov skladbe"
+              className={`flex h-8 items-center max-lg:order-4 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
+                showShapes ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
+              }`}
+            >
+              Pokaži akorde
+            </button>
+          </div>
+        </div>
+        <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3">
+          <span className="hidden px-1 text-[9px] font-medium uppercase tracking-[0.08em] text-orange-400 lg:block">Nastavitve</span>
+          <div className="contents lg:flex lg:items-center lg:gap-2">
+            <button
+              ref={themeButtonRef}
+              type="button"
+              onClick={toggleThemeMenu}
+              aria-expanded={themeMenuPos !== null}
+              aria-label="Nastavitve"
+              title="Nastavitve"
+              className={`flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 transition active:scale-95 max-lg:order-11 ${
+                themeMenuPos ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
+              }`}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+          </div>
+        </div>
         <button
           type="button"
           onClick={rotateOn ? exitRotate : enterRotate}
           aria-pressed={rotateOn}
           aria-label={rotateOn ? "Nazaj pokončno" : "Zasukaj zaslon"}
           title={rotateOn ? "Nazaj pokončno" : "Zasukaj zaslon (ležeče)"}
-          className={`flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 transition active:scale-95 lg:hidden ${
+          className={`flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 transition active:scale-95 max-lg:order-12 lg:hidden ${
             rotateOn ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
           }`}
         >
@@ -3753,17 +3789,6 @@ export default function ChordsViewer({
             <rect x="3" y="9" width="14" height="10" rx="1.8" />
             <path d="M7 5.5A6 6 0 0 1 17.5 4" />
             <path d="m16 2 1.6 2.1L15.4 5.6" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          onClick={enterFullscreen}
-          aria-label="Celozaslonski način"
-          title="Celozaslonski način"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-neutral-200 transition hover:text-white active:scale-95 lg:order-6"
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-            <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
           </svg>
         </button>
       </div>
