@@ -62,6 +62,8 @@ const FONT_KEY = "komadi:chords:font";
 const SIMPLIFY_KEY = "komadi:chords:simplify";
 // "Pokaži akorde": sheme vseh akordov skladbe desno od naslova (kot na UG).
 const SHOW_SHAPES_KEY = "komadi:chords:showShapes";
+// "No capo": skladbe s capom prikaže v akordih brez capa (prijemi + N poltonov). Globalno.
+const NO_CAPO_KEY = "komadi:chords:noCapo";
 // Okvir s prijemi (Posebni akordi / Akordi v skladbi) razprt (1) ali zložen (0) — globalno.
 const SHAPES_OPEN_KEY = "komadi:chords:shapesOpen";
 const BG_KEY = "komadi:chords:bg";
@@ -446,6 +448,8 @@ export default function ChordsViewer({
   // "Pokaži akorde" — ena nastavitev za vse skladbe.
   const [showShapes, setShowShapes] = useState(() => readNumber(SHOW_SHAPES_KEY, 0) === 1);
   useEffect(() => writeNumber(SHOW_SHAPES_KEY, showShapes ? 1 : 0), [showShapes]);
+  const [noCapo, setNoCapo] = useState(() => readNumber(NO_CAPO_KEY, 0) === 1);
+  useEffect(() => writeNumber(NO_CAPO_KEY, noCapo ? 1 : 0), [noCapo]);
   const [shapesOpen, setShapesOpen] = useState(() => readNumber(SHAPES_OPEN_KEY, 1) === 1);
   useEffect(() => writeNumber(SHAPES_OPEN_KEY, shapesOpen ? 1 : 0), [shapesOpen]);
   // Prijemi iz opisa skladbe ("Cadd4  x 3 3 0 1 0") imajo prednost pred bazo.
@@ -1271,16 +1275,19 @@ export default function ChordsViewer({
   }, [barsHidden, editing, desktopBars]);
 
   const shift = (d: number) => setSemitones((s) => wrap(s + d));
+  // Premik akordov = transpozicija + (No capo) capo skladbe.
+  const capoShift = noCapo && capo ? capo : 0;
+  const chordShift = wrap(semitones + capoShift);
   const display = (name: string) => {
-    const t = transposeChord(name, semitones);
+    const t = transposeChord(name, chordShift);
     return simplify ? simplifyChord(t) : t;
   };
 
   // "Pokaži akorde": vsi akordi v pesmi (kot so prikazani), po vrsti prve pojavitve.
-  const songChords = useMemo(() => {
+  const songChords = (() => {
     const names = new Set<string>();
     const add = (name: string | null) => {
-      if (name) names.add(simplify ? simplifyChord(transposeChord(name, semitones)) : transposeChord(name, semitones));
+      if (name) names.add(simplify ? simplifyChord(transposeChord(name, chordShift)) : transposeChord(name, chordShift));
     };
     for (const line of body) {
       if (line.kind === "chords") line.chords.forEach((c) => add(c.name));
@@ -1289,17 +1296,17 @@ export default function ChordsViewer({
       else if (line.kind === "tab") line.header?.forEach((c) => add(c.name));
     }
     return [...names];
-  }, [body, semitones, simplify]);
+  })();
   // Posebni akordi (vse razen navadnih durovih/molovih trozvokov — A, Am, Cm,
   // Bbm, F# … tudi kot barre): /bas, add, sus, 7, maj7, 6, dim … Prikazani so
   // vedno na vrhu; "Pokaži akorde" prikaže vse.
-  const specialChords = useMemo(() => songChords.filter((n) => !isBasicChord(n)), [songChords]);
+  const specialChords = songChords.filter((n) => !isBasicChord(n));
   // "Impro": vsi prikazani akordi po vrsti (s ponovitvami) za zaznavo tonalitete.
   const [improOpen, setImproOpen] = useState(false);
-  const improChords = useMemo(() => {
+  const improChords = (() => {
     const out: string[] = [];
     const add = (name: string | null) => {
-      if (name) out.push(simplify ? simplifyChord(transposeChord(name, semitones)) : transposeChord(name, semitones));
+      if (name) out.push(simplify ? simplifyChord(transposeChord(name, chordShift)) : transposeChord(name, chordShift));
     };
     for (const line of body) {
       if (line.kind === "chords") line.chords.forEach((c) => add(c.name));
@@ -1308,7 +1315,7 @@ export default function ChordsViewer({
       else if (line.kind === "tab") line.header?.forEach((c) => add(c.name));
     }
     return out;
-  }, [body, semitones, simplify]);
+  })();
   const shapeChords = showShapes ? songChords : specialChords;
 
   // Tablature v pesmi so privzeto skrite (ostane samo vrstica akordov nad
@@ -3752,6 +3759,19 @@ export default function ChordsViewer({
             >
               Pokaži akorde
             </button>
+            {capo ? (
+              <button
+                type="button"
+                onClick={() => setNoCapo((v) => !v)}
+                aria-pressed={noCapo}
+                title={`Akordi brez capa: prijemi s capom na ${capo}. prečki prestavljeni za ${capo} poltonov navzgor`}
+                className={`flex h-8 items-center max-lg:order-4 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
+                  noCapo ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
+                }`}
+              >
+                No capo
+              </button>
+            ) : null}
           </div>
         </div>
         <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3">
@@ -3800,7 +3820,9 @@ export default function ChordsViewer({
               <h2 className="text-xl font-semibold text-(--cv-title)">{song.title}</h2>
               <p className="text-sm text-(--cv-muted)">{song.author}</p>
               {capo !== null && (
-                <p className="mt-1 text-sm font-medium text-(--cv-chord)">Capo: {capo}. prag</p>
+                <p className="mt-1 text-sm font-medium text-(--cv-chord)">
+                  {capoShift ? `Brez capa (izvirno capo ${capo}, akordi +${capo})` : `Capo: ${capo}. prag`}
+                </p>
               )}
               {description.length > 0 && (
                 <button
@@ -4237,7 +4259,7 @@ export default function ChordsViewer({
             </div>
           </div>
         )}
-        {improOpen && <ImproPanel chords={improChords} capo={capo} onClose={() => setImproOpen(false)} />}
+        {improOpen && <ImproPanel chords={improChords} capo={capoShift ? null : capo} onClose={() => setImproOpen(false)} />}
       </div>
 
       {shapeTip && (
