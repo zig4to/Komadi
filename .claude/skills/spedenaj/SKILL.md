@@ -40,6 +40,16 @@ description: "Pripravi skladbo iz 'Pregled in odobritev' (songs.review_pending) 
 `song.mjs list` → pokaži skladbe v pregledu (preverjene so označene in jih preskoči). Če uporabnik ni povedal
 katere, ga vprašaj (več jih lahko izbere). Za vsako skladbo `song.mjs dump <id>` za začetno stanje.
 
+**Naslov in izvajalec**: če sta napisana narobe (tipkarska napaka, manjkajoča črka, neuradno črkovanje — npr.
+"Eddie Rabbit" / "Driving my life away" namesto "Eddie Rabbitt" / "Drivin' My Life Away"), ju **kar popravi**
+(uporabnikova odločitev) — tudi ko LRCLIB zato ne najde besedila (`dump`: "LRCLIB nima…"), preveri iskanje s
+pravilnim imenom (`lrclib.net/api/search?track_name=…&artist_name=…`). Pred popravkom:
+- poglej `author_images` za staro in novo ime: obstaja slika pod novim imenom → skladba se pridruži temu izvajalcu;
+  obstaja samo pod starim → prepiši tudi vrstico v `author_images` (sicer kartica izgubi sliko);
+- shrani `{id, title, author}` v `backups/spedenaj/<id>-title-author-<čas>.json`, nato PATCH `songs` (REST s
+  service role ključem, kot `song.mjs`). Aplikacija ob spremenjenem naslovu/izvajalcu sama znova poišče LRC.
+V poročilu navedi staro → novo ime.
+
 ### 1. Video (izberi in zakleni)
 1. `song.mjs videos <id>` → kandidati z naslovom in kanalom.
 2. Uporabnikova odločitev: **raje neuradni** posnetki (lyric/audio uploadi drugih kanalov — ne `…VEVO`, ne
@@ -72,8 +82,11 @@ katere, ga vprašaj (več jih lahko izbere). Za vsako skladbo `song.mjs dump <id
    določi akorde:
    - kromagram primerjaj z akordi taba (intro je skoraj vedno iz akordov prve kitice ali refrena — uporabi njihova
      imena, ne surovih trozvokov iz analize);
-   - en akord na takt (ali na pol takta, če se tam res menja); ponovljeni enak akord zapiši toliko krat, kolikor
-     taktov (oz. 2 taktov) traja, npr. 8 taktov enega akorda → `Ebm Ebm Ebm Ebm` (po 2 takta);
+   - **zapiši vse takte** (uporabnikova odločitev): en akord na takt, noben takt ne sme manjkati — število akordov
+     = (konec − začetek) / bar; preveri, da se izide (Drivin' My Life Away: Solo 1 je bil zapisan s 3 akordi, slišijo
+     se 4). Kjer se akord menja sredi takta (ali se ponovi z drugo barvo, npr. E → E7), zapiši tudi to polovico
+     (`C#m A E7 E7`); enak akord čez več taktov ponovi za vsak takt. Isto velja za vse instrumentalne dele (solo,
+     interludij, outro);
    - vstavi `[Intro]` + vrstico akordov na začetek telesa (pred prvo oznako, za opisom).
 
 ### 4. Oznake delov
@@ -85,6 +98,13 @@ katere, ga vprašaj (več jih lahko izbere). Za vsako skladbo `song.mjs dump <id
    (razen intra) preveri v `a.json`, ali se tam igra (rms ni tišina): če tab tam nima dela, dodaj `[Solo N]` (ali
    `[Interlude]`) z vrstico akordov iz kromagrama (spet z imeni akordov taba; pogosto je to progresija kitice).
    Ena vrstica = 4–8 akordov; daljše razdeli.
+   - Preveri tudi vrstico "Možni instrumentalni deli brez prazne LRC vrstice" — LRC pogosto nima prazne vrstice
+     pred solom za refrenom (Drivin' My Life Away: 9 s za Chorusom 1 ni bilo med premori). V `a.json` preveri,
+     ali se tam igra, in naredi del kot zgoraj.
+   - **Akordi sola/interludija gredo vedno v svojo vrstico pod svojo oznako** (uporabnikova odločitev), nikoli na
+     konec zapete vrstice: tab pogosto piše "`Lookin' for a sunny day.  C#m A E7`" — premakni `C#m A E7` v
+     `[Solo N]` (če se tam nadaljuje še kaj, dodaj na isto vrstico, npr. `C#m A E7 E D`), zapeti vrstici pusti
+     samo akorde nad njenimi zlogi in ji konec (`lineOverrides.end`) skrajšaj na začetek sola.
 3. Zelo dolge vrstice (besedilo > ~45 znakov ali akordov > 8) razdeli na dve, akorde pa porazdeli nad pravimi zlogi.
 4. Zapiši besedilo: patch `{"text": "osnutek.txt", "video": "…", "duration": <dolžina videa>}` → `write` brez
    `--write`, preglej povzetek, nato z `--write`. Takoj zatem `dump <id> --audio a.json` (indeksi vrstic so zdaj novi).

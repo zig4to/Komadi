@@ -10,8 +10,8 @@ import { CLOSE_BUTTON, CLOSE_ICON, ScaleBoard, useIsDesktop } from "@/components
 // improvizacijo po skupinah (pentatonike in blues, lestvice in modusi,
 // vzporedna tonaliteta), znotraj skupine po deležu tonov akordov, ki so v
 // lestvici. Izbrano lestvico pokaže na vratu kitare kot stran Lestvice.
-// Računalnik: stolpec ob desnem robu, širino se vleče za levi rob
-// (komadi:chords:improWidth); telefon: čez cel zaslon.
+// Računalnik: stolpec ob desnem robu, ob odprtju 55 % širine (besedilo 45 : Impro 55), širino
+// se vleče za levi rob (dvoklik = spet 55 %); telefon: čez cel zaslon.
 
 const SELECT =
   "min-w-0 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm text-neutral-900 outline-none focus:border-indigo-400 dark:border-white/[0.1] dark:bg-[#16161b] dark:text-neutral-100";
@@ -23,19 +23,9 @@ const chevron = (d: string) => (
   </svg>
 );
 
-const WIDTH_KEY = "komadi:chords:improWidth";
-const DEFAULT_WIDTH = 608;
 const MIN_WIDTH = 320;
 // Besedilu levo ostane vsaj toliko prostora.
 const MIN_TEXT = 320;
-
-function readWidth() {
-  try {
-    const v = Number(localStorage.getItem(WIDTH_KEY));
-    if (Number.isFinite(v) && v >= MIN_WIDTH) return v;
-  } catch {}
-  return DEFAULT_WIDTH;
-}
 
 const keyValue = (k: SongKey) => `${k.tonic}:${k.minor ? "m" : "M"}`;
 
@@ -57,7 +47,8 @@ export default function ImproPanel({ chords, capo, onClose }: { chords: string[]
   const [pos, setPos] = useState(1);
   const [labels, setLabels] = useState<"note" | "int">("note");
   const desktop = useIsDesktop();
-  const [width, setWidth] = useState(readWidth);
+  // null = 55 % širine (privzeto ob vsakem odprtju), sicer povlečena širina v px.
+  const [width, setWidth] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -77,11 +68,7 @@ export default function ImproPanel({ chords, capo, onClose }: { chords: string[]
     setWidth(Math.round(Math.max(MIN_WIDTH, Math.min(parent - MIN_TEXT, right - e.clientX))));
   }
   function onResizeUp() {
-    if (!dragging) return;
-    setDragging(false);
-    try {
-      localStorage.setItem(WIDTH_KEY, String(width));
-    } catch {}
+    if (dragging) setDragging(false);
   }
 
   function select(id: string) {
@@ -102,7 +89,7 @@ export default function ImproPanel({ chords, capo, onClose }: { chords: string[]
       style={{
         paddingTop: "env(safe-area-inset-top)",
         paddingBottom: "env(safe-area-inset-bottom)",
-        width: desktop ? width : undefined,
+        width: desktop ? (width ?? "55%") : undefined,
       }}
     >
       {/* Ročaj za širino (računalnik): levi rob plošče. */}
@@ -115,12 +102,7 @@ export default function ImproPanel({ chords, capo, onClose }: { chords: string[]
         onPointerMove={onResizeMove}
         onPointerUp={onResizeUp}
         onPointerCancel={onResizeUp}
-        onDoubleClick={() => {
-          setWidth(DEFAULT_WIDTH);
-          try {
-            localStorage.removeItem(WIDTH_KEY);
-          } catch {}
-        }}
+        onDoubleClick={() => setWidth(null)}
         className="group absolute inset-y-0 -left-1.5 z-10 hidden w-3 cursor-col-resize touch-none lg:block"
       >
         <div
@@ -221,7 +203,7 @@ export default function ImproPanel({ chords, capo, onClose }: { chords: string[]
                 {current.note ? ` · ${current.note}` : ""} · {Math.round(current.fit * 100)} % tonov akordov skladbe je v lestvici · {index + 1}/{flat.length}
               </div>
             </div>
-            <ScaleBoard root={current.root} scale={current.scale} pos={pos} labels={labels} onPos={setPos} onLabels={setLabels} />
+            <ScaleBoard root={current.root} scale={current.scale} pos={pos} labels={labels} onPos={setPos} onLabels={setLabels} defaultZoom={1} />
           </>
         )}
       </div>

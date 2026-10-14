@@ -38,6 +38,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import ImproPanel from "@/components/ImproPanel";
+import { useIsDesktop } from "@/components/Scales";
 import type { ChordSection, Song, SyncedChords, SyncedLines } from "@/types/song";
 import { anchorScrollTop, computeAnchor, getRemoteView, subscribeRemoteView, type LocalView, type RemoteViewEntry, type SamSpiliView } from "@/lib/sharedChordsView";
 import { BACKGROUNDS, BACKGROUND_ORDER } from "@/lib/backgrounds";
@@ -80,7 +81,6 @@ const CHORD_GLOW_KEY = "komadi:chords:chordGlow";
 const MARK_BORDER_KEY = "komadi:chords:markBorder";
 const MARK_SHAPE_KEY = "komadi:chords:markShape";
 const MARK_WIDTH_KEY = "komadi:chords:markWidth";
-const FLOATING_PLAYER_KEY = "komadi:chords:floatingPlayer";
 // Izbrana različica prijema za vsak akord ({ "Dm": 1, … }).
 const SHAPE_CHOICE_KEY = "komadi:chords:shapeChoice";
 // Zamik besedila glede na video (s), za vsak posnetek posebej — drug video
@@ -89,6 +89,9 @@ const SHAPE_CHOICE_KEY = "komadi:chords:shapeChoice";
 // 0028 ni pognana.
 // Korak zamika (s).
 const LRC_OFFSET_STEP = 0.25;
+// Napredno: "Podčrtani akordi" — izklop označevanja akordov v zapetih vrsticah
+// (intro/solo ostanejo). Globalno, na tej napravi.
+const SUNG_CHORDS_KEY = "komadi:chords:sungChords";
 // m:ss za časovni razpon instrumentalnega dela.
 const formatSec = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, "0")}`;
 // Navaden durov/molov trozvok (A, Am, Cm, Bbm, F# … tudi kot barre); vse ostalo
@@ -922,10 +925,6 @@ export default function ChordsViewer({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   // Podrazdelek "Pametni predvajalnik" v naprednih nastavitvah (razprt/strnjen).
   const [smartInfoOpen, setSmartInfoOpen] = useState(false);
-  // Napredno: "Predvajalnik med pomikanjem" — med samodejnim pomikanjem desno
-  // plavajoče kontrole glasbe (YouTubeMiniPlayer floatingHost). Globalno.
-  const [floatingPlayer, setFloatingPlayer] = useState(() => readNumber(FLOATING_PLAYER_KEY, 0) === 1);
-  useEffect(() => writeNumber(FLOATING_PLAYER_KEY, floatingPlayer ? 1 : 0), [floatingPlayer]);
   const themeButtonRef = useRef<HTMLButtonElement>(null);
   const ssSettingsRef = useRef<HTMLButtonElement>(null);
   // Začetni zaslon Sam Špili: gumb Meni odpre isti meni ⚙ (stranske vrstice tam ni).
@@ -973,11 +972,6 @@ export default function ChordsViewer({
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const editing = draft !== null;
-  const startEdit = () => {
-    closeThemeMenu();
-    setEditError(null);
-    setDraft(toEditableText(chordsText));
-  };
   const cancelEdit = () => {
     if (draft !== null && draft !== toEditableText(chordsText) && !window.confirm("Zavržem spremembe?")) return;
     setDraft(null);
@@ -1007,9 +1001,6 @@ export default function ChordsViewer({
   // Gumb celozaslonsko: skrije obe zgornji vrstici (kot med samodejnim
   // pomikanjem) in, kjer gre (Fullscreen API — ne npr. v iPhone Safariju),
   // še vrstico brskalnika/sistema. Izhod: gumb v kotu ali Nazaj.
-  // Koren pregledovalnika — cilj portala za plavajoči predvajalnik.
-  const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
-  const setRoot = useCallback((el: HTMLDivElement | null) => setRootEl(el), []);
   // Telefon: vrstica samo za drsnik po skladbi (YouTubeMiniPlayer sliderHost).
   const [sliderHostEl, setSliderHostEl] = useState<HTMLDivElement | null>(null);
   const setSliderHost = useCallback((el: HTMLDivElement | null) => setSliderHostEl(el), []);
@@ -1204,8 +1195,10 @@ export default function ChordsViewer({
         transformOrigin: "top left",
       }
     : themeVars;
-  // Zgornji vrstici skrite: med samodejnim pomikanjem ali v celozaslonskem načinu.
-  const barsHidden = fullscreen || isFullscreen || !!remote?.fullscreen;
+  // Zgornji vrstici skrite: med samodejnim pomikanjem (samo telefon) ali v
+  // celozaslonskem načinu. Na računalniku sta sicer vedno vidni (tudi ob drsenju).
+  const desktopBars = useIsDesktop();
+  const barsHidden = (fullscreen && !desktopBars) || isFullscreen || !!remote?.fullscreen;
 
   // Drsenje: zgornji vrstici sta lepljivi (sticky) prvi del pomičnega besedila.
   // Navzdol ju besedilo naravno odrine gor (kot filtri v aplikaciji Kam — brez
@@ -1228,7 +1221,7 @@ export default function ChordsViewer({
       outer.style.transition = `grid-template-rows ${BARS_TRANSITION}${animate ? ", top 200ms ease-out" : ""}`;
       outer.style.top = `${v - h}px`;
     };
-    if (barsHidden || editing) {
+    if (barsHidden || editing || desktopBars) {
       setReveal(0, false);
       outer.style.top = "0px";
       return;
@@ -1275,7 +1268,7 @@ export default function ChordsViewer({
       el.removeEventListener("touchend", markUser);
       el.removeEventListener("wheel", markUser);
     };
-  }, [barsHidden, editing]);
+  }, [barsHidden, editing, desktopBars]);
 
   const shift = (d: number) => setSemitones((s) => wrap(s + d));
   const display = (name: string) => {
@@ -1385,8 +1378,7 @@ export default function ChordsViewer({
   );
   // Ročno posneti ali zamrznjeni časi (songs.synced_lines) imajo prednost pred LRCLIB.
   const [syncedLines, setSyncedLines] = useState<SyncedLines | null>(song.synced_lines ?? null);
-  // Ročno preverjeno (0035): akordi pregledani / predvajalnik usklajen.
-  const [verifiedChordsAt, setVerifiedChordsAt] = useState(song.verified_chords_at ?? null);
+  // Ročno preverjeno (0035): predvajalnik usklajen (oznaki se nastavljata na strani Pregled in odobritev).
   const [verifiedPlayerAt, setVerifiedPlayerAt] = useState(song.verified_player_at ?? null);
   // Posnetek, ki trenutno igra (onPlaying) — zamik velja zanj.
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
@@ -1423,7 +1415,26 @@ export default function ChordsViewer({
   );
   // Telefon (zaslon < 1024 px): deli z akordi uporabljajo svoj zamik (offsetPhone).
   const [isPhone] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches);
-  const chordPoints = useMemo(() => flattenChordSections(chordSections, isPhone), [chordSections, isPhone]);
+  // "Zamik akordov": deli samo z akordi v zapetih vrsticah (podčrtani) se
+  // premaknejo za synced_chords.sungOffset; intro/solo (vrstice brez besedila) ne.
+  const sungOffset = syncedChords?.sungOffset ?? 0;
+  const [sungChordsOn, setSungChordsOn] = useState(() => readNumber(SUNG_CHORDS_KEY, 1) === 1);
+  useEffect(() => writeNumber(SUNG_CHORDS_KEY, sungChordsOn ? 1 : 0), [sungChordsOn]);
+  const chordPoints = useMemo(() => {
+    const lyricLine = (i: number) => {
+      const l = body[i];
+      return l?.kind === "pair" || (l?.kind === "text" && l.segments.some((s) => "text" in s && s.text.trim() !== ""));
+    };
+    const isSung = (s: (typeof chordSections)[number]) => s.points.length > 0 && s.points.every((p) => lyricLine(p.line));
+    const shifted = chordSections
+      .filter((s) => sungChordsOn || !syncedChords?.sungUnderline || !isSung(s))
+      .map((s) =>
+        sungOffset && isSung(s)
+          ? { ...s, offset: s.offset + sungOffset, offsetPhone: s.offsetPhone != null ? s.offsetPhone + sungOffset : undefined }
+          : s,
+      );
+    return flattenChordSections(shifted, isPhone);
+  }, [chordSections, isPhone, sungOffset, body, sungChordsOn, syncedChords?.sungUnderline]);
   useEffect(() => {
     syncStateRef.current = { synced_lines: syncedLines, synced_chords: syncedChords, verified_player_at: verifiedPlayerAt };
   });
@@ -1514,6 +1525,23 @@ export default function ChordsViewer({
       setLrcOffsetError(error ? error.message : null);
     }, 700);
   };
+  // Zamik podčrtanih akordov (synced_chords.sungOffset): takoj velja, v bazo gre
+  // 0,7 s po zadnjem kliku; zaklenjen enako kot zamik besedila.
+  const [sungOffsetOpen, setSungOffsetOpen] = useState(false);
+  const saveSungTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(saveSungTimerRef.current), []);
+  const setSungOffset = (seconds: number) => {
+    if (!syncedChords || offsetLocked) return;
+    const next: SyncedChords = { ...syncedChords, sungOffset: Math.round(seconds * 100) / 100 };
+    if (!next.sungOffset) delete next.sungOffset;
+    setSyncedChords(next);
+    clearTimeout(saveSungTimerRef.current);
+    saveSungTimerRef.current = setTimeout(async () => {
+      const { error } = await supabase.from("songs").update({ synced_chords: next }).eq("id", song.id);
+      setLrcOffsetError(error ? error.message : null);
+    }, 700);
+  };
+  const changeSungOffset = (delta: number) => setSungOffset(sungOffset + delta);
   const [activeLine, setActiveLine] = useState(-1);
   const [gapNextLine, setGapNextLine] = useState(-1);
   // "Sam Špili": kliknjen Play, posnetek se še nalaga.
@@ -1940,19 +1968,9 @@ export default function ChordsViewer({
   };
 
   // --- Ročno preverjanje (oznaki na kartici, pogoj za "Odobri") ---
-  const [verifySaving, setVerifySaving] = useState(false);
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const verifyError = (message: string) =>
     setVerifyMsg(`Shranjevanje ni uspelo: ${message}${/verified_/.test(message) ? " — poženi migracijo 0035_add_verification.sql v Supabase." : ""}`);
-  const toggleVerifyChords = async () => {
-    const next = verifiedChordsAt ? null : new Date().toISOString();
-    setVerifySaving(true);
-    const { error } = await supabase.from("songs").update({ verified_chords_at: next }).eq("id", song.id);
-    setVerifySaving(false);
-    if (error) return verifyError(error.message);
-    setVerifiedChordsAt(next);
-    setVerifyMsg(null);
-  };
   // "Predvajalnik preverjen": zamrzne trenutne čase vrstic (s koncem in ključem
   // vrstice), posnetek, ki igra, in s tem njegov zamik (lrc_offsets) — skladba
   // potem ne rabi več LRCLIB in je ne spremeni kasnejša logika povezovanja.
@@ -1992,11 +2010,6 @@ export default function ChordsViewer({
     if (markVerified) setVerifiedPlayerAt(at);
     setVerifyMsg(null);
   };
-  const confirmPlayer = async () => {
-    setVerifySaving(true);
-    await freezePlayer(true);
-    setVerifySaving(false);
-  };
   // Samodejna zamrznitev: skladba je označena kot preverjena, časi pa še niso
   // zamrznjeni — ob prvem predvajanju s časi se zaklenejo (enkrat na odprtje).
   const autoFrozeRef = useRef(false);
@@ -2010,46 +2023,6 @@ export default function ChordsViewer({
     autoFrozeRef.current = true;
     void freezeRef.current(false);
   }, [needsFreeze]);
-  const unverifyPlayer = async () => {
-    if (!window.confirm("Razveljavim oznako \"Predvajalnik preverjen\"? Shranjeni časi ostanejo.")) return;
-    setVerifySaving(true);
-    const { error } = await supabase.from("songs").update({ verified_player_at: null }).eq("id", song.id);
-    setVerifySaving(false);
-    if (error) return verifyError(error.message);
-    setVerifiedPlayerAt(null);
-    setVerifyMsg(null);
-  };
-  const verifyDate = (iso: string) => new Date(iso).toLocaleDateString("sl-SI");
-  const verifyCheck = (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0">
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
-  const verifyRowCls = (on: boolean) =>
-    `flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-xs font-medium disabled:opacity-50 ${
-      on ? "border-emerald-500/70 bg-emerald-500/10 text-emerald-300" : "border-neutral-700 text-neutral-200 hover:border-orange-400 hover:text-white"
-    }`;
-  const verifyChordsRow = (
-    <button type="button" onClick={toggleVerifyChords} disabled={verifySaving} aria-pressed={!!verifiedChordsAt} className={verifyRowCls(!!verifiedChordsAt)}>
-      {verifyCheck}
-      {verifiedChordsAt ? `Akordi preverjeni (${verifyDate(verifiedChordsAt)})` : "Označi: akordi preverjeni"}
-    </button>
-  );
-  const verifyPlayerRow = (
-    <div className="space-y-1">
-      <button
-        type="button"
-        onClick={verifiedPlayerAt ? unverifyPlayer : confirmPlayer}
-        disabled={verifySaving || (!verifiedPlayerAt && (!playingVideo || !sync?.points.length))}
-        aria-pressed={!!verifiedPlayerAt}
-        className={verifyRowCls(!!verifiedPlayerAt)}
-      >
-        {verifyCheck}
-        {verifiedPlayerAt ? `Predvajalnik preverjen (${verifyDate(verifiedPlayerAt)})` : "Označi: predvajalnik preverjen"}
-      </button>
-      {verifyMsg && <p className="px-1 text-[10px] leading-tight text-red-400">{verifyMsg}</p>}
-    </div>
-  );
   const deleteSyncedLines = async () => {
     if (!window.confirm("Izbrišem ročno posnete čase (vrstice in akorde) za to skladbo?")) return;
     const { error } = await supabase.from("songs").update({ synced_lines: null, synced_chords: null }).eq("id", song.id);
@@ -3135,7 +3108,7 @@ export default function ChordsViewer({
   };
 
   return createPortal(
-    <div ref={setRoot} data-view-portal onClick={(e) => e.stopPropagation()} style={rootStyle} className="fixed inset-0 z-50 isolate flex flex-col overflow-hidden bg-(--cv-bg) pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
+    <div data-view-portal onClick={(e) => e.stopPropagation()} style={rootStyle} className="fixed inset-0 z-50 isolate flex flex-col overflow-hidden bg-(--cv-bg) pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
       {theme.pattern && (
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
           <PatternSvg id={theme.pattern} colors={patternColors} className="h-full w-full" />
@@ -3178,25 +3151,6 @@ export default function ChordsViewer({
           style={{ top: themeMenuPos.top, bottom: themeMenuPos.bottom, left: themeMenuPos.left, maxHeight: themeMenuPos.maxHeight }}
           className={`fixed w-72 space-y-3 overflow-y-auto rounded-xl border border-orange-400 dark:border-white/10 dark:glass-menu dark:rounded-2xl bg-neutral-900 p-3 font-sans shadow-xl ${samSpili ? "ss-phone-menu z-50" : "z-10"}`}
         >
-          {/* "Sam Špili" prekrije urejevalnik, snemanje in samodejno pomikanje — tam jih ni. */}
-          {!samSpili && (
-          <button
-            type="button"
-            onClick={() => {
-              if (!editing) return startEdit();
-              closeThemeMenu();
-              cancelEdit();
-            }}
-            className="flex w-full items-center gap-2 rounded-lg border border-neutral-700 px-2.5 py-1.5 text-left text-xs font-medium text-neutral-200 hover:border-orange-400 hover:text-white"
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-amber-400">
-              <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
-            </svg>
-            {editing ? "Zapri urejanje" : "Uredi besedilo in akorde"}
-          </button>
-          )}
-          {!samSpili && verifyChordsRow}
           {/* "Sam Špili": naslov, razpirajoča "Tema", napredne na dnu. */}
           {samSpili ? (
             <>
@@ -3207,10 +3161,15 @@ export default function ChordsViewer({
               </div>
             </>
           ) : (
-            themePickers
+            // Vse nastavitve tem in barv v enem razprtem razdelku (telefon in računalnik).
+            <div className="border-t border-neutral-700 px-1 pt-2">
+              {pickerHeader("Tema", ssSettingsThemeOpen, () => setSsSettingsThemeOpen((v) => !v))}
+              {ssSettingsThemeOpen && <div className="mt-3 space-y-3 pl-2">{themePickers}</div>}
+            </div>
           )}
-          {/* Pametni predvajalnik: v glavnih nastavitvah (ne v naprednih). */}
-          <div className="border-t border-neutral-700 px-1 pt-2">
+          {/* Pametni predvajalnik: v glavnih nastavitvah (ne v naprednih). Računalnik:
+              skrit v navadnem pogledu — zamika in Posnemi čase so v orodni vrstici. */}
+          <div className={`border-t border-neutral-700 px-1 pt-2 ${samSpili ? "" : "lg:hidden"}`}>
             <button
               type="button"
               onClick={() => setSmartInfoOpen((v) => !v)}
@@ -3295,6 +3254,40 @@ export default function ChordsViewer({
                 </div>
               </div>
             )}
+            {underlineSung && syncedChords && (
+              <div className={`mt-1.5 flex items-center justify-between gap-2 ${samSpili ? "" : "lg:hidden"}`}>
+                <span className="text-[11px] text-neutral-300">
+                  Zamik akordov
+                  <span className="block text-[10px] leading-tight text-neutral-500">
+                    {offsetLocked ? "zaklenjeno — preverjena skladba" : "podčrtani akordi v zapetih vrsticah"}
+                  </span>
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => changeSungOffset(-LRC_OFFSET_STEP)}
+                    disabled={offsetLocked}
+                    className="rounded-full border border-orange-400 px-2 text-xs text-amber-400 disabled:opacity-40"
+                  >
+                    −0,25 s
+                  </button>
+                  <OffsetValue
+                    value={sungOffset}
+                    disabled={offsetLocked}
+                    onSet={setSungOffset}
+                    className="w-14 text-center text-[11px] tabular-nums text-neutral-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => changeSungOffset(LRC_OFFSET_STEP)}
+                    disabled={offsetLocked}
+                    className="rounded-full border border-orange-400 px-2 text-xs text-amber-400 disabled:opacity-40"
+                  >
+                    +0,25 s
+                  </button>
+                </div>
+              </div>
+            )}
             {!samSpili && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {/* Na računalniku je ta gumb v orodni vrstici. */}
@@ -3316,6 +3309,7 @@ export default function ChordsViewer({
                 )}
               </div>
             )}
+            {verifyMsg && <span className="mt-1 block text-[10px] leading-tight text-red-400">{verifyMsg}</span>}
             {smartAvailable && lrcOffsetError && (
               <span className="mt-1 block text-[10px] leading-tight text-red-400">
                 Zamik je shranjen samo v tem brskalniku ({lrcOffsetError}). Poženi migracijo 0028_add_lrc_offset.sql v Supabase.
@@ -3347,33 +3341,29 @@ export default function ChordsViewer({
             </button>
             {advancedOpen && (
               <div className="space-y-2 px-1 pt-2">
-                {samSpili ? (
-                  <p className="text-[10px] leading-tight text-neutral-500">Tu še ni naprednih nastavitev.</p>
+                {underlineSung ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-neutral-200">
+                      Podčrtani akordi
+                      <span className="block text-[10px] leading-tight text-neutral-500">Označevanje akordov v zapetih vrsticah</span>
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={sungChordsOn}
+                      aria-label="Podčrtani akordi"
+                      onClick={() => setSungChordsOn((v) => !v)}
+                      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${sungChordsOn ? "bg-orange-400" : "bg-neutral-600"}`}
+                    >
+                      <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${sungChordsOn ? "translate-x-4" : ""}`} />
+                    </button>
+                  </div>
                 ) : (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-neutral-200">
-                    Predvajalnik med pomikanjem
-                    <span className="block text-[10px] leading-tight text-neutral-500">Glasba desno med samodejnim pomikanjem</span>
-                  </span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={floatingPlayer}
-                    aria-label="Predvajalnik med pomikanjem"
-                    onClick={() => setFloatingPlayer((v) => !v)}
-                    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${floatingPlayer ? "bg-orange-400" : "bg-neutral-600"}`}
-                  >
-                    <span
-                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${floatingPlayer ? "translate-x-4" : ""}`}
-                    />
-                  </button>
-                </div>
+                  <p className="text-[10px] leading-tight text-neutral-500">Tu še ni naprednih nastavitev.</p>
                 )}
               </div>
             )}
           </div>
-          {/* Predvajalnik preverjen: čisto na dnu menija. */}
-          <div className="border-t border-neutral-700 pt-2">{verifyPlayerRow}</div>
         </div>
       )}
 
@@ -3442,7 +3432,7 @@ export default function ChordsViewer({
       {/* Telefon: steklena podlaga obeh vrstic — zameglitev je na tem ločenem sloju,
           ne na vrsticah (backdrop-filter bi kot transform ujel fixed sličico videa). */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-neutral-900/55 backdrop-blur-xl backdrop-saturate-150 lg:hidden" />
-      <div className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 max-lg:bg-transparent lg:px-16">
+      <div className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 max-lg:bg-transparent lg:px-12 lg:[zoom:1.35]">
         {/* Tudi brez kandidatov: v izbirniku posnetka lahko prilepiš povezavo. */}
         <YouTubeMiniPlayer
             videoIds={offsetLocked && lockedVideo ? [lockedVideo] : videoIds}
@@ -3457,7 +3447,6 @@ export default function ChordsViewer({
                 ? `https://www.youtube.com/watch?v=${videoIds[0]}`
                 : `https://www.youtube.com/results?search_query=${encodeURIComponent(`${song.author} ${song.title}`)}`)
             }
-            floatingHost={floatingPlayer && fullscreen ? rootEl : null}
             sliderHost={sliderHostEl}
             sectionMarkers={sectionMarkers}
             onTime={onVideoTime}
@@ -3510,7 +3499,8 @@ export default function ChordsViewer({
       {/* Telefon: drsnik po skladbi čez celo širino, med zgornjo vrstico in orodji. */}
       <div ref={setSliderHost} className="flex shrink-0 items-center px-4 pb-2 empty:hidden lg:hidden" />
 
-      <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 max-lg:border-white/10 max-lg:bg-transparent lg:px-16">
+      {/* Računalnik: orodna vrstica povečana (zoom), pri 100 % je bila premajhna. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 max-lg:border-white/10 max-lg:bg-transparent lg:px-12 lg:[zoom:1.35]">
         {/* Neposredno v Sam Špili (iste skladbe kot v meniju Akordi, ne med snemanjem
             in ne za sledilca). Celozaslonsko + ležeče v istem kliku, kot iz menija. */}
         {hasSamSpili(song) && !recorder && !follower && (
@@ -3522,7 +3512,7 @@ export default function ChordsViewer({
               openChordsViewer(song.id, "samspili");
             }}
             title="Sam Špili"
-            className="flex items-center gap-1.5 rounded-full border border-orange-400 py-1 pl-2 pr-2.5 text-xs font-medium text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15"
+            className="flex items-center gap-1.5 rounded-full border border-orange-400 py-1 pl-2 pr-2.5 text-xs font-medium text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 lg:order-1"
           >
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-orange-400">
               <circle cx="12" cy="12" r="10" />
@@ -3531,8 +3521,27 @@ export default function ChordsViewer({
             Sam Špili
           </button>
         )}
+        {/* Računalnik: povezava na Ultimate Guitar (skupina Povezave). */}
+        {song.chords_source_url && /ultimate-guitar.com/.test(song.chords_source_url) && (
+          <a
+            href={song.chords_source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Odpri na Ultimate Guitar"
+            className="hidden items-center gap-1.5 rounded-full border border-orange-400 py-1 pl-2 pr-2.5 text-xs font-medium text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 lg:order-2 lg:flex"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-orange-500">
+              <path d="M18.1 6.9A8 8 0 1 0 20 12h-7" />
+            </svg>
+            Ultimate Guitar
+          </a>
+        )}
+        {/* Računalnik: ločila med skupinami orodne vrstice. */}
+        {[3, 7, 12, 16].map((o) => (
+          <span key={o} aria-hidden="true" style={{ order: o }} className="mx-1 hidden h-6 w-px bg-white/15 lg:block" />
+        ))}
         <div
-          className="flex items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5"
+          className="flex items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5 lg:order-4"
           role="group"
           aria-label="Transpozicija"
         >
@@ -3557,7 +3566,7 @@ export default function ChordsViewer({
           onClick={() => setSimplify((v) => !v)}
           aria-pressed={simplify}
           title="Poenostavi akorde (D7 → D, Am7 → Am)"
-          className={`flex h-8 items-center rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
+          className={`flex h-8 items-center lg:order-14 rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
             simplify ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
           }`}
         >
@@ -3568,7 +3577,7 @@ export default function ChordsViewer({
           onClick={() => setShowShapes((v) => !v)}
           aria-pressed={showShapes}
           title="Pokaži prijeme vseh akordov skladbe"
-          className={`flex h-8 items-center whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
+          className={`flex h-8 items-center lg:order-15 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
             showShapes ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
           }`}
         >
@@ -3579,13 +3588,13 @@ export default function ChordsViewer({
           onClick={() => setImproOpen((v) => !v)}
           aria-pressed={improOpen}
           title="Lestvice za improvizacijo v tonaliteti skladbe"
-          className={`flex h-8 items-center whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
+          className={`flex h-8 items-center lg:order-13 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
             improOpen ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
           }`}
         >
           Impro
         </button>
-        <div className="flex items-center rounded-full border border-orange-400 dark:border-white/15 p-0.5" role="group" aria-label="Velikost pisave">
+        <div className="flex items-center rounded-full border border-orange-400 dark:border-white/15 p-0.5 lg:order-5" role="group" aria-label="Velikost pisave">
           <button
             type="button"
             onClick={() => setFontSize((f) => Math.max(MIN_FONT, f - FONT_STEP))}
@@ -3610,7 +3619,7 @@ export default function ChordsViewer({
         {/* Računalnik: zamik Smart playa v vrstici (na telefonu v ⚙ → Napredne nastavitve). */}
         {smartAvailable && (
           <div
-            className="hidden items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5 lg:flex"
+            className="hidden items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5 lg:order-10 lg:flex"
             role="group"
             aria-label="Zamik besedila"
             title={playingVideo ? "Zamik besedila za posnetek, ki igra" : "Zamik besedila za posnetek, ki zaigra ob ▶"}
@@ -3648,6 +3657,42 @@ export default function ChordsViewer({
             )}
           </div>
         )}
+        {/* Računalnik: zamik podčrtanih akordov (na telefonu v ⚙ → Pametni predvajalnik). */}
+        {underlineSung && syncedChords && (
+          <div
+            className="hidden items-center rounded-full border border-orange-400 dark:border-white/15 py-0.5 pl-2.5 pr-0.5 lg:order-11 lg:flex"
+            role="group"
+            aria-label="Zamik akordov"
+            title="Zamik podčrtanih akordov v zapetih vrsticah (intro in solo ostaneta)"
+          >
+            <button
+              type="button"
+              onClick={() => setSungOffsetOpen((v) => !v)}
+              aria-expanded={sungOffsetOpen}
+              title={offsetLocked ? "Zamik je zaklenjen — skladba je preverjena (spremeniš ga prek Popravi skladbe)" : undefined}
+              className={`mr-0.5 flex h-7 items-center whitespace-nowrap text-xs ${sungOffsetOpen ? "text-neutral-400" : "pr-2 text-neutral-200 hover:text-white"}`}
+            >
+              Zamik akordov
+              {!sungOffsetOpen && sungOffset !== 0 && (
+                <span className="ml-1 tabular-nums text-amber-400">
+                  {sungOffset > 0 ? "+" : ""}
+                  {sungOffset.toFixed(2).replace(".", ",")}
+                </span>
+              )}
+            </button>
+            {sungOffsetOpen && (
+              <>
+                <button type="button" onClick={() => changeSungOffset(-LRC_OFFSET_STEP)} disabled={offsetLocked} aria-label="Akordi 0,25 s prej" title="Akordi 0,25 s prej" className={toneButton}>
+                  −
+                </button>
+                <OffsetValue value={sungOffset} disabled={offsetLocked} onSet={setSungOffset} className="w-12 text-center text-xs tabular-nums text-neutral-200" />
+                <button type="button" onClick={() => changeSungOffset(LRC_OFFSET_STEP)} disabled={offsetLocked} aria-label="Akordi 0,25 s pozneje" title="Akordi 0,25 s pozneje" className={toneButton}>
+                  +
+                </button>
+              </>
+            )}
+          </div>
+        )}
         {/* Računalnik: napredni urejevalnik besedila (isti kot na straneh Pregled
             in odobritev / Popravi skladbe). */}
         {onOpenEditor && (
@@ -3656,7 +3701,7 @@ export default function ChordsViewer({
             onClick={onOpenEditor}
             disabled={!!recorder}
             title="Napredni urejevalnik besedila z akordi in tablatur"
-            className="hidden h-8 items-center gap-1.5 rounded-full border border-orange-400 dark:border-white/15 px-3 text-xs text-neutral-200 transition hover:text-white disabled:opacity-40 active:scale-95 lg:flex"
+            className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-orange-400 dark:border-white/15 px-3 text-xs text-neutral-200 transition hover:text-white disabled:opacity-40 active:scale-95 lg:order-8"
           >
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-amber-400">
               <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -3671,7 +3716,7 @@ export default function ChordsViewer({
           onClick={recorder ? cancelRecorder : startRecorder}
           aria-pressed={!!recorder}
           title={recorder ? "Prekliči snemanje časov" : "Posnemi čase vrstic in akordov za Smart play"}
-          className={`hidden h-8 items-center gap-1.5 rounded-full border border-orange-400 dark:border-white/15 px-3 text-xs transition active:scale-95 lg:flex ${
+          className={`hidden h-8 items-center gap-1.5 rounded-full border border-orange-400 dark:border-white/15 px-3 text-xs transition active:scale-95 lg:order-9 lg:flex ${
             recorder ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
           }`}
         >
@@ -3685,7 +3730,7 @@ export default function ChordsViewer({
           aria-expanded={themeMenuPos !== null}
           aria-label="Nastavitve"
           title="Nastavitve"
-          className={`flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 transition active:scale-95 ${
+          className={`flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 transition active:scale-95 lg:order-17 ${
             themeMenuPos ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
           }`}
         >
@@ -3715,7 +3760,7 @@ export default function ChordsViewer({
           onClick={enterFullscreen}
           aria-label="Celozaslonski način"
           title="Celozaslonski način"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-neutral-200 transition hover:text-white active:scale-95"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-neutral-200 transition hover:text-white active:scale-95 lg:order-6"
         >
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
             <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />

@@ -210,6 +210,18 @@ if (cmd === "list") {
     }
     if (lines.find((l) => l.text)?.time >= 6) gaps.unshift(`0:00–${fmt(lines.find((l) => l.text).time)} (intro)`);
     console.log(`Instrumentalni premori v LRC (≥ 6 s): ${gaps.join(", ") || "-"}`);
+    // Premori brez prazne LRC vrstice: konec zapete vrstice kot v aplikaciji
+    // (največ 0,9 s/besedo, vsaj 5 s) in do naslednje vrstice ≥ 4 s — pogosto
+    // solo/interludij za refrenom (Drivin' My Life Away: za Chorusom 1).
+    const hidden = [];
+    for (let k = 0; k < lines.length; k++) {
+      const l = lines[k];
+      const next = lines[k + 1];
+      if (!l.text || !next?.text) continue;
+      const end = l.time + Math.max(5, 0.9 * l.text.split(/s+/).length);
+      if (next.time - end >= 4) hidden.push(`${fmt(end)}–${fmt(next.time)} (po "${l.text.slice(0, 30)}")`);
+    }
+    if (hidden.length) console.log(`Možni instrumentalni deli brez prazne LRC vrstice (≥ 4 s): ${hidden.join(", ")}`);
   }
   if (audio) {
     console.log(`\n## Posnetek ${audio.videoId}: ${audio.duration} s, glasba od ${audio.musicStart} s, ${audio.bpm} BPM, takt ${audio.bar} s od ${audio.downbeat} s`);
@@ -292,8 +304,9 @@ if (cmd === "list") {
         };
       }),
     ];
-    // sungUnderline (skill podcrtaj-akorde) ostane, dokler je isti video.
-    const keepFlags = synced.synced_chords?.videoId === video && synced.synced_chords.sungUnderline ? { sungUnderline: true } : {};
+    // sungUnderline in sungOffset (podčrtani akordi) ostaneta, dokler je isti video.
+    const same = synced.synced_chords?.videoId === video ? synced.synced_chords : null;
+    const keepFlags = { ...(same?.sungUnderline ? { sungUnderline: true } : {}), ...(same?.sungOffset ? { sungOffset: same.sungOffset } : {}) };
     update.synced_chords = { videoId: video, sections, ...keepFlags };
     notes.push(`akordi: ${sections.map((x) => `${x.name} ${x.points.length}× (${fmt(x.points[0]?.t ?? 0)}–${x.end != null ? fmt(x.end) : "?"})`).join(", ")}`);
   }

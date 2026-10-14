@@ -173,6 +173,7 @@ export function ScaleBoard({
   labels,
   onPos,
   onLabels,
+  defaultZoom,
 }: {
   root: number;
   scale: Scale;
@@ -180,16 +181,19 @@ export function ScaleBoard({
   labels: "note" | "int";
   onPos: (pos: number) => void;
   onLabels: (labels: "note" | "int") => void;
+  // Začetna povečava (Impro: 100 % ob vsakem odprtju); takrat se ne shranjuje.
+  defaultZoom?: number;
 }) {
   const desktop = useIsDesktop();
   const [playing, setPlaying] = useState<string | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const neckRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoomState] = useState(readZoom);
+  const [zoom, setZoomState] = useState(() => defaultZoom ?? readZoom());
   function setZoom(z: number) {
     const next = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 10) / 10;
     setZoomState(next);
+    if (defaultZoom != null) return;
     try {
       localStorage.setItem(ZOOM_KEY, String(next));
     } catch {}

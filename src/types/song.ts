@@ -92,6 +92,9 @@ export interface SyncedChords {
   // vrstici z besedilom je ob svojem času samo podčrtan, v vrstici brez
   // besedila (intro, solo, outro) pobarvan.
   sungUnderline?: boolean;
+  // "Zamik akordov" (s): prišteje se delom, ki imajo akorde samo v zapetih
+  // vrsticah (podčrtani akordi); intro/solo/outro ostanejo, kot so.
+  sungOffset?: number;
 }
 
 // frozen = zamrznjeni izračunani časi (ob "Predvajalnik preverjen"), ne ročni
