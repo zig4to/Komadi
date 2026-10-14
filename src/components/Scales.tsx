@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useBackableOpen } from "@/lib/useBackableOpen";
+import { FRETS, NAMES, OPEN, SCALES, intLabel, mod12, positionsOf, scaleById, type Scale } from "@/lib/scales";
 
 // Lestvice (kartica na domači strani desno od Tunerja): vrat kitare v
 // standardni uglasitvi z označeno lestvico — ton, lestvica, položaj (boks),
@@ -10,81 +11,19 @@ import { useBackableOpen } from "@/lib/useBackableOpen";
 // "Zaigraj lestvico" zaigra položaj gor in dol. Računalnik: vrat vodoravno
 // (visoka e zgoraj kot v tabu), telefon: navpično (strune v stolpcih).
 
-const NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
-const INTERVALS: Record<number, string> = { 0: "1", 1: "b2", 2: "2", 3: "b3", 4: "3", 5: "4", 6: "b5", 7: "5", 8: "b6", 9: "6", 10: "b7", 11: "7" };
-// E2 A2 D3 G3 B3 E4 (MIDI), od nizke E navzgor.
-const OPEN = [40, 45, 50, 55, 59, 64];
-const FRETS = 17;
-const INLAYS = [3, 5, 7, 9, 12, 15, 17];
-
-type Scale = {
-  id: string;
-  name: string;
-  // Toni, iz katerih se gradijo položaji (nps tonov na struno).
-  base: number[];
-  // Dodatni toni (blue nota), dodani znotraj razpona boksa na vsaki struni.
-  extra?: number[];
-  nps: number;
-  sharp4?: boolean;
-};
-
-const SCALES: Scale[] = [
-  { id: "minpent", name: "Mol pentatonika", base: [0, 3, 5, 7, 10], nps: 2 },
-  { id: "majpent", name: "Dur pentatonika", base: [0, 2, 4, 7, 9], nps: 2 },
-  { id: "blues", name: "Blues", base: [0, 3, 5, 7, 10], extra: [6], nps: 2 },
-  { id: "major", name: "Dur (jonska)", base: [0, 2, 4, 5, 7, 9, 11], nps: 3 },
-  { id: "minor", name: "Naravni mol", base: [0, 2, 3, 5, 7, 8, 10], nps: 3 },
-  { id: "harm", name: "Harmonični mol", base: [0, 2, 3, 5, 7, 8, 11], nps: 3 },
-  { id: "dorian", name: "Dorska", base: [0, 2, 3, 5, 7, 9, 10], nps: 3 },
-  { id: "mixo", name: "Miksolidijska", base: [0, 2, 4, 5, 7, 9, 10], nps: 3 },
-  { id: "phryg", name: "Frigijska", base: [0, 1, 3, 5, 7, 8, 10], nps: 3 },
-  { id: "lyd", name: "Lidijska", base: [0, 2, 4, 6, 7, 9, 11], nps: 3, sharp4: true },
-];
-
 const KEY = "komadi:scales";
-
-type Cell = [string: number, fret: number];
-type Position = { k: number; start: number; end: number; cells: Cell[] };
-
-const mod12 = (n: number) => ((n % 12) + 12) % 12;
-const intLabel = (iv: number, sc: Scale) => (iv === 6 && sc.sharp4 ? "#4" : INTERVALS[iv]);
-
-// Položaj k: začni na nizki E pri k-ti stopnji osnove, na vsaki struni vzemi
-// `nps` zaporednih tonov lestvice in nadaljuj na naslednji struni s prvim
-// višjim tonom — da klasične pentatonične bokse (2 na struno) in 3-na-struno
-// položaje 7-tonskih lestvic. Razvrščeni po prečki, a številčenje začne pri
-// položaju z osnovnim tonom na nizki E (kot "boks 1" pri pentatoniki).
-function positionsOf(root: number, sc: Scale): Position[] {
-  const out: Position[] = [];
-  for (let k = 0; k < sc.base.length; k++) {
-    let f0 = 0;
-    while (mod12(OPEN[0] + f0 - root) !== sc.base[k]) f0++;
-    let p = OPEN[0] + f0;
-    const cells: Cell[] = [];
-    for (let s = 0; s < 6; s++) {
-      let taken = 0;
-      while (taken < sc.nps) {
-        if (p - OPEN[s] >= 0 && sc.base.includes(mod12(p - root))) {
-          cells.push([s, p - OPEN[s]]);
-          taken++;
-        }
-        p++;
-      }
-    }
-    if (sc.extra) {
-      for (let s = 0; s < 6; s++) {
-        const frets = cells.filter((c) => c[0] === s).map((c) => c[1]);
-        for (let f = Math.min(...frets); f <= Math.max(...frets); f++) {
-          if (sc.extra.includes(mod12(OPEN[s] + f - root))) cells.push([s, f]);
-        }
-      }
-    }
-    const frets = cells.map((c) => c[1]);
-    if (Math.max(...frets) <= FRETS) out.push({ k, start: Math.min(...frets), end: Math.max(...frets), cells });
-  }
-  out.sort((a, b) => a.start - b.start);
-  const first = Math.max(0, out.findIndex((p) => p.k === 0));
-  return [...out.slice(first), ...out.slice(0, first)];
+const INLAYS = [3, 5, 7, 9, 12, 15, 17];
+// Povečava vratu (+ / − ob "Zaigraj lestvico"), skupna za Lestvice in Impro.
+const ZOOM_KEY = "komadi:scales:zoom";
+const ZOOM_MIN = 0.6;
+const ZOOM_MAX = 2;
+const ZOOM_STEP = 0.1;
+function readZoom() {
+  try {
+    const v = Number(localStorage.getItem(ZOOM_KEY));
+    if (Number.isFinite(v) && v >= ZOOM_MIN && v <= ZOOM_MAX) return v;
+  } catch {}
+  return 1;
 }
 
 type Stored = { root: number; scale: string; pos: number; labels: "note" | "int" };
@@ -106,7 +45,7 @@ function readStored(): Stored {
 }
 
 const LG = "(min-width: 1024px)";
-function useIsDesktop() {
+export function useIsDesktop() {
   return useSyncExternalStore(
     (cb) => {
       const mq = window.matchMedia(LG);
@@ -124,24 +63,20 @@ const CHIP_OFF =
   "border-neutral-200 text-neutral-600 hover:bg-neutral-100 dark:border-white/[0.08] dark:text-neutral-300 dark:hover:bg-white/[0.06]";
 const LABEL = "mb-1.5 text-[11px] uppercase tracking-[0.06em] text-neutral-500";
 
+export const CLOSE_ICON = (
+  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" className="h-4 w-4">
+    <path d="M18 6 6 18M6 6l12 12" />
+  </svg>
+);
+export const CLOSE_BUTTON =
+  "rounded-full p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-500 dark:hover:bg-white/[0.06] dark:hover:text-neutral-200";
+
 export default function Scales({ onClose }: { onClose: () => void }) {
   useBackableOpen(true, onClose);
-  const desktop = useIsDesktop();
   const [state, setState] = useState<Stored>(readStored);
-  const [playing, setPlaying] = useState<string | null>(null);
-  const ctxRef = useRef<AudioContext | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const neckRef = useRef<HTMLDivElement>(null);
-
-  const sc = SCALES.find((s) => s.id === state.scale) ?? SCALES[0];
-  const positions = positionsOf(state.root, sc);
-  const pos = state.pos > positions.length ? 0 : state.pos;
-  const active = pos ? positions[pos - 1] : null;
-  const activeSet = active ? new Set(active.cells.map((c) => `${c[0]},${c[1]}`)) : null;
-  const allInts = [...sc.base, ...(sc.extra ?? [])].sort((a, b) => a - b);
+  const sc = scaleById(state.scale);
 
   function update(patch: Partial<Stored>) {
-    stopPlaying();
     setState((prev) => {
       const next = { ...prev, ...patch };
       try {
@@ -159,9 +94,126 @@ export default function Scales({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      data-view-portal
+      className="fixed inset-0 z-50 flex flex-col bg-white text-neutral-900 dark:bg-[#0d0d10] dark:text-neutral-100"
+      style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
+      <div className="flex items-center gap-3 border-b border-neutral-200 px-4 py-3 dark:border-white/[0.08]">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0 text-indigo-500 dark:text-indigo-400">
+          <path d="M3 6h18M3 10h18M3 14h18M3 18h18" />
+          <circle cx="7" cy="8" r="1.4" fill="currentColor" />
+          <circle cx="12" cy="12" r="1.4" fill="currentColor" />
+          <circle cx="17" cy="16" r="1.4" fill="currentColor" />
+        </svg>
+        <h2 className="flex-1 text-base font-semibold">Lestvice</h2>
+        <button type="button" onClick={onClose} aria-label="Zapri" title="Zapri" className={CLOSE_BUTTON}>
+          {CLOSE_ICON}
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        <div className="flex flex-col gap-3 px-4 pt-3.5">
+          <div>
+            <div className={LABEL}>Ton</div>
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+              {NAMES.map((n, i) => (
+                <button
+                  key={n}
+                  type="button"
+                  aria-pressed={i === state.root}
+                  onClick={() => update({ root: i })}
+                  className={`${CHIP} min-w-10 px-2.5 font-mono ${i === state.root ? CHIP_ON : CHIP_OFF}`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className={LABEL}>Lestvica</div>
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+              {SCALES.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  aria-pressed={s.id === sc.id}
+                  onClick={() => update({ scale: s.id, pos: 1 })}
+                  className={`${CHIP} ${s.id === sc.id ? CHIP_ON : CHIP_OFF}`}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <ScaleBoard
+          root={state.root}
+          scale={sc}
+          pos={state.pos}
+          labels={state.labels}
+          onPos={(pos) => update({ pos })}
+          onLabels={(labels) => update({ labels })}
+        />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// Položaji, note/intervali, "Zaigraj lestvico", opis in vrat kitare za eno
+// lestvico — stran Lestvice in plošča Impro v pregledovalniku akordov.
+export function ScaleBoard({
+  root,
+  scale: sc,
+  pos: posIn,
+  labels,
+  onPos,
+  onLabels,
+}: {
+  root: number;
+  scale: Scale;
+  pos: number;
+  labels: "note" | "int";
+  onPos: (pos: number) => void;
+  onLabels: (labels: "note" | "int") => void;
+}) {
+  const desktop = useIsDesktop();
+  const [playing, setPlaying] = useState<string | null>(null);
+  const ctxRef = useRef<AudioContext | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const neckRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoomState] = useState(readZoom);
+  function setZoom(z: number) {
+    const next = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 10) / 10;
+    setZoomState(next);
+    try {
+      localStorage.setItem(ZOOM_KEY, String(next));
+    } catch {}
+  }
+
+  const positions = positionsOf(root, sc);
+  const pos = posIn > positions.length ? 0 : posIn;
+  const active = pos ? positions[pos - 1] : null;
+  const activeSet = active ? new Set(active.cells.map((c) => `${c[0]},${c[1]}`)) : null;
+  const allInts = [...sc.base, ...(sc.extra ?? [])].sort((a, b) => a - b);
+
+  // Nova lestvica, ton ali položaj ustavi predvajanje.
+  const playKey = `${root}:${sc.id}:${pos}`;
   useEffect(
     () => () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = null;
+      setPlaying(null);
+    },
+    [playKey],
+  );
+
+  useEffect(
+    () => () => {
       ctxRef.current?.close().catch(() => {});
     },
     [],
@@ -232,8 +284,8 @@ export default function Scales({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const el = neckRef.current;
     if (!el || activeStart == null || !desktop) return;
-    el.scrollTo({ left: Math.max(0, PAD + NUT + activeStart * FW - 80), behavior: "smooth" });
-  }, [activeStart, desktop, FW]);
+    el.scrollTo({ left: Math.max(0, (PAD + NUT + activeStart * FW) * zoom - 80), behavior: "smooth" });
+  }, [activeStart, desktop, FW, zoom]);
 
   const len = NUT + FRETS * FW;
   const wid = 5 * SW;
@@ -248,7 +300,7 @@ export default function Scales({ onClose }: { onClose: () => void }) {
   for (let s = 0; s < 6; s++) {
     for (let f = 0; f <= FRETS; f++) {
       const midi = OPEN[s] + f;
-      const iv = mod12(midi - state.root);
+      const iv = mod12(midi - root);
       if (!allInts.includes(iv)) continue;
       const key = `${s},${f}`;
       const isRoot = iv === 0;
@@ -256,11 +308,7 @@ export default function Scales({ onClose }: { onClose: () => void }) {
       const [x, y] = at(s, noteD(f));
       const dim = activeSet != null && !activeSet.has(key);
       dots.push(
-        <g
-          key={key}
-          onClick={() => pluck(midi)}
-          className={`cursor-pointer transition-opacity ${dim ? "opacity-[0.18]" : ""}`}
-        >
+        <g key={key} onClick={() => pluck(midi)} className={`cursor-pointer transition-opacity ${dim ? "opacity-[0.18]" : ""}`}>
           <circle
             cx={x}
             cy={y}
@@ -277,7 +325,7 @@ export default function Scales({ onClose }: { onClose: () => void }) {
             dominantBaseline="middle"
             className={`pointer-events-none font-mono text-[11px] font-medium ${isRoot || isBlue ? "fill-white" : "fill-white dark:fill-neutral-900"}`}
           >
-            {state.labels === "note" ? NAMES[midi % 12] : intLabel(iv, sc)}
+            {labels === "note" ? NAMES[midi % 12] : intLabel(iv, sc)}
           </text>
         </g>,
       );
@@ -286,199 +334,170 @@ export default function Scales({ onClose }: { onClose: () => void }) {
 
   const board = desktop ? { x: PAD + NUT, y: PAD - 8, w: FRETS * FW, h: wid + 16 } : { x: PAD - 8, y: PAD + NUT, w: wid + 16, h: FRETS * FW };
 
-  if (typeof document === "undefined") return null;
+  return (
+    <>
+      <div className="flex flex-col gap-3 border-b border-neutral-200 px-4 py-3.5 dark:border-white/[0.08]">
+        <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
+          <div className="min-w-0">
+            <div className={LABEL}>Položaj</div>
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+              <button type="button" aria-pressed={pos === 0} onClick={() => onPos(0)} className={`${CHIP} ${pos === 0 ? CHIP_ON : CHIP_OFF}`}>
+                Cel vrat
+              </button>
+              {positions.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  aria-pressed={pos === i + 1}
+                  onClick={() => onPos(i + 1)}
+                  className={`${CHIP} min-w-9 px-2.5 ${pos === i + 1 ? CHIP_ON : CHIP_OFF}`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className={LABEL}>Na pikah</div>
+            <div className="inline-flex rounded-full border border-neutral-200 p-0.5 dark:border-white/[0.08]">
+              {(["note", "int"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={labels === v}
+                  onClick={() => onLabels(v)}
+                  className={`rounded-full px-3 py-1 text-sm transition ${
+                    labels === v ? "bg-neutral-100 text-neutral-900 dark:bg-white/[0.1] dark:text-white" : "text-neutral-500"
+                  }`}
+                >
+                  {v === "note" ? "Note" : "Intervali"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="lg:ml-auto">
+            <div className={LABEL}>Velikost</div>
+            <div className="inline-flex items-center rounded-full border border-neutral-200 p-0.5 dark:border-white/[0.08]" role="group" aria-label="Velikost vratu">
+              <button
+                type="button"
+                onClick={() => setZoom(zoom - ZOOM_STEP)}
+                disabled={zoom <= ZOOM_MIN}
+                aria-label="Manjši vrat"
+                title="Manjši vrat"
+                className="flex h-7 w-8 items-center justify-center rounded-full text-lg leading-none text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-30 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoom(1)}
+                title="Privzeta velikost"
+                className="w-11 text-center font-mono text-xs tabular-nums text-neutral-500"
+              >
+                {Math.round(zoom * 100)} %
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoom(zoom + ZOOM_STEP)}
+                disabled={zoom >= ZOOM_MAX}
+                aria-label="Večji vrat"
+                title="Večji vrat"
+                className="flex h-7 w-8 items-center justify-center rounded-full text-lg leading-none text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-30 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
+              >
+                +
+              </button>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={playScale}
+            className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+          >
+            {playing ? (
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5">
+                <rect x="6" y="5" width="4" height="14" rx="1" />
+                <rect x="14" y="5" width="4" height="14" rx="1" />
+              </svg>
+            ) : (
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5">
+                <path d="M7 4v16l13-8z" />
+              </svg>
+            )}
+            {playing ? "Ustavi" : "Zaigraj lestvico"}
+          </button>
+        </div>
+      </div>
 
-  return createPortal(
-    <div
-      data-view-portal
-      className="fixed inset-0 z-50 flex flex-col bg-white text-neutral-900 dark:bg-[#0d0d10] dark:text-neutral-100"
-      style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}
-    >
-      <div className="flex items-center gap-3 border-b border-neutral-200 px-4 py-3 dark:border-white/[0.08]">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0 text-indigo-500 dark:text-indigo-400">
-          <path d="M3 6h18M3 10h18M3 14h18M3 18h18" />
-          <circle cx="7" cy="8" r="1.4" fill="currentColor" />
-          <circle cx="12" cy="12" r="1.4" fill="currentColor" />
-          <circle cx="17" cy="16" r="1.4" fill="currentColor" />
+      <div className="flex flex-wrap gap-x-5 gap-y-1 px-4 pt-3 text-sm text-neutral-500">
+        <span>
+          <span className="font-medium text-neutral-900 dark:text-white">
+            {NAMES[root]} {sc.name.toLowerCase()}
+          </span>
+          {" · "}
+          {active ? `položaj ${pos} · prečke ${active.start}–${active.end}` : "cel vrat"}
+        </span>
+        <span className="font-mono text-xs leading-5">{allInts.map((iv) => NAMES[mod12(root + iv)]).join(" ")}</span>
+        <span className="font-mono text-xs leading-5">{allInts.map((iv) => intLabel(iv, sc)).join(" ")}</span>
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 pt-2 text-xs text-neutral-500">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-orange-500 dark:bg-orange-400" />
+          osnovni ton
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-neutral-800 dark:bg-neutral-200" />
+          ton lestvice
+        </span>
+        {sc.extra && (
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-sky-500 dark:bg-sky-400" />
+            blue nota
+          </span>
+        )}
+        <span>· tapni piko za zvok</span>
+      </div>
+
+      <div ref={neckRef} className="overflow-x-auto px-4 pt-3 pb-5">
+        <svg width={W * zoom} height={H * zoom} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Vrat kitare z označeno lestvico" className="mx-auto block">
+          <rect x={board.x} y={board.y} width={board.w} height={board.h} rx={6} className="fill-[#efe7dc] dark:fill-[#17161a]" />
+          {INLAYS.map((f) => {
+            const d = NUT + (f - 0.5) * FW;
+            const [lx, ly] = desktop ? [PAD + d, H - 6] : [PAD - 16, PAD + d];
+            return (
+              <g key={f}>
+                {(f === 12 ? [1.5, 3.5] : [2.5]).map((off) => {
+                  const [x, y] = at(off, d);
+                  return <circle key={off} cx={x} cy={y} r={5} className="fill-[#c9c2b8] dark:fill-[#3a3840]" />;
+                })}
+                <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" className="fill-neutral-500 font-mono text-[10px]">
+                  {f}
+                </text>
+              </g>
+            );
+          })}
+          {Array.from({ length: FRETS + 1 }, (_, f) => {
+            const [x1, y1] = at(0, fretD(f));
+            const [x2, y2] = at(5, fretD(f));
+            return (
+              <line
+                key={f}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                strokeWidth={f === 0 ? 4 : 1.5}
+                className={f === 0 ? "stroke-neutral-900 dark:stroke-neutral-200" : "stroke-[#c9c2b8] dark:stroke-[#3a3840]"}
+              />
+            );
+          })}
+          {OPEN.map((_, s) => {
+            const [x1, y1] = at(s, 0);
+            const [x2, y2] = at(s, len);
+            return <line key={s} x1={x1} y1={y1} x2={x2} y2={y2} strokeWidth={1 + (5 - s) * 0.3} className="stroke-[#9a948c] dark:stroke-[#5b5862]" />;
+          })}
+          {dots}
         </svg>
-        <h2 className="flex-1 text-base font-semibold">Lestvice</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Zapri"
-          title="Zapri"
-          className="rounded-full p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-500 dark:hover:bg-white/[0.06] dark:hover:text-neutral-200"
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" className="h-4 w-4">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
-        </button>
       </div>
-
-      <div className="flex-1 overflow-y-auto">
-        <div className="flex flex-col gap-3 border-b border-neutral-200 px-4 py-3.5 dark:border-white/[0.08]">
-          <div>
-            <div className={LABEL}>Ton</div>
-            <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
-              {NAMES.map((n, i) => (
-                <button
-                  key={n}
-                  type="button"
-                  aria-pressed={i === state.root}
-                  onClick={() => update({ root: i })}
-                  className={`${CHIP} min-w-10 px-2.5 font-mono ${i === state.root ? CHIP_ON : CHIP_OFF}`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className={LABEL}>Lestvica</div>
-            <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
-              {SCALES.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  aria-pressed={s.id === sc.id}
-                  onClick={() => update({ scale: s.id, pos: 1 })}
-                  className={`${CHIP} ${s.id === sc.id ? CHIP_ON : CHIP_OFF}`}
-                >
-                  {s.name}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
-            <div className="min-w-0">
-              <div className={LABEL}>Položaj</div>
-              <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
-                <button type="button" aria-pressed={pos === 0} onClick={() => update({ pos: 0 })} className={`${CHIP} ${pos === 0 ? CHIP_ON : CHIP_OFF}`}>
-                  Cel vrat
-                </button>
-                {positions.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    aria-pressed={pos === i + 1}
-                    onClick={() => update({ pos: i + 1 })}
-                    className={`${CHIP} min-w-9 px-2.5 ${pos === i + 1 ? CHIP_ON : CHIP_OFF}`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div className={LABEL}>Na pikah</div>
-              <div className="inline-flex rounded-full border border-neutral-200 p-0.5 dark:border-white/[0.08]">
-                {(["note", "int"] as const).map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    aria-pressed={state.labels === v}
-                    onClick={() => update({ labels: v })}
-                    className={`rounded-full px-3 py-1 text-sm transition ${
-                      state.labels === v ? "bg-neutral-100 text-neutral-900 dark:bg-white/[0.1] dark:text-white" : "text-neutral-500"
-                    }`}
-                  >
-                    {v === "note" ? "Note" : "Intervali"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={playScale}
-              className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-700 lg:ml-auto dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-            >
-              {playing ? (
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5">
-                  <rect x="6" y="5" width="4" height="14" rx="1" />
-                  <rect x="14" y="5" width="4" height="14" rx="1" />
-                </svg>
-              ) : (
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5">
-                  <path d="M7 4v16l13-8z" />
-                </svg>
-              )}
-              {playing ? "Ustavi" : "Zaigraj lestvico"}
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-x-5 gap-y-1 px-4 pt-3 text-sm text-neutral-500">
-          <span>
-            <span className="font-medium text-neutral-900 dark:text-white">
-              {NAMES[state.root]} {sc.name.toLowerCase()}
-            </span>
-            {" · "}
-            {active ? `položaj ${pos} · prečke ${active.start}–${active.end}` : "cel vrat"}
-          </span>
-          <span className="font-mono text-xs leading-5">{allInts.map((iv) => NAMES[mod12(state.root + iv)]).join(" ")}</span>
-          <span className="font-mono text-xs leading-5">{allInts.map((iv) => intLabel(iv, sc)).join(" ")}</span>
-        </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 pt-2 text-xs text-neutral-500">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-orange-500 dark:bg-orange-400" />
-            osnovni ton
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-neutral-800 dark:bg-neutral-200" />
-            ton lestvice
-          </span>
-          {sc.extra && (
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-sky-500 dark:bg-sky-400" />
-              blue nota
-            </span>
-          )}
-          <span>· tapni piko za zvok</span>
-        </div>
-
-        <div ref={neckRef} className="overflow-x-auto px-4 pt-3 pb-5">
-          <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Vrat kitare z označeno lestvico" className="mx-auto block">
-            <rect x={board.x} y={board.y} width={board.w} height={board.h} rx={6} className="fill-[#efe7dc] dark:fill-[#17161a]" />
-            {INLAYS.map((f) => {
-              const d = NUT + (f - 0.5) * FW;
-              const [lx, ly] = desktop ? [PAD + d, H - 6] : [PAD - 16, PAD + d];
-              return (
-                <g key={f}>
-                  {(f === 12 ? [1.5, 3.5] : [2.5]).map((off) => {
-                    const [x, y] = at(off, d);
-                    return <circle key={off} cx={x} cy={y} r={5} className="fill-[#c9c2b8] dark:fill-[#3a3840]" />;
-                  })}
-                  <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" className="fill-neutral-500 font-mono text-[10px]">
-                    {f}
-                  </text>
-                </g>
-              );
-            })}
-            {Array.from({ length: FRETS + 1 }, (_, f) => {
-              const [x1, y1] = at(0, fretD(f));
-              const [x2, y2] = at(5, fretD(f));
-              return (
-                <line
-                  key={f}
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
-                  strokeWidth={f === 0 ? 4 : 1.5}
-                  className={f === 0 ? "stroke-neutral-900 dark:stroke-neutral-200" : "stroke-[#c9c2b8] dark:stroke-[#3a3840]"}
-                />
-              );
-            })}
-            {OPEN.map((_, s) => {
-              const [x1, y1] = at(s, 0);
-              const [x2, y2] = at(s, len);
-              return <line key={s} x1={x1} y1={y1} x2={x2} y2={y2} strokeWidth={1 + (5 - s) * 0.3} className="stroke-[#9a948c] dark:stroke-[#5b5862]" />;
-            })}
-            {dots}
-          </svg>
-        </div>
-      </div>
-    </div>,
-    document.body,
+    </>
   );
 }

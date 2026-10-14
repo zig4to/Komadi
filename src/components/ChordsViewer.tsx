@@ -37,6 +37,7 @@ import {
   type SyncPoint, sectionOffset, instrumentalGapAt } from "@/lib/syncedLyrics";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
+import ImproPanel from "@/components/ImproPanel";
 import type { ChordSection, Song, SyncedChords, SyncedLines } from "@/types/song";
 import { anchorScrollTop, computeAnchor, getRemoteView, subscribeRemoteView, type LocalView, type RemoteViewEntry, type SamSpiliView } from "@/lib/sharedChordsView";
 import { BACKGROUNDS, BACKGROUND_ORDER } from "@/lib/backgrounds";
@@ -1300,6 +1301,21 @@ export default function ChordsViewer({
   // Bbm, F# … tudi kot barre): /bas, add, sus, 7, maj7, 6, dim … Prikazani so
   // vedno na vrhu; "Pokaži akorde" prikaže vse.
   const specialChords = useMemo(() => songChords.filter((n) => !isBasicChord(n)), [songChords]);
+  // "Impro": vsi prikazani akordi po vrsti (s ponovitvami) za zaznavo tonalitete.
+  const [improOpen, setImproOpen] = useState(false);
+  const improChords = useMemo(() => {
+    const out: string[] = [];
+    const add = (name: string | null) => {
+      if (name) out.push(simplify ? simplifyChord(transposeChord(name, semitones)) : transposeChord(name, semitones));
+    };
+    for (const line of body) {
+      if (line.kind === "chords") line.chords.forEach((c) => add(c.name));
+      else if (line.kind === "pair") line.chunks.forEach((c) => add(c.chord));
+      else if (line.kind === "text") line.segments.forEach((s) => "chord" in s && add(s.chord));
+      else if (line.kind === "tab") line.header?.forEach((c) => add(c.name));
+    }
+    return out;
+  }, [body, semitones, simplify]);
   const shapeChords = showShapes ? songChords : specialChords;
 
   // Tablature v pesmi so privzeto skrite (ostane samo vrstica akordov nad
@@ -3558,6 +3574,17 @@ export default function ChordsViewer({
         >
           Pokaži akorde
         </button>
+        <button
+          type="button"
+          onClick={() => setImproOpen((v) => !v)}
+          aria-pressed={improOpen}
+          title="Lestvice za improvizacijo v tonaliteti skladbe"
+          className={`flex h-8 items-center whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
+            improOpen ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
+          }`}
+        >
+          Impro
+        </button>
         <div className="flex items-center rounded-full border border-orange-400 dark:border-white/15 p-0.5" role="group" aria-label="Velikost pisave">
           <button
             type="button"
@@ -4140,6 +4167,7 @@ export default function ChordsViewer({
             </div>
           </div>
         )}
+        {improOpen && <ImproPanel chords={improChords} capo={capo} onClose={() => setImproOpen(false)} />}
       </div>
 
       {shapeTip && (
