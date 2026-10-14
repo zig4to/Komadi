@@ -70,7 +70,12 @@ function StatCard({
 }) {
   const body = (
     <>
-      {decor}
+      {decor && (
+        // Okras v kotu: na računalniku samo ob prehodu z miško (telefon ga skrije sam).
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          {decor}
+        </span>
+      )}
       <span className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot} ${pulse ? "animate-pulse" : ""}`} />
         <span className="truncate">{label}</span>
@@ -143,7 +148,12 @@ function ActionCard({
         active ? `ring-2 ${tone.ring} ${tone.tint}` : "hover:bg-neutral-50 dark:hover:bg-white/[0.06]"
       } ${className}`}
     >
-      {decor}
+      {decor && (
+        // Okras v kotu: na računalniku samo ob prehodu z miško (telefon ga skrije sam).
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          {decor}
+        </span>
+      )}
       <span className={`flex shrink-0 items-center justify-center rounded-xl bg-neutral-100 dark:bg-white/[0.06] ${small ? "h-8 w-8 lg:h-9 lg:w-9" : "h-9 w-9"} ${tone.text}`}>
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={small ? "h-4 w-4 lg:h-[18px] lg:w-[18px]" : "h-[18px] w-[18px]"}>
           {icon}

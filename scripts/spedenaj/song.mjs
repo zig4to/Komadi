@@ -292,7 +292,9 @@ if (cmd === "list") {
         };
       }),
     ];
-    update.synced_chords = { videoId: video, sections };
+    // sungUnderline (skill podcrtaj-akorde) ostane, dokler je isti video.
+    const keepFlags = synced.synced_chords?.videoId === video && synced.synced_chords.sungUnderline ? { sungUnderline: true } : {};
+    update.synced_chords = { videoId: video, sections, ...keepFlags };
     notes.push(`akordi: ${sections.map((x) => `${x.name} ${x.points.length}× (${fmt(x.points[0]?.t ?? 0)}–${x.end != null ? fmt(x.end) : "?"})`).join(", ")}`);
   }
   // 4) časi vrstic: osnova = obstoječi ročni časi (po remapu) ali LRC poravnava novega besedila

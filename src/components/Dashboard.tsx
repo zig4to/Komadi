@@ -2548,7 +2548,7 @@ export default function Dashboard({ user }: { user: User }) {
   }, [activeView]);
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pt-3 pb-8 space-y-6 lg:max-w-6xl lg:pt-5">
+    <div className="mx-auto w-full max-w-3xl px-4 pt-3 pb-8 space-y-6 lg:max-w-4xl lg:pt-5 xl:max-w-6xl">
       <header className="relative flex items-center justify-between">
         {/* Računalnik: glavna navigacija na sredini med naslovom "Bitne Tabs" in
             iskanjem — desni del glave je širši od naslova, zato je zamaknjena levo

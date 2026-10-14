@@ -371,7 +371,7 @@ export function HighlightRow({
                     viewBox="0 0 160 120"
                     preserveAspectRatio="xMaxYMax meet"
                     style={{ color: accent }}
-                    className="pointer-events-none absolute -right-[18%] bottom-0 -z-10 h-full w-[85%] opacity-20 transition-opacity duration-300 group-hover:opacity-80 dark:opacity-[0.15] dark:group-hover:opacity-70"
+                    className="pointer-events-none absolute -right-[18%] bottom-0 -z-10 h-full w-[85%] opacity-0 transition-opacity duration-300 group-hover:opacity-80 dark:group-hover:opacity-70 [@media(hover:none)]:opacity-20 dark:[@media(hover:none)]:opacity-[0.15]"
                   >
                     <g fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
                       {motifs[item.label] ?? DEFAULT_MOTIF}
