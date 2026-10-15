@@ -2245,10 +2245,12 @@ export default function ChordsViewer({
     };
   }, [isFollowing]);
   // Vodja izstopi iz celozaslonskega načina → tudi sledilec (če je vstopil).
+  // Ne v Sam Špili: tam si sledilec celozaslonski način vklopi sam (prvi dotik),
+  // vodja ga pogosto nima (računalnik) — sicer bi ga vsako sporočilo vrglo ven.
   const remoteFullscreen = !!remote?.fullscreen;
   useEffect(() => {
-    if (!remoteFullscreen && follower && document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  }, [remoteFullscreen, follower]);
+    if (!remoteFullscreen && follower && !samSpili && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }, [remoteFullscreen, follower, samSpili]);
   // Med instrumentalnim delom (brez natapkanih akordov): od polovice premora se
   // pogled že pomakne na vrstico za njim (gapNextLine), da ni treba čakati konca sola.
   const scrollLine = follower ? -1 : activeChord ? activeChord.line : activeLine >= 0 ? activeLine : gapNextLine;

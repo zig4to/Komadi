@@ -148,6 +148,14 @@ Cilj: vrstica je označena natanko takrat, ko se poje — nič prehitevanja, ni�
 s capom — preveri, ali opis taba omenja capo) in vrstice, kjer se akordi slabo ujemajo. Akordov kitic/refrenov
 **ne spreminjaj** — samo navedi v poročilu (uporabnikova odločitev).
 
+**Primerjava z zabrenkaj.si** (uporabnikova odločitev): če ima skladba `zabrenkaj_url` (ali je pesem na
+zabrenkaj.si — poišči na `https://www.zabrenkaj.si/vse-pesmi/` in povezavo zapiši v `zabrenkaj_url`, samo
+povezavo, nikoli vsebine), preveri tudi akorde od tam: po vrsticah primerjaj akorde taba z zabrenkaj in s
+posnetkom (`a.json`) ter v poročilu navedi, kje se razlikujejo in kateri vir se bolje ujema s posnetkom.
+Pozor: stran akorde pogosto naloži šele v brskalniku (v HTML jih ni — Z Goričkega v Piran); takrat poskusi z
+brskalnikom (Claude in Chrome), sicer v poročilu napiši, da jih ni bilo mogoče prebrati. Akordov taba tudi
+tu ne spreminjaj sam — samo poročaj.
+
 ### 8. Končna kontrola in poročilo
 1. `song.mjs dump <id> --audio a.json` še enkrat: brez LRC vrstic brez para, deli z akordi na pravem videu,
    shranjeni časi naraščajo, oznake delov oštevilčene.

@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import Dashboard from "@/components/Dashboard";
 import LoginScreen from "@/components/LoginScreen";
+import GuestJam from "@/components/GuestJam";
+import { guestTokenFromUrl } from "@/lib/guestLink";
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 
 // Obvezna prijava (isti Supabase Auth kot hub TomStudios, glej
@@ -25,6 +27,8 @@ export default function AuthGate() {
   const [user, setUser] = useState<User | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const recoveringRef = useRef(false);
+  // Povezava za goste Skupnega Jama (?gost=<žeton>): brez prijave → stran GuestJam.
+  const [guestToken] = useState(guestTokenFromUrl);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -107,6 +111,8 @@ export default function AuthGate() {
     // key: ob menjavi uporabnika se vse stanje Dashboarda začne na novo.
     return <Dashboard key={user.id} user={user} />;
   }
+
+  if (guestToken && status !== "recovery") return <GuestJam token={guestToken} />;
 
   return (
     <LoginScreen

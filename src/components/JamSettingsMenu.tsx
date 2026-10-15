@@ -6,7 +6,7 @@ import { useBackableOpen } from "@/lib/useBackableOpen";
 
 // Gumb z zobnikom desno od "Nazaj" v glavi Jama — spustni meni z nastavitvami,
 // ki veljajo samo za Jam.
-export default function JamSettingsMenu({ onReorder }: { onReorder?: () => void }) {
+export default function JamSettingsMenu({ onReorder, onShare }: { onReorder?: () => void; onShare?: () => void }) {
   const [open, setOpen] = useState(false);
   const [lead, setLead] = useFollowerLead();
   const leadLabel = `${lead.toFixed(2).replace(".", ",")} s`;
@@ -59,6 +59,26 @@ export default function JamSettingsMenu({ onReorder }: { onReorder?: () => void 
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-fuchsia-600 dark:text-fuchsia-400">
             Nastavitve Jama
           </p>
+          {/* Telefon: deli povezavo za goste (na računalniku gumb "Deli" v glavi Jama). */}
+          {onShare && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onShare();
+              }}
+              className="mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left font-medium text-neutral-800 transition hover:bg-fuchsia-500/10 lg:hidden dark:text-neutral-100"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-fuchsia-600 dark:text-fuchsia-400">
+                <circle cx="18" cy="5" r="3" />
+                <circle cx="6" cy="12" r="3" />
+                <circle cx="18" cy="19" r="3" />
+                <path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98" />
+              </svg>
+              Deli povezavo za goste
+            </button>
+          )}
           {onReorder && (
             <button
               type="button"

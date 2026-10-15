@@ -6,6 +6,8 @@ import type { User } from "@supabase/supabase-js";
 import ChordsButtons from "@/components/ChordsButtons";
 import JamBoard, { type JamBoardItem } from "@/components/JamBoard";
 import JamSettingsMenu from "@/components/JamSettingsMenu";
+import { GUEST_SHARE_TEXT, createGuestLink } from "@/lib/guestLink";
+import ShareSheet from "@/components/ShareSheet";
 import { fullNameFor, initialsOf } from "@/lib/userName";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { dedupeShared, importSharedSongs, songMatchKey } from "@/lib/importShared";
@@ -1675,7 +1677,18 @@ export default function Dashboard({ user }: { user: User }) {
   // krogci z začetnicami pod gumbom "Skupni Jam". Naročen, ko je Jam odprt —
   // vidiš prisotne tudi iz osebnega Jama; javiš se (track) samo, dokler imaš
   // odprt Skupni Jam.
-  const [jamPresence, setJamPresence] = useState<{ id: string; name: string }[]>([]);
+  const [jamPresence, setJamPresence] = useState<{ id: string; name: string; guest?: boolean }[]>([]);
+  // Gumb Deli (Skupni Jam): povezava za goste brez računa (src/lib/guestLink.ts).
+  const [shareMsg, setShareMsg] = useState("");
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const shareTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const shareJamWithGuests = async () => {
+    const res = await createGuestLink();
+    if ("url" in res) return setShareUrl(res.url);
+    setShareMsg(res.error);
+    clearTimeout(shareTimerRef.current);
+    shareTimerRef.current = setTimeout(() => setShareMsg(""), 5000);
+  };
   const presenceChannelRef = useRef<RealtimeChannel | null>(null);
   const presenceTrackRef = useRef(false);
   const presenceNameRef = useRef(myDisplayName ?? "");
@@ -1688,8 +1701,8 @@ export default function Dashboard({ user }: { user: User }) {
     const channel = supabase.channel("shared-jam-presence", { config: { presence: { key: user.id } } });
     channel
       .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState<{ name: string }>();
-        setJamPresence(Object.entries(state).map(([id, metas]) => ({ id, name: metas[0]?.name ?? "" })));
+        const state = channel.presenceState<{ name: string; guest?: boolean }>();
+        setJamPresence(Object.entries(state).map(([id, metas]) => ({ id, name: metas[0]?.name ?? "", guest: !!metas[0]?.guest })));
       })
       .subscribe((status) => {
         if (status !== "SUBSCRIBED") return;
@@ -1714,9 +1727,9 @@ export default function Dashboard({ user }: { user: User }) {
         {jamPresence.slice(0, 6).map((p) => (
           <span
             key={p.id}
-            title={p.id === user.id ? `${p.name} (ti)` : p.name}
+            title={p.id === user.id ? `${p.name} (ti)` : p.guest ? `${p.name} (gost)` : p.name}
             style={{ backgroundColor: authorAccentHex(p.name || "?") }}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold text-white ring-2 ring-neutral-50 dark:ring-neutral-900"
+            className={`flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold text-white ring-2 ring-neutral-50 dark:ring-neutral-900 ${p.guest ? "outline-dashed outline-1 outline-offset-1 outline-fuchsia-400" : ""}`}
           >
             {initialsOf(p.name)}
           </span>
@@ -1735,6 +1748,10 @@ export default function Dashboard({ user }: { user: User }) {
   // Supabase Realtime Broadcast, nič v bazi (src/lib/sharedChordsView.ts).
   // mode = način pregledovalnika pri vodji ("samspili" = Sam Špili, null = navaden).
   type SharedLeader = { id: string; name: string; songId: string; since: number; view: LocalView | null; seen: number; mode?: "samspili" | null };
+  // Vodja = ta zavihek, ne uporabnik: z istim računom na dveh napravah bi druga
+  // naprava vodjevo sporočilo vzela za svoje in pošiljala svoj pogled (gost je
+  // utripal med Sam Špili in akordi).
+  const [viewerId] = useState(() => `${user.id}:${Math.random().toString(36).slice(2, 10)}`);
   const [sharedLeader, setSharedLeader] = useState<SharedLeader | null>(null);
   const [followingLeader, setFollowingLeader] = useState(true);
   const viewChannelRef = useRef<RealtimeChannel | null>(null);
@@ -1744,7 +1761,7 @@ export default function Dashboard({ user }: { user: User }) {
   const expectedOpenRef = useRef<string | null | undefined>(undefined);
   const lastSentRef = useRef(0);
   const lastViewRef = useRef<LocalView | null>(null);
-  const amLeader = sharedLeader?.id === user.id;
+  const amLeader = sharedLeader?.id === viewerId;
   const openChordsModeRef = useRef(openChordsMode);
   useEffect(() => {
     sharedLeaderRef.current = sharedLeader;
@@ -1768,7 +1785,7 @@ export default function Dashboard({ user }: { user: User }) {
     viewChannelRef.current?.send({ type: "broadcast", event: "view", payload: msg });
   const sendLeaderView = (view: LocalView | null) => {
     const me = sharedLeaderRef.current;
-    if (!me || me.id !== user.id || !view) return;
+    if (!me || me.id !== viewerId || !view) return;
     // Sam Špili: napredek v vrstici posodobljen na trenutek pošiljanja (zamik
     // omejevanja pošiljanja in srčni utrip bi ga sicer poslali zastarelega).
     let ss = view.ss;
@@ -1776,7 +1793,7 @@ export default function Dashboard({ user }: { user: User }) {
       const late = (Date.now() - lastViewAtRef.current) / 1000;
       ss = { ...ss, p: Math.min(1, ss.p + ss.rate * late) };
     }
-    sendView({ type: "view", leaderId: user.id, leaderName: myDisplayName ?? "", songId: me.songId, since: me.since, mode: openChordsModeRef.current === "samspili" ? "samspili" : null, ...view, ...(ss ? { ss } : {}) });
+    sendView({ type: "view", leaderId: viewerId, leaderName: myDisplayName ?? "", songId: me.songId, since: me.since, mode: openChordsModeRef.current === "samspili" ? "samspili" : null, ...view, ...(ss ? { ss } : {}) });
   };
   // Pogled vodje (ChordsViewer onLocalView): pošlji največ ~10× na sekundo, zadnjega vedno.
   const sendTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -1838,7 +1855,7 @@ export default function Dashboard({ user }: { user: User }) {
     // Srčni utrip vodje in odstranitev vodje brez utripa.
     const beat = setInterval(() => {
       const me = sharedLeaderRef.current;
-      if (me?.id === user.id) sendLeaderView(lastViewRef.current);
+      if (me?.id === viewerId) sendLeaderView(lastViewRef.current);
       else if (me && Date.now() - me.seen > SHARED_VIEW_STALE_MS) {
         publishRemoteView(null);
         setSharedLeader(null);
@@ -1847,13 +1864,13 @@ export default function Dashboard({ user }: { user: User }) {
     return () => {
       clearInterval(beat);
       clearTimeout(sendTimerRef.current);
-      if (sharedLeaderRef.current?.id === user.id) sendView({ type: "close", leaderId: user.id });
+      if (sharedLeaderRef.current?.id === viewerId) sendView({ type: "close", leaderId: viewerId });
       viewChannelRef.current = null;
       supabase.removeChannel(channel);
       sharedLeaderRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presenceTracking, user.id]);
+  }, [presenceTracking, viewerId]);
   // Moje odprtje/zaprtje akordov (klik), ne tisto iz sledenja: odprtje brez
   // aktivnega vodje → vodim; če vodja že je → sledenje se ustavi (moja izbira).
   useEffect(() => {
@@ -1875,19 +1892,19 @@ export default function Dashboard({ user }: { user: User }) {
       }
       expectedOpenRef.current = undefined;
       const leader = sharedLeaderRef.current;
-      const leaderActive = !!leader && (leader.id === user.id || Date.now() - leader.seen <= SHARED_VIEW_STALE_MS);
+      const leaderActive = !!leader && (leader.id === viewerId || Date.now() - leader.seen <= SHARED_VIEW_STALE_MS);
       if (open) {
-        if (!leaderActive || leader?.id === user.id) {
-          const since = leader?.id === user.id ? leader.since : Date.now();
-          const next = { id: user.id, name: myDisplayName ?? "", songId: open, since, view: null, seen: Date.now() };
+        if (!leaderActive || leader?.id === viewerId) {
+          const since = leader?.id === viewerId ? leader.since : Date.now();
+          const next = { id: viewerId, name: myDisplayName ?? "", songId: open, since, view: null, seen: Date.now() };
           sharedLeaderRef.current = next;
           setSharedLeader(next);
           lastViewRef.current = null;
         } else {
           setFollowingLeader(false);
         }
-      } else if (leader?.id === user.id) {
-        sendView({ type: "close", leaderId: user.id });
+      } else if (leader?.id === viewerId) {
+        sendView({ type: "close", leaderId: viewerId });
         sharedLeaderRef.current = null;
         setSharedLeader(null);
       } else if (leaderActive) {
@@ -1897,7 +1914,7 @@ export default function Dashboard({ user }: { user: User }) {
     window.addEventListener("komadi-storage", onStore);
     return () => window.removeEventListener("komadi-storage", onStore);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presenceTracking, user.id]);
+  }, [presenceTracking, viewerId]);
   // Skladba vodje iz tuje knjižnice: naloži jo, da se akordi lahko odprejo.
   const leaderSongId = sharedLeader && !amLeader ? sharedLeader.songId : null;
   useEffect(() => {
@@ -2606,7 +2623,34 @@ export default function Dashboard({ user }: { user: User }) {
                 </svg>
                 Nazaj
               </button>
-              <JamSettingsMenu onReorder={jamArchiveOpen ? undefined : () => setJamReorder(true)} />
+              {jamShared && !jamArchiveOpen && (
+                <button
+                  type="button"
+                  onClick={shareJamWithGuests}
+                  title="Pošlji povezavo ljudem brez računa — v brskalniku vidijo iste akorde (velja 24 ur)"
+                  className="hidden items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium text-neutral-600 transition hover:text-fuchsia-600 lg:inline-flex dark:text-neutral-300 dark:hover:text-fuchsia-400"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
+                    <circle cx="18" cy="5" r="3" />
+                    <circle cx="6" cy="12" r="3" />
+                    <circle cx="18" cy="19" r="3" />
+                    <path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98" />
+                  </svg>
+                  Deli
+                </button>
+              )}
+              <JamSettingsMenu
+                onReorder={jamArchiveOpen ? undefined : () => setJamReorder(true)}
+                onShare={jamShared && !jamArchiveOpen ? shareJamWithGuests : undefined}
+              />
+              {shareUrl && (
+                <ShareSheet url={shareUrl} text={GUEST_SHARE_TEXT} title="Povabi v Skupni Jam" onClose={() => setShareUrl(null)} />
+              )}
+              {shareMsg && (
+                <span role="status" className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-neutral-900 px-4 py-2 text-sm text-white shadow-lg">
+                  {shareMsg}
+                </span>
+              )}
             </div>
           </>
         ) : goalOpen ? (
