@@ -2764,13 +2764,16 @@ export default function ChordsViewer({
     return () => clearTimeout(t);
   }, [ssRequested]);
   const [ssIsFullscreen, setSsIsFullscreen] = useState(() => typeof document !== "undefined" && (!!document.fullscreenElement || isAppFullscreen()));
-  // Sledilec (Skupni Jam): celozaslonsko pokončno (brez zaklepanja v ležeče).
+  // Sledilec (Skupni Jam, tudi gost): celozaslonsko — na telefonu ležeče.
   // Brskalnik zahteva dotik na tej napravi, zato ga sproži prvi dotik v Sam
-  // špili ali gumb na čakalnem zaslonu — samodejno ob odprtju ne gre.
+  // špili, gumb na čakalnem zaslonu ali poziv, ko vodja začne igrati.
   const ssFollowerFullscreen = () => {
+    setSsFsPromptDismissed(true);
     if (document.fullscreenElement || !canBrowserFullscreen()) return;
-    document.documentElement.requestFullscreen().catch(() => {});
+    if (window.matchMedia("(pointer: coarse)").matches) enterLandscapeFullscreen();
+    else document.documentElement.requestFullscreen().catch(() => {});
   };
+  const [ssFsPromptDismissed, setSsFsPromptDismissed] = useState(false);
   useEffect(() => {
     if (!samSpili) return;
     const onChange = () => setSsIsFullscreen(!!document.fullscreenElement || isAppFullscreen());
@@ -4351,6 +4354,25 @@ export default function ChordsViewer({
           style={{ backgroundImage: "gradient" in theme ? theme.gradient : undefined }}
           onClick={follower ? ssFollowerFullscreen : undefined}
         >
+          {/* Sledilec na telefonu: vodja je začel igrati, celozaslonsko še ni —
+              en dotik kamorkoli preklopi v celozaslonsko ležeče. */}
+          {follower && ssShowLines && !ssIsFullscreen && !ssFsPromptDismissed && canBrowserFullscreen() &&
+            typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  ssFollowerFullscreen();
+                }}
+                className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-black/70 text-white backdrop-blur-sm"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-12 w-12 text-orange-400">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+                </svg>
+                <span className="text-xl font-semibold">Tapni za celozaslonski način</span>
+                <span className="text-sm text-white/70">{follower.leaderName || "Vodja"} je začel igrati — zasukaj telefon ležeče</span>
+              </button>
+            )}
           {theme.pattern && (
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
               <PatternSvg id={theme.pattern} colors={patternColors} className="h-full w-full" />
