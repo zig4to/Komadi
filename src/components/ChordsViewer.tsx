@@ -5,7 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { createPortal } from "react-dom";
 import AutoScrollControl from "@/components/AutoScrollControl";
 import ChordDiagram from "@/components/ChordDiagram";
-import YouTubeMiniPlayer, { youTubeVideoId, type PlayerController } from "@/components/YouTubeMiniPlayer";
+import YouTubeMiniPlayer, { youTubeVideoId, type PlayerController, VOLUME_KEY, readVolume } from "@/components/YouTubeMiniPlayer";
 import { enterLandscapeFullscreen, canBrowserFullscreen, hasSamSpili, isAppFullscreen, openChordsViewer } from "@/lib/openChords";
 import {
   applyEditedText,
@@ -1615,6 +1615,23 @@ export default function ChordsViewer({
   const ssShowLines = samSpili && (follower ? !!remote?.ss : ssHasPlayed);
   // Telefon, med pavzo: tap na vrstico skoči tja in predvaja naprej.
   const playerCtlRef = useRef<PlayerController | null>(null);
+  // Glasnost posnetka po 5 % — ista v akordih v aplikaciji in v Sam Špili
+  // (komadi:chords:volume; nov predvajalnik jo prevzame ob zagonu). Sam Špili:
+  // ↑ / ↓ in gumba v stranski vrstici; navadni pogled: gumba v orodni vrstici.
+  const [volume, setVolumeState] = useState(() => (typeof window === "undefined" ? 100 : readVolume()));
+  const [ssVolMsg, setSsVolMsg] = useState<string | null>(null);
+  const ssVolTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const ssChangeVolume = (delta: number) => {
+    const next = Math.max(0, Math.min(100, Math.round((volume + delta) / 5) * 5));
+    setVolumeState(next);
+    try {
+      window.localStorage.setItem(VOLUME_KEY, String(next));
+    } catch {}
+    playerCtlRef.current?.setVolume(next);
+    setSsVolMsg(`Glasnost ${next} %`);
+    clearTimeout(ssVolTimerRef.current);
+    ssVolTimerRef.current = setTimeout(() => setSsVolMsg(null), 1300);
+  };
   const playbackRef = useRef({ time: 0, playing: false });
   // "Posnemi čase": med predvajanjem uporabnik tapne ob začetku vsake zapete
   // vrstice; cursor = vrstica (indeks v body), ki jo naslednji tap označi.
@@ -2063,6 +2080,27 @@ export default function ChordsViewer({
     autoFrozeRef.current = true;
     void freezeRef.current(false);
   }, [needsFreeze]);
+  // Zaporedje nasveta v vrsticah po 3–4 akorde (enakomerno: 14 → 4 + 4 + 3 + 3), da je pregledno.
+  const tipRows = (names: string[]) => {
+    const rows = Math.ceil(names.length / 4);
+    const out: string[][] = [];
+    let at = 0;
+    for (let r = 0; r < rows; r++) {
+      const n = Math.ceil((names.length - at) / (rows - r));
+      out.push(names.slice(at, at + n));
+      at += n;
+    }
+    return (
+      <div className="mt-1 space-y-0.5 font-mono text-lg font-bold text-(--cv-chord) lg:text-xl">
+        {out.map((row, i) => (
+          <p key={i} className="whitespace-pre">
+            {row.join("  →  ")}
+            {i < out.length - 1 && <span className="text-(--cv-muted)">  →</span>}
+          </p>
+        ))}
+      </div>
+    );
+  };
   // Prijemi akordov za vrstico nasveta (vsak akord enkrat, izbrana različica kot drugod).
   const tipShapeRow = (names: string[]) => (
     <div className="mt-1.5 flex flex-nowrap gap-1 overflow-x-auto pb-1 opacity-90 [scrollbar-width:thin] [zoom:0.75]">
@@ -2799,6 +2837,43 @@ export default function ChordsViewer({
   // Play: samo predvajanje. Celozaslonsko/ležeče se vklopi že ob kliku na
   // "Sam Špili" v meniju (enterLandscapeFullscreen) ali z gumbom ⛶ — ne tukaj,
   // ker requestFullscreen porabi dovoljenje klika in bi YouTube ostal ustavljen.
+  // ▶ v predvajalniku ali play na samodejnem pomikanju (navadni pogled): skladba,
+  // celozaslonsko in samodejno pomikanje v istem kliku. Brskalniški celozaslonski
+  // način na telefonu samo, če predvajalnik že obstaja — ob prvem zagonu bi
+  // requestFullscreen porabil dovoljenje klika in YouTube bi ostal ustavljen (ista
+  // past kot pri Sam Špili); takrat se skrijeta samo vrstici aplikacije.
+  const autoScrollCtlRef = useRef<{ play: () => void } | null>(null);
+  const startPlayView = (from: "player" | "autoscroll") => {
+    if (samSpili || recorder || follower) return;
+    const playerExists = playerCtlRef.current?.currentTime() != null;
+    const phone = window.matchMedia("(pointer: coarse)").matches;
+    closeThemeMenu();
+    setIsFullscreen(true);
+    if ((playerExists || !phone) && canBrowserFullscreen() && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+    if (from === "player" && !smartActive) autoScrollCtlRef.current?.play();
+    if (from === "autoscroll") playerCtlRef.current?.play();
+  };
+  // Tipkovnica (akordi v aplikaciji in Sam Špili): ↑ / ↓ = glasnost po 5 % (ne za
+  // sledilca — ta nima svojega predvajanja; ne v urejevalniku in poljih).
+  const ssVolumeKeysRef = useRef(ssChangeVolume);
+  useEffect(() => {
+    ssVolumeKeysRef.current = ssChangeVolume;
+  });
+  useEffect(() => {
+    if (follower) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      e.preventDefault();
+      ssVolumeKeysRef.current(e.key === "ArrowUp" ? 5 : -5);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [follower]);
   const ssPlay = () => {
     setSmartOn(true);
     setSsActive(true);
@@ -3514,6 +3589,7 @@ export default function ChordsViewer({
             smartAvailable={smartAvailable}
             smartOn={smartOn}
             onSmartToggle={setSmartOn}
+            onUserPlay={() => startPlayView("player")}
             controllerRef={playerCtlRef}
             preferredId={preferredVideo}
             onSelect={async (id) => {
@@ -3665,6 +3741,21 @@ export default function ChordsViewer({
               </svg>
             </button>
           </div>
+        </div>
+        <div className="flex items-center rounded-full border border-orange-400 dark:border-white/15 p-0.5 max-lg:order-6" role="group" aria-label="Glasnost" title="Glasnost posnetka (↑ / ↓)">
+          <button type="button" onClick={() => ssChangeVolume(-5)} disabled={volume <= 0} aria-label="Tišje" title="Tišje (↓)" className={`${toneButton} px-1.5 text-xs`}>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+              <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
+              <path d="M16 12h5" />
+            </svg>
+          </button>
+          <span className="w-9 text-center text-[11px] tabular-nums text-neutral-300">{volume}%</span>
+          <button type="button" onClick={() => ssChangeVolume(5)} disabled={volume >= 100} aria-label="Glasneje" title="Glasneje (↑)" className={`${toneButton} px-1.5 text-xs`}>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+              <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
+              <path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12" />
+            </svg>
+          </button>
         </div>
         <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3 xl:pl-2 2xl:pl-3">
           <span className="hidden px-1 text-[9px] font-medium uppercase tracking-[0.08em] text-orange-400 lg:block">Urejanje</span>
@@ -3981,12 +4072,12 @@ export default function ChordsViewer({
             {/* "Nasvet": ponavljajoča se zaporedja akordov (shranil skill spedenaj v
                 songs.chord_tips; imena prikazana s transpozicijo / Simpl / No capo). */}
             {song.chord_tips && (song.chord_tips.whole || song.chord_tips.parts.length > 0) && (
-              <div className="relative z-10 self-start rounded-xl border border-sky-400/40 bg-sky-400/[0.05] px-3 py-1.5 lg:px-4 lg:py-2" aria-label="Nasvet">
+              <div className="relative z-10 self-start rounded-xl border border-sky-400/40 bg-sky-400/[0.05] px-2.5 py-1.5" aria-label="Nasvet">
                 <button
                   type="button"
                   onClick={() => setTipsOpen((v) => !v)}
                   aria-expanded={tipsOpen}
-                  className="flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-sky-400 lg:text-xs"
+                  className="flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-sky-400"
                 >
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
                     <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z" />
@@ -4001,7 +4092,7 @@ export default function ChordsViewer({
                     {song.chord_tips.whole ? (
                       <div className="py-2 first:pt-0">
                         <p className="text-sm font-medium lg:text-base">Akordi se čez celo skladbo ponavljajo:</p>
-                        <p className="mt-1 font-mono text-lg font-bold text-(--cv-chord) lg:text-xl">{song.chord_tips.whole.map(display).join("  →  ")}</p>
+                        {tipRows(song.chord_tips.whole.map(display))}
                         {tipShapes && tipShapeRow(song.chord_tips.whole.map(display))}
                       </div>
                     ) : (
@@ -4011,7 +4102,7 @@ export default function ChordsViewer({
                             {part.label}
                             <span className="font-normal text-(--cv-muted)">{part.count > 1 ? ` · ${part.count}× vedno isto` : " · ponavlja se"}</span>
                           </p>
-                          <p className="mt-0.5 font-mono text-lg font-bold text-(--cv-chord) lg:text-xl">{part.unit.map(display).join("  →  ")}</p>
+                          {tipRows(part.unit.map(display))}
                           {tipShapes && tipShapeRow(part.unit.map(display))}
                         </div>
                       ))
@@ -4370,6 +4461,11 @@ export default function ChordsViewer({
         {improOpen && <ImproPanel chords={improChords} capo={capoShift ? null : capo} onClose={() => setImproOpen(false)} />}
       </div>
 
+      {ssVolMsg && (
+        <div role="status" className="pointer-events-none fixed left-1/2 top-6 z-[60] -translate-x-1/2 rounded-full bg-black/75 px-4 py-2 font-sans text-sm font-semibold text-white shadow-lg backdrop-blur">
+          {ssVolMsg}
+        </div>
+      )}
       {shapeTip && (
         <div
           data-chord-name
@@ -4443,7 +4539,15 @@ export default function ChordsViewer({
 
       {/* Med pametnim sledenjem ni ročnega autoscrolla — ne bi se smela tepsti. */}
       {!editing && !smartActive && !recorder && !follower && !samSpili ? (
-        <AutoScrollControl scrollRef={scrollRef} speedFactor={2.5} onPlayingChange={setFullscreen} above={fontButtons} />
+        <AutoScrollControl
+          scrollRef={scrollRef}
+          speedFactor={2.5}
+          onPlayingChange={setFullscreen}
+          above={fontButtons}
+          controlRef={autoScrollCtlRef}
+          desktopSpeed={2}
+          onPlayClick={() => startPlayView("autoscroll")}
+        />
       ) : (
         !editing &&
         !samSpili &&
@@ -4457,6 +4561,7 @@ export default function ChordsViewer({
           style={{ backgroundImage: "gradient" in theme ? theme.gradient : undefined }}
           onClick={follower ? ssFollowerFullscreen : undefined}
         >
+
           {/* Sledilec na telefonu: vodja je začel igrati, celozaslonsko še ni —
               en dotik kamorkoli preklopi v celozaslonsko ležeče. */}
           {follower && ssShowLines && !ssIsFullscreen && !ssFsPromptDismissed && canBrowserFullscreen() &&
@@ -4599,6 +4704,18 @@ export default function ChordsViewer({
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
                   <path d="M11 19l-7-7 7-7" /><path d="M19 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button type="button" onClick={() => ssChangeVolume(5)} aria-label="Glasneje" title="Glasneje (↑)" className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                  <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
+                  <path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12" />
+                </svg>
+              </button>
+              <button type="button" onClick={() => ssChangeVolume(-5)} aria-label="Tišje" title="Tišje (↓)" className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                  <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
+                  <path d="M16 12h5" />
                 </svg>
               </button>
               <button

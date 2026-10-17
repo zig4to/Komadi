@@ -17,6 +17,9 @@ type YTPlayer = {
   getDuration(): number;
   loadVideoById(videoId: string): void;
   destroy(): void;
+  setVolume(volume: number): void;
+  getVolume(): number;
+  unMute(): void;
 };
 type YTNamespace = {
   Player: new (
@@ -108,7 +111,18 @@ export type PlayerController = {
   pause: () => void;
   // Preskok za delta sekund (npr. ±5 v "Sam Špili").
   seekBy: (delta: number) => void;
+  // Glasnost posnetka 0–100 (shranjena v komadi:chords:volume — skupna za akorde in Sam Špili).
+  setVolume: (volume: number) => void;
 };
+
+export const VOLUME_KEY = "komadi:chords:volume";
+export function readVolume(): number {
+  try {
+    const v = Number(window.localStorage.getItem(VOLUME_KEY));
+    if (window.localStorage.getItem(VOLUME_KEY) !== null && Number.isFinite(v)) return Math.max(0, Math.min(100, v));
+  } catch {}
+  return 100;
+}
 
 export default function YouTubeMiniPlayer({
   videoIds,
@@ -121,6 +135,7 @@ export default function YouTubeMiniPlayer({
   smartAvailable = false,
   smartOn = false,
   onSmartToggle,
+  onUserPlay,
   controllerRef,
   preferredId = null,
   onSelect,
@@ -151,6 +166,9 @@ export default function YouTubeMiniPlayer({
   smartAvailable?: boolean;
   smartOn?: boolean;
   onSmartToggle?: (on: boolean) => void;
+  // Uporabnik je s ▶ zagnal predvajanje (klicano v istem kliku, ne ob pavzi in ne
+  // pri Smart play) — ChordsViewer vklopi celozaslonsko in samodejno pomikanje.
+  onUserPlay?: () => void;
   controllerRef?: React.RefObject<PlayerController | null>;
   // Izbirnik posnetka: izbira se shrani (ChordsViewer → songs.preferred_video_id);
   // onSelect vrne napako ali null, preferredId je trenutno shranjeni posnetek.
@@ -226,6 +244,8 @@ export default function YouTubeMiniPlayer({
         playerVars: { playsinline: 1, rel: 0, modestbranding: 1, autoplay: 1, origin: window.location.origin },
         events: {
           onReady: () => {
+            // Shranjena glasnost (Sam Špili / akordi v aplikaciji, gumba Glasneje/Tišje).
+            playerRef.current?.setVolume(readVolume());
             if (pendingSeekRef.current != null) playerRef.current?.seekTo(pendingSeekRef.current, true);
             playerRef.current?.playVideo();
             armStallTimer();
@@ -318,6 +338,12 @@ export default function YouTubeMiniPlayer({
         const t = Math.max(0, Math.min(player.getDuration() || Infinity, player.getCurrentTime() + delta));
         player.seekTo(t, true);
         setCurrent(t);
+      },
+      setVolume: (volume) => {
+        const player = playerRef.current;
+        if (!player) return;
+        player.unMute();
+        player.setVolume(volume);
       },
     };
   });
@@ -514,6 +540,10 @@ export default function YouTubeMiniPlayer({
     else if (playing) playerRef.current.pauseVideo();
     else playerRef.current.playVideo();
   };
+  const playClick = () => {
+    if (!playing) onUserPlay?.();
+    togglePlay();
+  };
   const seekBy = (delta: number) => {
     const player = playerRef.current;
     if (!player) return;
@@ -652,7 +682,7 @@ export default function YouTubeMiniPlayer({
           )}
           <button
             type="button"
-            onClick={togglePlay}
+            onClick={playClick}
             disabled={loading}
             aria-label={playing ? "Premor" : "Predvajaj"}
             title={playing ? "Premor" : "Predvajaj skladbo"}
@@ -734,7 +764,7 @@ export default function YouTubeMiniPlayer({
             </button>
             <button
               type="button"
-              onClick={togglePlay}
+              onClick={playClick}
               disabled={loading}
               aria-label={playing ? "Premor" : "Predvajaj"}
               title={playing ? "Premor" : "Predvajaj skladbo"}

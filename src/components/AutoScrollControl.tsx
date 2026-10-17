@@ -10,6 +10,9 @@ export default function AutoScrollControl({
   speedFactor = 1,
   onPlayingChange,
   above,
+  onPlayClick,
+  controlRef,
+  desktopSpeed,
 }: {
   scrollRef: React.RefObject<HTMLElement | null>;
   // Množitelj hitrosti (1 = PDF). Besedilo akordov je gostejše od PDF strani,
@@ -20,6 +23,13 @@ export default function AutoScrollControl({
   // Dodatni gumbi nad kontrolo, v istem plavajočem vogalu (ChordsViewer: velikost
   // pisave v ležečem načinu).
   above?: React.ReactNode;
+  // Uporabnik je zagnal/nadaljeval pomikanje s klikom (klicano v istem kliku —
+  // ChordsViewer vklopi celozaslonski način, ki ga brskalnik dovoli samo ob kliku).
+  onPlayClick?: () => void;
+  // Zagon od zunaj (ChordsViewer: ▶ v predvajalniku zažene tudi pomikanje).
+  controlRef?: React.MutableRefObject<{ play: () => void } | null>;
+  // Začetna hitrost na računalniku (≥ 1024 px); sicer 5.
+  desktopSpeed?: number;
 }) {
   // Samodejno pomikanje: "autoScrollStarted" je enosmerno stikalo (krogec ->
   // kontrolna vrstica), "isPlaying" pa dvosmerni play/pause preklop znotraj
@@ -28,7 +38,9 @@ export default function AutoScrollControl({
   // zagnati.
   const [autoScrollStarted, setAutoScrollStarted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [speed, setSpeed] = useState(5);
+  const [speed, setSpeed] = useState(() =>
+    desktopSpeed != null && typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches ? desktopSpeed : 5,
+  );
   const speedRef = useRef(speed);
   const rafIdRef = useRef<number | null>(null);
   const lastTimestampRef = useRef<number | null>(null);
@@ -45,6 +57,18 @@ export default function AutoScrollControl({
   const userActiveRef = useRef(false);
   const lastWrittenRef = useRef<number | null>(null);
 
+  useEffect(() => {
+    if (!controlRef) return;
+    controlRef.current = {
+      play: () => {
+        setAutoScrollStarted(true);
+        setIsPlaying(true);
+      },
+    };
+    return () => {
+      controlRef.current = null;
+    };
+  }, [controlRef]);
   const onPlayingChangeRef = useRef(onPlayingChange);
   useEffect(() => {
     onPlayingChangeRef.current = onPlayingChange;
@@ -209,6 +233,7 @@ export default function AutoScrollControl({
         onClick={() => {
           setAutoScrollStarted(true);
           setIsPlaying(true);
+          onPlayClick?.();
         }}
         aria-label="Zaženi samodejno pomikanje"
         title="Zaženi samodejno pomikanje"
@@ -287,7 +312,10 @@ export default function AutoScrollControl({
 
       <button
         type="button"
-        onClick={() => setIsPlaying((p) => !p)}
+        onClick={() => {
+          if (!isPlaying) onPlayClick?.();
+          setIsPlaying((p) => !p);
+        }}
         aria-label={isPlaying ? "Premor" : "Nadaljuj"}
         title={isPlaying ? "Premor" : "Nadaljuj"}
         className="order-5 flex h-8 w-8 lg:order-none items-center justify-center rounded-full hover:bg-neutral-800 hover:text-white active:scale-95"

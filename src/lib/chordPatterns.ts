@@ -85,7 +85,8 @@ export function findChordPatterns(body: ChordsLine[], display: (name: string) =>
       if (units.length < 2 && first.length === sections.find((s) => s.type === label)!.chords.length) continue;
       if (!units.every((u) => sameCycle(u, first))) continue;
       // Samo zaporedja (vsaj 2 akorda), ne en sam akord čez cel del.
-      if (first.length > 8 || new Set(first).size < 2) continue;
+      // Del, ki se ponovi (≥ 2×), sme imeti daljše zaporedje (refren Soldier of Fortune: 14 akordov).
+      if (first.length > (units.length > 1 ? 16 : 8) || new Set(first).size < 2) continue;
       parts.push({ label, count: units.length, unit: first });
     }
   }
