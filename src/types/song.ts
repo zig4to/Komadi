@@ -60,6 +60,8 @@ export interface Song {
   preferred_video_id?: string | null;
   // Ročno posneti časi posameznih akordov (0033_add_synced_chords.sql).
   synced_chords?: SyncedChords | null;
+  // "Nasvet": ponavljajoča se zaporedja akordov (skill spedenaj, 0041_add_chord_tips.sql).
+  chord_tips?: { whole: string[] | null; parts: { label: string; count: number; unit: string[] }[]; sameVerseChorus: boolean } | null;
   // Ročno preverjeno (0035_add_verification.sql): "Akordi v aplikaciji" so
   // pregledani; Smart play / Sam Špili je usklajen — ob tej potrditvi se časi
   // zamrznejo v synced_lines (frozen) in posnetek v preferred_video_id.
@@ -108,7 +110,7 @@ export interface SyncedLines {
 
 export type NewSong = Omit<
   Song,
-  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids" | "lrc_offsets" | "user_id" | "imported_from" | "review_pending" | "synced_lines" | "preferred_video_id" | "synced_chords" | "verified_chords_at" | "verified_player_at"
+  "id" | "created_at" | "copy_count" | "jam_added_at" | "jam_played" | "goal_added_at" | "goal_learned" | "youtube_url" | "spotify_url" | "youtube_music_url" | "import_batch_id" | "chords_text" | "youtube_embed_ids" | "lrc_offsets" | "user_id" | "imported_from" | "review_pending" | "synced_lines" | "preferred_video_id" | "synced_chords" | "verified_chords_at" | "verified_player_at" | "chord_tips"
 >;
 
 export interface SimilarSong {

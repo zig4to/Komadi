@@ -157,6 +157,11 @@ brskalnikom (Claude in Chrome), sicer v poročilu napiši, da jih ni bilo mogoč
 tu ne spreminjaj sam — samo poročaj.
 
 ### 8. Končna kontrola in poročilo
+0. **Nasvet (ponavljajoča se zaporedja)**: ko je besedilo z oznakami delov zapisano, zaženi
+   `song.mjs tips <id> --write` — poišče, ali se cela skladba vrti na enem zaporedju akordov ali imajo vse kitice /
+   refreni … isto zaporedje (`src/lib/chordPatterns.ts`), in to shrani v `songs.chord_tips` (null, če ni ničesar);
+   pregledovalnik to pokaže v okencu "Nasvet" desno od akordov skladbe. V poročilu navedi, kaj je našel.
+   Po vsaki kasnejši spremembi besedila (akordi, oznake) ga zaženi znova.
 1. `song.mjs dump <id> --audio a.json` še enkrat: brez LRC vrstic brez para, deli z akordi na pravem videu,
    shranjeni časi naraščajo, oznake delov oštevilčene.
 2. Poročaj za vsako skladbo (kratko, slovensko):

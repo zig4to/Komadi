@@ -10,6 +10,8 @@
 //         LRC poravnava (čas → vrstica), LRC vrstice brez para, zapete vrstice brez časa;
 //         z --audio še ujemanje akordov taba s posnetkom (tonaliteta, vrstice, ki ne sedejo)
 //   … song.mjs write <id> --patch patch.json [--write]      brez --write samo pokaže, kaj bi zapisal
+//   … song.mjs tips <id> [--write]                          ponavljajoča se zaporedja akordov → songs.chord_tips
+//         (src/lib/chordPatterns.ts, "Nasvet" v pregledovalniku; null, če ni ponavljanj)
 //
 // patch.json (vse neobvezno):
 //   { "text": "draft.txt",              urejeno besedilo (applyEditedText + rebaseSyncOnEdit)
@@ -35,6 +37,7 @@ const root = fileURLToPath(new URL("../..", import.meta.url));
 globalThis.window ??= { localStorage: { getItem: () => null, setItem: () => {} } };
 const jiti = createJiti(import.meta.url, { alias: { "@": `${root}src` } });
 const { parseChords, splitDescription, toEditableText, applyEditedText, transposeChord } = await jiti.import("../../src/lib/chords.ts");
+const { findChordPatterns } = await jiti.import("../../src/lib/chordPatterns.ts");
 const { fetchLrcCandidates, pickBestCandidate, alignLyrics, lineKey, rebaseSyncOnEdit, remapLines } =
   await jiti.import("../../src/lib/syncedLyrics.ts");
 
@@ -344,6 +347,21 @@ if (cmd === "list") {
     await rest(`songs?id=eq.${s.id}`, { method: "PATCH", body: JSON.stringify(update), headers: { ...headers, Prefer: "return=minimal" } });
     console.log(`\nzapisano (${Object.keys(update).join(", ")}); prejšnje stanje: ${backup}`);
   }
+} else if (cmd === "tips") {
+  const s = await loadSong(id);
+  // Nasvet ne vpliva na čase/predvajanje — dovoljen tudi pri preverjenih skladbah (uporabnik, 2026-10-17).
+  const { body } = splitDescription(parseChords(s.chords_text ?? ""));
+  const tips = findChordPatterns(body, (n) => n);
+  if (!tips) console.log("Ni ponavljajočih se zaporedij → chord_tips = null");
+  else {
+    if (tips.whole) console.log(`Cela skladba: ${tips.whole.join(" ")}`);
+    for (const p of tips.parts) console.log(`${p.label} ×${p.count}: ${p.unit.join(" ")}`);
+    if (tips.sameVerseChorus) console.log("Kitica in refren: enako zaporedje");
+  }
+  if (process.argv.includes("--write")) {
+    await rest(`songs?id=eq.${s.id}`, { method: "PATCH", body: JSON.stringify({ chord_tips: tips }), headers: { ...headers, Prefer: "return=minimal" } });
+    console.log("zapisano (chord_tips)");
+  } else console.log("(poskusno — za zapis dodaj --write)");
 } else {
   console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(0, 26).join("\n"));
   process.exit(cmd ? 1 : 0);

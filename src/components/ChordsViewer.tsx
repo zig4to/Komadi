@@ -1,7 +1,7 @@
 "use client";
 
 import { PATTERN_OPACITY_MAX, PatternSvg, scaledBackgroundColors } from "@/lib/backgroundPatterns";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import AutoScrollControl from "@/components/AutoScrollControl";
 import ChordDiagram from "@/components/ChordDiagram";
@@ -447,6 +447,9 @@ export default function ChordsViewer({
 
   // "Pokaži akorde" — ena nastavitev za vse skladbe.
   const [showShapes, setShowShapes] = useState(() => readNumber(SHOW_SHAPES_KEY, 0) === 1);
+  // "Nasvet" (ponavljajoča se zaporedja akordov) — razprt ali strnjen, na tej napravi.
+  const [tipsOpen, setTipsOpen] = useState(() => readNumber("komadi:chords:tipsOpen", 1) === 1);
+  useEffect(() => writeNumber("komadi:chords:tipsOpen", tipsOpen ? 1 : 0), [tipsOpen]);
   useEffect(() => writeNumber(SHOW_SHAPES_KEY, showShapes ? 1 : 0), [showShapes]);
   const [noCapo, setNoCapo] = useState(() => readNumber(NO_CAPO_KEY, 0) === 1);
   useEffect(() => writeNumber(NO_CAPO_KEY, noCapo ? 1 : 0), [noCapo]);
@@ -1274,6 +1277,33 @@ export default function ChordsViewer({
     };
   }, [barsHidden, editing, desktopBars]);
 
+  // Računalnik: povečava orodne vrstice, da je vsebina v eni vrsti do desnega
+  // roba (laptop 1280 px in večji zasloni; največ 135 %). Izmeri se pri 100 % brez
+  // prelamljanja ob vsakem izrisu (gumbi se pojavijo/izginejo) in ob spremembi velikosti.
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const fitToolbar = useCallback(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    if (!window.matchMedia("(min-width: 1024px)").matches) {
+      el.style.zoom = "";
+      return;
+    }
+    el.style.zoom = "1";
+    const have = el.getBoundingClientRect().width;
+    el.style.flexWrap = "nowrap";
+    el.style.width = "max-content";
+    const need = el.getBoundingClientRect().width;
+    el.style.width = "";
+    el.style.flexWrap = "";
+    el.style.zoom = String(Math.max(0.8, Math.min(1.35, (have / Math.max(1, need)) * 0.995)));
+  }, []);
+  useLayoutEffect(() => {
+    fitToolbar();
+  });
+  useEffect(() => {
+    window.addEventListener("resize", fitToolbar);
+    return () => window.removeEventListener("resize", fitToolbar);
+  }, [fitToolbar]);
   const shift = (d: number) => setSemitones((s) => wrap(s + d));
   // Premik akordov = transpozicija + (No capo) capo skladbe.
   const capoShift = noCapo && capo ? capo : 0;
@@ -3511,8 +3541,9 @@ export default function ChordsViewer({
       {/* Telefon: drsnik po skladbi čez celo širino, med zgornjo vrstico in orodji. */}
       <div ref={setSliderHost} className="flex shrink-0 items-center px-4 pb-2 empty:hidden lg:hidden" />
 
-      {/* Računalnik: orodna vrstica povečana (zoom), pri 100 % je bila premajhna. */}
-      <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 max-lg:border-white/10 max-lg:bg-transparent lg:items-end lg:gap-3 lg:px-12 lg:[zoom:1.35]">
+      {/* Računalnik: orodna vrstica se poveča toliko, da je v eni vrsti do desnega
+          roba (fitToolbar, največ 135 %); telefon: navaden tok gumbov. */}
+      <div ref={toolbarRef} className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 max-lg:border-white/10 max-lg:bg-transparent lg:items-end lg:gap-3 lg:px-12 xl:px-8">
         {/* Računalnik: skupine z napisom (Povezave, Prilagajanje, Urejanje, Funkcije,
             Nastavitve); telefon: "contents" + max-lg:order — en tok gumbov kot prej. */}
         {((hasSamSpili(song) && !recorder && !follower) || (!!song.chords_source_url && /ultimate-guitar.com/.test(song.chords_source_url))) && (
@@ -3557,7 +3588,7 @@ export default function ChordsViewer({
               </div>
             </div>
         )}
-        <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3">
+        <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3 xl:pl-2 2xl:pl-3">
           <span className="hidden px-1 text-[9px] font-medium uppercase tracking-[0.08em] text-orange-400 lg:block">Prilagajanje</span>
           <div className="contents lg:flex lg:items-center lg:gap-2">
             <div
@@ -3616,7 +3647,7 @@ export default function ChordsViewer({
             </button>
           </div>
         </div>
-        <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3">
+        <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3 xl:pl-2 2xl:pl-3">
           <span className="hidden px-1 text-[9px] font-medium uppercase tracking-[0.08em] text-orange-400 lg:block">Urejanje</span>
           <div className="contents lg:flex lg:items-center lg:gap-2">
             {/* Računalnik: napredni urejevalnik besedila (isti kot na straneh Pregled
@@ -3728,7 +3759,7 @@ export default function ChordsViewer({
             )}
           </div>
         </div>
-        <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3">
+        <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3 xl:pl-2 2xl:pl-3">
           <span className="hidden px-1 text-[9px] font-medium uppercase tracking-[0.08em] text-orange-400 lg:block">Funkcije</span>
           <div className="contents lg:flex lg:items-center lg:gap-2">
             <button
@@ -3779,7 +3810,7 @@ export default function ChordsViewer({
             ) : null}
           </div>
         </div>
-        <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3">
+        <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3 xl:pl-2 2xl:pl-3">
           <span className="hidden px-1 text-[9px] font-medium uppercase tracking-[0.08em] text-orange-400 lg:block">Nastavitve</span>
           <div className="contents lg:flex lg:items-center lg:gap-2">
             <button
@@ -3926,6 +3957,45 @@ export default function ChordsViewer({
                 })}
               </div>
               )}
+              </div>
+            )}
+            {/* "Nasvet": ponavljajoča se zaporedja akordov (shranil skill spedenaj v
+                songs.chord_tips; imena prikazana s transpozicijo / Simpl / No capo). */}
+            {song.chord_tips && (song.chord_tips.whole || song.chord_tips.parts.length > 0) && (
+              <div className="max-w-sm rounded-xl border border-sky-400/40 bg-sky-400/[0.05] px-3 pb-2 pt-2" aria-label="Nasvet">
+                <button
+                  type="button"
+                  onClick={() => setTipsOpen((v) => !v)}
+                  aria-expanded={tipsOpen}
+                  className={`flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-sky-400 ${tipsOpen ? "mb-1.5" : ""}`}
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                    <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z" />
+                  </svg>
+                  Nasvet
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`ml-auto h-3.5 w-3.5 transition ${tipsOpen ? "rotate-180" : ""}`}>
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+                {tipsOpen && (
+                  <div className="space-y-1.5 text-xs text-(--cv-text)">
+                    {song.chord_tips.whole ? (
+                      <p>
+                        Akordi se čez celo skladbo ponavljajo:
+                        <span className="mt-1 block font-mono text-sm font-semibold text-(--cv-chord)">{song.chord_tips.whole.map(display).join("  →  ")}</span>
+                      </p>
+                    ) : (
+                      song.chord_tips.parts.map((part) => (
+                        <p key={part.label}>
+                          <span className="font-medium">{part.label}</span>
+                          {part.count > 1 ? ` (${part.count}×)` : ""} — vedno isto:
+                          <span className="ml-1 font-mono font-semibold text-(--cv-chord)">{part.unit.map(display).join(" → ")}</span>
+                        </p>
+                      ))
+                    )}
+                    {song.chord_tips.sameVerseChorus && <p className="text-(--cv-muted)">Kitica in refren imata enako zaporedje.</p>}
+                  </div>
+                )}
               </div>
             )}
             </div>
