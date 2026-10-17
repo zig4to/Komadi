@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { matchesSearch, searchWords } from "@/lib/search";
 import { flushSync } from "react-dom";
 import type { User } from "@supabase/supabase-js";
 import ChordsButtons from "@/components/ChordsButtons";
@@ -899,20 +900,19 @@ export default function Dashboard({ user }: { user: User }) {
   }, [goalSongs, goalExtras]);
 
   const goalPickerResults = useMemo(() => {
-    const q = goalPickerQuery.trim().toLowerCase();
-    if (!q) return [];
+    const words = searchWords(goalPickerQuery);
+    if (!words.length) return [];
     return songs
       .filter((s) => !s.goal_added_at)
-      .filter((s) => `${s.title} ${s.author}`.toLowerCase().includes(q))
+      .filter((s) => matchesSearch(words, s.title, s.author))
       .slice(0, 20);
   }, [songs, goalPickerQuery]);
 
   // V načinu "Skupno" isti filtri veljajo za skladbe drugih uporabnikov.
   const filteredSongs = useMemo(() => {
-    const q = filters.search.trim().toLowerCase();
+    const words = searchWords(filters.search);
     return (sharedOn ? (sharedSongs ?? []) : songs).filter((s) => {
-      if (q && !`${s.title} ${s.author}`.toLowerCase().includes(q))
-        return false;
+      if (!matchesSearch(words, s.title, s.author)) return false;
       if (filters.genres.length && !filters.genres.includes(s.genre))
         return false;
       if (filters.eras.length && !filters.eras.includes(s.era)) return false;
@@ -968,8 +968,13 @@ export default function Dashboard({ user }: { user: User }) {
   }
 
   const displaySongs = useMemo(
-    () => filteredSongs.filter((s) => !reportedSongIds.has(s.id)).sort(songComparator(songSort)),
-    [filteredSongs, songSort, reportedSongIds],
+    // Prijavljene skladbe so skrite (so na "Popravi skladbe") — razen med iskanjem,
+    // da iskanje najde vse skladbe.
+    () =>
+      filteredSongs
+        .filter((s) => !reportedSongIds.has(s.id) || searchWords(filters.search).length > 0)
+        .sort(songComparator(songSort)),
+    [filteredSongs, songSort, reportedSongIds, filters.search],
   );
   // Stran "Vse skladbe" (klik na kartico statistike): vsa knjižnica, isti vrstni red.
   const allSongsSorted = useMemo(() => [...songs].sort(songComparator(songSort)), [songs, songSort]);

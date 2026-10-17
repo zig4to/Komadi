@@ -136,6 +136,9 @@ export default function YouTubeMiniPlayer({
   smartOn = false,
   onSmartToggle,
   onUserPlay,
+  onSmartPlay,
+  preload,
+  playMenu,
   controllerRef,
   preferredId = null,
   onSelect,
@@ -169,6 +172,13 @@ export default function YouTubeMiniPlayer({
   // Uporabnik je s ▶ zagnal predvajanje (klicano v istem kliku, ne ob pavzi in ne
   // pri Smart play) — ChordsViewer vklopi celozaslonsko in samodejno pomikanje.
   onUserPlay?: () => void;
+  // Uporabnik je vklopil Smart play (klicano v istem kliku) — ChordsViewer vklopi celozaslonsko.
+  onSmartPlay?: () => void;
+  // Računalnik: predvajalnik se ustvari (ustavljen) malo po odprtju, da prvi ▶ v istem
+  // kliku zaigra in vklopi celozaslonski način (ob ustvarjanju v kliku bi ga ta porabil).
+  preload?: boolean;
+  // ▶ in Smart play (ko skladba ne igra) odpreta mali meni: "Predvajaj" / "Celozaslonsko predvajaj".
+  playMenu?: boolean;
   controllerRef?: React.RefObject<PlayerController | null>;
   // Izbirnik posnetka: izbira se shrani (ChordsViewer → songs.preferred_video_id);
   // onSelect vrne napako ali null, preferredId je trenutno shranjeni posnetek.
@@ -227,11 +237,14 @@ export default function YouTubeMiniPlayer({
   // odprtju pregledovalnika. YouTube iframe lahko doda svoje vnose v zgodovino
   // brskalnika, kar je med odpiranjem zmedlo useBackableOpen (sistemski
   // "Nazaj") in pregledovalnik se je takoj zaprl.
-  function start() {
+  // false = predvajalnik se ustvari samo pripravljen (preload) — ob pripravljenosti ne zaigra.
+  const autoplayRef = useRef(true);
+  function start(autoplay = true) {
+    autoplayRef.current = autoplay;
     const host = hostRef.current;
     if (!host || started) return;
     setStarted(true);
-    setLoading(true);
+    if (autoplay) setLoading(true);
     setCurrentId(idsRef.current[attemptRef.current]);
     loadYouTubeApi().then((YT) => {
       if (!hostRef.current) return;
@@ -241,11 +254,12 @@ export default function YouTubeMiniPlayer({
         videoId: idsRef.current[attemptRef.current],
         width: 200,
         height: 200,
-        playerVars: { playsinline: 1, rel: 0, modestbranding: 1, autoplay: 1, origin: window.location.origin },
+        playerVars: { playsinline: 1, rel: 0, modestbranding: 1, autoplay: autoplay ? 1 : 0, origin: window.location.origin },
         events: {
           onReady: () => {
             // Shranjena glasnost (Sam Špili / akordi v aplikaciji, gumba Glasneje/Tišje).
             playerRef.current?.setVolume(readVolume());
+            if (!autoplayRef.current) return;
             if (pendingSeekRef.current != null) playerRef.current?.seekTo(pendingSeekRef.current, true);
             playerRef.current?.playVideo();
             armStallTimer();
@@ -328,7 +342,10 @@ export default function YouTubeMiniPlayer({
       },
       currentTime: () => playerRef.current?.getCurrentTime() ?? null,
       play: () => {
-        if (!playerRef.current) start();
+        if (!playerRef.current) {
+          autoplayRef.current = true;
+          start();
+        }
         else playerRef.current.playVideo();
       },
       pause: () => playerRef.current?.pauseVideo(),
@@ -347,6 +364,14 @@ export default function YouTubeMiniPlayer({
       },
     };
   });
+
+  // Računalnik: pripravi predvajalnik 1,5 s po odprtju (ustavljen).
+  useEffect(() => {
+    if (!preload || started) return;
+    const t = setTimeout(() => start(false), 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preload]);
 
   // Izbirnik: naslovi se naložijo ob prvem odprtju.
   useEffect(() => {
@@ -536,12 +561,46 @@ export default function YouTubeMiniPlayer({
   const ready = started && !loading;
 
   const togglePlay = () => {
-    if (!playerRef.current) start();
+    if (!playerRef.current) {
+      autoplayRef.current = true;
+      setLoading(true);
+      start();
+      return;
+    }
     else if (playing) playerRef.current.pauseVideo();
     else playerRef.current.playVideo();
   };
-  const playClick = () => {
-    if (!playing) onUserPlay?.();
+  // Mali meni ob ▶ / Smart play: izbira navadnega ali celozaslonskega predvajanja
+  // (izbira v meniju je nov klik — celozaslonski način ga sme porabiti).
+  const [playMenuAt, setPlayMenuAt] = useState<{ kind: "play" | "smart"; left: number; top: number } | null>(null);
+  const openPlayMenu = (kind: "play" | "smart", el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    setPlayMenuAt({ kind, left: Math.max(8, Math.min(window.innerWidth - 228, r.left)), top: r.bottom + 6 });
+  };
+  useEffect(() => {
+    if (!playMenuAt) return;
+    const close = (e: PointerEvent) => {
+      if (!(e.target as HTMLElement).closest("[data-play-menu]")) setPlayMenuAt(null);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [playMenuAt]);
+  const choosePlay = (fullscreen: boolean) => {
+    const kind = playMenuAt?.kind;
+    setPlayMenuAt(null);
+    if (kind === "smart") {
+      onSmartToggle?.(true);
+      if (fullscreen) onSmartPlay?.();
+      if (!playing) togglePlay();
+    } else {
+      if (fullscreen) onUserPlay?.();
+      togglePlay();
+    }
+  };
+  const playClick = (e: React.MouseEvent<HTMLElement>) => {
+    if (playing) return togglePlay();
+    if (playMenu) return openPlayMenu("play", e.currentTarget);
+    onUserPlay?.();
     togglePlay();
   };
   const seekBy = (delta: number) => {
@@ -646,6 +705,33 @@ export default function YouTubeMiniPlayer({
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
+      {playMenuAt &&
+        createPortal(
+          <div
+            data-play-menu
+            data-view-portal
+            role="menu"
+            style={{ left: playMenuAt.left, top: playMenuAt.top }}
+            className="fixed z-[70] w-56 rounded-xl border border-orange-400/60 bg-neutral-900 p-1.5 font-sans text-sm text-neutral-100 shadow-2xl"
+          >
+            <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wider text-orange-400">
+              {playMenuAt.kind === "smart" ? "Smart play" : "Predvajanje"}
+            </p>
+            <button type="button" role="menuitem" onClick={() => choosePlay(false)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-white/[0.08]">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-amber-400">
+                <path d="M7 4v16l13-8z" />
+              </svg>
+              Predvajaj
+            </button>
+            <button type="button" role="menuitem" onClick={() => choosePlay(true)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-white/[0.08]">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-amber-400">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+              </svg>
+              Celozaslonsko predvajaj
+            </button>
+          </div>,
+          document.body,
+        )}
       {failedAll ? (
         <a
           href={watchUrl}
@@ -660,9 +746,11 @@ export default function YouTubeMiniPlayer({
           {smartAvailable && (
             <button
               type="button"
-              onClick={() => {
+              onClick={(e) => {
                 if (smartOn) return onSmartToggle?.(false);
+                if (playMenu && !playing) return openPlayMenu("smart", e.currentTarget);
                 onSmartToggle?.(true);
+                onSmartPlay?.();
                 if (!playing) togglePlay();
               }}
               disabled={loading}
@@ -764,7 +852,7 @@ export default function YouTubeMiniPlayer({
             </button>
             <button
               type="button"
-              onClick={playClick}
+              onClick={togglePlay}
               disabled={loading}
               aria-label={playing ? "Premor" : "Predvajaj"}
               title={playing ? "Premor" : "Predvajaj skladbo"}

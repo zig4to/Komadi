@@ -1615,6 +1615,9 @@ export default function ChordsViewer({
   const ssShowLines = samSpili && (follower ? !!remote?.ss : ssHasPlayed);
   // Telefon, med pavzo: tap na vrstico skoči tja in predvaja naprej.
   const playerCtlRef = useRef<PlayerController | null>(null);
+  // Računalnik (miška, ≥ 1024 px): predvajalnik pripravljen vnaprej — prvi ▶ zaigra in
+  // vklopi celozaslonski način v istem kliku. Telefon: ustvari se šele ob prvem ▶.
+  const [preloadPlayer] = useState(() => typeof window !== "undefined" && window.matchMedia("(pointer: fine) and (min-width: 1024px)").matches);
   // Glasnost posnetka po 5 % — ista v akordih v aplikaciji in v Sam Špili
   // (komadi:chords:volume; nov predvajalnik jo prevzame ob zagonu). Sam Špili:
   // ↑ / ↓ in gumba v stranski vrstici; navadni pogled: gumba v orodni vrstici.
@@ -1628,7 +1631,11 @@ export default function ChordsViewer({
       window.localStorage.setItem(VOLUME_KEY, String(next));
     } catch {}
     playerCtlRef.current?.setVolume(next);
-    setSsVolMsg(`Glasnost ${next} %`);
+    showKeyMsg(`Glasnost ${next} %`);
+  };
+  // Kratko obvestilo na vrhu (glasnost, hitrost pomikanja s tipkovnice).
+  const showKeyMsg = (msg: string) => {
+    setSsVolMsg(msg);
     clearTimeout(ssVolTimerRef.current);
     ssVolTimerRef.current = setTimeout(() => setSsVolMsg(null), 1300);
   };
@@ -2839,17 +2846,17 @@ export default function ChordsViewer({
   // ker requestFullscreen porabi dovoljenje klika in bi YouTube ostal ustavljen.
   // ▶ v predvajalniku ali play na samodejnem pomikanju (navadni pogled): skladba,
   // celozaslonsko in samodejno pomikanje v istem kliku. Brskalniški celozaslonski
-  // način na telefonu samo, če predvajalnik že obstaja — ob prvem zagonu bi
+  // način samo, če predvajalnik že obstaja (tudi na računalniku) — ob prvem zagonu bi
   // requestFullscreen porabil dovoljenje klika in YouTube bi ostal ustavljen (ista
-  // past kot pri Sam Špili); takrat se skrijeta samo vrstici aplikacije.
-  const autoScrollCtlRef = useRef<{ play: () => void } | null>(null);
-  const startPlayView = (from: "player" | "autoscroll") => {
+  // past kot pri Sam Špili: prvi ▶ ni igral, drugi je); takrat se skrijeta samo
+  // vrstici aplikacije, brskalniški celozaslonski se vklopi ob naslednjem kliku.
+  const autoScrollCtlRef = useRef<{ play: () => void; changeSpeed: (delta: number) => number } | null>(null);
+  const startPlayView = (from: "player" | "autoscroll" | "smart") => {
     if (samSpili || recorder || follower) return;
     const playerExists = playerCtlRef.current?.currentTime() != null;
-    const phone = window.matchMedia("(pointer: coarse)").matches;
     closeThemeMenu();
     setIsFullscreen(true);
-    if ((playerExists || !phone) && canBrowserFullscreen() && !document.fullscreenElement) {
+    if (playerExists && canBrowserFullscreen() && !document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
     }
     if (from === "player" && !smartActive) autoScrollCtlRef.current?.play();
@@ -2858,12 +2865,35 @@ export default function ChordsViewer({
   // Tipkovnica (akordi v aplikaciji in Sam Špili): ↑ / ↓ = glasnost po 5 % (ne za
   // sledilca — ta nima svojega predvajanja; ne v urejevalniku in poljih).
   const ssVolumeKeysRef = useRef(ssChangeVolume);
+  // Numerična tipkovnica + / −: velikost besedila (navadni pogled: pisava, Sam Špili: povečava).
+  const fontKeysRef = useRef<(dir: 1 | -1) => void>(() => {});
   useEffect(() => {
     ssVolumeKeysRef.current = ssChangeVolume;
+    fontKeysRef.current = (dir) => {
+      if (samSpili) changeSsScale(dir * SS_SCALE_STEP);
+      else setFontSize((f) => Math.min(MAX_FONT, Math.max(MIN_FONT, f + dir * FONT_STEP)));
+    };
   });
   useEffect(() => {
     if (follower) return;
     const onKey = (e: KeyboardEvent) => {
+      // Numerična 0 / 1: samodejno pomikanje počasneje / hitreje (navadni pogled).
+      if ((e.code === "Numpad0" || e.code === "Numpad1") && !samSpili) {
+        const t = e.target as HTMLElement | null;
+        if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+        const ctl = autoScrollCtlRef.current;
+        if (!ctl) return;
+        e.preventDefault();
+        showKeyMsg(`Hitrost pomikanja ${ctl.changeSpeed(e.code === "Numpad1" ? 1 : -1)}`);
+        return;
+      }
+      if (e.code === "NumpadAdd" || e.code === "NumpadSubtract") {
+        const t = e.target as HTMLElement | null;
+        if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+        e.preventDefault();
+        fontKeysRef.current(e.code === "NumpadAdd" ? 1 : -1);
+        return;
+      }
       if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
       if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
       const t = e.target as HTMLElement | null;
@@ -2873,7 +2903,7 @@ export default function ChordsViewer({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [follower]);
+  }, [follower, samSpili]);
   const ssPlay = () => {
     setSmartOn(true);
     setSsActive(true);
@@ -3590,6 +3620,9 @@ export default function ChordsViewer({
             smartOn={smartOn}
             onSmartToggle={setSmartOn}
             onUserPlay={() => startPlayView("player")}
+            onSmartPlay={() => startPlayView("smart")}
+            preload={preloadPlayer && !follower}
+            playMenu={!samSpili && !follower}
             controllerRef={playerCtlRef}
             preferredId={preferredVideo}
             onSelect={async (id) => {

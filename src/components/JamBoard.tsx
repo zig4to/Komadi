@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
+import { matchesSearch, searchWords } from "@/lib/search";
 import ChordsButtons from "@/components/ChordsButtons";
 import { authorAccentHex } from "@/lib/authorColor";
 import { useBackableOpen } from "@/lib/useBackableOpen";
@@ -61,11 +62,11 @@ export default function JamBoard({
   useBackableOpen(pickerOpen, () => setPickerOpen(false));
 
   const pickerResults = useMemo(() => {
-    const q = pickerQuery.trim().toLowerCase();
-    if (!q) return [];
+    const words = searchWords(pickerQuery);
+    if (!words.length) return [];
     return librarySongs
       .filter((s) => !excludeIds.has(s.id))
-      .filter((s) => `${s.title} ${s.author}`.toLowerCase().includes(q))
+      .filter((s) => matchesSearch(words, s.title, s.author))
       .slice(0, 20);
   }, [librarySongs, excludeIds, pickerQuery]);
 

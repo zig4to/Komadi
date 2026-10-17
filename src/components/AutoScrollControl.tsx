@@ -27,7 +27,7 @@ export default function AutoScrollControl({
   // ChordsViewer vklopi celozaslonski način, ki ga brskalnik dovoli samo ob kliku).
   onPlayClick?: () => void;
   // Zagon od zunaj (ChordsViewer: ▶ v predvajalniku zažene tudi pomikanje).
-  controlRef?: React.MutableRefObject<{ play: () => void } | null>;
+  controlRef?: React.MutableRefObject<{ play: () => void; changeSpeed: (delta: number) => number } | null>;
   // Začetna hitrost na računalniku (≥ 1024 px); sicer 5.
   desktopSpeed?: number;
 }) {
@@ -63,6 +63,13 @@ export default function AutoScrollControl({
       play: () => {
         setAutoScrollStarted(true);
         setIsPlaying(true);
+      },
+      // Numerična tipkovnica 0 / 1 (ChordsViewer): hitrost 1–13, vrne novo.
+      changeSpeed: (delta) => {
+        const next = Math.max(1, Math.min(13, speedRef.current + delta));
+        speedRef.current = next;
+        setSpeed(next);
+        return next;
       },
     };
     return () => {

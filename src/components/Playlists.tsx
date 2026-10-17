@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { matchesSearch, searchWords } from "@/lib/search";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import type { Playlist, PlaylistSong, Song } from "@/types/song";
@@ -73,13 +74,10 @@ export default function Playlists({
   const selectedSongIds = new Set(selectedEntries.map((e) => e.song_id));
 
   const pickerResults = useMemo(() => {
-    const words = pickerQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const words = searchWords(pickerQuery);
     if (words.length === 0) return [];
     return songs
-      .filter((s) => {
-        const hay = `${s.title} ${s.author}`.toLowerCase();
-        return words.every((w) => hay.includes(w));
-      })
+      .filter((s) => matchesSearch(words, s.title, s.author))
       .slice(0, 20);
   }, [songs, pickerQuery]);
 
