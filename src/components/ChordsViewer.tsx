@@ -448,12 +448,15 @@ export default function ChordsViewer({
   // "Pokaži akorde" — ena nastavitev za vse skladbe.
   const [showShapes, setShowShapes] = useState(() => readNumber(SHOW_SHAPES_KEY, 0) === 1);
   // "Nasvet" (ponavljajoča se zaporedja akordov) — razprt ali strnjen, na tej napravi.
-  const [tipsOpen, setTipsOpen] = useState(() => readNumber("komadi:chords:tipsOpen", 1) === 1);
+  const [tipsOpen, setTipsOpen] = useState(() => readNumber("komadi:chords:tipsOpen", 0) === 1);
   useEffect(() => writeNumber("komadi:chords:tipsOpen", tipsOpen ? 1 : 0), [tipsOpen]);
+  // "Nasvet" → "Prikaži akorde": pod vsako vrstico nasveta prijemi njenih akordov.
+  const [tipShapes, setTipShapes] = useState(() => readNumber("komadi:chords:tipShapes", 0) === 1);
+  useEffect(() => writeNumber("komadi:chords:tipShapes", tipShapes ? 1 : 0), [tipShapes]);
   useEffect(() => writeNumber(SHOW_SHAPES_KEY, showShapes ? 1 : 0), [showShapes]);
   const [noCapo, setNoCapo] = useState(() => readNumber(NO_CAPO_KEY, 0) === 1);
   useEffect(() => writeNumber(NO_CAPO_KEY, noCapo ? 1 : 0), [noCapo]);
-  const [shapesOpen, setShapesOpen] = useState(() => readNumber(SHAPES_OPEN_KEY, 1) === 1);
+  const [shapesOpen, setShapesOpen] = useState(() => readNumber(SHAPES_OPEN_KEY, 0) === 1);
   useEffect(() => writeNumber(SHAPES_OPEN_KEY, shapesOpen ? 1 : 0), [shapesOpen]);
   // Prijemi iz opisa skladbe ("Cadd4  x 3 3 0 1 0") imajo prednost pred bazo.
   const descShapes = useMemo(() => parseDescriptionShapes(chordsText), [chordsText]);
@@ -474,13 +477,13 @@ export default function ChordsViewer({
     [body],
   );
   useEffect(() => {
-    if ((!showShapes && !hasSpecialChords) || chordDb) return;
+    if ((!showShapes && !hasSpecialChords && !tipShapes) || chordDb) return;
     let alive = true;
     loadChordDb().then((db) => alive && setChordDb(db));
     return () => {
       alive = false;
     };
-  }, [showShapes, hasSpecialChords, chordDb]);
+  }, [showShapes, hasSpecialChords, tipShapes, chordDb]);
 
   // "Tema": ozadje vsebine in barva akordov — ena nastavitev za vse skladbe.
   const [normalBgIndex, setNormalBgIndex] = useState(() => readNumber(BG_KEY, DEFAULT_BG));
@@ -2060,6 +2063,22 @@ export default function ChordsViewer({
     autoFrozeRef.current = true;
     void freezeRef.current(false);
   }, [needsFreeze]);
+  // Prijemi akordov za vrstico nasveta (vsak akord enkrat, izbrana različica kot drugod).
+  const tipShapeRow = (names: string[]) => (
+    <div className="mt-1.5 flex flex-nowrap gap-1 overflow-x-auto pb-1 opacity-90 [scrollbar-width:thin] [zoom:0.75]">
+      {[...new Set(names)].map((name) => {
+        const positions = mergeShapes(descShapes.get(name), chordDb ? findChordShapes(chordDb, name) : []);
+        const position = positions[Math.min(shapeChoice[name] ?? 0, Math.max(0, positions.length - 1))];
+        return position ? (
+          <ChordDiagram key={name} name={name} position={position} />
+        ) : (
+          <span key={name} className="px-1 text-sm font-bold text-(--cv-chord)" title="Prijem ni znan">
+            {name}
+          </span>
+        );
+      })}
+    </div>
+  );
   const deleteSyncedLines = async () => {
     if (!window.confirm("Izbrišem ročno posnete čase (vrstice in akorde) za to skladbo?")) return;
     const { error } = await supabase.from("songs").update({ synced_lines: null, synced_chords: null }).eq("id", song.id);
@@ -3888,7 +3907,7 @@ export default function ChordsViewer({
                 akordi; "Pokaži akorde" prikaže vse (posebni so označeni). */}
             {shapeChords.length > 0 && (
               <div
-                className={`rounded-xl border px-2.5 pb-1.5 pt-2 ${showShapes ? "border-(--cv-border)" : "border-orange-400/40 bg-orange-400/[0.05]"}`}
+                className={`relative z-10 self-start rounded-xl border px-2.5 py-1.5 ${showShapes ? "border-(--cv-border)" : "border-orange-400/40 bg-orange-400/[0.05]"}`}
                 aria-label={showShapes ? "Akordi v skladbi" : "Posebni akordi"}
               >
                 <button
@@ -3896,7 +3915,7 @@ export default function ChordsViewer({
                   onClick={() => setShapesOpen((v) => !v)}
                   aria-expanded={shapesOpen}
                   title={shapesOpen ? "Skrij prijeme" : "Pokaži prijeme"}
-                  className={`flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-(--cv-chord) ${shapesOpen ? "mb-1.5" : ""}`}
+                  className="flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-(--cv-chord)"
                 >
                   {showShapes ? "Akordi v skladbi" : "Posebni akordi"}
                   {/* Zaprto okno: seznam akordov samo, če jih je največ 5 (sicer le število). */}
@@ -3913,7 +3932,7 @@ export default function ChordsViewer({
                   </svg>
                 </button>
               {shapesOpen && (
-              <div className="flex flex-wrap gap-x-2 gap-y-2">
+              <div className="absolute left-0 top-full mt-1.5 flex w-max max-w-[min(48rem,calc(100vw-2rem))] flex-wrap gap-x-2 gap-y-2 rounded-xl border border-(--cv-border) bg-(--cv-bg) p-2.5 shadow-2xl">
                 {shapeChords.map((name) => {
                   const special = showShapes && specialChords.includes(name);
                   const own = descShapes.get(name);
@@ -3962,12 +3981,12 @@ export default function ChordsViewer({
             {/* "Nasvet": ponavljajoča se zaporedja akordov (shranil skill spedenaj v
                 songs.chord_tips; imena prikazana s transpozicijo / Simpl / No capo). */}
             {song.chord_tips && (song.chord_tips.whole || song.chord_tips.parts.length > 0) && (
-              <div className="max-w-sm rounded-xl border border-sky-400/40 bg-sky-400/[0.05] px-3 pb-2 pt-2" aria-label="Nasvet">
+              <div className="relative z-10 self-start rounded-xl border border-sky-400/40 bg-sky-400/[0.05] px-3 py-1.5 lg:px-4 lg:py-2" aria-label="Nasvet">
                 <button
                   type="button"
                   onClick={() => setTipsOpen((v) => !v)}
                   aria-expanded={tipsOpen}
-                  className={`flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-sky-400 ${tipsOpen ? "mb-1.5" : ""}`}
+                  className="flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-sky-400 lg:text-xs"
                 >
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
                     <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z" />
@@ -3978,22 +3997,36 @@ export default function ChordsViewer({
                   </svg>
                 </button>
                 {tipsOpen && (
-                  <div className="space-y-1.5 text-xs text-(--cv-text)">
+                  <div className="absolute left-0 top-full mt-1.5 w-[min(36rem,calc(100vw-2rem))] divide-y divide-sky-400/25 rounded-xl border border-sky-400/50 bg-(--cv-bg) p-3 text-xs text-(--cv-text) shadow-2xl lg:p-4 lg:text-sm">
                     {song.chord_tips.whole ? (
-                      <p>
-                        Akordi se čez celo skladbo ponavljajo:
-                        <span className="mt-1 block font-mono text-sm font-semibold text-(--cv-chord)">{song.chord_tips.whole.map(display).join("  →  ")}</span>
-                      </p>
+                      <div className="py-2 first:pt-0">
+                        <p className="text-sm font-medium lg:text-base">Akordi se čez celo skladbo ponavljajo:</p>
+                        <p className="mt-1 font-mono text-lg font-bold text-(--cv-chord) lg:text-xl">{song.chord_tips.whole.map(display).join("  →  ")}</p>
+                        {tipShapes && tipShapeRow(song.chord_tips.whole.map(display))}
+                      </div>
                     ) : (
                       song.chord_tips.parts.map((part) => (
-                        <p key={part.label}>
-                          <span className="font-medium">{part.label}</span>
-                          {part.count > 1 ? ` (${part.count}×)` : ""} — vedno isto:
-                          <span className="ml-1 font-mono font-semibold text-(--cv-chord)">{part.unit.map(display).join(" → ")}</span>
-                        </p>
+                        <div key={part.label} className="py-2 first:pt-0">
+                          <p className="text-sm font-semibold lg:text-base">
+                            {part.label}
+                            <span className="font-normal text-(--cv-muted)">{part.count > 1 ? ` · ${part.count}× vedno isto` : " · ponavlja se"}</span>
+                          </p>
+                          <p className="mt-0.5 font-mono text-lg font-bold text-(--cv-chord) lg:text-xl">{part.unit.map(display).join("  →  ")}</p>
+                          {tipShapes && tipShapeRow(part.unit.map(display))}
+                        </div>
                       ))
                     )}
-                    {song.chord_tips.sameVerseChorus && <p className="text-(--cv-muted)">Kitica in refren imata enako zaporedje.</p>}
+                    {song.chord_tips.sameVerseChorus && <p className="py-2 text-sm font-medium text-sky-300 lg:text-base">Kitica in refren imata enako zaporedje.</p>}
+                    <button
+                      type="button"
+                      onClick={() => setTipShapes((v) => !v)}
+                      aria-pressed={tipShapes}
+                      className={`mt-2 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition lg:px-3 lg:py-1 lg:text-xs ${
+                        tipShapes ? "border-sky-400 bg-sky-400/15 text-sky-300" : "border-sky-400/50 text-sky-400 hover:bg-sky-400/10"
+                      }`}
+                    >
+                      {tipShapes ? "Skrij akorde" : "Prikaži akorde"}
+                    </button>
                   </div>
                 )}
               </div>
