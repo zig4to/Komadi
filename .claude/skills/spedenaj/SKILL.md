@@ -18,6 +18,9 @@ description: "Pripravi skladbo iz 'Pregled in odobritev' (songs.review_pending) 
     zvok, vrne začetek glasbe, BPM, mrežo taktov (`downbeat` + k·`bar`) in za vsako polovico takta 3 najverjetnejše
     trozvoke + surovi kromagram. Zvok se po analizi izbriše. Okolje enkrat:
     `py -m venv "$LOCALAPPDATA/Komadi/spedenaj-venv"` in `…/Scripts/python -m pip install yt-dlp imageio-ffmpeg numpy`.
+  - `"$LOCALAPPDATA/Komadi/spedenaj-venv/Scripts/python" scripts/spedenaj/beats.py <videoId> --from s --to s
+    --downbeat d --beat b --chords Am,C,D` — ocena akordov taba za vsak udarec (za postavitev akordov nad zloge,
+    korak 2.5).
     Če prenos vrne 403, posodobi yt-dlp (`pip install -U yt-dlp`) in poskusi znova.
 - Začasne datoteke (osnutki, `a.json`, `patch.json`) piši v scratchpad seje, ne v repozitorij.
 - Kako aplikacija uporablja podatke (podrobno v CLAUDE.md, "Pametni predvajalnik" in "Preverjene skladbe"):
@@ -73,7 +76,35 @@ V poročilu navedi staro → novo ime.
 3. Odstrani "2x", "x2", "Repeat", "Refren" opombe iz telesa (ponovitve morajo biti izpisane).
 4. **Brez LRC** (`dump` to pove): preveri samo očitne bližnjice (2x, "Refren", "(Chorus)") — jih izpiši, če je jasno,
    kaj ponavljajo, sicer javi v poročilu. Časov vrstic pri teh skladbah ne urejaj (uporabnikova odločitev).
-5. Po urejanju `song.mjs dump <id> --text osnutek.txt` → "LRC vrstice brez para" mora biti 0 (ali samo vrstice, ki
+5. **Akordi nad vsako vrstico z besedilom** (uporabnikova odločitev): vsaka zapeta vrstica v celem telesu mora
+   imeti akorde nad besedami, kjer se zamenjajo — tudi ko tab akorde napiše samo enkrat (npr. samo nad prvo
+   vrstico kitice in potem "repeat like verse", "Am / C / D", ali kitice brez akordov). **Postopek** (Six Blade
+   Knife, 2026-10-19 — uporabnik ga je potrdil; uporabi ga vsakič, ko so akordi samo na začetku):
+   1. **Zaporedje**: iz dela taba, kjer je zapisano (enaka kitica/refren → isto zaporedje), sicer iz `a.json`
+      (imena akordov taba, ne surovi trozvoki). Riff/obrat (npr. Am C D = 2 takta) je enota.
+   2. **Menjave po udarcih**: `scripts/spedenaj/beats.py <video> --from … --to … --downbeat <a.json> --beat
+      <a.json> --chords Am,C,D,…` izpiše oceno akordov taba za vsak udarec (pol takta je pregrobo). Iz tega
+      določi, na katerem udarcu obrata pride vsak akord (Six Blade Knife: Am na 1. udarcu, C na 5., D na 7.; po
+      instrumentalnem delu se mreža lahko zamakne — preveri downbeat vsakega dela posebej).
+   3. **Časi menjav** za vse obrate dela: začetek obrata `t0 + k·obrat` + odmik akorda.
+   4. **Zlogi**: vsaka LRC vrstica (tudi del vrstice, ki ima svoj LRC čas — "Your six blade knife," 0:33,9 /
+      "do anything for you" 0:36,2) poje zloge od svojega časa naprej po ~0,5 s/zlog (stisnjeno, če se sicer ne
+      konča ~0,3 s pred naslednjo). Akord gre nad besedo z najbližjim začetkom zloga. Akord, ki pride do ~0,8 s
+      pred vrstico in je na udarcu takta, gre na njen prvi zlog (predtakt: "Your [Am]six"); akord po koncu petja
+      vrstice gre **na konec iste vrstice** (rep: "for you   C   D"), ne na začetek naslednje.
+   5. **Zdrava pamet čez model**: linearni zlogi so le groba ocena (dolgi zadržani zlogi). Enaka melodija → enako
+      mesto akorda v vseh kiticah ("Your six blade [C]knife" vsakič). Akord, ki pride malo pred LRC časom
+      naslednjega dela vrstice, spada na zadnjo besedo pred njim (C pred "do" → nad "knife", ne nad "do" —
+      uporabnik: "C zamujajo").
+   6. **Cele obrate v vrstici**: fraza, ki se poje čez dva obrata, ima v vrstici oba (Am C D Am C D); obrat pred
+      petjem iste fraze gre na začetek vrstice nad presledke ("Am C D  Anything you want it to"). Dolge vrstice
+      deli na meji obrata. Takti brez petja med frazami ostanejo v vrsticah (kot rep ali začetek), cele
+      instrumentalne dele pa v svoje vrstice samih akordov (in jih natapkaj, korak 5) — noben takt ne manjka.
+   7. Na koncu v poročilu navedi, kje je postavitev negotova (uporabnik preveri ob poslušanju).
+   V `dump` mora imeti vsaka vrstica z besedilom vrsto `pair` (akordi j:ime), nobena `text` z besedilom —
+   izjema samo vrstice, kjer se res poje brez spremljave (navedi v poročilu). Primer: Six Blade Knife (tab je imel
+   akorde le nad prvo vrstico kitice in "Am / C / D repeat like verse").
+6. Po urejanju `song.mjs dump <id> --text osnutek.txt` → "LRC vrstice brez para" mora biti 0 (ali samo vrstice, ki
    so res samo spremljevalni vokal/vzklik — te navedi v poročilu).
 
 ### 3. Intro
@@ -162,7 +193,7 @@ tu ne spreminjaj sam — samo poročaj.
    refreni … isto zaporedje (`src/lib/chordPatterns.ts`), in to shrani v `songs.chord_tips` (null, če ni ničesar);
    pregledovalnik to pokaže v okencu "Nasvet" desno od akordov skladbe. V poročilu navedi, kaj je našel.
    Po vsaki kasnejši spremembi besedila (akordi, oznake) ga zaženi znova.
-1. `song.mjs dump <id> --audio a.json` še enkrat: brez LRC vrstic brez para, deli z akordi na pravem videu,
+1. `song.mjs dump <id> --audio a.json` še enkrat: brez LRC vrstic brez para, vsaka vrstica z besedilom je `pair` (ima akorde), deli z akordi na pravem videu,
    shranjeni časi naraščajo, oznake delov oštevilčene.
 2. Poročaj za vsako skladbo (kratko, slovensko):
    - izbran video (naslov, kanal, glasba od X s) in zakaj;

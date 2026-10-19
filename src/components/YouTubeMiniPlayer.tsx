@@ -30,7 +30,7 @@ type YTNamespace = {
       height: number;
       playerVars?: Record<string, number | string>;
       events?: {
-        onReady?: () => void;
+        onReady?: (e: { target: YTPlayer }) => void;
         onStateChange?: (e: { data: number }) => void;
         onError?: (e: { data: number }) => void;
       };
@@ -186,7 +186,10 @@ export default function YouTubeMiniPlayer({
   onSelect?: (videoId: string) => Promise<string | null>;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
+  // playerRef = šele pripravljen predvajalnik (onReady) — prej YT.Player še nima
+  // metod (playVideo ...). createdRef = ustvarjen, morda še ne pripravljen.
   const playerRef = useRef<YTPlayer | null>(null);
+  const createdRef = useRef<YTPlayer | null>(null);
   const onPlayingRef = useRef(onPlaying);
   const onTimeRef = useRef(onTime);
   useEffect(() => {
@@ -239,10 +242,13 @@ export default function YouTubeMiniPlayer({
   // "Nazaj") in pregledovalnik se je takoj zaprl.
   // false = predvajalnik se ustvari samo pripravljen (preload) — ob pripravljenosti ne zaigra.
   const autoplayRef = useRef(true);
+  const startedRef = useRef(false);
   function start(autoplay = true) {
     autoplayRef.current = autoplay;
     const host = hostRef.current;
-    if (!host || started) return;
+    // Ref, ne stanje: preload in prvi ▶ v istem trenutku sta ustvarila dva predvajalnika.
+    if (!host || started || startedRef.current) return;
+    startedRef.current = true;
     setStarted(true);
     if (autoplay) setLoading(true);
     setCurrentId(idsRef.current[attemptRef.current]);
@@ -250,13 +256,16 @@ export default function YouTubeMiniPlayer({
       if (!hostRef.current) return;
       const el = document.createElement("div");
       host.appendChild(el);
-      playerRef.current = new YT.Player(el, {
+      createdRef.current = new YT.Player(el, {
         videoId: idsRef.current[attemptRef.current],
         width: 200,
         height: 200,
         playerVars: { playsinline: 1, rel: 0, modestbranding: 1, autoplay: autoplay ? 1 : 0, origin: window.location.origin },
         events: {
-          onReady: () => {
+          onReady: (e) => {
+            // e.target je pripravljen predvajalnik z vsemi metodami (objekt iz
+            // konstruktorja jih ob tem trenutku včasih še nima).
+            playerRef.current = e.target;
             // Shranjena glasnost (Sam Špili / akordi v aplikaciji, gumba Glasneje/Tišje).
             playerRef.current?.setVolume(readVolume());
             if (!autoplayRef.current) return;
@@ -292,7 +301,7 @@ export default function YouTubeMiniPlayer({
             const next = idsRef.current[attemptRef.current];
             if (next) {
               setCurrentId(next);
-              playerRef.current?.loadVideoById(next);
+              createdRef.current?.loadVideoById(next);
               armStallTimer();
             }
             else {
@@ -308,7 +317,8 @@ export default function YouTubeMiniPlayer({
   useEffect(() => {
     return () => {
       clearTimeout(stallTimerRef.current);
-      playerRef.current?.destroy();
+      createdRef.current?.destroy();
+      createdRef.current = null;
       playerRef.current = null;
     };
   }, []);
@@ -330,7 +340,9 @@ export default function YouTubeMiniPlayer({
         const player = playerRef.current;
         if (!player) {
           // Še ni zagnan: zaženi zdaj (klik je uporabnikova gesta) in skoči, ko začne igrati.
+          // Pripravljen vnaprej (preload), a še ne nared: onReady naj zaigra.
           pendingSeekRef.current = Math.max(0, seconds);
+          autoplayRef.current = true;
           start();
           return true;
         }

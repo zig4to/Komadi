@@ -230,6 +230,10 @@ export function findCapo(lines: ChordsLine[]): number | null {
 
 function pairChunks(chords: { col: number; name: string }[], lyric: string) {
   const chunks: { chord: string | null; lyric: string }[] = [];
+  // Akordi za koncem besedila ("…ba - by  A/E    E    E"): besedilo do zadnjega
+  // akorda dopolni s presledki, da kosi ohranijo razmik iz vrstice akordov —
+  // sicer so bili prazni in akordi stisnjeni skupaj (razmik v urejevalniku ni deloval).
+  lyric = lyric.padEnd(chords[chords.length - 1].col);
   if (chords[0].col > 0) chunks.push({ chord: null, lyric: lyric.slice(0, chords[0].col) });
   chords.forEach((c, i) => {
     const end = i + 1 < chords.length ? chords[i + 1].col : undefined;
