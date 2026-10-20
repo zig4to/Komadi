@@ -135,9 +135,12 @@ const SS_SLOT_ROWS = 1.4;
 const SS_CENTER = 0.4;
 // "Sam Špili": premor v petju (s), ki šteje kot instrumentalni del — poudarek se ugasne.
 const SS_GAP_MIN = 4;
-// "Sam Špili": ročni pomik (prst/kolešček) ustavi sledenje; po toliko ms brez
-// dotika se pogled vrne k skladbi.
-const SS_USER_HOLD = 3000;
+// Ročni pomik (prst/kolešček) ustavi sledenje; po toliko s brez dotika se pogled
+// vrne k označeni vrstici (navadni pogled in Sam Špili; ⚙ → Napredne nastavitve).
+const FOLLOW_RETURN_KEY = "komadi:chords:followReturn";
+const FOLLOW_RETURN_DEFAULT = 2;
+const FOLLOW_RETURN_MIN = 1;
+const FOLLOW_RETURN_MAX = 10;
 // Ojačanje ročnega pomika (prst ×, kolešček ×) — velika pisava, malo prostora.
 const SS_DRAG_GAIN = 1;
 const SS_WHEEL_GAIN = 1;
@@ -513,6 +516,15 @@ export default function ChordsViewer({
   // (⚙ → Napredne nastavitve, na napravo; privzeto 3 s).
   const [markerLead, setMarkerLead] = useState(() => readNumber("komadi:chords:markerLead", 3));
   useEffect(() => writeNumber("komadi:chords:markerLead", markerLead), [markerLead]);
+  // Po ročnem pomiku med predvajanjem (navadni pogled in Sam Špili) se pogled
+  // po toliko sekundah vrne na označeno vrstico (⚙ → Napredne nastavitve, na
+  // napravo; privzeto 2 s — uporabnikova odločitev 2026-10-21).
+  const [followReturn, setFollowReturn] = useState(() => readNumber(FOLLOW_RETURN_KEY, FOLLOW_RETURN_DEFAULT));
+  useEffect(() => writeNumber(FOLLOW_RETURN_KEY, followReturn), [followReturn]);
+  const followReturnMsRef = useRef(followReturn * 1000);
+  useEffect(() => {
+    followReturnMsRef.current = followReturn * 1000;
+  });
   useEffect(() => writeNumber("komadi:chords:storyOpen", storyOpen ? 1 : 0), [storyOpen]);
   // Klik izven okenca "Ali si vedel?" ga zapre.
   const storyRef = useRef<HTMLDivElement>(null);
@@ -2562,10 +2574,10 @@ export default function ChordsViewer({
     const t = transposeChord(raw, chordShift);
     return simplify ? simplifyChord(t) : t;
   })();
-  // Ročno pomikanje (dotik, kolesce) za 4 s ustavi samodejno sledenje.
+  // Ročno pomikanje (dotik, kolesce) za followReturn s ustavi samodejno sledenje.
   const lastUserScrollRef = useRef(0);
   // Klik na oznako dela na drsniku: naslov dela tik pod lepljivi zgornji vrstici
-  // (tudi ko se ne predvaja); samodejno sledenje počaka 4 s, da ga ne potegne nazaj.
+  // (tudi ko se ne predvaja); samodejno sledenje počaka followReturn s.
   const scrollToSection = (lineIndex?: number) => {
     const el = scrollRef.current;
     const line = lineIndex == null ? null : el?.querySelector<HTMLElement>(`[data-line="${lineIndex}"]`);
@@ -2577,29 +2589,69 @@ export default function ChordsViewer({
       el.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
     });
   };
+  const scrollLineRef = useRef(scrollLine);
+  useEffect(() => {
+    scrollLineRef.current = scrollLine;
+  });
+  // Trenutna vrstica ~ tretjino od vrha vidnega dela.
+  const scrollToLineNow = (index: number) => {
+    const el = scrollRef.current;
+    const line = index < 0 ? null : el?.querySelector<HTMLElement>(`[data-line="${index}"]`);
+    if (!el || !line) return;
+    const top = el.scrollTop + line.getBoundingClientRect().top - el.getBoundingClientRect().top - el.clientHeight / 3;
+    el.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  };
+  const scrollToLineNowRef = useRef(scrollToLineNow);
+  useEffect(() => {
+    scrollToLineNowRef.current = scrollToLineNow;
+  });
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !smartActive) return;
+    // Povratek na označeno vrstico followReturn s po zadnjem dotiku — tudi če se
+    // vrstica vmes ne zamenja (prej šele ob naslednji vrstici). Prst, ki še
+    // vleče, šteje kot dotik (ne potegne nazaj sredi pomikanja).
+    let touching = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const arm = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (touching || Date.now() - lastUserScrollRef.current < followReturnMsRef.current - 20) return arm();
+        // Med pavzo ne vleče nazaj (brskanje po besedilu).
+        if (playbackRef.current.playing) scrollToLineNowRef.current(scrollLineRef.current);
+      }, followReturnMsRef.current);
+    };
     const mark = () => {
       lastUserScrollRef.current = Date.now();
+      arm();
     };
-    el.addEventListener("touchstart", mark, { passive: true });
+    const down = () => {
+      touching = true;
+      mark();
+    };
+    const up = () => {
+      touching = false;
+      mark();
+    };
+    el.addEventListener("touchstart", down, { passive: true });
+    el.addEventListener("touchmove", mark, { passive: true });
+    el.addEventListener("touchend", up, { passive: true });
+    el.addEventListener("touchcancel", up, { passive: true });
     el.addEventListener("wheel", mark, { passive: true });
     el.addEventListener("pointerdown", mark);
     return () => {
-      el.removeEventListener("touchstart", mark);
+      clearTimeout(timer);
+      el.removeEventListener("touchstart", down);
+      el.removeEventListener("touchmove", mark);
+      el.removeEventListener("touchend", up);
+      el.removeEventListener("touchcancel", up);
       el.removeEventListener("wheel", mark);
       el.removeEventListener("pointerdown", mark);
     };
   }, [smartActive]);
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || scrollLine < 0 || Date.now() - lastUserScrollRef.current < 4000) return;
-    const line = el.querySelector<HTMLElement>(`[data-line="${scrollLine}"]`);
-    if (!line) return;
-    // Trenutna vrstica ~ tretjino od vrha vidnega dela.
-    const top = el.scrollTop + line.getBoundingClientRect().top - el.getBoundingClientRect().top - el.clientHeight / 3;
-    el.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    if (scrollLine < 0 || Date.now() - lastUserScrollRef.current < followReturnMsRef.current) return;
+    scrollToLineNowRef.current(scrollLine);
   }, [scrollLine]);
 
   // --- "Sam Špili": 3 vrstice čez cel zaslon ---
@@ -2853,7 +2905,7 @@ export default function ChordsViewer({
     };
     // Ročno pomikanje (prst ali kolešček), tudi med predvajanjem: ko začneš
     // pomikati, samodejno sledenje obstane (pogled ostane, kamor ga postaviš);
-    // SS_USER_HOLD ms po zadnjem dotiku se gladko vrne k mestu, ki se poje.
+    // followReturn s (⚙ → Napredne nastavitve) po zadnjem dotiku se gladko vrne k mestu, ki se poje.
     // Vlečenje ni tap (ne skoči na vrstico).
     let userPos: number | null = null;
     let returning = false;
@@ -2962,12 +3014,12 @@ export default function ChordsViewer({
       }
       // Med ročnim pomikanjem pogled stoji, kjer ga je pustil uporabnik.
       if (userPos !== null) {
-        if (drag || now - lastUserAt <= SS_USER_HOLD) {
+        if (drag || now - lastUserAt <= followReturnMsRef.current) {
           pos = userPos;
           inner.style.transform = `translate3d(0, ${-pos}px, 0)`;
           return;
         }
-        // Po SS_USER_HOLD ms brez dotika: gladek povratek k skladbi.
+        // Po followReturn s brez dotika: gladek povratek k skladbi.
         userPos = null;
         returning = true;
       }
@@ -3845,6 +3897,34 @@ export default function ChordsViewer({
                       onClick={() => setMarkerLead((v) => Math.min(15, v + 1))}
                       disabled={markerLead >= 15}
                       aria-label="Več sekund pred delom"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-orange-400 text-sm text-amber-400 hover:bg-orange-400/15 disabled:opacity-40"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                {/* Povratek na označeno vrstico po ročnem pomiku (navadni pogled in Sam Špili). */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-neutral-200">
+                    Vrnitev na označeno vrstico
+                    <span className="block text-[10px] leading-tight text-neutral-500">Po ročnem pomiku med predvajanjem se besedilo vrne čez toliko sekund</span>
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setFollowReturn((v) => Math.max(FOLLOW_RETURN_MIN, v - 1))}
+                      disabled={followReturn <= FOLLOW_RETURN_MIN}
+                      aria-label="Prej nazaj na vrstico"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-orange-400 text-sm text-amber-400 hover:bg-orange-400/15 disabled:opacity-40"
+                    >
+                      −
+                    </button>
+                    <span className="w-10 text-center text-xs tabular-nums text-neutral-200">{followReturn} s</span>
+                    <button
+                      type="button"
+                      onClick={() => setFollowReturn((v) => Math.min(FOLLOW_RETURN_MAX, v + 1))}
+                      disabled={followReturn >= FOLLOW_RETURN_MAX}
+                      aria-label="Pozneje nazaj na vrstico"
                       className="flex h-6 w-6 items-center justify-center rounded-full border border-orange-400 text-sm text-amber-400 hover:bg-orange-400/15 disabled:opacity-40"
                     >
                       +
