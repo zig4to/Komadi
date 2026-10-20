@@ -4,7 +4,8 @@ import type { ChordsLine } from "@/lib/chords";
 // cela skladba na enem zaporedju (Pumped Up Kicks) ali enako zaporedje v vseh
 // kiticah / refrenih … Akordi so prikazani (transpozicija, Simpl, No capo).
 
-export type PatternPart = { label: string; count: number; unit: string[] };
+// which/of: samo ko zaporedje nimajo vsi deli te vrste — kateri (1., 2. … te vrste) in koliko jih je.
+export type PatternPart = { label: string; count: number; unit: string[]; which?: number[]; of?: number };
 export type ChordPatterns = { whole: string[] | null; parts: PatternPart[]; sameVerseChorus: boolean };
 
 const TYPES: [RegExp, string][] = [
@@ -81,13 +82,25 @@ export function findChordPatterns(body: ChordsLine[], display: (name: string) =>
       byType.set(s.type, [...(byType.get(s.type) ?? []), u]);
     }
     for (const [label, units] of byType) {
-      const first = units[0];
-      if (units.length < 2 && first.length === sections.find((s) => s.type === label)!.chords.length) continue;
-      if (!units.every((u) => sameCycle(u, first))) continue;
+      if (units.length < 2 && units[0].length === sections.find((s) => s.type === label)!.chords.length) continue;
+      // Največja skupina delov z enakim zaporedjem — ostali (skrajšane ali daljše
+      // kitice, 500 Miles) se izpustijo, pri več delih morata imeti isto vsaj dva.
+      let best: number[] = [];
+      for (let i = 0; i < units.length; i++) {
+        const group = units.flatMap((u, k) => (sameCycle(u, units[i]) ? [k] : []));
+        if (group.length > best.length) best = group;
+      }
+      if (units.length > 1 && best.length < 2) continue;
+      const first = units[best[0]];
       // Samo zaporedja (vsaj 2 akorda), ne en sam akord čez cel del.
       // Del, ki se ponovi (≥ 2×), sme imeti daljše zaporedje (refren Soldier of Fortune: 14 akordov).
-      if (first.length > (units.length > 1 ? 16 : 8) || new Set(first).size < 2) continue;
-      parts.push({ label, count: units.length, unit: first });
+      if (first.length > (best.length > 1 ? 16 : 8) || new Set(first).size < 2) continue;
+      parts.push({
+        label,
+        count: best.length,
+        unit: first,
+        ...(best.length < units.length ? { which: best.map((k) => k + 1), of: units.length } : {}),
+      });
     }
   }
   const v = parts.find((p) => p.label === "Kitica");

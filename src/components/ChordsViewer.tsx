@@ -38,6 +38,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import ImproPanel from "@/components/ImproPanel";
+import ChordQuiz from "@/components/ChordQuiz";
 import { useIsDesktop } from "@/components/Scales";
 import type { ChordSection, Song, SyncedChords, SyncedLines } from "@/types/song";
 import { anchorScrollTop, computeAnchor, getRemoteView, subscribeRemoteView, type LocalView, type RemoteViewEntry, type SamSpiliView } from "@/lib/sharedChordsView";
@@ -59,12 +60,14 @@ export type SharedViewProp =
 // ob obstoječih povezavah/PDF v ChordsButtons.tsx, ne nadomestilo.
 
 const FONT_KEY = "komadi:chords:font";
-// Računalnik: ročna velikost orodne vrstice (zoom); brez ključa = samodejno (fitToolbar).
-const TOOLBAR_SCALE_KEY = "komadi:chords:toolbarScale";
+// Računalnik: ročna velikost orodne vrstice (zoom), samo ob odprtem Impro; brez
+// ključa = samodejno. Brez Impro je velikost vedno samodejna (fitToolbar).
+const TOOLBAR_SCALE_KEY = "komadi:chords:toolbarScaleImpro";
 const TOOLBAR_SCALE_STEP = 0.05;
 const TOOLBAR_SCALE_MIN = 0.6;
 const TOOLBAR_SCALE_MAX = 2;
 const TOOLBAR_COLLAPSED_KEY = "komadi:chords:toolbarCollapsed";
+// Simplify: za vsako skladbo posebej (komadi:chords:simplify:<id>), kot transpozicija.
 const SIMPLIFY_KEY = "komadi:chords:simplify";
 // "Pokaži akorde": sheme vseh akordov skladbe desno od naslova (kot na UG).
 const SHOW_SHAPES_KEY = "komadi:chords:showShapes";
@@ -470,17 +473,41 @@ export default function ChordsViewer({
   useEffect(() => writeNumber(FONT_KEY, fontSize), [fontSize]);
 
   // "Poenostavi" (D7 → D, Am7 → Am …) — ena nastavitev za vse skladbe.
-  const [simplify, setSimplify] = useState(() => readNumber(SIMPLIFY_KEY, 0) === 1);
-  useEffect(() => writeNumber(SIMPLIFY_KEY, simplify ? 1 : 0), [simplify]);
+  const [simplify, setSimplify] = useState(() => readNumber(`${SIMPLIFY_KEY}:${song.id}`, 0) === 1);
+  useEffect(() => writeNumber(`${SIMPLIFY_KEY}:${song.id}`, simplify ? 1 : 0), [simplify, song.id]);
 
   // "Pokaži akorde" — ena nastavitev za vse skladbe.
   const [showShapes, setShowShapes] = useState(() => readNumber(SHOW_SHAPES_KEY, 0) === 1);
   // "Nasvet" (ponavljajoča se zaporedja akordov) — razprt ali strnjen, na tej napravi.
   const [tipsOpen, setTipsOpen] = useState(() => readNumber("komadi:chords:tipsOpen", 0) === 1);
   useEffect(() => writeNumber("komadi:chords:tipsOpen", tipsOpen ? 1 : 0), [tipsOpen]);
+  // Klik izven okenca "Nasvet" ga zapre.
+  const tipsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!tipsOpen) return;
+    const close = (e: PointerEvent) => {
+      if (!tipsRef.current?.contains(e.target as Node)) setTipsOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [tipsOpen]);
   // "Ali si vedel?" (opis pesmi in zanimivosti) — razprt ali strnjen, na tej napravi.
   const [storyOpen, setStoryOpen] = useState(() => readNumber("komadi:chords:storyOpen", 0) === 1);
+  // Klik na oznako dela na drsniku (Refren 2 …) skoči toliko sekund pred del
+  // (⚙ → Napredne nastavitve, na napravo; privzeto 3 s).
+  const [markerLead, setMarkerLead] = useState(() => readNumber("komadi:chords:markerLead", 3));
+  useEffect(() => writeNumber("komadi:chords:markerLead", markerLead), [markerLead]);
   useEffect(() => writeNumber("komadi:chords:storyOpen", storyOpen ? 1 : 0), [storyOpen]);
+  // Klik izven okenca "Ali si vedel?" ga zapre.
+  const storyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!storyOpen) return;
+    const close = (e: PointerEvent) => {
+      if (!storyRef.current?.contains(e.target as Node)) setStoryOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [storyOpen]);
   // "Nasvet" → "Prikaži akorde": pod vsako vrstico nasveta prijemi njenih akordov.
   const [tipShapes, setTipShapes] = useState(() => readNumber("komadi:chords:tipShapes", 0) === 1);
   useEffect(() => writeNumber("komadi:chords:tipShapes", tipShapes ? 1 : 0), [tipShapes]);
@@ -1397,6 +1424,9 @@ export default function ChordsViewer({
   const specialChords = songChords.filter((n) => !isBasicChord(n));
   // "Impro": vsi prikazani akordi po vrsti (s ponovitvami) za zaznavo tonalitete.
   const [improOpen, setImproOpen] = useState(false);
+  // "Kviz": ugibanje akordov po delih — nadomesti besedilo (da se odgovorov ne vidi), predvajalnik ostane.
+  const [quizOpen, setQuizOpen] = useState(false);
+  useBackableOpen(quizOpen, () => setQuizOpen(false));
   const improChords = (() => {
     const out: string[] = [];
     const add = (name: string | null) => {
@@ -1560,6 +1590,8 @@ export default function ChordsViewer({
   });
   // Računalnik: gumbi za zamik v vrstici se razprejo šele ob kliku na "Zamik".
   const [offsetOpen, setOffsetOpen] = useState(false);
+  // Gumb "Ton": strnjen (ikona + napis + zamik), klik odpre − / vrednost / +.
+  const [toneOpen, setToneOpen] = useState(false);
   // Posnetek, za katerega velja zamik: tisti, ki igra, pred prvim predvajanjem
   // pa prvi kandidat (zaigra ob ▶) — tako se zamik da vpisati že vnaprej.
   const offsetVideo = playingVideo ?? videoIds[0] ?? null;
@@ -3349,6 +3381,8 @@ export default function ChordsViewer({
   // Manjši gumbi za strnjeni skupini "Ton" in velikost pisave (oranžna obroba okrog celote).
   const toneButton =
     "flex h-7 min-w-7 items-center justify-center rounded-full text-sm font-medium text-neutral-200 hover:bg-neutral-800 hover:text-white disabled:opacity-40 active:scale-95";
+  // Orodna vrstica: vsi gumbi visoki 26 px (kot Sam Špili / Ultimate Guitar) — v skupinah z robom in p-0.5 notranji 20 px.
+  const toolbarTone = toneButton.replace("h-7 min-w-7", "h-5 min-w-5");
 
   // Oznake delov na drsniku "Prevrtavanje": napis v vrsti nad drsnikom, pri gneči
   // pod njim, sicer samo črtica (row −1). ~5,2 px na znak pri 9 px pisavi.
@@ -3620,13 +3654,40 @@ export default function ChordsViewer({
                       <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${sungChordsOn ? "translate-x-4" : ""}`} />
                     </button>
                   </div>
-                ) : (
-                  <p className="text-[10px] leading-tight text-neutral-500 lg:hidden">Tu še ni naprednih nastavitev.</p>
-                )}
-                {/* Računalnik: velikost orodne vrstice (null = samodejno, prilagodi se širini). */}
+                ) : null}
+                {/* Skok pred del ob kliku na oznako na drsniku. */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-neutral-200">
+                    Skok pred klikom na del besedila
+                    <span className="block text-[10px] leading-tight text-neutral-500">Klik na oznako na drsniku (Refren 2 …) začne toliko prej</span>
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setMarkerLead((v) => Math.max(0, v - 1))}
+                      disabled={markerLead <= 0}
+                      aria-label="Manj sekund pred delom"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-orange-400 text-sm text-amber-400 hover:bg-orange-400/15 disabled:opacity-40"
+                    >
+                      −
+                    </button>
+                    <span className="w-10 text-center text-xs tabular-nums text-neutral-200">{markerLead} s</span>
+                    <button
+                      type="button"
+                      onClick={() => setMarkerLead((v) => Math.min(15, v + 1))}
+                      disabled={markerLead >= 15}
+                      aria-label="Več sekund pred delom"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-orange-400 text-sm text-amber-400 hover:bg-orange-400/15 disabled:opacity-40"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                {/* Računalnik, samo ob odprtem Impro: velikost orodne vrstice (null = samodejno). */}
+                {improOpen && (
                 <div className="hidden items-center justify-between gap-2 lg:flex">
                   <span className="text-xs text-neutral-200">
-                    Velikost orodne vrstice
+                    Velikost orodne vrstice (Impro)
                     <button
                       type="button"
                       onClick={() => setToolbarScale(null)}
@@ -3660,6 +3721,7 @@ export default function ChordsViewer({
                     </button>
                   </div>
                 </div>
+                )}
               </div>
             )}
           </div>
@@ -3749,6 +3811,7 @@ export default function ChordsViewer({
             sliderHost={sliderHostEl}
             sliderBelow={improOpen}
             sectionMarkers={sectionMarkers}
+            markerLead={markerLead}
             onMarkerClick={(m) => scrollToSection(m.line)}
             onTime={onVideoTime}
             smartAvailable={smartAvailable}
@@ -3827,7 +3890,7 @@ export default function ChordsViewer({
       <div
         ref={toolbarRef}
         data-impro={improOpen ? "" : undefined}
-        data-scale={toolbarScale ?? undefined}
+        data-scale={improOpen ? (toolbarScale ?? undefined) : undefined}
         className={`${toolbarCollapsed ? "hidden" : "flex"} shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 max-lg:border-white/10 max-lg:bg-transparent lg:items-end lg:gap-3 lg:px-12 xl:px-8`}>
         {/* Računalnik: skupine z napisom (Povezave, Prilagajanje, Urejanje, Funkcije,
             Nastavitve); telefon: "contents" + max-lg:order — en tok gumbov kot prej. */}
@@ -3846,7 +3909,7 @@ export default function ChordsViewer({
                       openChordsViewer(song.id, "samspili");
                     }}
                     title="Sam Špili"
-                    className="flex items-center gap-1.5 rounded-full border border-orange-400 py-1 pl-2 pr-2.5 text-xs font-medium text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 max-lg:order-1"
+                    className="flex items-center gap-1.5 h-[26px] rounded-full border border-orange-400 pl-2 pr-2.5 text-xs font-medium text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 max-lg:order-1"
                   >
                     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-orange-400">
                       <circle cx="12" cy="12" r="10" />
@@ -3862,7 +3925,7 @@ export default function ChordsViewer({
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Odpri na Ultimate Guitar"
-                    className="hidden items-center gap-1.5 rounded-full border border-orange-400 py-1 pl-2 pr-2.5 text-xs font-medium text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 lg:flex"
+                    className="hidden items-center gap-1.5 h-[26px] rounded-full border border-orange-400 pl-2 pr-2.5 text-xs font-medium text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 lg:flex"
                   >
                     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-orange-500">
                       <path d="M18.1 6.9A8 8 0 1 0 20 12h-7" />
@@ -3881,21 +3944,39 @@ export default function ChordsViewer({
               role="group"
               aria-label="Transpozicija"
             >
-              <span className="mr-0.5 text-xs text-neutral-400">Ton</span>
-              <button type="button" onClick={() => shift(-1)} aria-label="Pol tona nižje" title="Pol tona nižje" className={toneButton}>
+              <button
+                type="button"
+                onClick={() => setToneOpen((v) => !v)}
+                aria-expanded={toneOpen}
+                title="Transpozicija"
+                className={`mr-0.5 flex h-5 items-center gap-1 text-xs ${toneOpen ? "text-neutral-400" : "pr-2 text-neutral-200 hover:text-white"}`}
+              >
+                {/* Ena nota: transpozicija. */}
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="-ml-1 h-3.5 w-3.5 shrink-0 text-amber-400">
+                  <circle cx="8" cy="18" r="3" fill="currentColor" />
+                  <path d="M11 18V4l7 3" />
+                </svg>
+                Ton
+                {!toneOpen && semitones !== 0 && <span className="ml-0.5 tabular-nums text-amber-400">{semitones > 0 ? `+${semitones}` : semitones}</span>}
+              </button>
+              {toneOpen && (
+              <>
+              <button type="button" onClick={() => shift(-1)} aria-label="Pol tona nižje" title="Pol tona nižje" className={toolbarTone}>
                 −
               </button>
               <button
                 type="button"
                 onClick={() => setSemitones(0)}
                 title="Izvirna tonaliteta"
-                className={`${toneButton} w-7 tabular-nums ${semitones !== 0 ? "text-amber-400" : ""}`}
+                className={`${toolbarTone} w-7 tabular-nums ${semitones !== 0 ? "text-amber-400" : ""}`}
               >
                 {semitones > 0 ? `+${semitones}` : semitones}
               </button>
-              <button type="button" onClick={() => shift(1)} aria-label="Pol tona višje" title="Pol tona višje" className={toneButton}>
+              <button type="button" onClick={() => shift(1)} aria-label="Pol tona višje" title="Pol tona višje" className={toolbarTone}>
                 +
               </button>
+              </>
+              )}
             </div>
             <div className="flex items-center rounded-full border border-orange-400 dark:border-white/15 p-0.5 max-lg:order-6" role="group" aria-label="Velikost pisave">
               <button
@@ -3904,7 +3985,7 @@ export default function ChordsViewer({
                 disabled={fontSize <= MIN_FONT}
                 aria-label="Manjša pisava"
                 title="Manjša pisava"
-                className={`${toneButton} px-1.5 text-xs`}
+                className={`${toolbarTone} px-1.5 text-xs`}
               >
                 A−
               </button>
@@ -3914,7 +3995,7 @@ export default function ChordsViewer({
                 disabled={fontSize >= MAX_FONT}
                 aria-label="Večja pisava"
                 title="Večja pisava"
-                className={`${toneButton} px-1.5 text-base`}
+                className={`${toolbarTone} px-1.5 text-base`}
               >
                 A+
               </button>
@@ -3924,28 +4005,13 @@ export default function ChordsViewer({
               onClick={enterFullscreen}
               aria-label="Celozaslonski način"
               title="Celozaslonski način"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-neutral-200 transition hover:text-white active:scale-95 max-lg:order-13"
+              className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-neutral-200 transition hover:text-white active:scale-95 max-lg:order-13"
             >
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
                 <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
               </svg>
             </button>
           </div>
-        </div>
-        <div className="flex items-center rounded-full border border-orange-400 dark:border-white/15 p-0.5 max-lg:order-6" role="group" aria-label="Glasnost" title="Glasnost posnetka (↑ / ↓)">
-          <button type="button" onClick={() => ssChangeVolume(-5)} disabled={volume <= 0} aria-label="Tišje" title="Tišje (↓)" className={`${toneButton} px-1.5 text-xs`}>
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-              <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
-              <path d="M16 12h5" />
-            </svg>
-          </button>
-          <span className="w-9 text-center text-[11px] tabular-nums text-neutral-300">{volume}%</span>
-          <button type="button" onClick={() => ssChangeVolume(5)} disabled={volume >= 100} aria-label="Glasneje" title="Glasneje (↑)" className={`${toneButton} px-1.5 text-xs`}>
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-              <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
-              <path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12" />
-            </svg>
-          </button>
         </div>
         <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3 xl:pl-2 2xl:pl-3">
           <span className="hidden px-1 text-[9px] font-medium uppercase tracking-[0.08em] text-orange-400 lg:block">Urejanje</span>
@@ -3957,14 +4023,14 @@ export default function ChordsViewer({
                 type="button"
                 onClick={onOpenEditor}
                 disabled={!!recorder}
-                title="Napredni urejevalnik besedila z akordi in tablatur"
-                className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-orange-400 dark:border-white/15 px-3 text-xs text-neutral-200 transition hover:text-white disabled:opacity-40 active:scale-95 max-lg:order-9"
+                title="Urejevalnik — napredni urejevalnik besedila z akordi in tablatur"
+                aria-label="Urejevalnik"
+                className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-xs text-neutral-200 transition hover:text-white disabled:opacity-40 active:scale-95 max-lg:order-9"
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-amber-400">
                   <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                   <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
                 </svg>
-                Urejevalnik
               </button>
             )}
             {/* Računalnik: "Posnemi čase" v vrstici (na telefonu v ⚙ → Napredne nastavitve). */}
@@ -3972,13 +4038,13 @@ export default function ChordsViewer({
               type="button"
               onClick={recorder ? cancelRecorder : startRecorder}
               aria-pressed={!!recorder}
-              title={recorder ? "Prekliči snemanje časov" : "Posnemi čase vrstic in akordov za Smart play"}
-              className={`hidden h-8 items-center gap-1.5 rounded-full border border-orange-400 dark:border-white/15 px-3 text-xs transition active:scale-95 max-lg:order-10 lg:flex ${
+              title={recorder ? "Prekliči snemanje časov" : syncedLines || syncedChords ? "Nadaljuj snemanje časov vrstic in akordov" : "Posnemi čase vrstic in akordov za Smart play"}
+              aria-label={recorder ? "Prekliči snemanje" : syncedLines || syncedChords ? "Nadaljuj snemanje" : "Posnemi čase"}
+              className={`hidden h-[26px] w-[26px] items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-xs transition active:scale-95 max-lg:order-10 lg:flex ${
                 recorder ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
               }`}
             >
               <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-500" />
-              {recorder ? "Prekliči snemanje" : syncedLines || syncedChords ? "Nadaljuj snemanje" : "Posnemi čase"}
             </button>
             {/* Računalnik: zamik Smart playa v vrstici (na telefonu v ⚙ → Napredne nastavitve). */}
             {smartAvailable && (
@@ -3993,8 +4059,14 @@ export default function ChordsViewer({
                   onClick={() => setOffsetOpen((v) => !v)}
                   aria-expanded={offsetOpen}
                   title={offsetLocked ? "Zamik je zaklenjen — skladba je preverjena (spremeniš ga prek Popravi skladbe)" : undefined}
-                  className={`mr-0.5 flex h-7 items-center text-xs ${offsetOpen ? "text-neutral-400" : "pr-2 text-neutral-200 hover:text-white"}`}
+                  className={`mr-0.5 flex h-5 items-center gap-1 text-xs ${offsetOpen ? "text-neutral-400" : "pr-2 text-neutral-200 hover:text-white"}`}
                 >
+                  {/* Štoparica: časovni zamik besedila glede na posnetek. */}
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="-ml-1 h-3.5 w-3.5 text-amber-400">
+                    <path d="M10 2h4" />
+                    <path d="m12 14 3-3" />
+                    <circle cx="12" cy="14" r="8" />
+                  </svg>
                   Zamik
                   {!offsetOpen && lrcOffset !== 0 && (
                     <span className="ml-1 tabular-nums text-amber-400">
@@ -4005,7 +4077,7 @@ export default function ChordsViewer({
                 </button>
                 {offsetOpen && (
                   <>
-                    <button type="button" onClick={() => changeLrcOffset(-LRC_OFFSET_STEP)} disabled={!offsetVideo || offsetLocked} aria-label="Besedilo 0,25 s prej" title="Besedilo 0,25 s prej" className={toneButton}>
+                    <button type="button" onClick={() => changeLrcOffset(-LRC_OFFSET_STEP)} disabled={!offsetVideo || offsetLocked} aria-label="Besedilo 0,25 s prej" title="Besedilo 0,25 s prej" className={toolbarTone}>
                       −
                     </button>
                     <OffsetValue
@@ -4014,7 +4086,7 @@ export default function ChordsViewer({
                       onSet={setLrcOffset}
                       className="w-12 text-center text-xs tabular-nums text-neutral-200"
                     />
-                    <button type="button" onClick={() => changeLrcOffset(LRC_OFFSET_STEP)} disabled={!offsetVideo || offsetLocked} aria-label="Besedilo 0,25 s pozneje" title="Besedilo 0,25 s pozneje" className={toneButton}>
+                    <button type="button" onClick={() => changeLrcOffset(LRC_OFFSET_STEP)} disabled={!offsetVideo || offsetLocked} aria-label="Besedilo 0,25 s pozneje" title="Besedilo 0,25 s pozneje" className={toolbarTone}>
                       +
                     </button>
                   </>
@@ -4034,7 +4106,7 @@ export default function ChordsViewer({
                   onClick={() => setSungOffsetOpen((v) => !v)}
                   aria-expanded={sungOffsetOpen}
                   title={offsetLocked ? "Zamik je zaklenjen — skladba je preverjena (spremeniš ga prek Popravi skladbe)" : undefined}
-                  className={`mr-0.5 flex h-7 items-center whitespace-nowrap text-xs ${sungOffsetOpen ? "text-neutral-400" : "pr-2 text-neutral-200 hover:text-white"}`}
+                  className={`mr-0.5 flex h-5 items-center whitespace-nowrap text-xs ${sungOffsetOpen ? "text-neutral-400" : "pr-2 text-neutral-200 hover:text-white"}`}
                 >
                   Zamik akordov
                   {!sungOffsetOpen && sungOffset !== 0 && (
@@ -4046,11 +4118,11 @@ export default function ChordsViewer({
                 </button>
                 {sungOffsetOpen && (
                   <>
-                    <button type="button" onClick={() => changeSungOffset(-LRC_OFFSET_STEP)} disabled={offsetLocked} aria-label="Akordi 0,25 s prej" title="Akordi 0,25 s prej" className={toneButton}>
+                    <button type="button" onClick={() => changeSungOffset(-LRC_OFFSET_STEP)} disabled={offsetLocked} aria-label="Akordi 0,25 s prej" title="Akordi 0,25 s prej" className={toolbarTone}>
                       −
                     </button>
                     <OffsetValue value={sungOffset} disabled={offsetLocked} onSet={setSungOffset} className="w-12 text-center text-xs tabular-nums text-neutral-200" />
-                    <button type="button" onClick={() => changeSungOffset(LRC_OFFSET_STEP)} disabled={offsetLocked} aria-label="Akordi 0,25 s pozneje" title="Akordi 0,25 s pozneje" className={toneButton}>
+                    <button type="button" onClick={() => changeSungOffset(LRC_OFFSET_STEP)} disabled={offsetLocked} aria-label="Akordi 0,25 s pozneje" title="Akordi 0,25 s pozneje" className={toolbarTone}>
                       +
                     </button>
                   </>
@@ -4064,13 +4136,23 @@ export default function ChordsViewer({
           <div className="contents lg:flex lg:items-center lg:gap-2">
             <button
               type="button"
-              onClick={() => setImproOpen((v) => !v)}
+              onClick={() => {
+                setImproOpen((v) => !v);
+                setQuizOpen(false);
+              }}
               aria-pressed={improOpen}
               title="Lestvice za improvizacijo v tonaliteti skladbe"
-              className={`flex h-8 items-center max-lg:order-5 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
+              className={`flex h-[26px] items-center gap-1.5 max-lg:order-5 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
                 improOpen ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
               }`}
             >
+              {/* Ista ikona kot v glavi odprtega Impro (vrat s toni, ImproPanel.tsx). */}
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-amber-400">
+                <path d="M3 6h18M3 10h18M3 14h18M3 18h18" />
+                <circle cx="7" cy="8" r="1.4" fill="currentColor" />
+                <circle cx="12" cy="12" r="1.4" fill="currentColor" />
+                <circle cx="17" cy="16" r="1.4" fill="currentColor" />
+              </svg>
               Impro
             </button>
             <button
@@ -4078,21 +4160,34 @@ export default function ChordsViewer({
               onClick={() => setSimplify((v) => !v)}
               aria-pressed={simplify}
               title="Poenostavi akorde (D7 → D, Am7 → Am)"
-              className={`flex h-8 items-center max-lg:order-3 rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
+              className={`flex h-[26px] items-center gap-1.5 max-lg:order-3 rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
                 simplify ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
               }`}
             >
-              Simpl
+              {/* Radirka: zbriše dodatke akordov (D7 → D, Am7 → Am, /bas). */}
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-amber-400">
+                <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
+                <path d="M22 21H7" />
+                <path d="m5 11 9 9" />
+              </svg>
+              Simplify
             </button>
             <button
               type="button"
               onClick={() => setShowShapes((v) => !v)}
               aria-pressed={showShapes}
               title="Pokaži prijeme vseh akordov skladbe"
-              className={`flex h-8 items-center max-lg:order-4 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
+              className={`flex h-[26px] items-center gap-1.5 max-lg:order-4 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
                 showShapes ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
               }`}
             >
+              {/* Diagram prijema akorda. */}
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-amber-400">
+                <rect x="5" y="3" width="14" height="18" rx="1.5" />
+                <path d="M5 8h14M5 13h14M10 3v18M14 3v18" />
+                <circle cx="10" cy="10.5" r="1.3" fill="currentColor" />
+                <circle cx="14" cy="15.5" r="1.3" fill="currentColor" />
+              </svg>
               Pokaži akorde
             </button>
             {capo ? (
@@ -4101,10 +4196,16 @@ export default function ChordsViewer({
                 onClick={() => setNoCapo((v) => !v)}
                 aria-pressed={noCapo}
                 title={`Akordi brez capa: prijemi s capom na ${capo}. prečki prestavljeni za ${capo} poltonov navzgor`}
-                className={`flex h-8 items-center max-lg:order-4 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
+                className={`flex h-[26px] items-center gap-1.5 max-lg:order-4 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
                   noCapo ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
                 }`}
               >
+                {/* Strune s kapodastrom, prečrtano. */}
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-amber-400">
+                  <path d="M8 3v18M12 3v18M16 3v18" />
+                  <path d="M5 9h14" strokeWidth={3} />
+                  <path d="m4 4 16 16" />
+                </svg>
                 No capo
               </button>
             ) : null}
@@ -4120,7 +4221,7 @@ export default function ChordsViewer({
               aria-expanded={themeMenuPos !== null}
               aria-label="Nastavitve"
               title="Nastavitve"
-              className={`flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 transition active:scale-95 max-lg:order-11 ${
+              className={`flex h-[26px] w-[26px] items-center justify-center rounded-full border border-orange-400 dark:border-white/15 transition active:scale-95 max-lg:order-11 ${
                 themeMenuPos ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
               }`}
             >
@@ -4138,7 +4239,7 @@ export default function ChordsViewer({
               }}
               aria-label="Zloži orodno vrstico"
               title="Zloži orodno vrstico"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-neutral-200 transition hover:text-white active:scale-95 max-lg:order-13"
+              className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-neutral-200 transition hover:text-white active:scale-95 max-lg:order-13"
             >
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                 <path d="m18 15-6-6-6 6" />
@@ -4152,7 +4253,7 @@ export default function ChordsViewer({
           aria-pressed={rotateOn}
           aria-label={rotateOn ? "Nazaj pokončno" : "Zasukaj zaslon"}
           title={rotateOn ? "Nazaj pokončno" : "Zasukaj zaslon (ležeče)"}
-          className={`flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 transition active:scale-95 max-lg:order-12 lg:hidden ${
+          className={`flex h-[26px] w-[26px] items-center justify-center rounded-full border border-orange-400 dark:border-white/15 transition active:scale-95 max-lg:order-12 lg:hidden ${
             rotateOn ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
           }`}
         >
@@ -4166,36 +4267,14 @@ export default function ChordsViewer({
       </div>
       </div>
           <div className="pt-4 font-mono leading-snug text-(--cv-text)" style={{ fontSize }}>
-            <div className="mb-4 flex flex-wrap items-start gap-x-8 gap-y-3 font-sans">
-            <div className="shrink-0">
+            <div className="relative mb-4 flex flex-wrap items-start gap-x-8 gap-y-3 font-sans max-lg:gap-x-3">
+            <div className={`shrink-0 ${nav ? "pr-24 lg:pr-0" : ""}`}>
               <h2 className="text-xl font-semibold text-(--cv-title)">{song.title}</h2>
               <p className="text-sm text-(--cv-muted)">{song.author}</p>
               {capo !== null && (
                 <p className="mt-1 text-sm font-medium text-(--cv-chord)">
                   {capoShift ? `Brez capa (izvirno capo ${capo}, akordi +${capo})` : `Capo: ${capo}. prag`}
                 </p>
-              )}
-              {description.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setDescriptionOpen((v) => !v)}
-                  aria-expanded={descriptionOpen}
-                  className="mt-2 inline-flex items-center gap-1 rounded-full border border-(--cv-border) px-3 py-1 text-xs font-medium text-(--cv-text) hover:border-amber-400"
-                >
-                  Opis skladbe
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className={`h-3.5 w-3.5 transition ${descriptionOpen ? "rotate-180" : ""}`}
-                  >
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </button>
               )}
             </div>
             {/* Prijemi akordov (najprej iz opisa, nato iz baze) — izbrana različica, ‹ › pod
@@ -4214,9 +4293,9 @@ export default function ChordsViewer({
                   className="flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-(--cv-chord)"
                 >
                   {showShapes ? "Akordi v skladbi" : "Posebni akordi"}
-                  {/* Zaprto okno: seznam akordov samo, če jih je največ 5 (sicer le število). */}
+                  {/* Zaprto okno (samo računalnik): seznam akordov, če jih je največ 5 (sicer le število). */}
                   {!shapesOpen && (
-                    <span className="truncate font-normal normal-case tracking-normal text-(--cv-muted)">
+                    <span className="hidden truncate font-normal lg:inline normal-case tracking-normal text-(--cv-muted)">
                       · {shapeChords.length <= 5 ? shapeChords.join(", ") : `${shapeChords.length} akordov`}
                     </span>
                   )}
@@ -4277,23 +4356,25 @@ export default function ChordsViewer({
             {/* "Nasvet": ponavljajoča se zaporedja akordov (shranil skill spedenaj v
                 songs.chord_tips; imena prikazana s transpozicijo / Simpl / No capo). */}
             {song.chord_tips && (song.chord_tips.whole || song.chord_tips.parts.length > 0) && (
-              <div className="relative z-10 self-start rounded-xl border border-violet-400/40 bg-violet-400/[0.05] px-2.5 py-1.5" aria-label="Nasvet">
+              <div ref={tipsRef} className="z-10 self-start rounded-xl border border-violet-400/40 bg-violet-400/[0.05] px-2 py-1.5 lg:relative lg:px-2.5" aria-label="Nasvet">
+                {/* Telefon: samo ikona (desno od Posebni akordi), okno čez celo vrstico. */}
                 <button
                   type="button"
                   onClick={() => setTipsOpen((v) => !v)}
                   aria-expanded={tipsOpen}
+                  title="Nasvet"
                   className="flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-violet-400"
                 >
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
                     <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z" />
                   </svg>
-                  Nasvet
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`ml-auto h-3.5 w-3.5 transition ${tipsOpen ? "rotate-180" : ""}`}>
+                  <span className="hidden lg:inline">Nasvet</span>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`ml-auto hidden h-3.5 w-3.5 transition lg:block ${tipsOpen ? "rotate-180" : ""}`}>
                     <path d="m6 9 6 6 6-6" />
                   </svg>
                 </button>
                 {tipsOpen && (
-                  <div className="absolute left-0 top-full mt-1.5 w-[min(36rem,calc(100vw-2rem))] divide-y divide-violet-400/25 rounded-xl border border-violet-400/50 bg-(--cv-bg) p-3 text-xs text-(--cv-text) shadow-2xl lg:p-4 lg:text-sm">
+                  <div className="absolute left-0 top-full z-20 mt-1.5 divide-y max-lg:right-0 lg:w-[min(36rem,calc(100vw-2rem))] divide-violet-400/25 rounded-xl border border-violet-400/50 bg-(--cv-bg) p-3 text-xs text-(--cv-text) shadow-2xl lg:p-4 lg:text-sm">
                     {song.chord_tips.whole ? (
                       <div className="py-2 first:pt-0">
                         <p className="text-sm font-medium lg:text-base">Akordi se čez celo skladbo ponavljajo:</p>
@@ -4305,7 +4386,13 @@ export default function ChordsViewer({
                         <div key={part.label} className="py-2 first:pt-0">
                           <p className="text-sm font-semibold lg:text-base">
                             {part.label}
-                            <span className="font-normal text-(--cv-muted)">{part.count > 1 ? ` · ${part.count}× vedno isto` : " · ponavlja se"}</span>
+                            <span className="font-normal text-(--cv-muted)">
+                              {part.which && part.of
+                                ? ` · ${part.which.join(", ")} (${part.count} od ${part.of})`
+                                : part.count > 1
+                                  ? ` · ${part.count}× vedno isto`
+                                  : " · ponavlja se"}
+                            </span>
                           </p>
                           {tipRows(part.unit.map(display))}
                           {tipShapes && tipShapeRow(part.unit.map(display))}
@@ -4329,23 +4416,25 @@ export default function ChordsViewer({
             )}
             {/* "Ali si vedel?": o čem govori pesem in 5 zanimivosti (skill spedenaj → songs.song_story). */}
             {song.song_story && (
-              <div className="relative z-10 self-start rounded-xl border border-emerald-400/40 bg-emerald-400/[0.05] px-2.5 py-1.5" aria-label="Ali si vedel?">
+              <div ref={storyRef} className="z-10 self-start rounded-xl border border-emerald-400/40 bg-emerald-400/[0.05] px-2 py-1.5 lg:relative lg:px-2.5" aria-label="Ali si vedel?">
                 <button
                   type="button"
                   onClick={() => setStoryOpen((v) => !v)}
                   aria-expanded={storyOpen}
+                  title="Ali si vedel?"
                   className="flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-emerald-400"
                 >
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
                     <path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z" />
                   </svg>
-                  Ali si vedel?
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`ml-auto h-3.5 w-3.5 transition ${storyOpen ? "rotate-180" : ""}`}>
+                  {/* Telefon: samo ikona, okno čez celo vrstico. */}
+                  <span className="hidden lg:inline">Ali si vedel?</span>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`ml-auto hidden h-3.5 w-3.5 transition lg:block ${storyOpen ? "rotate-180" : ""}`}>
                     <path d="m6 9 6 6 6-6" />
                   </svg>
                 </button>
                 {storyOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 max-h-[70vh] w-[min(40rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-emerald-400/50 bg-(--cv-bg) p-3 font-sans text-sm leading-relaxed text-(--cv-text) shadow-2xl lg:left-0 lg:right-auto lg:p-4 lg:text-base">
+                  <div className="absolute left-0 right-0 top-full z-20 mt-1.5 max-h-[70vh] overflow-y-auto lg:w-[min(40rem,calc(100vw-2rem))] rounded-xl border border-emerald-400/50 bg-(--cv-bg) p-3 font-sans text-sm leading-relaxed text-(--cv-text) shadow-2xl lg:left-0 lg:right-auto lg:p-4 lg:text-base">
                     <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-400">O pesmi</p>
                     {song.song_story.about.split(/\n\s*\n/).map((para, i) => (
                       <p key={i} className="mb-2">
@@ -4362,24 +4451,64 @@ export default function ChordsViewer({
                 )}
               </div>
             )}
+            {/* Kviz: ugibanje akordov po delih skladbe (ChordQuiz.tsx). */}
+            {improChords.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuizOpen((v) => !v);
+                  setImproOpen(false);
+                }}
+                aria-pressed={quizOpen}
+                aria-label="Kviz"
+                title="Kviz"
+                className={`relative z-10 flex items-center gap-1.5 self-start rounded-xl border px-2 py-1.5 lg:px-2.5 text-[11px] font-semibold uppercase tracking-wide transition lg:text-xs ${
+                  quizOpen ? "border-rose-400 bg-rose-400/20 text-rose-200" : "border-rose-400/40 bg-rose-400/[0.05] text-rose-300 hover:bg-rose-400/10"
+                }`}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 lg:h-4 lg:w-4">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" />
+                  <path d="M12 17h.01" />
+                </svg>
+                <span className="hidden lg:inline">Kviz</span>
+              </button>
+            )}
+            {/* Opis skladbe (desno od Kviza). */}
+            {description.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setDescriptionOpen((v) => !v)}
+                aria-expanded={descriptionOpen}
+                aria-label="Opis skladbe"
+                title="Opis skladbe"
+                className={`relative z-10 flex h-7 w-7 self-start items-center justify-center rounded-full border text-(--cv-text) transition hover:border-amber-400 ${descriptionOpen ? "border-amber-400 bg-amber-400/10" : "border-(--cv-border)"}`}
+              >
+                {/* Dokument z vrsticami: opis skladbe (album, opombe …). */}
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <path d="M14 2v6h6M8 13h8M8 17h5" />
+                </svg>
+              </button>
+            )}
             {/* Naprej/nazaj po seznamu, iz katerega je bila skladba odprta. */}
             {nav && (
-              // ml-auto: vedno na desnem robu vrstice — mesto ni odvisno od širine
-              // okenc levo (Nasvet / Ali si vedel? nimajo vse skladbe), zato ob listanju ne skače.
-              <div className="ml-auto flex items-center gap-0.5 self-start rounded-xl border border-sky-400/40 bg-sky-400/[0.05] px-1 py-0.5" title={nav.label}>
+              // Zgoraj desno v vrstici z naslovom (absolutno) — mesto ni odvisno od okenc
+              // levo, zato ob listanju ne skače; ozek.
+              <div className="absolute right-0 top-0 flex items-center rounded-lg border border-sky-400/40 bg-sky-400/[0.05] px-0.5" title={nav.label}>
                 <button
                   type="button"
                   onClick={nav.onPrev}
                   disabled={!nav.prev}
                   title={nav.prev ? `Prejšnja: ${nav.prev.title} – ${nav.prev.author}` : undefined}
                   aria-label={nav.prev ? `Prejšnja skladba: ${nav.prev.title}` : "Prejšnja skladba"}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-sky-400 transition hover:bg-sky-400/15 disabled:opacity-30 disabled:hover:bg-transparent lg:h-8 lg:w-8"
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-sky-400 transition hover:bg-sky-400/15 disabled:opacity-30 disabled:hover:bg-transparent"
                 >
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                     <path d="m15 18-6-6 6-6" />
                   </svg>
                 </button>
-                <span className="min-w-[3.2rem] text-center font-sans text-[11px] tabular-nums text-sky-300 lg:text-xs">
+                <span className="px-0.5 text-center font-sans text-[11px] tabular-nums text-sky-300">
                   {nav.index + 1}/{nav.count}
                 </span>
                 <button
@@ -4388,15 +4517,19 @@ export default function ChordsViewer({
                   disabled={!nav.next}
                   title={nav.next ? `Naslednja: ${nav.next.title} – ${nav.next.author}` : undefined}
                   aria-label={nav.next ? `Naslednja skladba: ${nav.next.title}` : "Naslednja skladba"}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-sky-400 transition hover:bg-sky-400/15 disabled:opacity-30 disabled:hover:bg-transparent lg:h-8 lg:w-8"
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-sky-400 transition hover:bg-sky-400/15 disabled:opacity-30 disabled:hover:bg-transparent"
                 >
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                     <path d="m9 18 6-6-6-6" />
                   </svg>
                 </button>
               </div>
             )}
             </div>
+            {quizOpen ? (
+              <ChordQuiz body={body} display={display} onClose={() => setQuizOpen(false)} />
+            ) : (
+            <>
             {descriptionOpen && (
               <div className="mb-4 rounded-lg border border-(--cv-border) bg-(--cv-panel) p-3 text-[0.85em] text-(--cv-text)">
                 {description.map((l, i) => renderLine(l, i, false))}
@@ -4417,6 +4550,8 @@ export default function ChordsViewer({
                 {renderLine(l, i, true)}
               </div>
             ))}
+            </>
+            )}
           </div>
         </div>
         {/* Telefon: pod pesmijo (vodoravno). Računalnik: navpičen stolpec ob desnem
@@ -4831,7 +4966,7 @@ export default function ChordsViewer({
       {/* "Sam Špili": prekrije pregledovalnik (predvajalnik ostane spodaj in igra). */}
       {samSpili && (
         <div
-          className="absolute inset-0 z-40 isolate flex flex-col overflow-hidden bg-(--cv-bg) text-(--cv-text) [--ss-btn:2.25rem] lg:[--ss-btn:3rem]"
+          className="absolute inset-0 z-40 isolate flex flex-col overflow-hidden bg-(--cv-bg) text-(--cv-text) ss-root"
           style={{ backgroundImage: "gradient" in theme ? theme.gradient : undefined }}
           onClick={follower ? ssFollowerFullscreen : undefined}
         >
@@ -4883,9 +5018,9 @@ export default function ChordsViewer({
                 onClick={onClose}
                 aria-label="Zapri"
                 title="Zapri"
-                className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
               </button>
@@ -4895,9 +5030,9 @@ export default function ChordsViewer({
                 aria-label={ssSidebarOpen ? "Skrij meni" : "Pokaži meni"}
                 title={ssSidebarOpen ? "Skrij meni" : "Pokaži meni"}
                 aria-expanded={ssSidebarOpen}
-                className={`flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${ssSidebarOpen ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
+                className={`flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${ssSidebarOpen ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
                   <path d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
@@ -4908,9 +5043,9 @@ export default function ChordsViewer({
                 onClick={ssToggleOrientation}
                 aria-label={portrait ? "Ležeče" : "Pokončno"}
                 title={portrait ? "Zasukaj v ležeči način" : "Zasukaj v pokončni način"}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)] lg:hidden"
+                className="flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)] lg:hidden"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={`h-4 w-4 transition-transform duration-300 ${portrait ? "rotate-90" : ""}`}>
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={`h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] transition-transform duration-300 ${portrait ? "rotate-90" : ""}`}>
                   <rect x="7" y="2" width="10" height="20" rx="2.2" />
                   <path d="M11 18h2" />
                 </svg>
@@ -4931,15 +5066,15 @@ export default function ChordsViewer({
                 disabled={!ssActive && ssRequested}
                 aria-label={ssActive ? "Pavza" : "Predvajaj"}
                 title={ssActive ? "Pavza" : "Predvajaj"}
-                className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
                 {ssActive ? (
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 lg:h-5 lg:w-5">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
                     <rect x="6" y="5" width="4" height="14" rx="1" />
                     <rect x="14" y="5" width="4" height="14" rx="1" />
                   </svg>
                 ) : (
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 h-4 w-4 lg:h-5 lg:w-5">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
                     <path d="M7 5v14l12-7z" />
                   </svg>
                 )}
@@ -4951,9 +5086,9 @@ export default function ChordsViewer({
                 }}
                 aria-label="Na začetek"
                 title="Na začetek"
-                className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
                   <path d="M6 5v14" />
                   <path d="M18 19 9 12l9-7z" fill="currentColor" />
                 </svg>
@@ -4963,9 +5098,9 @@ export default function ChordsViewer({
                 onClick={() => playerCtlRef.current?.seekBy(5)}
                 aria-label="5 s naprej"
                 title="5 s naprej"
-                className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
                   <path d="M13 19l7-7-7-7" /><path d="M5 19l7-7-7-7" />
                 </svg>
               </button>
@@ -4974,20 +5109,20 @@ export default function ChordsViewer({
                 onClick={() => playerCtlRef.current?.seekBy(-5)}
                 aria-label="5 s nazaj"
                 title="5 s nazaj"
-                className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
                   <path d="M11 19l-7-7 7-7" /><path d="M19 19l-7-7 7-7" />
                 </svg>
               </button>
-              <button type="button" onClick={() => ssChangeVolume(5)} aria-label="Glasneje" title="Glasneje (↑)" className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+              <button type="button" onClick={() => ssChangeVolume(5)} aria-label="Glasneje" title="Glasneje (↑)" className="flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
                   <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
                   <path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12" />
                 </svg>
               </button>
-              <button type="button" onClick={() => ssChangeVolume(-5)} aria-label="Tišje" title="Tišje (↓)" className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+              <button type="button" onClick={() => ssChangeVolume(-5)} aria-label="Tišje" title="Tišje (↓)" className="flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
                   <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
                   <path d="M16 12h5" />
                 </svg>
@@ -4998,9 +5133,9 @@ export default function ChordsViewer({
                 aria-label="Prevrtavanje"
                 title="Prevrtavanje"
                 aria-pressed={ssSeekOpen}
-                className={`flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${ssSeekOpen ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
+                className={`flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${ssSeekOpen ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
                   <path d="M3 12h4M13 12h8" /><circle cx="10" cy="12" r="3" />
                 </svg>
               </button>
@@ -5014,9 +5149,9 @@ export default function ChordsViewer({
                 aria-label="Nastavitve"
                 title="Nastavitve"
                 aria-expanded={themeMenuPos !== null}
-                className={`flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${themeMenuPos ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
+                className={`flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${themeMenuPos ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
                   <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
                   <circle cx="12" cy="12" r="3" />
                 </svg>
@@ -5088,7 +5223,7 @@ export default function ChordsViewer({
                       <button
                         key={k}
                         type="button"
-                        onClick={() => ssSeekToTime(m.t)}
+                        onClick={() => ssSeekToTime(Math.max(0, m.t - markerLead))}
                         title={`${m.label} · ${fmtClock(m.t)}`}
                         style={{ left: `${m.left}%` }}
                         className="absolute top-1/2 flex h-4 w-3 -translate-x-1/2 -translate-y-1/2 justify-center"

@@ -61,7 +61,7 @@ export interface Song {
   // Ročno posneti časi posameznih akordov (0033_add_synced_chords.sql).
   synced_chords?: SyncedChords | null;
   // "Nasvet": ponavljajoča se zaporedja akordov (skill spedenaj, 0041_add_chord_tips.sql).
-  chord_tips?: { whole: string[] | null; parts: { label: string; count: number; unit: string[] }[]; sameVerseChorus: boolean } | null;
+  chord_tips?: { whole: string[] | null; parts: { label: string; count: number; unit: string[]; which?: number[]; of?: number }[]; sameVerseChorus: boolean } | null;
   // "Ali si vedel?": o čem govori pesem in 5 zanimivosti (skill spedenaj, 0042_add_song_story.sql).
   song_story?: { about: string; facts: string[]; sources?: string[] } | null;
   // Ročno preverjeno (0035_add_verification.sql): "Akordi v aplikaciji" so

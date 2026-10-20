@@ -378,6 +378,10 @@ export default function Dashboard({ user }: { user: User }) {
   // "Preverjeno špila": celostranski seznam preverjenih skladb (klik na kartico
   // statistike na domači strani) — enak vzorec kot ostale celostranske strani.
   const [verifiedOpen, setVerifiedOpen] = usePersistentBool("komadi:verified:open", false);
+  // Iskanje na strani Preverjeno špila (samo po njenih skladbah; tudi listanje ‹ › v akordih gre po zadetkih).
+  const [verifiedQuery, setVerifiedQuery] = useState("");
+  // Iskanje na strani Vsi komadi (samo po njenih skladbah).
+  const [allPageQuery, setAllPageQuery] = useState("");
   // "Vse skladbe": celostranski seznam vse knjižnice (klik na kartico statistike).
   const [allSongsOpen, setAllSongsOpen] = usePersistentBool("komadi:allsongs:open", false);
   const [queueOpen, setQueueOpen] = usePersistentBool("komadi:queue:open", false);
@@ -978,7 +982,10 @@ export default function Dashboard({ user }: { user: User }) {
     [filteredSongs, songSort, reportedSongIds, filters.search],
   );
   // Stran "Vse skladbe" (klik na kartico statistike): vsa knjižnica, isti vrstni red.
-  const allSongsSorted = useMemo(() => [...songs].sort(songComparator(songSort)), [songs, songSort]);
+  const allSongsSorted = useMemo(() => {
+    const words = searchWords(allPageQuery);
+    return songs.filter((s) => matchesSearch(words, s.title, s.author)).sort(songComparator(songSort));
+  }, [songs, songSort, allPageQuery]);
   const [allSongsVisible, setAllSongsVisible] = useState(RESULTS_PAGE);
 
   // Razpoloženja niso fiksen nabor: obrazcu ponudimo privzete predloge +
@@ -2203,6 +2210,42 @@ export default function Dashboard({ user }: { user: User }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+  // Iskanje po skladbah ene strani (Preverjeno špila, Vsi komadi): v vrstici z
+  // glavno navigacijo, desno od Domov / Jam; isti slog kot iskanje na domači strani.
+  function renderPageSearch(value: string, onChange: (v: string) => void, label: string) {
+    return (
+      <div className="relative w-full lg:w-72">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500 dark:text-neutral-400">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          enterKeyHint="search"
+          placeholder="Išči skladbo ali avtorja"
+          aria-label={label}
+          className="w-full rounded-full border border-neutral-300 bg-white py-2 pl-10 pr-9 text-sm text-neutral-800 placeholder-neutral-500 transition focus:border-neutral-400 focus:outline-none dark:border-white/10 dark:text-neutral-200 dark:bg-white/[0.05] dark:focus:border-white/20 dark:focus:bg-white/[0.1]"
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            aria-label="Počisti iskanje"
+            title="Počisti iskanje"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+    );
+  }
   function renderSearchBox(className: string) {
     return (
       <div className={className}>
@@ -3107,14 +3150,31 @@ export default function Dashboard({ user }: { user: User }) {
         )}
       </header>
 
-      <MainNav
-        active={activeNav}
-        onSelect={handleMainNav}
-        disabled={!isSupabaseConfigured}
-        onSearch={handlePhoneSearch}
-        searchActive={phoneSearchShown && (activeNav === "home" || activeNav === "shared")}
-        className={`mt-3! w-full lg:w-fit ${activeNav === "home" || activeNav === "shared" || activeNav === "jam" ? "lg:hidden" : ""}`}
-      />
+      {(() => {
+        const nav = (cls: string) => (
+          <MainNav
+            active={activeNav}
+            onSelect={handleMainNav}
+            disabled={!isSupabaseConfigured}
+            onSearch={handlePhoneSearch}
+            searchActive={phoneSearchShown && (activeNav === "home" || activeNav === "shared")}
+            className={`${cls} w-full lg:w-fit ${activeNav === "home" || activeNav === "shared" || activeNav === "jam" ? "lg:hidden" : ""}`}
+          />
+        );
+        const pageSearch = verifiedOpen
+          ? renderPageSearch(verifiedQuery, setVerifiedQuery, "Išči po preverjenih skladbah")
+          : allSongsOpen
+            ? renderPageSearch(allPageQuery, setAllPageQuery, "Išči po vseh skladbah")
+            : null;
+        return pageSearch ? (
+          <div className="mt-3! flex flex-col gap-3 lg:flex-row lg:items-center">
+            {nav("")}
+            {pageSearch}
+          </div>
+        ) : (
+          nav("mt-3!")
+        );
+      })()}
 
       {/* Napredni urejevalnik besedila z akordi (portal čez cel zaslon) — odpre ga
           "Uredi besedilo" na straneh Popravi skladbe in Pregled in odobritev. */}
@@ -3538,8 +3598,10 @@ export default function Dashboard({ user }: { user: User }) {
           <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
           {(() => {
             const byDate = (a: Song, b: Song) => (b.verified_player_at ?? "").localeCompare(a.verified_player_at ?? "");
-            const mine = verifiedSongs.filter((x) => x.user_id === LIBRARY_OWNER_ID).sort(byDate);
-            const others = verifiedSongs.filter((x) => x.user_id !== LIBRARY_OWNER_ID).sort(byDate);
+            const vWords = searchWords(verifiedQuery);
+            const shown = verifiedSongs.filter((x) => matchesSearch(vWords, x.title, x.author));
+            const mine = shown.filter((x) => x.user_id === LIBRARY_OWNER_ID).sort(byDate);
+            const others = shown.filter((x) => x.user_id !== LIBRARY_OWNER_ID).sort(byDate);
             const groups = [
               { title: "Skladbe", list: mine, own: true },
               { title: "Skladbe drugih", list: others, own: false },
@@ -5062,10 +5124,14 @@ export default function Dashboard({ user }: { user: User }) {
           openChordsNav === "verified"
             ? [...verifiedSongs].sort(byVerified)
             : openChordsNav === "verified-page"
-              ? [
-                  ...verifiedSongs.filter((x) => x.user_id === LIBRARY_OWNER_ID).sort(byVerified),
-                  ...verifiedSongs.filter((x) => x.user_id !== LIBRARY_OWNER_ID).sort(byVerified),
-                ]
+              ? (() => {
+                  const vWords = searchWords(verifiedQuery);
+                  const shown = verifiedSongs.filter((x) => matchesSearch(vWords, x.title, x.author));
+                  return [
+                    ...shown.filter((x) => x.user_id === LIBRARY_OWNER_ID).sort(byVerified),
+                    ...shown.filter((x) => x.user_id !== LIBRARY_OWNER_ID).sort(byVerified),
+                  ];
+                })()
               : openChordsNav === "all"
                 ? displaySongs
                 : openChordsNav === "allpage"

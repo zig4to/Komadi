@@ -242,3 +242,14 @@ textarea,
     padding-right: env(safe-area-inset-right);
   }
 }
+
+/* Sam Špili: velikost gumbov v desnem stolpcu. Na telefonu po višini zaslona —
+   odprt stolpec (10 gumbov + razmiki in robovi) se ravno prilega; na računalniku fiksno. */
+.ss-root {
+  --ss-btn: clamp(1.75rem, calc((100dvh - 6rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)) / 10), 4.5rem);
+}
+@media (min-width: 1024px) {
+  .ss-root {
+    --ss-btn: 3.5rem;
+  }
+}

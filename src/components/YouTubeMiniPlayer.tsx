@@ -132,6 +132,7 @@ export default function YouTubeMiniPlayer({
   sliderHost,
   sliderBelow = false,
   sectionMarkers,
+  markerLead = 0,
   onMarkerClick,
   onTime,
   smartAvailable = false,
@@ -165,6 +166,8 @@ export default function YouTubeMiniPlayer({
   // Računalnik: oznake delov skladbe (Intro, Verse 1 …) na drsniku v tej
   // vrstici, t = čas v posnetku (ChordsViewer); klik skoči na začetek dela.
   sectionMarkers?: { t: number; label: string; line?: number }[];
+  // Klik na oznako skoči toliko sekund pred del (oznaka ostane na začetku dela).
+  markerLead?: number;
   // Klik na oznako dela (pregledovalnik pomakne besedilo do tega dela).
   onMarkerClick?: (m: { t: number; label: string; line?: number }) => void;
   // "Pametni predvajalnik": trenutni čas in dolžina videa (ob predvajanju
@@ -632,10 +635,11 @@ export default function YouTubeMiniPlayer({
       togglePlay();
     }
   };
-  const playClick = (e: React.MouseEvent<HTMLElement>) => {
+  const playClick = () => {
     if (playing) return togglePlay();
-    if (playMenu) return openPlayMenu("play", e.currentTarget);
-    onUserPlay?.();
+    // Pregledovalnik (playMenu): ▶ samo predvaja — brez menija in celozaslonskega
+    // načina (meni ostane le pri Smart playu).
+    if (!playMenu) onUserPlay?.();
     togglePlay();
   };
   const seekBy = (delta: number) => {
@@ -720,14 +724,15 @@ export default function YouTubeMiniPlayer({
               key={i}
               type="button"
               onClick={() => {
-                seekTo(m.t);
+                seekTo(Math.max(0, m.t - markerLead));
                 onMarkerClick?.(m);
               }}
               title={`${m.label} · ${formatTime(m.t)}`}
               style={{ left: `${m.left}%` }}
-              className="group absolute top-1/2 flex h-4 w-2 -translate-x-1/2 -translate-y-1/2 justify-center"
+              className="group absolute top-1/2 flex h-4 w-2 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
             >
-              <span className="h-full w-px bg-neutral-300/60 group-hover:bg-amber-400" />
+              {/* Črtica čez drsnik (nižja od klikalnega območja h-4). */}
+              <span className="h-2.5 w-px bg-neutral-300/60 group-hover:bg-amber-400" />
               {m.row >= 0 && (
                 <span
                   className={`absolute left-1/2 whitespace-nowrap ${sliderBelow ? "text-[7px]" : "text-[9px]"} leading-none text-neutral-400 group-hover:text-amber-400 ${m.row === 0 ? "bottom-full mb-px" : "top-full mt-px"}`}
@@ -793,7 +798,9 @@ export default function YouTubeMiniPlayer({
                 if (smartOn) return onSmartToggle?.(false);
                 if (playMenu && !playing) return openPlayMenu("smart", e.currentTarget);
                 onSmartToggle?.(true);
-                onSmartPlay?.();
+                // Pregledovalnik (playMenu) med predvajanjem: samo vklopi sledenje —
+                // celozaslonsko je posebej (gumb ⛶ ali meni pred predvajanjem).
+                if (!playMenu) onSmartPlay?.();
                 if (!playing) togglePlay();
               }}
               disabled={loading}
