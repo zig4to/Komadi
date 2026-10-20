@@ -1369,7 +1369,14 @@ export default function ChordsViewer({
     } catch {}
   };
   // Zložena orodna vrstica (puščica pri ⚙); predvajalnik ostane. Na napravo.
-  const [toolbarCollapsed, setToolbarCollapsedState] = useState(() => readOptionalNumber(TOOLBAR_COLLAPSED_KEY) === 1);
+  // Telefon: ob vsakem odprtju zložena (uporabnikova odločitev 2026-10-20), odpre
+  // jo puščica v vrstici predvajalnika; računalnik si stanje zapomni.
+  const [toolbarCollapsed, setToolbarCollapsedState] = useState(() => {
+    try {
+      if (window.matchMedia("(max-width: 1023px)").matches) return true;
+    } catch {}
+    return readOptionalNumber(TOOLBAR_COLLAPSED_KEY) === 1;
+  });
   const setToolbarCollapsed = (v: boolean) => {
     setToolbarCollapsedState(v);
     writeNumber(TOOLBAR_COLLAPSED_KEY, v ? 1 : 0);
