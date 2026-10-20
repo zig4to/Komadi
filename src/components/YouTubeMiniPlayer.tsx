@@ -130,7 +130,9 @@ export default function YouTubeMiniPlayer({
   onPlaying,
   floatingHost,
   sliderHost,
+  sliderBelow = false,
   sectionMarkers,
+  onMarkerClick,
   onTime,
   smartAvailable = false,
   smartOn = false,
@@ -158,9 +160,13 @@ export default function YouTubeMiniPlayer({
   // Drsnik po skladbi (in čas) v lastni vrstici pod zgornjo (ChordsViewer) —
   // portal v ta element; brez njega ostane v vrstici s kontrolami.
   sliderHost?: HTMLElement | null;
+  // Računalnik: drsnik tudi tu v sliderHost (vrstica pod gumbi), npr. ob odprtem Impro.
+  sliderBelow?: boolean;
   // Računalnik: oznake delov skladbe (Intro, Verse 1 …) na drsniku v tej
   // vrstici, t = čas v posnetku (ChordsViewer); klik skoči na začetek dela.
-  sectionMarkers?: { t: number; label: string }[];
+  sectionMarkers?: { t: number; label: string; line?: number }[];
+  // Klik na oznako dela (pregledovalnik pomakne besedilo do tega dela).
+  onMarkerClick?: (m: { t: number; label: string; line?: number }) => void;
   // "Pametni predvajalnik": trenutni čas in dolžina videa (ob predvajanju
   // vsakih 250 ms in ob preskoku z drsnikom/gumbi).
   onTime?: (seconds: number, duration: number, playing: boolean) => void;
@@ -243,6 +249,9 @@ export default function YouTubeMiniPlayer({
   // false = predvajalnik se ustvari samo pripravljen (preload) — ob pripravljenosti ne zaigra.
   const autoplayRef = useRef(true);
   const startedRef = useRef(false);
+  // Ali je video že kdaj zaigral — do takrat klik na drsnik / oznako dela samo premakne
+  // položaj (YouTube bi ob seekTo v stanju "pripravljen" začel predvajati).
+  const hasPlayedRef = useRef(false);
   function start(autoplay = true) {
     autoplayRef.current = autoplay;
     const host = hostRef.current;
@@ -268,6 +277,13 @@ export default function YouTubeMiniPlayer({
             playerRef.current = e.target;
             // Shranjena glasnost (Sam Špili / akordi v aplikaciji, gumba Glasneje/Tišje).
             playerRef.current?.setVolume(readVolume());
+            // Dolžina že pred predvajanjem (oznake delov na drsniku takoj po odprtju).
+            const readDuration = (tries: number) => {
+              const d = playerRef.current?.getDuration() ?? 0;
+              if (d > 0) setDuration((prev) => prev || d);
+              else if (tries > 0) setTimeout(() => readDuration(tries - 1), 500);
+            };
+            readDuration(10);
             if (!autoplayRef.current) return;
             if (pendingSeekRef.current != null) playerRef.current?.seekTo(pendingSeekRef.current, true);
             playerRef.current?.playVideo();
@@ -283,6 +299,7 @@ export default function YouTubeMiniPlayer({
               setLoading(false);
             }
             if (e.data === 1) {
+              hasPlayedRef.current = true;
               if (pendingSeekRef.current != null) {
                 const t = pendingSeekRef.current;
                 pendingSeekRef.current = null;
@@ -358,7 +375,10 @@ export default function YouTubeMiniPlayer({
           autoplayRef.current = true;
           start();
         }
-        else playerRef.current.playVideo();
+        else {
+          if (!hasPlayedRef.current && pendingSeekRef.current != null) playerRef.current.seekTo(pendingSeekRef.current, true);
+          playerRef.current.playVideo();
+        }
       },
       pause: () => playerRef.current?.pauseVideo(),
       seekBy: (delta) => {
@@ -580,7 +600,10 @@ export default function YouTubeMiniPlayer({
       return;
     }
     else if (playing) playerRef.current.pauseVideo();
-    else playerRef.current.playVideo();
+    else {
+      if (!hasPlayedRef.current && pendingSeekRef.current != null) playerRef.current.seekTo(pendingSeekRef.current, true);
+      playerRef.current.playVideo();
+    }
   };
   // Mali meni ob ▶ / Smart play: izbira navadnega ali celozaslonskega predvajanja
   // (izbira v meniju je nov klik — celozaslonski način ga sme porabiti).
@@ -642,6 +665,11 @@ export default function YouTubeMiniPlayer({
   );
   const seekTo = (t: number) => {
     setCurrent(t);
+    // Še ni igral: samo zapomni položaj, ▶ začne od tam.
+    if (!hasPlayedRef.current) {
+      pendingSeekRef.current = t;
+      return;
+    }
     playerRef.current?.seekTo(t, true);
   };
   // Oznake delov: napis samo, če je dovolj prostora od prejšnjega prikazanega
@@ -665,9 +693,9 @@ export default function YouTubeMiniPlayer({
       .map((m) => {
         const x = (m.t / duration) * trackW;
         const short = m.label.replace(/^Interlude/i, "Inter.").replace(/^Pre-?Chorus/i, "Pre-Ch.").replace(/^Instrumental/i, "Instr.");
-        // ~5,2 px na znak pri 9 px pisavi + razmik
+        // ~5,2 px na znak pri 9 px pisavi + razmik (ob odprtem Impro 7 px — vrstica drsnika je tam povečana)
         const row = x >= lastEnd[0] ? 0 : x >= lastEnd[1] ? 1 : -1;
-        if (row >= 0) lastEnd[row] = x + short.length * 5.2 + 6;
+        if (row >= 0) lastEnd[row] = x + short.length * (sliderBelow ? 4.1 : 5.2) + 6;
         return { ...m, short, left: (m.t / duration) * 100, row };
       });
   })();
@@ -691,7 +719,10 @@ export default function YouTubeMiniPlayer({
             <button
               key={i}
               type="button"
-              onClick={() => seekTo(m.t)}
+              onClick={() => {
+                seekTo(m.t);
+                onMarkerClick?.(m);
+              }}
               title={`${m.label} · ${formatTime(m.t)}`}
               style={{ left: `${m.left}%` }}
               className="group absolute top-1/2 flex h-4 w-2 -translate-x-1/2 -translate-y-1/2 justify-center"
@@ -699,7 +730,7 @@ export default function YouTubeMiniPlayer({
               <span className="h-full w-px bg-neutral-300/60 group-hover:bg-amber-400" />
               {m.row >= 0 && (
                 <span
-                  className={`absolute left-1/2 whitespace-nowrap text-[9px] leading-none text-neutral-400 group-hover:text-amber-400 ${m.row === 0 ? "bottom-full mb-px" : "top-full mt-px"}`}
+                  className={`absolute left-1/2 whitespace-nowrap ${sliderBelow ? "text-[7px]" : "text-[9px]"} leading-none text-neutral-400 group-hover:text-amber-400 ${m.row === 0 ? "bottom-full mb-px" : "top-full mt-px"}`}
                 >
                   {m.short}
                 </span>
@@ -804,7 +835,11 @@ export default function YouTubeMiniPlayer({
           </button>
 
           {/* Računalnik: drsnik v tej vrstici; telefon: v lastni vrstici (sliderHost). */}
-          {sliderHost ? <div className="hidden min-w-0 flex-1 items-center gap-4 px-3 lg:flex">{seekBar(true)}</div> : seekBar(true)}
+          {sliderHost ? (
+            !sliderBelow && <div className="hidden min-w-0 flex-1 items-center gap-4 px-3 lg:flex">{seekBar(true)}</div>
+          ) : (
+            seekBar(true)
+          )}
 
         </>
       )}
@@ -836,7 +871,7 @@ export default function YouTubeMiniPlayer({
 
       {sliderHost &&
         !failedAll &&
-        createPortal(<div className="flex w-full items-center gap-2">{seekBar(false)}</div>, sliderHost)}
+        createPortal(<div className="flex w-full items-center gap-2 lg:gap-4">{seekBar(sliderBelow)}</div>, sliderHost)}
 
       {floatingHost &&
         createPortal(

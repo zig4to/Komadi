@@ -14,9 +14,9 @@ import { CLOSE_BUTTON, CLOSE_ICON, ScaleBoard, useIsDesktop } from "@/components
 // se vleče za levi rob (dvoklik = spet 55 %); telefon: čez cel zaslon.
 
 const SELECT =
-  "min-w-0 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm text-neutral-900 outline-none focus:border-indigo-400 dark:border-white/[0.1] dark:bg-[#16161b] dark:text-neutral-100";
+  "min-w-0 rounded-lg border border-neutral-200 bg-white px-2.5 py-1 text-sm text-neutral-900 outline-none focus:border-indigo-400 dark:border-white/[0.1] dark:bg-[#16161b] dark:text-neutral-100";
 const STEP =
-  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-white shadow-sm transition hover:bg-indigo-600 active:scale-95 disabled:opacity-30 dark:bg-indigo-500 dark:hover:bg-indigo-400";
+  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-white shadow-sm transition hover:bg-indigo-600 active:scale-95 disabled:opacity-30 dark:bg-indigo-500 dark:hover:bg-indigo-400";
 const chevron = (d: string) => (
   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
     <path d={d} />
@@ -29,7 +29,18 @@ const MIN_TEXT = 320;
 
 const keyValue = (k: SongKey) => `${k.tonic}:${k.minor ? "m" : "M"}`;
 
-export default function ImproPanel({ chords, capo, onClose }: { chords: string[]; capo: number | null; onClose: () => void }) {
+export default function ImproPanel({
+  chords,
+  currentChord,
+  capo,
+  onClose,
+}: {
+  chords: string[];
+  // Akord, ki je zdaj na vrsti v skladbi (Smart play / natapkani akordi); null = nič.
+  currentChord: string | null;
+  capo: number | null;
+  onClose: () => void;
+}) {
   useBackableOpen(true, onClose);
   const detected = useMemo(() => detectKey(chords), [chords]);
   const [keyOverride, setKeyOverride] = useState<SongKey | null>(null);
@@ -44,7 +55,7 @@ export default function ImproPanel({ chords, capo, onClose }: { chords: string[]
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const index = Math.max(0, flat.findIndex((o) => o.id === selectedId));
   const current = flat[index];
-  const [pos, setPos] = useState(1);
+  const [pos, setPos] = useState(0);
   const [labels, setLabels] = useState<"note" | "int">("note");
   const desktop = useIsDesktop();
   // null = 55 % širine (privzeto ob vsakem odprtju), sicer povlečena širina v px.
@@ -73,7 +84,7 @@ export default function ImproPanel({ chords, capo, onClose }: { chords: string[]
 
   function select(id: string) {
     setSelectedId(id);
-    setPos(1);
+    setPos(0);
   }
   const step = (d: number) => {
     if (!flat.length) return;
@@ -112,14 +123,66 @@ export default function ImproPanel({ chords, capo, onClose }: { chords: string[]
         />
         <div className="absolute left-1/2 top-1/2 h-10 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-neutral-300 group-hover:bg-indigo-400 dark:bg-white/20" />
       </div>
-      <div className="flex items-center gap-3 border-b border-neutral-200 px-4 py-3 dark:border-white/[0.08]">
+      <div className="flex items-center gap-3 border-b border-neutral-200 px-4 py-2 dark:border-white/[0.08]">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0 text-indigo-500 dark:text-indigo-400">
           <path d="M3 6h18M3 10h18M3 14h18M3 18h18" />
           <circle cx="7" cy="8" r="1.4" fill="currentColor" />
           <circle cx="12" cy="12" r="1.4" fill="currentColor" />
           <circle cx="17" cy="16" r="1.4" fill="currentColor" />
         </svg>
-        <h2 className="flex-1 text-base font-semibold">Impro</h2>
+        <h2 className="text-base font-semibold">Impro</h2>
+        {key && current && (
+          <div className="ml-4 min-w-0 flex-1 border-l border-neutral-200 pl-5 dark:border-white/[0.1]">
+            <label className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+              <span className="font-semibold text-neutral-800 dark:text-neutral-100">Tonaliteta</span>
+              <select
+                value={keyValue(shapeKey!)}
+                onChange={(e) => {
+                  const [t, m] = e.target.value.split(":");
+                  const k = { tonic: Number(t), minor: m === "m" };
+                  setKeyOverride(detected && keyValue(k) === keyValue(detected) ? null : k);
+                  setSelectedId(null);
+                  setPos(0);
+                }}
+                className={SELECT}
+              >
+                {[false, true].map((minor) => (
+                  <optgroup key={String(minor)} label={minor ? "Mol" : "Dur"}>
+                    {NAMES.map((n, t) => {
+                      const k = { tonic: t, minor };
+                      return (
+                        <option key={t} value={keyValue(k)}>
+                          {keyName(k)}
+                          {detected && keyValue(k) === keyValue(detected) ? " (zaznano)" : ""}
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                ))}
+              </select>
+              {capo ? (
+                <button
+                  type="button"
+                  aria-pressed={noCapo}
+                  onClick={() => {
+                    setNoCapo((v) => !v);
+                    setSelectedId(null);
+                    setPos(0);
+                  }}
+                  title={`Akordi so prijemi s capom na ${capo}. prečki — vklopi za lestvice brez capa (kot zveni).`}
+                  className={`rounded-full border px-3 py-1 text-xs transition ${
+                    noCapo
+                      ? "border-indigo-400 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300"
+                      : "border-neutral-200 text-neutral-600 dark:border-white/[0.1] dark:text-neutral-300"
+                  }`}
+                >
+                  {noCapo ? `Brez capa: ${keyName(key)}` : `Brez capa (capo ${capo})`}
+                </button>
+              ) : null}
+            </label>
+          </div>
+        )}
+        {!(key && current) && <div className="flex-1" />}
         <button type="button" onClick={onClose} aria-label="Zapri" title="Zapri" className={CLOSE_BUTTON}>
           {CLOSE_ICON}
         </button>
@@ -130,55 +193,7 @@ export default function ImproPanel({ chords, capo, onClose }: { chords: string[]
           <p className="px-4 py-6 text-sm text-neutral-500">V skladbi ni akordov, iz katerih bi lahko določil tonaliteto.</p>
         ) : (
           <>
-            <div className="flex flex-col gap-2.5 border-b border-neutral-200 px-4 py-3.5 dark:border-white/[0.08]">
-              <label className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-neutral-500">Tonaliteta</span>
-                <select
-                  value={keyValue(shapeKey!)}
-                  onChange={(e) => {
-                    const [t, m] = e.target.value.split(":");
-                    const k = { tonic: Number(t), minor: m === "m" };
-                    setKeyOverride(detected && keyValue(k) === keyValue(detected) ? null : k);
-                    setSelectedId(null);
-                    setPos(1);
-                  }}
-                  className={SELECT}
-                >
-                  {[false, true].map((minor) => (
-                    <optgroup key={String(minor)} label={minor ? "Mol" : "Dur"}>
-                      {NAMES.map((n, t) => {
-                        const k = { tonic: t, minor };
-                        return (
-                          <option key={t} value={keyValue(k)}>
-                            {keyName(k)}
-                            {detected && keyValue(k) === keyValue(detected) ? " (zaznano)" : ""}
-                          </option>
-                        );
-                      })}
-                    </optgroup>
-                  ))}
-                </select>
-                {capo ? (
-                  <button
-                    type="button"
-                    aria-pressed={noCapo}
-                    onClick={() => {
-                      setNoCapo((v) => !v);
-                      setSelectedId(null);
-                      setPos(1);
-                    }}
-                    title={`Akordi so prijemi s capom na ${capo}. prečki — vklopi za lestvice brez capa (kot zveni).`}
-                    className={`rounded-full border px-3 py-1 text-xs transition ${
-                      noCapo
-                        ? "border-indigo-400 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300"
-                        : "border-neutral-200 text-neutral-600 dark:border-white/[0.1] dark:text-neutral-300"
-                    }`}
-                  >
-                    {noCapo ? `Brez capa: ${keyName(key)}` : `Brez capa (capo ${capo})`}
-                  </button>
-                ) : null}
-              </label>
-
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-neutral-200 px-4 py-2 dark:border-white/[0.08]">
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => step(-1)} aria-label="Prejšnja lestvica" title="Prejšnja lestvica" className={STEP}>
                   {chevron("M15 6l-6 6 6 6")}
@@ -198,12 +213,12 @@ export default function ImproPanel({ chords, capo, onClose }: { chords: string[]
                   {chevron("M9 6l6 6-6 6")}
                 </button>
               </div>
-              <div className="text-xs text-neutral-500">
+              <div className="min-w-0 flex-1 text-xs text-neutral-500">
                 {groups.find((g) => g.options.includes(current))?.label}
                 {current.note ? ` · ${current.note}` : ""} · {Math.round(current.fit * 100)} % tonov akordov skladbe je v lestvici · {index + 1}/{flat.length}
               </div>
             </div>
-            <ScaleBoard root={current.root} scale={current.scale} pos={pos} labels={labels} onPos={setPos} onLabels={setLabels} defaultZoom={1} />
+            <ScaleBoard root={current.root} scale={current.scale} pos={pos} labels={labels} onPos={setPos} onLabels={setLabels} defaultZoom={1} compact songChords={soundingChords} currentChord={currentChord && shift ? shiftChord(currentChord, shift) : currentChord} />
           </>
         )}
       </div>

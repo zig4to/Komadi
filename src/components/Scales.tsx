@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useBackableOpen } from "@/lib/useBackableOpen";
-import { FRETS, NAMES, OPEN, SCALES, intLabel, mod12, positionsOf, scaleById, type Scale } from "@/lib/scales";
+import { FRETS, INTERVALS, NAMES, OPEN, SCALES, chordTones, intLabel, mod12, positionsOf, scaleById, type Scale } from "@/lib/scales";
 
 // Lestvice (kartica na domači strani desno od Tunerja): vrat kitare v
 // standardni uglasitvi z označeno lestvico — ton, lestvica, položaj (boks),
@@ -12,12 +12,15 @@ import { FRETS, NAMES, OPEN, SCALES, intLabel, mod12, positionsOf, scaleById, ty
 // (visoka e zgoraj kot v tabu), telefon: navpično (strune v stolpcih).
 
 const KEY = "komadi:scales";
-const INLAYS = [3, 5, 7, 9, 12, 15, 17];
+const INLAYS = [3, 5, 7, 9, 12, 15, 17, 19];
 // Povečava vratu (+ / − ob "Zaigraj lestvico"), skupna za Lestvice in Impro.
 const ZOOM_KEY = "komadi:scales:zoom";
 const ZOOM_MIN = 0.6;
 const ZOOM_MAX = 2;
 const ZOOM_STEP = 0.1;
+// Računalnik: "Prelomi vrat" — prečke 1–9 zgoraj, 10–19 v drugi vrsti pod njimi.
+const SPLIT_KEY = "komadi:scales:split";
+const SPLIT_FRET = 9;
 function readZoom() {
   try {
     const v = Number(localStorage.getItem(ZOOM_KEY));
@@ -36,7 +39,7 @@ function readStored(): Stored {
       return {
         root: Number.isInteger(v.root) && v.root >= 0 && v.root < 12 ? v.root : DEFAULTS.root,
         scale: SCALES.some((s) => s.id === v.scale) ? v.scale : DEFAULTS.scale,
-        pos: Number.isInteger(v.pos) && v.pos >= 0 ? v.pos : DEFAULTS.pos,
+        pos: Number.isInteger(v.pos) && v.pos >= -1 ? v.pos : DEFAULTS.pos,
         labels: v.labels === "int" ? "int" : "note",
       };
     }
@@ -174,6 +177,9 @@ export function ScaleBoard({
   onPos,
   onLabels,
   defaultZoom,
+  compact = false,
+  songChords,
+  currentChord,
 }: {
   root: number;
   scale: Scale;
@@ -183,6 +189,12 @@ export function ScaleBoard({
   onLabels: (labels: "note" | "int") => void;
   // Začetna povečava (Impro: 100 % ob vsakem odprtju); takrat se ne shranjuje.
   defaultZoom?: number;
+  // Impro: vse izbire v eni strnjeni vrstici brez napisov, opis in legenda v eni vrstici.
+  compact?: boolean;
+  // Impro: akordi skladbe za "Vsi toni" → označi akord.
+  songChords?: string[];
+  // Impro: akord, ki je zdaj na vrsti (možnost "Trenutna"); undefined = možnosti ni.
+  currentChord?: string | null;
 }) {
   const desktop = useIsDesktop();
   const [playing, setPlaying] = useState<string | null>(null);
@@ -190,6 +202,21 @@ export function ScaleBoard({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const neckRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoomState] = useState(() => defaultZoom ?? readZoom());
+  const [splitPref, setSplitPref] = useState(() => {
+    try {
+      return localStorage.getItem(SPLIT_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const split = splitPref && desktop;
+  function toggleSplit() {
+    const next = !splitPref;
+    setSplitPref(next);
+    try {
+      localStorage.setItem(SPLIT_KEY, next ? "1" : "0");
+    } catch {}
+  }
   function setZoom(z: number) {
     const next = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 10) / 10;
     setZoomState(next);
@@ -199,11 +226,31 @@ export function ScaleBoard({
     } catch {}
   }
 
+  // "Vsi toni": kaj označiti med vsemi toni — "" nič, "current" akord, ki je zdaj na vrsti, sicer ime akorda.
+  const [mark, setMark] = useState("");
+
   const positions = positionsOf(root, sc);
   const pos = posIn > positions.length ? 0 : posIn;
-  const active = pos ? positions[pos - 1] : null;
-  const activeSet = active ? new Set(active.cells.map((c) => `${c[0]},${c[1]}`)) : null;
+  // pos: -1 = "Vsi toni" (vsi toni na vratu, brez lestvice), 0 = "Cel vrat", n = položaj n.
+  const allNotes = pos === -1;
+  const active = pos > 0 ? positions[pos - 1] : null;
   const allInts = [...sc.base, ...(sc.extra ?? [])].sort((a, b) => a - b);
+  const markName = !allNotes || !mark ? null : mark === "current" ? (currentChord ?? null) : mark;
+  const markChord = markName ? chordTones(markName) : null;
+  const markTones = markChord ? markChord.tones : null;
+  const markRoot = markChord ? markChord.root : root;
+  // Glavni akordi tonalitete lestvice (molova lestvica → i iv v III VI VII V, sicer I ii iii IV V vi).
+  const minorish = sc.base.includes(3) && !sc.base.includes(4);
+  const keyChords = [
+    ...new Set(
+      (minorish
+        ? ([[0, true], [5, true], [7, true], [3, false], [8, false], [10, false], [7, false]] as const)
+        : ([[0, false], [5, false], [7, false], [9, true], [2, true], [4, true]] as const)
+      ).map(([d, m]) => NAMES[mod12(root + d)] + (m ? "m" : "")),
+    ),
+  ];
+  const uniqueSongChords = [...new Set(songChords ?? [])].filter((c) => chordTones(c));
+  const activeSet = active ? new Set(active.cells.map((c) => `${c[0]},${c[1]}`)) : null;
 
   // Nova lestvica, ton ali položaj ustavi predvajanje.
   const playKey = `${root}:${sc.id}:${pos}`;
@@ -287,9 +334,9 @@ export function ScaleBoard({
   const activeStart = active?.start ?? null;
   useEffect(() => {
     const el = neckRef.current;
-    if (!el || activeStart == null || !desktop) return;
+    if (!el || activeStart == null || !desktop || split) return;
     el.scrollTo({ left: Math.max(0, (PAD + NUT + activeStart * FW) * zoom - 80), behavior: "smooth" });
-  }, [activeStart, desktop, FW, zoom]);
+  }, [activeStart, desktop, split, FW, zoom]);
 
   const len = NUT + FRETS * FW;
   const wid = 5 * SW;
@@ -305,12 +352,13 @@ export function ScaleBoard({
     for (let f = 0; f <= FRETS; f++) {
       const midi = OPEN[s] + f;
       const iv = mod12(midi - root);
-      if (!allInts.includes(iv)) continue;
+      if (!allNotes && !allInts.includes(iv)) continue;
       const key = `${s},${f}`;
-      const isRoot = iv === 0;
-      const isBlue = (sc.extra ?? []).includes(iv);
+      const pc = midi % 12;
+      const isRoot = allNotes ? markTones != null && pc === markRoot : iv === 0;
+      const isBlue = !allNotes && (sc.extra ?? []).includes(iv);
       const [x, y] = at(s, noteD(f));
-      const dim = activeSet != null && !activeSet.has(key);
+      const dim = (activeSet != null && !activeSet.has(key)) || (markTones != null && !markTones.includes(pc));
       dots.push(
         <g key={key} onClick={() => pluck(midi)} className={`cursor-pointer transition-opacity ${dim ? "opacity-[0.18]" : ""}`}>
           <circle
@@ -329,7 +377,7 @@ export function ScaleBoard({
             dominantBaseline="middle"
             className={`pointer-events-none font-mono text-[11px] font-medium ${isRoot || isBlue ? "fill-white" : "fill-white dark:fill-neutral-900"}`}
           >
-            {labels === "note" ? NAMES[midi % 12] : intLabel(iv, sc)}
+            {labels === "note" ? NAMES[midi % 12] : markChord ? INTERVALS[mod12(midi - markRoot)] : intLabel(iv, sc)}
           </text>
         </g>,
       );
@@ -340,11 +388,76 @@ export function ScaleBoard({
 
   return (
     <>
-      <div className="flex flex-col gap-3 border-b border-neutral-200 px-4 py-3.5 dark:border-white/[0.08]">
-        <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
-          <div className="min-w-0">
-            <div className={LABEL}>Položaj</div>
+      <div className={`flex flex-col border-b border-neutral-200 px-4 dark:border-white/[0.08] ${compact ? "py-2" : "gap-3 py-3.5"}`}>
+        <div className={`flex flex-wrap ${compact ? "items-center gap-x-2.5 gap-y-2" : "items-end gap-x-5 gap-y-3"}`}>
+          <div className="min-w-0" role="group" aria-label="Položaj">
+            {!compact && <div className={LABEL}>Položaj</div>}
             <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+              {/* "Vsi toni" + v istem gumbu spustni seznam, kaj označiti med vsemi toni. */}
+              <span
+                className={`inline-flex shrink-0 items-stretch overflow-hidden whitespace-nowrap rounded-full border text-sm transition ${
+                  allNotes ? CHIP_ON : CHIP_OFF
+                }`}
+              >
+                <button
+                  type="button"
+                  aria-pressed={allNotes}
+                  onClick={() => onPos(-1)}
+                  title="Vsi toni na vratu kitare, brez lestvice"
+                  className="py-1.5 pl-3 pr-2"
+                >
+                  Vsi toni
+                </button>
+                <span className={`relative flex items-center gap-1 border-l pl-2 pr-2.5 ${allNotes ? "border-white/25" : "border-neutral-200 dark:border-white/[0.1]"}`}>
+                  {allNotes && mark ? <span className="font-medium">{mark === "current" ? `trenutna: ${currentChord ?? "—"}` : mark}</span> : null}
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                  <select
+                    value={allNotes ? mark : ""}
+                    onChange={(e) => {
+                      setMark(e.target.value);
+                      onPos(-1);
+                    }}
+                    aria-label="Označi med vsemi toni"
+                    title="Označi akord ali lestvico med vsemi toni"
+                    className="absolute inset-0 cursor-pointer bg-[#16161b] text-neutral-100 opacity-0 [color-scheme:dark] [&_optgroup]:bg-[#16161b] [&_option]:bg-[#16161b] [&_option]:text-neutral-100"
+                  >
+                    <option value="">Brez označevanja</option>
+                    {currentChord !== undefined && <option value="current">Trenutna: {currentChord ?? "— (predvajaj skladbo)"}</option>}
+                    {uniqueSongChords.length > 0 && (
+                      <optgroup label="Akordi skladbe">
+                        {uniqueSongChords.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <optgroup label={`Glavni akordi (${NAMES[root]} ${minorish ? "mol" : "dur"})`}>
+                      {keyChords.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Durovi akordi">
+                      {NAMES.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Molovi akordi">
+                      {NAMES.map((n) => (
+                        <option key={n} value={`${n}m`}>
+                          {n}m
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </span>
+              </span>
               <button type="button" aria-pressed={pos === 0} onClick={() => onPos(0)} className={`${CHIP} ${pos === 0 ? CHIP_ON : CHIP_OFF}`}>
                 Cel vrat
               </button>
@@ -361,8 +474,8 @@ export function ScaleBoard({
               ))}
             </div>
           </div>
-          <div>
-            <div className={LABEL}>Na pikah</div>
+          <div role="group" aria-label="Na pikah">
+            {!compact && <div className={LABEL}>Na pikah</div>}
             <div className="inline-flex rounded-full border border-neutral-200 p-0.5 dark:border-white/[0.08]">
               {(["note", "int"] as const).map((v) => (
                 <button
@@ -379,8 +492,23 @@ export function ScaleBoard({
               ))}
             </div>
           </div>
+          <div role="group" aria-label="Prilagajanje" className="hidden lg:flex">
+            <div className="flex items-center gap-2.5">
+              {/* Blaga vijolična ločnica pred prilagoditvami vratu. */}
+              <span aria-hidden="true" className="h-6 w-px bg-violet-400/40" />
+              <button
+                type="button"
+                aria-pressed={splitPref}
+                onClick={toggleSplit}
+                title="Vrat v dveh vrsticah: prečke 1–9 zgoraj, 10–19 spodaj"
+                className={`${CHIP} ${splitPref ? CHIP_ON : CHIP_OFF}`}
+              >
+                Prelomi vrat
+              </button>
+            </div>
+          </div>
           <div className="lg:ml-auto">
-            <div className={LABEL}>Velikost</div>
+            {!compact && <div className={LABEL}>Velikost</div>}
             <div className="inline-flex items-center rounded-full border border-neutral-200 p-0.5 dark:border-white/[0.08]" role="group" aria-label="Velikost vratu">
               <button
                 type="button"
@@ -415,7 +543,9 @@ export function ScaleBoard({
           <button
             type="button"
             onClick={playScale}
-            className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+            aria-label={playing ? "Ustavi" : "Zaigraj lestvico"}
+            title={playing ? "Ustavi" : "Zaigraj lestvico"}
+            className={`inline-flex items-center gap-2 rounded-full bg-neutral-900 text-sm ${compact ? "h-8 w-8 justify-center" : "px-4 py-2"} font-medium text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200`}
           >
             {playing ? (
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5">
@@ -427,23 +557,25 @@ export function ScaleBoard({
                 <path d="M7 4v16l13-8z" />
               </svg>
             )}
-            {playing ? "Ustavi" : "Zaigraj lestvico"}
+            {!compact && (playing ? "Ustavi" : "Zaigraj lestvico")}
           </button>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-x-5 gap-y-1 px-4 pt-3 text-sm text-neutral-500">
+      <div className={`flex flex-wrap gap-x-5 gap-y-1 px-4 text-sm text-neutral-500 ${compact ? "items-center pt-2" : "pt-3"}`}>
+        {!compact && (
         <span>
           <span className="font-medium text-neutral-900 dark:text-white">
             {NAMES[root]} {sc.name.toLowerCase()}
           </span>
           {" · "}
-          {active ? `položaj ${pos} · prečke ${active.start}–${active.end}` : "cel vrat"}
+          {active ? `položaj ${pos} · prečke ${active.start}–${active.end}` : allNotes ? "vsi toni" : "cel vrat"}
         </span>
+        )}
         <span className="font-mono text-xs leading-5">{allInts.map((iv) => NAMES[mod12(root + iv)]).join(" ")}</span>
         <span className="font-mono text-xs leading-5">{allInts.map((iv) => intLabel(iv, sc)).join(" ")}</span>
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 pt-2 text-xs text-neutral-500">
+      <div className={`flex flex-wrap gap-x-4 gap-y-1 px-4 text-xs text-neutral-500 ${compact ? "pt-1" : "pt-2"}`}>
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-orange-500 dark:bg-orange-400" />
           osnovni ton
@@ -461,46 +593,73 @@ export function ScaleBoard({
         <span>· tapni piko za zvok</span>
       </div>
 
-      <div ref={neckRef} className="overflow-x-auto px-4 pt-3 pb-5">
-        <svg width={W * zoom} height={H * zoom} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Vrat kitare z označeno lestvico" className="mx-auto block">
-          <rect x={board.x} y={board.y} width={board.w} height={board.h} rx={6} className="fill-[#efe7dc] dark:fill-[#17161a]" />
-          {INLAYS.map((f) => {
-            const d = NUT + (f - 0.5) * FW;
-            const [lx, ly] = desktop ? [PAD + d, H - 6] : [PAD - 16, PAD + d];
-            return (
-              <g key={f}>
-                {(f === 12 ? [1.5, 3.5] : [2.5]).map((off) => {
-                  const [x, y] = at(off, d);
-                  return <circle key={off} cx={x} cy={y} r={5} className="fill-[#c9c2b8] dark:fill-[#3a3840]" />;
-                })}
-                <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" className="fill-neutral-500 font-mono text-[10px]">
-                  {f}
-                </text>
-              </g>
-            );
-          })}
-          {Array.from({ length: FRETS + 1 }, (_, f) => {
-            const [x1, y1] = at(0, fretD(f));
-            const [x2, y2] = at(5, fretD(f));
-            return (
-              <line
-                key={f}
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                strokeWidth={f === 0 ? 4 : 1.5}
-                className={f === 0 ? "stroke-neutral-900 dark:stroke-neutral-200" : "stroke-[#c9c2b8] dark:stroke-[#3a3840]"}
-              />
-            );
-          })}
-          {OPEN.map((_, s) => {
-            const [x1, y1] = at(s, 0);
-            const [x2, y2] = at(s, len);
-            return <line key={s} x1={x1} y1={y1} x2={x2} y2={y2} strokeWidth={1 + (5 - s) * 0.3} className="stroke-[#9a948c] dark:stroke-[#5b5862]" />;
-          })}
-          {dots}
-        </svg>
+      <div ref={neckRef} className={`overflow-x-auto px-4 pb-5 ${compact ? "pt-2" : "pt-3"}`}>
+        {(split
+          ? [
+              [0, PAD + fretD(SPLIT_FRET) + 6],
+              [PAD + fretD(SPLIT_FRET) - 12, W],
+            ]
+          : [[0, W]]
+        ).map(([x0, x1], row) => (
+          <svg
+            key={row}
+            width={(x1 - x0) * zoom}
+            height={H * zoom}
+            viewBox={`${x0} 0 ${x1 - x0} ${H}`}
+            role="img"
+            aria-label={split ? `Vrat kitare, prečke ${row ? `${SPLIT_FRET + 1}–${FRETS}` : `0–${SPLIT_FRET}`}` : "Vrat kitare z označeno lestvico"}
+            className={`block ${split ? "" : "mx-auto"} ${row ? "mt-2" : ""}`}
+          >
+            <rect x={board.x} y={board.y} width={board.w} height={board.h} rx={6} className="fill-[#efe7dc] dark:fill-[#17161a]" />
+            {INLAYS.map((f) => {
+              const d = NUT + (f - 0.5) * FW;
+              const [lx, ly] = desktop ? [PAD + d, H - 6] : [PAD - 16, PAD + d];
+              return (
+                <g key={f}>
+                  {(f === 12 ? [1.5, 3.5] : [2.5]).map((off) => {
+                    const [x, y] = at(off, d);
+                    return <circle key={off} cx={x} cy={y} r={5} className="fill-[#c9c2b8] dark:fill-[#3a3840]" />;
+                  })}
+                  <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" className="fill-neutral-500 font-mono text-[10px]">
+                    {f}
+                  </text>
+                </g>
+              );
+            })}
+            {Array.from({ length: FRETS + 1 }, (_, f) => {
+              const [x1, y1] = at(0, fretD(f));
+              const [x2, y2] = at(5, fretD(f));
+              return (
+                <line
+                  key={f}
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  strokeWidth={f === 0 ? 4 : 1.5}
+                  className={f === 0 ? "stroke-neutral-900 dark:stroke-neutral-200" : "stroke-[#c9c2b8] dark:stroke-[#3a3840]"}
+                />
+              );
+            })}
+            {OPEN.map((_, s) => {
+              const [x1, y1] = at(s, 0);
+              const [x2, y2] = at(s, len);
+              return <line key={s} x1={x1} y1={y1} x2={x2} y2={y2} strokeWidth={1 + (5 - s) * 0.3} className="stroke-[#9a948c] dark:stroke-[#5b5862]" />;
+            })}
+            {dots}
+            {split && (
+              <text
+                x={PAD + NUT + (SPLIT_FRET + 0.5) * FW}
+                y={H - 6}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="fill-neutral-500 font-mono text-[10px]"
+              >
+                {SPLIT_FRET + 1}
+              </text>
+            )}
+          </svg>
+        ))}
       </div>
     </>
   );

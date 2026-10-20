@@ -24,6 +24,7 @@
 //                                       zapiše synced_lines: LRC poravnava (ali obstoječi ročni časi) + ti popravki
 //     "lrcAlbum": "Best Metal Ballads", LRC različica za synced_lines (ko aplikacija po dolžini videa izbere napačno)
 //     "saveLines": true                 zapiši synced_lines tudi brez lineOverrides (npr. samo zaradi lrcAlbum)
+//     "linesFrom": "lines.json"         osnova časov vrstic iz autosync.mjs (skladbe brez LRC) namesto LRC poravnave
 //   }
 // Pred pisanjem shrani staro vrstico v backups/spedenaj/<id>-<čas>.json. Preverjenih
 // skladb (verified_player_at) ne spreminja.
@@ -35,6 +36,18 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../..", import.meta.url));
 // fetchLrcCandidates bere/piše window.localStorage (predpomnilnik v brskalniku).
 globalThis.window ??= { localStorage: { getItem: () => null, setItem: () => {} } };
+// LRCLIB občasno vrača 503 (preobremenjen) — do 6 poskusov z naraščajočim premorom.
+{
+  const baseFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const isLrc = String(input).includes("lrclib.net");
+    for (let i = 0; ; i++) {
+      const res = await baseFetch(input, init);
+      if (!isLrc || res.status < 500 || i >= 5) return res;
+      await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+    }
+  };
+}
 const jiti = createJiti(import.meta.url, { alias: { "@": `${root}src` } });
 const { parseChords, splitDescription, toEditableText, applyEditedText, transposeChord } = await jiti.import("../../src/lib/chords.ts");
 const { findChordPatterns } = await jiti.import("../../src/lib/chordPatterns.ts");
@@ -314,9 +327,14 @@ if (cmd === "list") {
     notes.push(`akordi: ${sections.map((x) => `${x.name} ${x.points.length}× (${fmt(x.points[0]?.t ?? 0)}–${x.end != null ? fmt(x.end) : "?"})`).join(", ")}`);
   }
   // 4) časi vrstic: osnova = obstoječi ročni časi (po remapu) ali LRC poravnava novega besedila
-  if (patch.lineOverrides?.length || patch.saveLines) {
+  if (patch.lineOverrides?.length || patch.saveLines || patch.linesFrom) {
     let base;
-    if (synced.synced_lines?.points?.length) {
+    if (patch.linesFrom) {
+      const auto = JSON.parse(readFileSync(patch.linesFrom, "utf8"));
+      if (auto.video !== video) throw new Error(`linesFrom je za video ${auto.video}, skladba ima ${video}`);
+      base = auto.lines.map((p) => ({ t: r3(p.t), end: r3(p.end), line: p.line }));
+      notes.push(`časi vrstic: osnova = samodejno iz petja (${base.length} vrstic, ocenjenih ${auto.lines.filter((p) => p.guess).length})`);
+    } else if (synced.synced_lines?.points?.length) {
       base = remapLines(synced.synced_lines.points, body).points.map((p) => ({ t: p.t, end: p.end, line: p.line }));
       notes.push("časi vrstic: osnova = obstoječi shranjeni časi");
     } else {

@@ -5,7 +5,7 @@ export const NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb"
 export const INTERVALS: Record<number, string> = { 0: "1", 1: "b2", 2: "2", 3: "b3", 4: "3", 5: "4", 6: "b5", 7: "5", 8: "b6", 9: "6", 10: "b7", 11: "7" };
 // E2 A2 D3 G3 B3 E4 (MIDI), od nizke E navzgor.
 export const OPEN = [40, 45, 50, 55, 59, 64];
-export const FRETS = 17;
+export const FRETS = 19;
 
 export type Scale = {
   id: string;

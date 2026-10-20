@@ -59,6 +59,12 @@ export type SharedViewProp =
 // ob obstoječih povezavah/PDF v ChordsButtons.tsx, ne nadomestilo.
 
 const FONT_KEY = "komadi:chords:font";
+// Računalnik: ročna velikost orodne vrstice (zoom); brez ključa = samodejno (fitToolbar).
+const TOOLBAR_SCALE_KEY = "komadi:chords:toolbarScale";
+const TOOLBAR_SCALE_STEP = 0.05;
+const TOOLBAR_SCALE_MIN = 0.6;
+const TOOLBAR_SCALE_MAX = 2;
+const TOOLBAR_COLLAPSED_KEY = "komadi:chords:toolbarCollapsed";
 const SIMPLIFY_KEY = "komadi:chords:simplify";
 // "Pokaži akorde": sheme vseh akordov skladbe desno od naslova (kot na UG).
 const SHOW_SHAPES_KEY = "komadi:chords:showShapes";
@@ -279,6 +285,16 @@ function readNumber(key: string, fallback: number) {
 function wrap(n: number) {
   const m = ((n % 12) + 12) % 12;
   return m > 6 ? m - 12 : m;
+}
+
+function readOptionalNumber(key: string): number | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    const v = Number(raw);
+    return raw !== null && Number.isFinite(v) ? v : null;
+  } catch {
+    return null;
+  }
 }
 
 function writeNumber(key: string, value: number) {
@@ -1284,11 +1300,41 @@ export default function ChordsViewer({
   // roba (laptop 1280 px in večji zasloni; največ 135 %). Izmeri se pri 100 % brez
   // prelamljanja ob vsakem izrisu (gumbi se pojavijo/izginejo) in ob spremembi velikosti.
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const [toolbarScale, setToolbarScaleState] = useState<number | null>(() => readOptionalNumber(TOOLBAR_SCALE_KEY));
+  const setToolbarScale = (v: number | null) => {
+    setToolbarScaleState(v);
+    try {
+      if (v === null) window.localStorage.removeItem(TOOLBAR_SCALE_KEY);
+      else window.localStorage.setItem(TOOLBAR_SCALE_KEY, String(v));
+    } catch {}
+  };
+  // Zložena orodna vrstica (puščica pri ⚙); predvajalnik ostane. Na napravo.
+  const [toolbarCollapsed, setToolbarCollapsedState] = useState(() => readOptionalNumber(TOOLBAR_COLLAPSED_KEY) === 1);
+  const setToolbarCollapsed = (v: boolean) => {
+    setToolbarCollapsedState(v);
+    writeNumber(TOOLBAR_COLLAPSED_KEY, v ? 1 : 0);
+  };
+  // Prvi klik iz "samodejno" začne pri trenutni (izračunani) velikosti.
+  const stepToolbarScale = (d: number) => {
+    const from = toolbarScale ?? (Number(toolbarRef.current?.style.zoom) || 1);
+    const next = Math.round((from + d * TOOLBAR_SCALE_STEP) * 20) / 20;
+    setToolbarScale(Math.max(TOOLBAR_SCALE_MIN, Math.min(TOOLBAR_SCALE_MAX, next)));
+  };
   const fitToolbar = useCallback(() => {
     const el = toolbarRef.current;
     if (!el) return;
     if (!window.matchMedia("(min-width: 1024px)").matches) {
       el.style.zoom = "";
+      return;
+    }
+    // Ročna velikost (⚙ → Napredne nastavitve) ali ob odprtem Impro največja samodejna;
+    // gumbi se po potrebi prelomijo v drugo vrsto.
+    if (el.dataset.scale) {
+      el.style.zoom = el.dataset.scale;
+      return;
+    }
+    if (el.dataset.impro !== undefined) {
+      el.style.zoom = "1.35";
       return;
     }
     el.style.zoom = "1";
@@ -1516,7 +1562,7 @@ export default function ChordsViewer({
     const labelCount = new Map<string, number>();
     for (const l of body) if (l.kind === "section") labelCount.set(l.label, (labelCount.get(l.label) ?? 0) + 1);
     const labelSeen = new Map<string, number>();
-    const out: { t: number; label: string }[] = [];
+    const out: { t: number; label: string; line: number }[] = [];
     body.forEach((l, s) => {
       if (l.kind !== "section") return;
       const nextIdx = body.findIndex((m, i) => i > s && m.kind === "section");
@@ -1538,7 +1584,7 @@ export default function ChordsViewer({
       const nth = (labelSeen.get(l.label) ?? 0) + 1;
       labelSeen.set(l.label, nth);
       const numbered = (labelCount.get(l.label) ?? 0) > 1 && !/\d\s*$/.test(l.label);
-      out.push({ t: Math.max(0, t), label: numbered ? `${l.label} ${nth}` : l.label });
+      out.push({ t: Math.max(0, t), label: numbered ? `${l.label} ${nth}` : l.label, line: s });
     });
     return out.sort((a, b) => a.t - b.t);
   }, [sync, chordsWrongVideo, chordPoints, lrcOffset, body]);
@@ -2351,8 +2397,43 @@ export default function ChordsViewer({
   // Kar je označeno: pri sledilcu vodjev Smart play, sicer lasten.
   const shownLine = follower ? (remote?.smart?.line ?? -1) : smartActive ? activeLine : -1;
   const shownChord = follower ? (remote?.smart?.chord ?? null) : activeChord;
+  // Impro "Trenutna": obarvani (natapkani) akord, sicer prvi akord vrstice, ki se poje,
+  // oz. zadnji akord pred njo (vrstica brez akordov). Imena kot v improChords.
+  const improCurrentChord = (() => {
+    if (!improOpen) return null;
+    const lineChords = (i: number): (string | null)[] => {
+      const line = body[i];
+      if (!line) return [];
+      if (line.kind === "chords") return line.chords.map((c) => c.name);
+      if (line.kind === "pair") return line.chunks.map((c) => c.chord);
+      if (line.kind === "text") return line.segments.map((s) => ("chord" in s ? s.chord : null));
+      if (line.kind === "tab") return line.header?.map((c) => c.name) ?? [];
+      return [];
+    };
+    let raw: string | null = shownChord ? (lineChords(shownChord.line)[shownChord.chord] ?? null) : null;
+    if (!raw && shownLine >= 0) {
+      raw = lineChords(shownLine).find((c) => c) ?? null;
+      for (let i = shownLine - 1; !raw && i >= 0; i--) raw = lineChords(i).filter((c) => c).pop() ?? null;
+    }
+    if (!raw) return null;
+    const t = transposeChord(raw, chordShift);
+    return simplify ? simplifyChord(t) : t;
+  })();
   // Ročno pomikanje (dotik, kolesce) za 4 s ustavi samodejno sledenje.
   const lastUserScrollRef = useRef(0);
+  // Klik na oznako dela na drsniku: naslov dela tik pod lepljivi zgornji vrstici
+  // (tudi ko se ne predvaja); samodejno sledenje počaka 4 s, da ga ne potegne nazaj.
+  const scrollToSection = (lineIndex?: number) => {
+    const el = scrollRef.current;
+    const line = lineIndex == null ? null : el?.querySelector<HTMLElement>(`[data-line="${lineIndex}"]`);
+    if (!el || !line) return;
+    requestAnimationFrame(() => {
+      lastUserScrollRef.current = Date.now();
+      const bars = barsOuterRef.current?.offsetHeight ?? 0;
+      const top = el.scrollTop + line.getBoundingClientRect().top - el.getBoundingClientRect().top - bars - 20;
+      el.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    });
+  };
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !smartActive) return;
@@ -3525,8 +3606,45 @@ export default function ChordsViewer({
                     </button>
                   </div>
                 ) : (
-                  <p className="text-[10px] leading-tight text-neutral-500">Tu še ni naprednih nastavitev.</p>
+                  <p className="text-[10px] leading-tight text-neutral-500 lg:hidden">Tu še ni naprednih nastavitev.</p>
                 )}
+                {/* Računalnik: velikost orodne vrstice (null = samodejno, prilagodi se širini). */}
+                <div className="hidden items-center justify-between gap-2 lg:flex">
+                  <span className="text-xs text-neutral-200">
+                    Velikost orodne vrstice
+                    <button
+                      type="button"
+                      onClick={() => setToolbarScale(null)}
+                      disabled={toolbarScale === null}
+                      className="block text-[10px] leading-tight text-neutral-500 enabled:text-amber-400 enabled:hover:underline"
+                    >
+                      {toolbarScale === null ? "Samodejno" : "Ponastavi na samodejno"}
+                    </button>
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => stepToolbarScale(-1)}
+                      disabled={toolbarScale !== null && toolbarScale <= TOOLBAR_SCALE_MIN}
+                      aria-label="Manjša orodna vrstica"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-orange-400 text-sm text-amber-400 hover:bg-orange-400/15 disabled:opacity-40"
+                    >
+                      −
+                    </button>
+                    <span className="w-10 text-center text-xs tabular-nums text-neutral-200">
+                      {toolbarScale === null ? "auto" : `${Math.round(toolbarScale * 100)} %`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => stepToolbarScale(1)}
+                      disabled={toolbarScale !== null && toolbarScale >= TOOLBAR_SCALE_MAX}
+                      aria-label="Večja orodna vrstica"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-orange-400 text-sm text-amber-400 hover:bg-orange-400/15 disabled:opacity-40"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -3614,7 +3732,9 @@ export default function ChordsViewer({
                 : `https://www.youtube.com/results?search_query=${encodeURIComponent(`${song.author} ${song.title}`)}`)
             }
             sliderHost={sliderHostEl}
+            sliderBelow={improOpen}
             sectionMarkers={sectionMarkers}
+            onMarkerClick={(m) => scrollToSection(m.line)}
             onTime={onVideoTime}
             smartAvailable={smartAvailable}
             smartOn={smartOn}
@@ -3648,6 +3768,19 @@ export default function ChordsViewer({
               } catch {}
             }}
           />
+        {toolbarCollapsed && (
+          <button
+            type="button"
+            onClick={() => setToolbarCollapsed(false)}
+            aria-label="Pokaži orodno vrstico"
+            title="Pokaži orodno vrstico"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-amber-400 transition hover:bg-orange-400/15 active:scale-95"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+        )}
         <button
           type="button"
           onClick={onClose}
@@ -3666,12 +3799,21 @@ export default function ChordsViewer({
         </button>
       </div>
 
-      {/* Telefon: drsnik po skladbi čez celo širino, med zgornjo vrstico in orodji. */}
-      <div ref={setSliderHost} className="flex shrink-0 items-center px-4 pb-2 empty:hidden lg:hidden" />
+      {/* Telefon (in računalnik ob odprtem Impro): drsnik po skladbi čez celo širino, med zgornjo vrstico in orodji. */}
+      <div
+        ref={setSliderHost}
+        className={`flex shrink-0 items-center px-4 pb-2 empty:hidden ${
+          improOpen ? "lg:bg-neutral-900 lg:px-12 lg:pb-2.5 lg:pt-4 lg:[zoom:1.35]" : "lg:hidden"
+        }`}
+      />
 
       {/* Računalnik: orodna vrstica se poveča toliko, da je v eni vrsti do desnega
           roba (fitToolbar, največ 135 %); telefon: navaden tok gumbov. */}
-      <div ref={toolbarRef} className="flex shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 max-lg:border-white/10 max-lg:bg-transparent lg:items-end lg:gap-3 lg:px-12 xl:px-8">
+      <div
+        ref={toolbarRef}
+        data-impro={improOpen ? "" : undefined}
+        data-scale={toolbarScale ?? undefined}
+        className={`${toolbarCollapsed ? "hidden" : "flex"} shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 max-lg:border-white/10 max-lg:bg-transparent lg:items-end lg:gap-3 lg:px-12 xl:px-8`}>
         {/* Računalnik: skupine z napisom (Povezave, Prilagajanje, Urejanje, Funkcije,
             Nastavitve); telefon: "contents" + max-lg:order — en tok gumbov kot prej. */}
         {((hasSamSpili(song) && !recorder && !follower) || (!!song.chords_source_url && /ultimate-guitar.com/.test(song.chords_source_url))) && (
@@ -3972,6 +4114,21 @@ export default function ChordsViewer({
                 <circle cx="12" cy="12" r="3" />
               </svg>
             </button>
+            {/* Zloži orodno vrstico — predvajalnik zgoraj ostane; nazaj s puščico v njegovi vrstici. */}
+            <button
+              type="button"
+              onClick={() => {
+                closeThemeMenu();
+                setToolbarCollapsed(true);
+              }}
+              aria-label="Zloži orodno vrstico"
+              title="Zloži orodno vrstico"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-neutral-200 transition hover:text-white active:scale-95 max-lg:order-13"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="m18 15-6-6-6 6" />
+              </svg>
+            </button>
           </div>
         </div>
         <button
@@ -4105,12 +4262,12 @@ export default function ChordsViewer({
             {/* "Nasvet": ponavljajoča se zaporedja akordov (shranil skill spedenaj v
                 songs.chord_tips; imena prikazana s transpozicijo / Simpl / No capo). */}
             {song.chord_tips && (song.chord_tips.whole || song.chord_tips.parts.length > 0) && (
-              <div className="relative z-10 self-start rounded-xl border border-sky-400/40 bg-sky-400/[0.05] px-2.5 py-1.5" aria-label="Nasvet">
+              <div className="relative z-10 self-start rounded-xl border border-violet-400/40 bg-violet-400/[0.05] px-2.5 py-1.5" aria-label="Nasvet">
                 <button
                   type="button"
                   onClick={() => setTipsOpen((v) => !v)}
                   aria-expanded={tipsOpen}
-                  className="flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-sky-400"
+                  className="flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-violet-400"
                 >
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
                     <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z" />
@@ -4121,7 +4278,7 @@ export default function ChordsViewer({
                   </svg>
                 </button>
                 {tipsOpen && (
-                  <div className="absolute left-0 top-full mt-1.5 w-[min(36rem,calc(100vw-2rem))] divide-y divide-sky-400/25 rounded-xl border border-sky-400/50 bg-(--cv-bg) p-3 text-xs text-(--cv-text) shadow-2xl lg:p-4 lg:text-sm">
+                  <div className="absolute left-0 top-full mt-1.5 w-[min(36rem,calc(100vw-2rem))] divide-y divide-violet-400/25 rounded-xl border border-violet-400/50 bg-(--cv-bg) p-3 text-xs text-(--cv-text) shadow-2xl lg:p-4 lg:text-sm">
                     {song.chord_tips.whole ? (
                       <div className="py-2 first:pt-0">
                         <p className="text-sm font-medium lg:text-base">Akordi se čez celo skladbo ponavljajo:</p>
@@ -4140,13 +4297,13 @@ export default function ChordsViewer({
                         </div>
                       ))
                     )}
-                    {song.chord_tips.sameVerseChorus && <p className="py-2 text-sm font-medium text-sky-300 lg:text-base">Kitica in refren imata enako zaporedje.</p>}
+                    {song.chord_tips.sameVerseChorus && <p className="py-2 text-sm font-medium text-violet-300 lg:text-base">Kitica in refren imata enako zaporedje.</p>}
                     <button
                       type="button"
                       onClick={() => setTipShapes((v) => !v)}
                       aria-pressed={tipShapes}
                       className={`mt-2 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition lg:px-3 lg:py-1 lg:text-xs ${
-                        tipShapes ? "border-sky-400 bg-sky-400/15 text-sky-300" : "border-sky-400/50 text-sky-400 hover:bg-sky-400/10"
+                        tipShapes ? "border-violet-400 bg-violet-400/15 text-violet-300" : "border-violet-400/50 text-violet-400 hover:bg-violet-400/10"
                       }`}
                     >
                       {tipShapes ? "Skrij akorde" : "Prikaži akorde"}
@@ -4491,7 +4648,7 @@ export default function ChordsViewer({
             </div>
           </div>
         )}
-        {improOpen && <ImproPanel chords={improChords} capo={capoShift ? null : capo} onClose={() => setImproOpen(false)} />}
+        {improOpen && <ImproPanel chords={improChords} currentChord={improCurrentChord} capo={capoShift ? null : capo} onClose={() => setImproOpen(false)} />}
       </div>
 
       {ssVolMsg && (

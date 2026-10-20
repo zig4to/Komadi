@@ -146,7 +146,9 @@ export default function ChordsButtons({
     const panelLeft = menuPos
       ? Math.min(Math.max(8, menuAlign === "right" ? menuPos.left + menuPos.width - panelWidth : menuPos.left), window.innerWidth - panelWidth - 8)
       : 0;
-    const wide = panelWidth >= 340;
+    // Dva stolpca samo na telefonu/tablici; na računalniku vedno en stolpec povezav.
+    const desktop = typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
+    const wide = panelWidth >= 340 && !desktop;
     return (
       <span ref={rootRef} hidden>
 

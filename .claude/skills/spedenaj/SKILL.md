@@ -22,6 +22,13 @@ description: "Pripravi skladbo iz 'Pregled in odobritev' (songs.review_pending) 
     --downbeat d --beat b --chords Am,C,D` — ocena akordov taba za vsak udarec (za postavitev akordov nad zloge,
     korak 2.5).
     Če prenos vrne 403, posodobi yt-dlp (`pip install -U yt-dlp`) in poskusi znova.
+  - `"$LOCALAPPDATA/Komadi/spedenaj-venv/Scripts/python" scripts/spedenaj/vocals.py <videoId> --lang sl
+    --prompt besedilo.txt --out w.json` — Demucs izloči vokal, Whisper (faster-whisper, large-v3-turbo, CPU) ga
+    prepiše v besede s časi (besedilo taba = namig). ~2–5 min na skladbo. Okolje enkrat:
+    `…/Scripts/python -m pip install faster-whisper demucs soundfile`.
+  - `node --env-file=.env.local scripts/spedenaj/autosync.mjs <id> --words w.json --out lines.json` — besede iz
+    `w.json` poravna z vrsticami taba (samo naprej) → začetek/konec vsake zapete vrstice + delež ujetih besed;
+    vrstice pod 40 % so ocenjene (enakomerno med sosednjima). `lines.json` gre v patch kot `"linesFrom"` (korak 6b).
 - Začasne datoteke (osnutki, `a.json`, `patch.json`) piši v scratchpad seje, ne v repozitorij.
 - Kako aplikacija uporablja podatke (podrobno v CLAUDE.md, "Pametni predvajalnik" in "Preverjene skladbe"):
   - `chords_text` = UG zapis; telo pesmi = vse od prve oznake/vrstice akordov naprej; indeksi vrstic v `dump`
@@ -66,6 +73,14 @@ V poročilu navedi staro → novo ime.
 6. Če ima skladba že `synced_chords`/`synced_lines` za drug video, jih je treba za novi video narediti znova
    (ne samo prestaviti) — uporabnika na to opozori v poročilu.
 
+### 1b. Skladba še nima časov → najprej jih naredi
+Uporabnikova odločitev (2026-10-20): takoj po izbiri videa preveri, ali ima skladba čase vrstic — LRC s časi
+(`dump`: "LRC: … povezanih X/Y") ali shranjene `synced_lines` za ta video. Če nima ne enega ne drugega (ali ima
+`synced_lines` za drug video), **najprej naredi čase iz petja** (`vocals.py` → `autosync.mjs`, postopek v 6b) in jih
+zapiši, šele nato nadaljuj s korakom 2. `w.json` (prepoznane besede) obdrži do konca: ko korak 4 spremeni besedilo,
+`autosync.mjs` poženi znova z istim `w.json` (samo poravnava, brez ponovne prepoznave) in časi ponovno zapiši, da
+ustrezajo končnemu besedilu.
+
 ### 2. Popolnost besedila
 1. `song.mjs editable <id> --out osnutek.txt` → besedilo "akordi nad besedilom".
 2. Iz `dump`: **LRC vrstice brez para** = zapete vrstice, ki jih tab nima (ali so napisane drugače). Za vsako:
@@ -75,7 +90,7 @@ V poročilu navedi staro → novo ime.
    - manjkajoča vrstica: dodaj jo z akordi, ki jih ima ta del drugje (enak del, ponovitev).
 3. Odstrani "2x", "x2", "Repeat", "Refren" opombe iz telesa (ponovitve morajo biti izpisane).
 4. **Brez LRC** (`dump` to pove): preveri samo očitne bližnjice (2x, "Refren", "(Chorus)") — jih izpiši, če je jasno,
-   kaj ponavljajo, sicer javi v poročilu. Časov vrstic pri teh skladbah ne urejaj (uporabnikova odločitev).
+   kaj ponavljajo, sicer javi v poročilu. Čase vrstic teh skladb naredi samodejno iz petja (korak 6b).
 5. **Akordi nad vsako vrstico z besedilom** (uporabnikova odločitev): vsaka zapeta vrstica v celem telesu mora
    imeti akorde nad besedami, kjer se zamenjajo — tudi ko tab akorde napiše samo enkrat (npr. samo nad prvo
    vrstico kitice in potem "repeat like verse", "Am / C / D", ali kitice brez akordov). **Postopek** (Six Blade
@@ -152,7 +167,7 @@ V poročilu navedi staro → novo ime.
    - `line`/`chord` = indeksi iz zadnjega `dump` (`j` pri vsakem akordu).
 3. Patch `{"chordSections": [ … ]}` → `write` (najprej brez `--write`).
 
-### 6. Časi vrstic (samo skladbe z LRC)
+### 6. Časi vrstic (skladbe z LRC; brez LRC → 6b)
 Cilj: vrstica je označena natanko takrat, ko se poje — nič prehitevanja, nič označevanja čez instrumentalni del.
 0. **Prava LRC različica**: aplikacija izbere različico po dolžini videa — `dump --audio` uporabi isto (dolžino iz
    `a.json`). `dump` izpiše "vse različice"; z `--album "…"` si oglej drugo. Primerjaj čase vrstic po delih z
@@ -173,6 +188,19 @@ Cilj: vrstica je označena natanko takrat, ko se poje — nič prehitevanja, ni�
 4. Popravke zapiši kot `"lineOverrides": [{ "line", "t", "end" }]` → `write` naredi `synced_lines` iz LRC poravnave
    (ali obstoječih shranjenih časov) + popravkov, s ključi. Če popravkov ni, `synced_lines` NE zapisuj (aplikacija
    ostane na sprotnem LRCLIB).
+
+### 6b. Časi vrstic brez LRC (samodejno iz petja — prototip)
+Za skladbe, ki jih LRCLIB nima s časi (`dump`: "LRCLIB nima…"), namesto ročnega tapkanja (uporabnikova odločitev,
+2026-10-20). Prvič se naredi že v koraku 1b; tu jih po končnem besedilu le še enkrat poravnaj in preveri:
+1. Besedilo taba (samo zapete vrstice, `editable` brez vrstic akordov) shrani v `besedilo.txt` kot namig.
+2. `vocals.py <video> --lang <sl|hr|sr|en …> --prompt besedilo.txt --out w.json` (jezik po skladbi; zaklenjeni video
+   iz koraka 1).
+3. `autosync.mjs <id> --words w.json --out lines.json` → preglej poročilo: vrstice z "?" (pod 70 %) in "?? ocena"
+   primerjaj s kromagramom v `a.json` (začetek vrstice ≈ menjava akorda njenega prvega akorda) in jih po potrebi
+   popravi v `lines.json`.
+4. Patch `{ "video": "…", "linesFrom": "lines.json" }` (+ morebitni `lineOverrides`) → `write` brez `--write`, nato
+   z `--write`. Zapiše `synced_lines` s ključi, kot "Posnemi čase".
+5. V poročilu navedi delež zanesljivih vrstic in ocenjene/negotove vrstice — te uporabnik preveri ob poslušanju.
 
 ### 7. Akordi glede na posnetek (samo poročilo)
 `dump <id> --audio a.json` izpiše ujemanje: najboljši premik tonalitete (≠ 0 → tab je morda v drugi tonaliteti ali
