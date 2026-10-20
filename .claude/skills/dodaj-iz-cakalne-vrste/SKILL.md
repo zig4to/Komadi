@@ -299,7 +299,12 @@ razvrstita videe):
 ```
 node --env-file=.env.local scripts/fill-chords-text.mjs --id <song_id>
 node --env-file=.env.local scripts/fill-youtube-embed-ids.mjs --id <song_id>
+node --env-file=.env.local scripts/fill-bpm.mjs --id <song_id>
 ```
+- `fill-bpm.mjs` zapiše `songs.bpm` (tempo za metronom v pregledovalniku) iz
+  zvočne analize videa (`scripts/spedenaj/audio.py`, venv spedenaj); zato ga
+  zaženi PO `fill-youtube-embed-ids.mjs` (potrebuje video). Ob napaki (YouTube
+  "not a bot") ga ponovi kasneje — skladba brez bpm ima metronom na 100.
 - `fill-chords-text.mjs` zapiše `songs.chords_text` (surov UG markup
   `[ch]`/`[tab]`). Skladbe brez UG povezave ga nimajo — vrstica "Akordi v
   aplikaciji" se zanje ne prikaže, to ni napaka.

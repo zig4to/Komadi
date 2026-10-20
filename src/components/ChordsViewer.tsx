@@ -37,6 +37,7 @@ import {
   type SyncPoint, sectionOffset, instrumentalGapAt } from "@/lib/syncedLyrics";
 import { supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
+import { useMetronome } from "@/lib/useMetronome";
 import ImproPanel from "@/components/ImproPanel";
 import ChordQuiz from "@/components/ChordQuiz";
 import { useIsDesktop } from "@/components/Scales";
@@ -155,6 +156,11 @@ const lrcOffsetsKey = (id: string) => `komadi:chords:lrcOffsets:${id}`;
 // "Hitrost" predvajanja (gumb v Funkcije), za vsako skladbo; pod 0,5 je zvok YouTube preslab.
 const playbackRateKey = (id: string) => `komadi:chords:rate:${id}`;
 const PLAYBACK_RATES = [1, 0.9, 0.8, 0.7, 0.6, 0.5];
+// "Metronom" (gumb v Funkcije): izbrani tempo za vsako skladbo; privzeto songs.bpm.
+const metronomeKey = (id: string) => `komadi:chords:metronome:${id}`;
+const METRO_MIN = 30;
+const METRO_MAX = 240;
+const METRO_STEP = 5;
 // "Sam Špili": popravek velikosti besedila (množitelj), korak 5 %.
 const ssScaleKey = (id: string) => `komadi:chords:ssScale:${id}`;
 const SS_SCALE_STEP = 0.05;
@@ -1455,6 +1461,43 @@ export default function ChordsViewer({
       if (rate === 1) window.localStorage.removeItem(playbackRateKey(song.id));
       else window.localStorage.setItem(playbackRateKey(song.id), String(rate));
     } catch {}
+  };
+  // "Metronom": privzeto tempo skladbe (songs.bpm, sicer 100), − / + po 5 BPM;
+  // izbrani tempo zapomnjen za vsako skladbo na napravi.
+  const songBpm = song.bpm ? Math.round(song.bpm) : null;
+  const [metroBpm, setMetroBpmState] = useState(() => {
+    try {
+      const v = Number(window.localStorage.getItem(metronomeKey(song.id)));
+      if (v >= METRO_MIN && v <= METRO_MAX) return v;
+    } catch {}
+    return songBpm ?? 100;
+  });
+  const setMetroBpm = (bpm: number) => {
+    const v = Math.max(METRO_MIN, Math.min(METRO_MAX, Math.round(bpm)));
+    setMetroBpmState(v);
+    try {
+      if (v === (songBpm ?? 100)) window.localStorage.removeItem(metronomeKey(song.id));
+      else window.localStorage.setItem(metronomeKey(song.id), String(v));
+    } catch {}
+  };
+  const [metroOn, setMetroOn] = useState(false);
+  const metronome = useMetronome(metroBpm, metroOn);
+  const metroButtonRef = useRef<HTMLButtonElement>(null);
+  const [metroMenuPos, setMetroMenuPos] = useState<{ top: number; left: number } | null>(null);
+  useEffect(() => {
+    if (!metroMenuPos) return;
+    const close = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (t?.closest("[data-metro-menu]") || metroButtonRef.current?.contains(t)) return;
+      setMetroMenuPos(null);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [metroMenuPos]);
+  const toggleMetroMenu = () => {
+    const r = metroButtonRef.current?.getBoundingClientRect();
+    if (metroMenuPos || !r) return setMetroMenuPos(null);
+    setMetroMenuPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 216)) });
   };
   const rateButtonRef = useRef<HTMLButtonElement>(null);
   const [rateMenuPos, setRateMenuPos] = useState<{ top: number; left: number } | null>(null);
@@ -4335,9 +4378,11 @@ export default function ChordsViewer({
                 onClick={toggleRateMenu}
                 aria-expanded={rateMenuPos !== null}
                 title="Hitrost predvajanja posnetka (počasneje za vadbo)"
-                className={`flex h-[26px] items-center gap-1.5 max-lg:order-5 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
-                  rateMenuPos || playbackRate !== 1 ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
-                }`}
+                aria-label="Hitrost"
+                // Telefon: samo ikona (krog kot ⚙); ob kliku (odprt meni) se razširi z napisom.
+                className={`flex h-[26px] items-center max-lg:order-5 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 text-xs font-medium transition-all duration-200 active:scale-95 lg:gap-1.5 lg:px-2.5 ${
+                  rateMenuPos ? "gap-1.5 px-2.5" : "max-lg:w-[26px] max-lg:justify-center"
+                } ${rateMenuPos || playbackRate !== 1 ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"}`}
               >
                 {/* Merilnik hitrosti. */}
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-amber-400">
@@ -4345,8 +4390,10 @@ export default function ChordsViewer({
                   <path d="m12 18-3.5-5" />
                   <circle cx="12" cy="18" r="1.2" fill="currentColor" />
                 </svg>
-                Hitrost
-                {playbackRate !== 1 && <span className="tabular-nums">{String(playbackRate).replace(".", ",")}×</span>}
+                <span className={rateMenuPos ? "" : "max-lg:hidden"}>Hitrost</span>
+                {playbackRate !== 1 && (
+                  <span className={`tabular-nums ${rateMenuPos ? "" : "max-lg:hidden"}`}>{String(playbackRate).replace(".", ",")}×</span>
+                )}
               </button>
             )}
             {rateMenuPos && (
@@ -4375,6 +4422,81 @@ export default function ChordsViewer({
                     {playbackRate === r && <span aria-hidden="true">✓</span>}
                   </button>
                 ))}
+              </div>
+            )}
+            <button
+              ref={metroButtonRef}
+              type="button"
+              onClick={toggleMetroMenu}
+              aria-expanded={metroMenuPos !== null}
+              aria-label="Metronom"
+              title={`Metronom (${metroBpm} BPM)`}
+              // Telefon: samo ikona; ob kliku (odprt meni) se razširi z napisom — kot Hitrost.
+              className={`flex h-[26px] items-center max-lg:order-5 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 text-xs font-medium transition-all duration-200 active:scale-95 lg:gap-1.5 lg:px-2.5 ${
+                metroMenuPos ? "gap-1.5 px-2.5" : "max-lg:w-[26px] max-lg:justify-center"
+              } ${metroMenuPos || metroOn ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"}`}
+            >
+              {/* Metronom (piramida z nihalom). */}
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={`h-3.5 w-3.5 shrink-0 text-amber-400 ${metroOn ? "animate-pulse" : ""}`}>
+                <path d="M9 3h6l4 18H5z" />
+                <path d="M7.5 15h9" />
+                <path d="m12 15 4.5-9" />
+              </svg>
+              <span className={metroMenuPos ? "" : "max-lg:hidden"}>Metronom</span>
+              {metroOn && <span className={`tabular-nums ${metroMenuPos ? "" : "max-lg:hidden"}`}>{metroBpm}</span>}
+            </button>
+            {metroMenuPos && (
+              <div
+                data-metro-menu
+                aria-label="Metronom"
+                style={{ top: metroMenuPos.top, left: metroMenuPos.left }}
+                className="fixed z-50 flex w-52 flex-col gap-2 rounded-xl border border-orange-400/70 bg-neutral-900/95 p-3 text-sm text-neutral-200 shadow-xl backdrop-blur"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMetroBpm(metroBpm - METRO_STEP)}
+                    disabled={metroBpm <= METRO_MIN}
+                    aria-label={`Počasneje (−${METRO_STEP} BPM)`}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-lg transition hover:bg-white/10 active:scale-95 disabled:opacity-40"
+                  >
+                    −
+                  </button>
+                  <div className="text-center leading-tight">
+                    <div className="text-2xl font-semibold tabular-nums text-amber-400">{metroBpm}</div>
+                    <div className="text-[10px] uppercase tracking-wide text-neutral-400">BPM</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMetroBpm(metroBpm + METRO_STEP)}
+                    disabled={metroBpm >= METRO_MAX}
+                    aria-label={`Hitreje (+${METRO_STEP} BPM)`}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-lg transition hover:bg-white/10 active:scale-95 disabled:opacity-40"
+                  >
+                    +
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!metroOn) metronome.prime();
+                    setMetroOn((v) => !v);
+                  }}
+                  aria-pressed={metroOn}
+                  className={`rounded-full py-1.5 font-medium transition active:scale-95 ${
+                    metroOn ? "bg-orange-400/20 text-amber-400" : "bg-orange-500 text-white hover:bg-orange-400"
+                  }`}
+                >
+                  {metroOn ? "Ustavi" : "Začni"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMetroBpm(songBpm ?? 100)}
+                  disabled={metroBpm === (songBpm ?? 100)}
+                  className="text-xs text-neutral-400 transition hover:text-white disabled:opacity-50"
+                >
+                  {songBpm ? `Tempo skladbe: ${songBpm} BPM` : "Tempo skladbe še ni izmerjen (100 BPM)"}
+                </button>
               </div>
             )}
           </div>
@@ -4436,7 +4558,9 @@ export default function ChordsViewer({
       </div>
           <div className="pt-4 font-mono leading-snug text-(--cv-text)" style={{ fontSize }}>
             <div className="relative mb-4 flex flex-wrap items-start gap-x-8 gap-y-3 font-sans max-lg:gap-x-3">
-            <div className={`shrink-0 ${nav ? "pr-24 lg:pr-0" : ""}`}>
+            {/* Telefon: naslov čez celo širino — okenca (Posebni akordi, Nasvet, Ali si vedel?,
+                Kviz, Opis) so vedno v svoji vrstici pod avtorjem, samo ikone. */}
+            <div className={`shrink-0 max-lg:basis-full ${nav ? "pr-24 lg:pr-0" : ""}`}>
               <h2 className="text-xl font-semibold text-(--cv-title)">{song.title}</h2>
               <p className="text-sm text-(--cv-muted)">{song.author}</p>
               {capo !== null && (
@@ -4450,17 +4574,24 @@ export default function ChordsViewer({
                 akordi; "Pokaži akorde" prikaže vse (posebni so označeni). */}
             {shapeChords.length > 0 && (
               <div
-                className={`relative z-10 self-start rounded-xl border px-2.5 py-1.5 ${showShapes ? "border-(--cv-border)" : "border-orange-400/40 bg-orange-400/[0.05]"}`}
+                className={`relative z-10 self-start rounded-xl border px-2 py-1.5 lg:px-2.5 ${showShapes ? "border-(--cv-border)" : "border-orange-400/40 bg-orange-400/[0.05]"}`}
                 aria-label={showShapes ? "Akordi v skladbi" : "Posebni akordi"}
               >
                 <button
                   type="button"
                   onClick={() => setShapesOpen((v) => !v)}
                   aria-expanded={shapesOpen}
-                  title={shapesOpen ? "Skrij prijeme" : "Pokaži prijeme"}
+                  title={showShapes ? "Akordi v skladbi" : "Posebni akordi"}
                   className="flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-(--cv-chord)"
                 >
-                  {showShapes ? "Akordi v skladbi" : "Posebni akordi"}
+                  {/* Telefon: samo ikona (prijem akorda), kot Nasvet / Ali si vedel? desno od nje. */}
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 lg:hidden">
+                    <rect x="5" y="3" width="14" height="18" rx="1.5" />
+                    <path d="M5 8h14M5 13h14M10 3v18M14 3v18" />
+                    <circle cx="10" cy="10.5" r="1.3" fill="currentColor" />
+                    <circle cx="14" cy="15.5" r="1.3" fill="currentColor" />
+                  </svg>
+                  <span className="hidden lg:inline">{showShapes ? "Akordi v skladbi" : "Posebni akordi"}</span>
                   {/* Zaprto okno (samo računalnik): seznam akordov, če jih je največ 5 (sicer le število). */}
                   {!shapesOpen && (
                     <span className="hidden truncate font-normal lg:inline normal-case tracking-normal text-(--cv-muted)">
@@ -4468,9 +4599,9 @@ export default function ChordsViewer({
                     </span>
                   )}
                   {shapesOpen && showShapes && specialChords.length > 0 && (
-                    <span className="font-normal normal-case tracking-normal text-(--cv-muted)">· posebni so obrobljeni</span>
+                    <span className="hidden font-normal normal-case tracking-normal text-(--cv-muted) lg:inline">· posebni so obrobljeni</span>
                   )}
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`ml-auto h-3.5 w-3.5 shrink-0 transition ${shapesOpen ? "rotate-180" : ""}`}>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`ml-auto hidden h-3.5 w-3.5 shrink-0 transition lg:block ${shapesOpen ? "rotate-180" : ""}`}>
                     <path d="m6 9 6 6 6-6" />
                   </svg>
                 </button>

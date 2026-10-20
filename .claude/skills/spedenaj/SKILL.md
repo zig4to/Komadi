@@ -70,6 +70,9 @@ V poročilu navedi staro → novo ime.
 4. oEmbed "vgradnja OK" je samo namig — YouTube lahko vgradnjo zavrne šele v predvajalniku (napaka 150). Če
    uporabnik kasneje javi, da video ne igra, izberi naslednjega in ponovi korake 5–6.
 5. Video gre v patch kot `"video"`, njegova analiza (`a.json`) se uporablja v vseh naslednjih korakih.
+   Po zapisu videa posodobi še tempo za metronom: `node --env-file=.env.local scripts/fill-bpm.mjs --id <id>`
+   (izmeri `songs.bpm` na zaklenjenem videu). Če `a.json` kaže polovični/dvojni tempo (npr. kitica s 4 akordi
+   na takt), popravi `songs.bpm` ročno (PATCH) in to navedi v poročilu.
 6. Če ima skladba že `synced_chords`/`synced_lines` za drug video, jih je treba za novi video narediti znova
    (ne samo prestaviti) — uporabnika na to opozori v poročilu.
 
