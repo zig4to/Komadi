@@ -25,12 +25,18 @@ const KEY = "komadi:chords:open";
 // časov ("Posnemi čase" — gumb v naprednem urejevalniku besedila), brez
 // vrednosti = navaden pregledovalnik.
 const MODE_KEY = "komadi:chords:mode";
+// Seznam, iz katerega je bila skladba odprta ("verified", "verified-page",
+// "all", "allpage" — atribut data-nav-list okoli kartice): gumba naprej/nazaj
+// v pregledovalniku gresta po vrsti po tem seznamu.
+const NAV_KEY = "komadi:chords:nav";
 const STORE_EVENT = "komadi-storage";
 
 export type ChordsViewerMode = "samspili" | "record";
 
-function write(id: string | null, mode?: ChordsViewerMode) {
+function write(id: string | null, mode?: ChordsViewerMode, nav?: string | null) {
   try {
+    if (id && nav) window.localStorage.setItem(NAV_KEY, nav);
+    else if (!id || nav === null) window.localStorage.removeItem(NAV_KEY);
     if (id) window.localStorage.setItem(KEY, id);
     else window.localStorage.removeItem(KEY);
     if (id && mode) window.localStorage.setItem(MODE_KEY, mode);
@@ -39,7 +45,8 @@ function write(id: string | null, mode?: ChordsViewerMode) {
   window.dispatchEvent(new Event(STORE_EVENT));
 }
 
-export const openChordsViewer = (songId: string, mode?: ChordsViewerMode) => write(songId, mode);
+// nav: seznam (glej NAV_KEY); null ga pobriše, brez vrednosti ostane prejšnji.
+export const openChordsViewer = (songId: string, mode?: ChordsViewerMode, nav?: string | null) => write(songId, mode, nav);
 export const closeChordsViewer = () => write(null);
 
 // Celozaslonsko + ležeče za "Sam Špili". Klicati neposredno iz uporabnikovega
@@ -74,6 +81,21 @@ export function useOpenChordsMode(): ChordsViewerMode | null {
     try {
       const mode = window.localStorage.getItem(MODE_KEY);
       return mode === "samspili" || mode === "record" ? mode : null;
+    } catch {
+      return null;
+    }
+  }, []);
+  const subscribe = useCallback((cb: () => void) => {
+    window.addEventListener(STORE_EVENT, cb);
+    return () => window.removeEventListener(STORE_EVENT, cb);
+  }, []);
+  return useSyncExternalStore(subscribe, read, () => null);
+}
+
+export function useOpenChordsNav(): string | null {
+  const read = useCallback(() => {
+    try {
+      return window.localStorage.getItem(NAV_KEY);
     } catch {
       return null;
     }

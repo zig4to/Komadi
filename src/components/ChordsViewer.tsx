@@ -364,6 +364,7 @@ export default function ChordsViewer({
   autoRecord = false,
   onOpenEditor,
   inFix = false,
+  nav,
 }: {
   song: Song;
   onClose: () => void;
@@ -381,6 +382,17 @@ export default function ChordsViewer({
   // Skladba ima odprto prijavo (stran "Popravi skladbe") — takrat se zamik
   // besedila preverjene skladbe spet da nastavljati.
   inFix?: boolean;
+  // Gumba naprej/nazaj desno od "Ali si vedel?": po vrsti po seznamu, iz
+  // katerega je bila skladba odprta (Preverjeno špila / Vse skladbe).
+  nav?: {
+    index: number;
+    count: number;
+    prev: Song | null;
+    next: Song | null;
+    onPrev: () => void;
+    onNext: () => void;
+    label: string;
+  };
 }) {
   const follower = shared?.role === "follower" ? shared : null;
   const [followPillHidden, setFollowPillHidden] = useState(false);
@@ -466,6 +478,9 @@ export default function ChordsViewer({
   // "Nasvet" (ponavljajoča se zaporedja akordov) — razprt ali strnjen, na tej napravi.
   const [tipsOpen, setTipsOpen] = useState(() => readNumber("komadi:chords:tipsOpen", 0) === 1);
   useEffect(() => writeNumber("komadi:chords:tipsOpen", tipsOpen ? 1 : 0), [tipsOpen]);
+  // "Ali si vedel?" (opis pesmi in zanimivosti) — razprt ali strnjen, na tej napravi.
+  const [storyOpen, setStoryOpen] = useState(() => readNumber("komadi:chords:storyOpen", 0) === 1);
+  useEffect(() => writeNumber("komadi:chords:storyOpen", storyOpen ? 1 : 0), [storyOpen]);
   // "Nasvet" → "Prikaži akorde": pod vsako vrstico nasveta prijemi njenih akordov.
   const [tipShapes, setTipShapes] = useState(() => readNumber("komadi:chords:tipShapes", 0) === 1);
   useEffect(() => writeNumber("komadi:chords:tipShapes", tipShapes ? 1 : 0), [tipShapes]);
@@ -4310,6 +4325,75 @@ export default function ChordsViewer({
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+            {/* "Ali si vedel?": o čem govori pesem in 5 zanimivosti (skill spedenaj → songs.song_story). */}
+            {song.song_story && (
+              <div className="relative z-10 self-start rounded-xl border border-emerald-400/40 bg-emerald-400/[0.05] px-2.5 py-1.5" aria-label="Ali si vedel?">
+                <button
+                  type="button"
+                  onClick={() => setStoryOpen((v) => !v)}
+                  aria-expanded={storyOpen}
+                  className="flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-emerald-400"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                    <path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z" />
+                  </svg>
+                  Ali si vedel?
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`ml-auto h-3.5 w-3.5 transition ${storyOpen ? "rotate-180" : ""}`}>
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+                {storyOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 max-h-[70vh] w-[min(40rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-emerald-400/50 bg-(--cv-bg) p-3 font-sans text-sm leading-relaxed text-(--cv-text) shadow-2xl lg:left-0 lg:right-auto lg:p-4 lg:text-base">
+                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-400">O pesmi</p>
+                    {song.song_story.about.split(/\n\s*\n/).map((para, i) => (
+                      <p key={i} className="mb-2">
+                        {para}
+                      </p>
+                    ))}
+                    <p className="mb-1.5 mt-3 border-t border-emerald-400/25 pt-3 text-[11px] font-semibold uppercase tracking-wide text-emerald-400">5 zanimivosti</p>
+                    <ol className="list-decimal space-y-1.5 pl-5 marker:font-semibold marker:text-emerald-400">
+                      {song.song_story.facts.map((fact, i) => (
+                        <li key={i}>{fact}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+              </div>
+            )}
+            {/* Naprej/nazaj po seznamu, iz katerega je bila skladba odprta. */}
+            {nav && (
+              // ml-auto: vedno na desnem robu vrstice — mesto ni odvisno od širine
+              // okenc levo (Nasvet / Ali si vedel? nimajo vse skladbe), zato ob listanju ne skače.
+              <div className="ml-auto flex items-center gap-0.5 self-start rounded-xl border border-sky-400/40 bg-sky-400/[0.05] px-1 py-0.5" title={nav.label}>
+                <button
+                  type="button"
+                  onClick={nav.onPrev}
+                  disabled={!nav.prev}
+                  title={nav.prev ? `Prejšnja: ${nav.prev.title} – ${nav.prev.author}` : undefined}
+                  aria-label={nav.prev ? `Prejšnja skladba: ${nav.prev.title}` : "Prejšnja skladba"}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-sky-400 transition hover:bg-sky-400/15 disabled:opacity-30 disabled:hover:bg-transparent lg:h-8 lg:w-8"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                    <path d="m15 18-6-6 6-6" />
+                  </svg>
+                </button>
+                <span className="min-w-[3.2rem] text-center font-sans text-[11px] tabular-nums text-sky-300 lg:text-xs">
+                  {nav.index + 1}/{nav.count}
+                </span>
+                <button
+                  type="button"
+                  onClick={nav.onNext}
+                  disabled={!nav.next}
+                  title={nav.next ? `Naslednja: ${nav.next.title} – ${nav.next.author}` : undefined}
+                  aria-label={nav.next ? `Naslednja skladba: ${nav.next.title}` : "Naslednja skladba"}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-sky-400 transition hover:bg-sky-400/15 disabled:opacity-30 disabled:hover:bg-transparent lg:h-8 lg:w-8"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </button>
               </div>
             )}
             </div>

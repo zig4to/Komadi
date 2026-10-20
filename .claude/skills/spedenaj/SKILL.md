@@ -221,6 +221,19 @@ tu ne spreminjaj sam — samo poročaj.
    refreni … isto zaporedje (`src/lib/chordPatterns.ts`), in to shrani v `songs.chord_tips` (null, če ni ničesar);
    pregledovalnik to pokaže v okencu "Nasvet" desno od akordov skladbe. V poročilu navedi, kaj je našel.
    Po vsaki kasnejši spremembi besedila (akordi, oznake) ga zaženi znova.
+0b. **"Ali si vedel?" (opis pesmi in 5 zanimivosti)** — uporabnikova odločitev 2026-10-20, za vsako skladbo.
+   Napiši `story.json` = `{ "about": "…", "facts": ["…" ×5], "sources": ["url", …] }` v slovenščini in zapiši z
+   `song.mjs story <id> --file story.json` (poskusno) → `--write` (`songs.song_story`; pregledovalnik ga pokaže v
+   zelenem okencu "Ali si vedel?" desno od "Nasvet"). Dovoljeno tudi pri preverjenih skladbah (samo prikaz).
+   - `about`: 2–3 kratki odstavki (ločeni s prazno vrstico): o čem pesem govori (povzetek besedila s svojimi
+     besedami, ne citati), kdo jo je napisal, kdaj in zakaj (povod, ozadje), kakšen je njen namen / sporočilo.
+   - `facts`: natanko 5 kratkih zanimivosti (1–2 stavka): nastanek, snemanje, uspeh na lestvicah, priredbe,
+     filmi, nenavadni podatki. Brez ponavljanja tega, kar je že v `about`.
+   - **Samo preverjena dejstva**: vsako dejstvo potrdi s spletnim iskanjem (WebSearch: Wikipedia, Songfacts,
+     intervjuji); kar ni potrjeno, izpusti — raje manj znana, a resnična zanimivost kot izmišljena. Pazi na
+     priredbe: pri skladbi, ki jo izvaja drug izvajalec kot avtor (Killing Me Softly — Fugees, Last Kiss — Pearl
+     Jam), opiši izvirnik in to različico. Naslov/izvajalec v bazi sta lahko napisana neuradno ("CCR", "Abba").
+   - V `sources` navedi 1–3 URL-je, iz katerih si črpal (ne prikazujejo se, služijo preverjanju).
 1. `song.mjs dump <id> --audio a.json` še enkrat: brez LRC vrstic brez para, vsaka vrstica z besedilom je `pair` (ima akorde), deli z akordi na pravem videu,
    shranjeni časi naraščajo, oznake delov oštevilčene.
 2. Poročaj za vsako skladbo (kratko, slovensko):

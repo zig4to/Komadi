@@ -47,7 +47,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { usePersistentBool } from "@/lib/usePersistentBool";
 import { usePersistentString } from "@/lib/usePersistentString";
-import { closeChordsViewer, openChordsViewer, useOpenChordsMode, useOpenChordsSongId } from "@/lib/openChords";
+import { closeChordsViewer, openChordsViewer, useOpenChordsMode, useOpenChordsNav, useOpenChordsSongId } from "@/lib/openChords";
 import {
   SHARED_VIEW_HEARTBEAT_MS,
   SHARED_VIEW_STALE_MS,
@@ -282,6 +282,7 @@ export default function Dashboard({ user }: { user: User }) {
   const openChordsId = useOpenChordsSongId();
   // "samspili" = pregledovalnik se odpre v pogledu "Sam Špili" (3 vrstice).
   const openChordsMode = useOpenChordsMode();
+  const openChordsNav = useOpenChordsNav();
   // Seznam skladb se riše po RESULTS_PAGE kartic, naslednje ob pomiku do dna
   // (LoadMoreSentinel). Brez tega je vsaka od prvih črk v iskanju (ujema se
   // skoraj vseh ~290 skladb) in brisanje zadnje črke (spet cel seznam)
@@ -3499,7 +3500,7 @@ export default function Dashboard({ user }: { user: User }) {
           />
         </div>
       ) : allSongsOpen ? (
-        <div className="mt-3! space-y-4">
+        <div className="mt-3! space-y-4" data-nav-list="allpage">
           <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
           <div className="flex items-center gap-2">
             <span className="text-sm text-neutral-500">{allSongsSorted.length} skladb</span>
@@ -3533,7 +3534,7 @@ export default function Dashboard({ user }: { user: User }) {
           )}
         </div>
       ) : verifiedOpen ? (
-        <div className="mt-3! space-y-6">
+        <div className="mt-3! space-y-6" data-nav-list="verified-page">
           <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
           {(() => {
             const byDate = (a: Song, b: Song) => (b.verified_player_at ?? "").localeCompare(a.verified_player_at ?? "");
@@ -4627,6 +4628,7 @@ export default function Dashboard({ user }: { user: User }) {
                   onAddToJam={handleAddToJam}
                   onAddToSharedJam={handleAddToSharedJam}
                 />
+                <div data-nav-list="verified">
                 <VerifiedSongs
                   songs={verifiedSongs}
                   isOwn={() => true}
@@ -4636,6 +4638,7 @@ export default function Dashboard({ user }: { user: User }) {
                   onAddToJam={handleAddToJam}
                   onAddToSharedJam={handleAddToSharedJam}
                 />
+                </div>
                 <HomeHighlights
                   eras={eraHighlights}
                   genres={genreHighlights}
@@ -4971,7 +4974,7 @@ export default function Dashboard({ user }: { user: User }) {
                             : "Nobena skladba ne ustreza izbranim filtrom."}
                       </p>
                     )}
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" data-nav-list="all">
                       {displaySongs.slice(0, visibleResults).map((song) =>
                         sharedOn ? (
                           <SongCard
@@ -5053,8 +5056,42 @@ export default function Dashboard({ user }: { user: User }) {
         const chordsSong = openChordsId
           ? [...allSongs, ...(sharedSongs ?? []), ...Object.values(sharedJamSongs), ...verifiedAll, ...othersFavorites].find((s) => s.id === openChordsId && s.chords_text)
           : undefined;
+        // Gumba naprej/nazaj: seznam, iz katerega je bila skladba odprta (data-nav-list), v istem vrstnem redu.
+        const byVerified = (a: Song, b: Song) => (b.verified_player_at ?? "").localeCompare(a.verified_player_at ?? "");
+        const navList: Song[] =
+          openChordsNav === "verified"
+            ? [...verifiedSongs].sort(byVerified)
+            : openChordsNav === "verified-page"
+              ? [
+                  ...verifiedSongs.filter((x) => x.user_id === LIBRARY_OWNER_ID).sort(byVerified),
+                  ...verifiedSongs.filter((x) => x.user_id !== LIBRARY_OWNER_ID).sort(byVerified),
+                ]
+              : openChordsNav === "all"
+                ? displaySongs
+                : openChordsNav === "allpage"
+                  ? allSongsSorted
+                  : [];
+        const navSongs = navList.filter((s) => s.chords_text);
+        const navIndex = chordsSong ? navSongs.findIndex((s) => s.id === chordsSong.id) : -1;
+        const navTo = (k: number) => {
+          const next = navSongs[k];
+          if (next) openChordsViewer(next.id, openChordsMode === "samspili" ? "samspili" : undefined);
+        };
         return chordsSong ? (
           <ChordsViewer
+            nav={
+              navIndex >= 0 && navSongs.length > 1
+                ? {
+                    index: navIndex,
+                    count: navSongs.length,
+                    prev: navIndex > 0 ? navSongs[navIndex - 1] : null,
+                    next: navIndex < navSongs.length - 1 ? navSongs[navIndex + 1] : null,
+                    onPrev: () => navTo(navIndex - 1),
+                    onNext: () => navTo(navIndex + 1),
+                    label: openChordsNav === "verified" || openChordsNav === "verified-page" ? "Preverjeno špila" : "Vse skladbe",
+                  }
+                : undefined
+            }
             key={chordsSong.id + (openChordsMode ?? "")}
             song={chordsSong}
             onClose={closeChordsViewer}

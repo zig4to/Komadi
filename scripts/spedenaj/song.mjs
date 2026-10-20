@@ -12,6 +12,8 @@
 //   … song.mjs write <id> --patch patch.json [--write]      brez --write samo pokaže, kaj bi zapisal
 //   … song.mjs tips <id> [--write]                          ponavljajoča se zaporedja akordov → songs.chord_tips
 //         (src/lib/chordPatterns.ts, "Nasvet" v pregledovalniku; null, če ni ponavljanj)
+//   … song.mjs story <id> [--file story.json] [--write]   "Ali si vedel?" → songs.song_story
+//         ({ about, facts: [5], sources? }; brez --file izpiše shranjeno)
 //
 // patch.json (vse neobvezno):
 //   { "text": "draft.txt",              urejeno besedilo (applyEditedText + rebaseSyncOnEdit)
@@ -59,7 +61,7 @@ const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) throw new Error("Manjka NEXT_PUBLIC_SUPABASE_URL ali SUPABASE_SERVICE_ROLE_KEY (--env-file=.env.local).");
 const headers = { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
 const SONG_COLS =
-  "id,user_id,title,author,chords_text,youtube_url,youtube_music_url,youtube_embed_ids,preferred_video_id,lrc_offsets,synced_lines,synced_chords,verified_player_at,verified_chords_at,review_pending";
+  "id,user_id,title,author,chords_text,youtube_url,youtube_music_url,youtube_embed_ids,preferred_video_id,lrc_offsets,synced_lines,synced_chords,verified_player_at,verified_chords_at,review_pending,song_story";
 
 const [cmd, id] = process.argv.slice(2);
 const arg = (name) => {
@@ -380,7 +382,26 @@ if (cmd === "list") {
     await rest(`songs?id=eq.${s.id}`, { method: "PATCH", body: JSON.stringify({ chord_tips: tips }), headers: { ...headers, Prefer: "return=minimal" } });
     console.log("zapisano (chord_tips)");
   } else console.log("(poskusno — za zapis dodaj --write)");
+} else if (cmd === "story") {
+  // "Ali si vedel?" — samo prikaz, ne vpliva na predvajanje: dovoljeno tudi pri preverjenih skladbah.
+  const s = await loadSong(id);
+  const file = arg("--file");
+  if (!file) {
+    console.log(s.song_story ? JSON.stringify(s.song_story, null, 1) : "(song_story je prazen)");
+    process.exit(0);
+  }
+  const story = JSON.parse(readFileSync(file, "utf8"));
+  if (typeof story.about !== "string" || !story.about.trim()) throw new Error("story.about manjka");
+  if (!Array.isArray(story.facts) || story.facts.length !== 5 || story.facts.some((f) => typeof f !== "string" || !f.trim()))
+    throw new Error("story.facts mora imeti natanko 5 zanimivosti");
+  const clean = { about: story.about.trim(), facts: story.facts.map((f) => f.trim()), ...(story.sources?.length ? { sources: story.sources } : {}) };
+  console.log(`# ${s.title} — ${s.author}\n\n${clean.about}\n`);
+  clean.facts.forEach((f, i) => console.log(`${i + 1}. ${f}`));
+  if (process.argv.includes("--write")) {
+    await rest(`songs?id=eq.${s.id}`, { method: "PATCH", body: JSON.stringify({ song_story: clean }), headers: { ...headers, Prefer: "return=minimal" } });
+    console.log("\nzapisano (song_story)");
+  } else console.log("\n(poskusno — za zapis dodaj --write)");
 } else {
-  console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(0, 26).join("\n"));
+  console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(0, 28).join("\n"));
   process.exit(cmd ? 1 : 0);
 }

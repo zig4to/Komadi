@@ -18,6 +18,9 @@ const CARD_INTERACTIVE = "button, a, input, textarea, select, label, summary, [r
 // Predstavljeno), kjer za polna besedila ni dovolj prostora. Ista logika
 // (celozaslonski PDF pregled prek portala) je namenoma podvojena tu namesto
 // deljena s SongCard.tsx, da vsaka komponenta ostane samostojna.
+// Seznam okoli kartice (data-nav-list) za gumba naprej/nazaj v pregledovalniku.
+const navListOf = (card: HTMLElement | null) => card?.closest("[data-nav-list]")?.getAttribute("data-nav-list") ?? null;
+
 export default function ChordsButtons({
   song,
   onChordsClick,
@@ -170,7 +173,7 @@ export default function ChordsButtons({
                   onClick={() => {
                     setMenuOpen(false);
                     enterLandscapeFullscreen();
-                    openChordsViewer(song.id, "samspili");
+                    openChordsViewer(song.id, "samspili", navListOf(cardRef.current));
                     onChordsClick?.(song);
                   }}
                   className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
@@ -196,7 +199,7 @@ export default function ChordsButtons({
                   type="button"
                   onClick={() => {
                     setMenuOpen(false);
-                    openChordsViewer(song.id);
+                    openChordsViewer(song.id, undefined, navListOf(cardRef.current));
                     onChordsClick?.(song);
                   }}
                   className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-white/[0.08]"
