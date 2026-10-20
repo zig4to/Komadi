@@ -140,11 +140,21 @@ const SS_USER_HOLD = 3000;
 // Ojačanje ročnega pomika (prst ×, kolešček ×) — velika pisava, malo prostora.
 const SS_DRAG_GAIN = 1;
 const SS_WHEEL_GAIN = 1;
+// "Sam Špili" — test enakomernega pomikanja (kot autoscroll): položaj ni več
+// vrstica + napredek, ampak krivulja skozi začetke zapetih vrstic, zglajena z
+// drsečim povprečjem SS_SMOOTH_SEC s — brez ustavljanja po koncu petja in brez
+// pospeševanja med kratkimi/dolgimi vrsticami. Poudarek vrstice ostane enak.
+const SMOOTH_SCROLL_TEST_TITLES = ["vojna idej"];
+const SS_SMOOTH_SEC = 8;
+const SS_SMOOTH_STEP = 0.1;
 function fmtClock(s: number) {
   const t = Math.max(0, Math.floor(s));
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 }
 const lrcOffsetsKey = (id: string) => `komadi:chords:lrcOffsets:${id}`;
+// "Hitrost" predvajanja (gumb v Funkcije), za vsako skladbo; pod 0,5 je zvok YouTube preslab.
+const playbackRateKey = (id: string) => `komadi:chords:rate:${id}`;
+const PLAYBACK_RATES = [1, 0.9, 0.8, 0.7, 0.6, 0.5];
 // "Sam Špili": popravek velikosti besedila (množitelj), korak 5 %.
 const ssScaleKey = (id: string) => `komadi:chords:ssScale:${id}`;
 const SS_SCALE_STEP = 0.05;
@@ -1429,6 +1439,40 @@ export default function ChordsViewer({
   // "Kviz": ugibanje akordov po delih — nadomesti besedilo (da se odgovorov ne vidi), predvajalnik ostane.
   const [quizOpen, setQuizOpen] = useState(false);
   useBackableOpen(quizOpen, () => setQuizOpen(false));
+  // "Hitrost": počasnejše predvajanje posnetka za vadbo (Smart play in oznake
+  // sledijo, ker gredo po času videa); zapomnjeno za vsako skladbo na napravi.
+  const [playbackRate, setPlaybackRateState] = useState(() => {
+    try {
+      const v = Number(window.localStorage.getItem(playbackRateKey(song.id)));
+      return PLAYBACK_RATES.includes(v) ? v : 1;
+    } catch {
+      return 1;
+    }
+  });
+  const setPlaybackRate = (rate: number) => {
+    setPlaybackRateState(rate);
+    try {
+      if (rate === 1) window.localStorage.removeItem(playbackRateKey(song.id));
+      else window.localStorage.setItem(playbackRateKey(song.id), String(rate));
+    } catch {}
+  };
+  const rateButtonRef = useRef<HTMLButtonElement>(null);
+  const [rateMenuPos, setRateMenuPos] = useState<{ top: number; left: number } | null>(null);
+  useEffect(() => {
+    if (!rateMenuPos) return;
+    const close = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (t?.closest("[data-rate-menu]") || rateButtonRef.current?.contains(t)) return;
+      setRateMenuPos(null);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [rateMenuPos]);
+  const toggleRateMenu = () => {
+    const r = rateButtonRef.current?.getBoundingClientRect();
+    if (rateMenuPos || !r) return setRateMenuPos(null);
+    setRateMenuPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 140)) });
+  };
   const improChords = (() => {
     const out: string[] = [];
     const add = (name: string | null) => {
@@ -2307,7 +2351,7 @@ export default function ChordsViewer({
     if (duration && Math.abs(duration - videoDuration) > 1) setVideoDuration(duration);
     // "Sam Špili": zadnji čas + trenutek prejema; zanka pomikanja iz tega
     // sproti izračuna čas med 250-ms osvežitvami (gladko, brez stopnic).
-    ssClockRef.current = { t: seconds, at: performance.now(), playing };
+    ssClockRef.current = { t: seconds, at: performance.now(), playing, rate: ssClockRef.current.rate };
     // Drsnik prevrtavanja: ponovni izris le, ko je odprt (sicer vsakih 250 ms
     // ves pregledovalnik — zatikanje pomikanja).
     if (samSpili && ssSeekOpen) setSsTime(seconds);
@@ -2537,7 +2581,13 @@ export default function ChordsViewer({
   const ssLinesRef = useRef<HTMLDivElement>(null);
   // Napredek znotraj trenutne vrstice (0–1) iz lineProgressAt, osvežen ob
   // vsakem času posnetka; zanka pomikanja ga bere vsako sličico.
-  const ssClockRef = useRef({ t: 0, at: 0, playing: false });
+  // rate = hitrost predvajanja ("Hitrost"): video čas teče rate × hitreje od pravega.
+  const ssClockRef = useRef({ t: 0, at: 0, playing: false, rate: 1 });
+  // Nova hitrost: interpolacija (zanke oznak in Sam Špili) takoj od trenutnega časa naprej.
+  useEffect(() => {
+    const c = ssClockRef.current;
+    ssClockRef.current = { ...c, t: playerCtlRef.current?.currentTime() ?? c.t, at: performance.now(), rate: playbackRate };
+  }, [playbackRate]);
   // Oznake vrstice/akorda med predvajanjem: čas, interpoliran od zadnje osvežitve
   // predvajalnika (vsakih ~250 ms, na telefonu lahko redkeje), vsako sličico —
   // sicer je oznaka akorda zamujala do pol sekunde (outro One Step Forward).
@@ -2553,7 +2603,7 @@ export default function ChordsViewer({
       if (clock.playing) {
         // Največ 0,6 s naprej brez nove osvežitve (zastoj); nova osvežitev,
         // malo za oceno, ne vrne nazaj za drobce — večji skok (previjanje) velja.
-        let t = clock.t + Math.min(0.6, (now - clock.at) / 1000);
+        let t = clock.t + Math.min(0.6, ((now - clock.at) / 1000) * clock.rate);
         if (t < shownT && shownT - t < 0.3) t = shownT;
         shownT = t;
         applyTimingRef.current(t);
@@ -2564,9 +2614,12 @@ export default function ChordsViewer({
     return () => cancelAnimationFrame(raf);
   }, []);
   const ssSyncRef = useRef<{ points: SyncPoint[] | null; offset: number }>({ points: null, offset: 0 });
+  const ssDurationRef = useRef(0);
   useEffect(() => {
     ssSyncRef.current = { points: smartActive && sync ? sync.points : null, offset: lrcOffset };
+    ssDurationRef.current = videoDuration;
   });
+  const smoothScroll = SMOOTH_SCROLL_TEST_TITLES.includes(song.title.trim().toLowerCase());
   // Skupni Jam: vodja v Sam Špili pošilja položaj iz zanke pomikanja (zadnji je
   // v ssLastRef, da ga pošlje tudi reportView); sledilec ga bere iz
   // ssRemoteRef (+ trenutek prejema) namesto lastnega časa posnetka.
@@ -2654,7 +2707,12 @@ export default function ChordsViewer({
     let tops: number[] = [];
     let slot = 0;
     let boxH = box.clientHeight;
+    // Enakomerno pomikanje (SMOOTH_SCROLL_TEST_TITLES): prefiksne vsote krivulje
+    // položaja, vzorčene na SS_SMOOTH_STEP; zgradi se znova ob novih časih,
+    // dolžini videa ali merjenju (pisava, velikost okna).
+    let smooth: { points: SyncPoint[]; duration: number; pre: Float64Array; n: number } | null = null;
     const measure = () => {
+      smooth = null;
       // Merjena je vrstica sama (ne oznaka odseka nad njo).
       const rows = [...inner.querySelectorAll<HTMLElement>("[data-ss-line]")];
       tops = rows.map((r) => r.offsetTop);
@@ -2694,6 +2752,54 @@ export default function ChordsViewer({
       if (tops[k] === undefined) return tops.length ? Math.max(0, tops[tops.length - 1] - slot) : 0;
       const step = tops[k + 1] !== undefined ? tops[k + 1] - tops[k] : 0;
       return Math.max(0, tops[k] - slot + step * (rowPos - k));
+    };
+    // Sidra: (začetek zapete vrstice, njen položaj) — samo naprej; vmes linearno,
+    // zato se vrstice intra/sola prečkajo enakomerno. Na koncu videa zadnja vrstica.
+    const buildSmooth = (points: SyncPoint[], duration: number) => {
+      const anchors: [number, number][] = [[0, 0]];
+      for (const p of points) {
+        const [lt, ly] = anchors[anchors.length - 1];
+        const y = rowTarget(rowFor(p.lineIndex));
+        if (p.time > lt && y > ly) anchors.push([p.time, y]);
+      }
+      const [lastT, lastY] = anchors[anchors.length - 1];
+      const end = Math.max(duration, lastT + SS_SMOOTH_SEC);
+      const endY = rowTarget(ssLines.length - 1);
+      if (endY > lastY) anchors.push([end, endY]);
+      const n = Math.ceil(end / SS_SMOOTH_STEP) + 1;
+      const pre = new Float64Array(n + 1);
+      let a = 0;
+      for (let i = 0; i < n; i++) {
+        const t = i * SS_SMOOTH_STEP;
+        while (a + 1 < anchors.length && anchors[a + 1][0] <= t) a++;
+        const [t0, y0] = anchors[a];
+        const next = anchors[a + 1];
+        const y = next ? y0 + ((next[1] - y0) * (t - t0)) / (next[0] - t0) : y0;
+        pre[i + 1] = pre[i] + y;
+      }
+      return { points, duration, pre, n };
+    };
+    // Povprečje krivulje v oknu ±SS_SMOOTH_SEC/2 okoli časa t (na robovih ožje).
+    const smoothPos = (t: number) => {
+      const s = smooth!;
+      const half = Math.round(SS_SMOOTH_SEC / 2 / SS_SMOOTH_STEP);
+      const avgAt = (c: number) => {
+        const i0 = Math.max(0, c - half);
+        const i1 = Math.min(s.n - 1, c + half);
+        return i1 < i0 ? 0 : (s.pre[i1 + 1] - s.pre[i0]) / (i1 - i0 + 1);
+      };
+      const x = Math.min(s.n - 1, Math.max(0, t / SS_SMOOTH_STEP));
+      const c = Math.floor(x);
+      return avgAt(c) + (avgAt(c + 1) - avgAt(c)) * (x - c);
+    };
+    // Piksel → delna vrstica (obratno od rowTarget), za sporočila vodje.
+    const rowAtPx = (y: number) => {
+      const target = y + slot;
+      if (!tops.length || target <= tops[0]) return 0;
+      let k = 0;
+      while (k + 1 < tops.length && tops[k + 1] <= target) k++;
+      const step = tops[k + 1] !== undefined ? tops[k + 1] - tops[k] : 0;
+      return step > 0 ? k + (target - tops[k]) / step : k;
     };
     // Ročno pomikanje (prst ali kolešček), tudi med predvajanjem: ko začneš
     // pomikati, samodejno sledenje obstane (pogled ostane, kamor ga postaviš);
@@ -2847,7 +2953,7 @@ export default function ChordsViewer({
       }
       const clock = ssClockRef.current;
       // Interpoliran čas; največ 0,6 s naprej brez nove osvežitve (zastoj).
-      let t = clock.playing ? clock.t + Math.min(0.6, (now - clock.at) / 1000) : clock.t;
+      let t = clock.playing ? clock.t + Math.min(0.6, ((now - clock.at) / 1000) * clock.rate) : clock.t;
       // Nova osvežitev je lahko malo za ocenjenim — ne nazaj za drobce
       // (tresenje); večji skok nazaj (previjanje) velja takoj.
       if (clock.playing && t < shownT && shownT - t < 0.3) t = shownT;
@@ -2898,14 +3004,24 @@ export default function ChordsViewer({
           rate = clock.playing && q < 1 ? to / first.time : 0;
         }
       }
-      ease(rowTarget(rowPos), dt);
+      if (smoothScroll && points?.length && tops.length) {
+        const duration = ssDurationRef.current;
+        if (!smooth || smooth.points !== points || smooth.duration !== duration) smooth = buildSmooth(points, duration);
+        const y = smoothPos(lt);
+        ease(y, dt);
+        // Za sledilce: isti položaj kot delna vrstica + hitrost (vrstice/s).
+        rowPos = rowAtPx(y);
+        k = Math.floor(rowPos);
+        rate = clock.playing ? Math.max(0, (rowAtPx(smoothPos(lt + 0.25)) - rowPos) / 0.25) : 0;
+      } else ease(rowTarget(rowPos), dt);
       // Vodja v Skupnem Jamu: sporočilo ob novi vrstici, pavzi/predvajanju,
       // preskoku (napredek ni tam, kjer ga sledilec pričakuje) in 1× na sekundo.
       if (leaderReportRef.current) {
         const view: SamSpiliView = {
           row: k,
           p: Math.round((k >= 0 ? rowPos - k : progress) * 1000) / 1000,
-          rate: Math.round(rate * 10000) / 10000,
+          // Sledilec napreduje v pravem času — hitrost predvajanja je že vračunana.
+          rate: Math.round(rate * clock.rate * 10000) / 10000,
           hl: want,
           playing: clock.playing,
         };
@@ -2937,7 +3053,7 @@ export default function ChordsViewer({
       box.removeEventListener("click", onClickCapture, true);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ssShowLines, ssLines]);
+  }, [ssShowLines, ssLines, smoothScroll]);
   // Med predvajanjem "Sam Špili" se zaslon ne sme temniti/zakleniti (Screen
   // Wake Lock). Brskalnik ključavnico sprosti, ko je zavihek skrit, zato jo ob
   // vrnitvi (visibilitychange) zahtevamo znova. Brez podpore se ne zgodi nič.
@@ -3303,8 +3419,8 @@ export default function ChordsViewer({
       const orphanButton = inBody && i === firstOrphanTab && <div className="mt-3">{tabButton(-1)}</div>;
       if (!showStaff && !line.header) return <div key={i}>{orphanButton}</div>;
       if (!showStaff && line.header) {
-        // Skrita tablatura: samo zaporedje akordov, vsak enako širok
-        // (4 znake, daljši + presledek), brez vodoravnega pomika.
+        // Skrita tablatura: samo zaporedje akordov, za vsakim enak razmik
+        // (3 presledki, tudi za daljšimi imeni), brez vodoravnega pomika.
         return (
           <div key={i}>
             {orphanButton}
@@ -3312,7 +3428,7 @@ export default function ChordsViewer({
               {line.header.map((c, j) => {
                 const name = display(c.name);
                 return (
-                  <span key={j} className="whitespace-pre" style={{ minWidth: `${Math.max(4, name.length + 1)}ch` }}>
+                  <span key={j} className="whitespace-pre" style={{ minWidth: `${name.length + 3}ch` }}>
                     {chordName(name, inBody ? { line: i, chord: j } : undefined)}
                   </span>
                 );
@@ -3824,6 +3940,7 @@ export default function ChordsViewer({
             preload={preloadPlayer && !follower}
             playMenu={!samSpili && !follower}
             controllerRef={playerCtlRef}
+            playbackRate={playbackRate}
             preferredId={preferredVideo}
             onSelect={async (id) => {
               // Preverjen predvajalnik je vezan na svoj posnetek: drug posnetek ga razveljavi.
@@ -3911,13 +4028,13 @@ export default function ChordsViewer({
                       openChordsViewer(song.id, "samspili");
                     }}
                     title="Sam Špili"
-                    className="flex items-center gap-1.5 h-[26px] rounded-full border border-orange-400 pl-2 pr-2.5 text-xs font-medium text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 max-lg:order-1"
+                    aria-label="Sam Špili"
+                    className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-orange-400 text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 max-lg:order-1"
                   >
                     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-orange-400">
                       <circle cx="12" cy="12" r="10" />
                       <path d="M10 8.5v7l5.5-3.5z" />
                     </svg>
-                    Sam Špili
                   </button>
                 )}
                 {/* Računalnik: povezava na Ultimate Guitar (skupina Povezave). */}
@@ -3927,12 +4044,12 @@ export default function ChordsViewer({
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Odpri na Ultimate Guitar"
-                    className="hidden items-center gap-1.5 h-[26px] rounded-full border border-orange-400 pl-2 pr-2.5 text-xs font-medium text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 lg:flex"
+                    aria-label="Odpri na Ultimate Guitar"
+                    className="hidden h-[26px] w-[26px] items-center justify-center rounded-full border border-orange-400 text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 lg:flex"
                   >
                     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-orange-500">
                       <path d="M18.1 6.9A8 8 0 1 0 20 12h-7" />
                     </svg>
-                    Ultimate Guitar
                   </a>
                 )}
               </div>
@@ -4211,6 +4328,55 @@ export default function ChordsViewer({
                 No capo
               </button>
             ) : null}
+            {!follower && (
+              <button
+                ref={rateButtonRef}
+                type="button"
+                onClick={toggleRateMenu}
+                aria-expanded={rateMenuPos !== null}
+                title="Hitrost predvajanja posnetka (počasneje za vadbo)"
+                className={`flex h-[26px] items-center gap-1.5 max-lg:order-5 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
+                  rateMenuPos || playbackRate !== 1 ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
+                }`}
+              >
+                {/* Merilnik hitrosti. */}
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-amber-400">
+                  <path d="M4 18a8 8 0 1 1 16 0" />
+                  <path d="m12 18-3.5-5" />
+                  <circle cx="12" cy="18" r="1.2" fill="currentColor" />
+                </svg>
+                Hitrost
+                {playbackRate !== 1 && <span className="tabular-nums">{String(playbackRate).replace(".", ",")}×</span>}
+              </button>
+            )}
+            {rateMenuPos && (
+              <div
+                data-rate-menu
+                role="menu"
+                aria-label="Hitrost predvajanja"
+                style={{ top: rateMenuPos.top, left: rateMenuPos.left }}
+                className="fixed z-50 flex w-32 flex-col overflow-hidden rounded-xl border border-orange-400/70 bg-neutral-900/95 py-1 text-sm shadow-xl backdrop-blur"
+              >
+                {PLAYBACK_RATES.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={playbackRate === r}
+                    onClick={() => {
+                      setPlaybackRate(r);
+                      setRateMenuPos(null);
+                    }}
+                    className={`flex items-center justify-between px-3 py-1.5 text-left tabular-nums transition hover:bg-white/10 ${
+                      playbackRate === r ? "text-amber-400" : "text-neutral-200"
+                    }`}
+                  >
+                    {r === 1 ? "Normalno" : `${String(r).replace(".", ",")}×`}
+                    {playbackRate === r && <span aria-hidden="true">✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <div className="contents lg:flex lg:flex-col lg:gap-1 lg:border-l lg:border-white/15 lg:pl-3 xl:pl-2 2xl:pl-3">

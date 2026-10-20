@@ -20,6 +20,7 @@ type YTPlayer = {
   setVolume(volume: number): void;
   getVolume(): number;
   unMute(): void;
+  setPlaybackRate(rate: number): void;
 };
 type YTNamespace = {
   Player: new (
@@ -146,8 +147,11 @@ export default function YouTubeMiniPlayer({
   preferredId = null,
   onSelect,
   lockedNote,
+  playbackRate = 1,
 }: {
   videoIds: string[];
+  // Hitrost predvajanja ("Hitrost" v ChordsViewer, 0,5–1); velja tudi po zamenjavi posnetka.
+  playbackRate?: number;
   // Preverjena skladba: seznam ima samo zaklenjen posnetek, polja za dodajanje
   // ni — namesto njega ta opomba (ChordsViewer).
   lockedNote?: string;
@@ -201,10 +205,17 @@ export default function YouTubeMiniPlayer({
   const createdRef = useRef<YTPlayer | null>(null);
   const onPlayingRef = useRef(onPlaying);
   const onTimeRef = useRef(onTime);
+  const rateRef = useRef(playbackRate);
   useEffect(() => {
     onPlayingRef.current = onPlaying;
     onTimeRef.current = onTime;
+    rateRef.current = playbackRate;
   });
+  // Nova hitrost takoj; YouTube jo ob novem posnetku (loadVideoById) ponastavi,
+  // zato se ponovno nastavi tudi ob pripravljenosti in ob začetku predvajanja.
+  useEffect(() => {
+    playerRef.current?.setPlaybackRate(playbackRate);
+  }, [playbackRate]);
   // Kandidati po vrsti (glej ChordsViewer): ob napaki (101/150 — lastnik ne
   // dovoli vgradnje) naloži naslednjega V ISTI predvajalnik (loadVideoById),
   // brez novega iframea; na koncu pokaže kodo napake.
@@ -280,6 +291,7 @@ export default function YouTubeMiniPlayer({
             playerRef.current = e.target;
             // Shranjena glasnost (Sam Špili / akordi v aplikaciji, gumba Glasneje/Tišje).
             playerRef.current?.setVolume(readVolume());
+            playerRef.current?.setPlaybackRate(rateRef.current);
             // Dolžina že pred predvajanjem (oznake delov na drsniku takoj po odprtju).
             const readDuration = (tries: number) => {
               const d = playerRef.current?.getDuration() ?? 0;
@@ -303,6 +315,7 @@ export default function YouTubeMiniPlayer({
             }
             if (e.data === 1) {
               hasPlayedRef.current = true;
+              playerRef.current?.setPlaybackRate(rateRef.current);
               if (pendingSeekRef.current != null) {
                 const t = pendingSeekRef.current;
                 pendingSeekRef.current = null;
