@@ -553,6 +553,8 @@ export default function ChordsViewer({
   const [patternOpacity, setPatternOpacity] = useState(() => readNumber(PATTERN_OPACITY_KEY, DEFAULT_PATTERN_OPACITY));
   useEffect(() => writeNumber(PATTERN_OPACITY_KEY, patternOpacity), [patternOpacity]);
   const patternColors = scaledBackgroundColors(patternOpacity);
+  // Sam Špili na telefonu: vzorec malo manj viden (manjši zaslon, vzorec bolj moti besedilo).
+  const ssPhonePatternColors = scaledBackgroundColors(patternOpacity * 0.75);
   const [chordColorIndex, setChordColorIndex] = useState(() => readNumber(CHORD_COLOR_KEY, 0));
   useEffect(() => writeNumber(BG_KEY, normalBgIndex), [normalBgIndex]);
   useEffect(() => writeNumber(CHORD_COLOR_KEY, chordColorIndex), [chordColorIndex]);
@@ -4992,7 +4994,7 @@ export default function ChordsViewer({
             )}
           {theme.pattern && (
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-              <PatternSvg id={theme.pattern} colors={patternColors} className="h-full w-full" />
+              <PatternSvg id={theme.pattern} colors={isPhone ? ssPhonePatternColors : patternColors} className="h-full w-full" />
             </div>
           )}
           {ssShowLines ? (
@@ -5045,9 +5047,13 @@ export default function ChordsViewer({
                 title={portrait ? "Zasukaj v ležeči način" : "Zasukaj v pokončni način"}
                 className="flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)] lg:hidden"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={`h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] transition-transform duration-300 ${portrait ? "rotate-90" : ""}`}>
-                  <rect x="7" y="2" width="10" height="20" rx="2.2" />
-                  <path d="M11 18h2" />
+                {/* Telefon, nagnjen med obema legama, + puščici v krogu: "zasukaj". */}
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={`h-[calc(var(--ss-btn)*0.55)] w-[calc(var(--ss-btn)*0.55)] transition-transform duration-300 ${portrait ? "rotate-90" : ""}`}>
+                  <rect x="8.5" y="6.5" width="7" height="11" rx="1.4" transform="rotate(-45 12 12)" />
+                  <path d="M3.5 9.5A9 9 0 0 1 14 3.2" />
+                  <path d="M11.6 1.6 14 3.2l-1.6 2.4" />
+                  <path d="M20.5 14.5A9 9 0 0 1 10 20.8" />
+                  <path d="M12.4 22.4 10 20.8l1.6-2.4" />
                 </svg>
               </button>
               )}

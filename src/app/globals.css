@@ -248,6 +248,12 @@ textarea,
 .ss-root {
   --ss-btn: clamp(1.75rem, calc((100dvh - 6rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)) / 10), 4.5rem);
 }
+/* Telefon pokončno: enako veliki kot + / − spodaj desno (h-9). */
+@media (max-width: 1023px) and (orientation: portrait) {
+  .ss-root {
+    --ss-btn: 2.25rem;
+  }
+}
 @media (min-width: 1024px) {
   .ss-root {
     --ss-btn: 3.5rem;
