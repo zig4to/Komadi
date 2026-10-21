@@ -2390,7 +2390,19 @@ export default function ChordsViewer({
     if (recorder) {
       if ((e.target as HTMLElement).closest("[data-chord-name],button,a")) return;
       const line = nextLyricLine(lineIndex);
-      if (line >= 0 && line <= lineIndex + 3) setRecorder({ ...recorder, cursor: line });
+      if (line < 0 || line > lineIndex + 3) return;
+      setRecorder({ ...recorder, cursor: line });
+      // Posnetek skoči na začetek vrstice (0,3 s prej): posneti čas (v tej seji
+      // ali shranjen), sicer čas iz trenutne sinhronizacije; ponovljena vrstica =
+      // ponovitev, časovno najbližja trenutnemu mestu. Brez časa ostane samo kazalec.
+      const now = playbackRef.current.time - lrcOffset;
+      const times = [
+        ...recorder.lines.filter((p) => p.line === line).map((p) => p.t),
+        ...(recorder.lines.some((p) => p.line === line) ? [] : (sync?.points ?? []).filter((p) => p.lineIndex === line).map((p) => p.time)),
+      ];
+      if (!times.length) return;
+      const t = times.reduce((a, b) => (Math.abs(b - now) < Math.abs(a - now) ? b : a));
+      playerCtlRef.current?.seekAndPlay(Math.max(0, t + lrcOffset - 0.3));
       return;
     }
     // Klik ali tap na vrstico z besedilom skoči tja — tudi med predvajanjem in z
@@ -5100,10 +5112,11 @@ export default function ChordsViewer({
                     if (e.detail === 0) recordTap();
                   }}
                   disabled={recorder.cursor < 0}
-                  className="w-2/5 shrink-0 rounded-xl bg-orange-500 py-4 text-lg font-bold tracking-wide text-white active:scale-[0.98] disabled:opacity-40 lg:order-1 lg:mb-2 lg:w-full lg:py-8 lg:text-2xl"
+                  // Majhen gumb (uporabnik, 2026-10-21) — več prostora za seznam delov z akordi.
+                  className="w-1/4 shrink-0 rounded-lg bg-orange-500 py-1.5 text-sm font-bold tracking-wide text-white active:scale-[0.98] disabled:opacity-40 lg:order-1 lg:mb-2 lg:w-full lg:py-1.5"
                 >
                   TAP
-                  <span className="block text-[10px] font-medium tracking-normal opacity-80">vrstica</span>
+                  <span className="block text-[9px] font-medium tracking-normal opacity-80 lg:inline lg:pl-1.5">vrstica</span>
                 </button>
                 {/* Instrumentalni deli: izbrani prejme klike na akorde. */}
                 <div className="min-w-0 flex-1 rounded-xl border border-neutral-700 p-1 lg:order-3 lg:flex lg:min-h-0 lg:flex-col">
