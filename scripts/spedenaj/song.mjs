@@ -392,8 +392,9 @@ if (cmd === "list") {
   }
   const story = JSON.parse(readFileSync(file, "utf8"));
   if (typeof story.about !== "string" || !story.about.trim()) throw new Error("story.about manjka");
-  if (!Array.isArray(story.facts) || story.facts.length !== 5 || story.facts.some((f) => typeof f !== "string" || !f.trim()))
-    throw new Error("story.facts mora imeti natanko 5 zanimivosti");
+  // Do 5 zanimivosti; manj (ali nič), kadar ni dovolj preverjenih dejstev — takrat samo opis.
+  if (!Array.isArray(story.facts) || story.facts.length > 5 || story.facts.some((f) => typeof f !== "string" || !f.trim()))
+    throw new Error("story.facts: 0–5 zanimivosti");
   const clean = { about: story.about.trim(), facts: story.facts.map((f) => f.trim()), ...(story.sources?.length ? { sources: story.sources } : {}) };
   console.log(`# ${s.title} — ${s.author}\n\n${clean.about}\n`);
   clean.facts.forEach((f, i) => console.log(`${i + 1}. ${f}`));

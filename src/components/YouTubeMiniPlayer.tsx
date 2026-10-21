@@ -621,33 +621,6 @@ export default function YouTubeMiniPlayer({
       playerRef.current.playVideo();
     }
   };
-  // Mali meni ob ▶ / Smart play: izbira navadnega ali celozaslonskega predvajanja
-  // (izbira v meniju je nov klik — celozaslonski način ga sme porabiti).
-  const [playMenuAt, setPlayMenuAt] = useState<{ kind: "play" | "smart"; left: number; top: number } | null>(null);
-  const openPlayMenu = (kind: "play" | "smart", el: HTMLElement) => {
-    const r = el.getBoundingClientRect();
-    setPlayMenuAt({ kind, left: Math.max(8, Math.min(window.innerWidth - 228, r.left)), top: r.bottom + 6 });
-  };
-  useEffect(() => {
-    if (!playMenuAt) return;
-    const close = (e: PointerEvent) => {
-      if (!(e.target as HTMLElement).closest("[data-play-menu]")) setPlayMenuAt(null);
-    };
-    document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
-  }, [playMenuAt]);
-  const choosePlay = (fullscreen: boolean) => {
-    const kind = playMenuAt?.kind;
-    setPlayMenuAt(null);
-    if (kind === "smart") {
-      onSmartToggle?.(true);
-      if (fullscreen) onSmartPlay?.();
-      if (!playing) togglePlay();
-    } else {
-      if (fullscreen) onUserPlay?.();
-      togglePlay();
-    }
-  };
   const playClick = () => {
     if (playing) return togglePlay();
     // Pregledovalnik (playMenu): ▶ samo predvaja — brez menija in celozaslonskega
@@ -766,33 +739,6 @@ export default function YouTubeMiniPlayer({
 
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
-      {playMenuAt &&
-        createPortal(
-          <div
-            data-play-menu
-            data-view-portal
-            role="menu"
-            style={{ left: playMenuAt.left, top: playMenuAt.top }}
-            className="fixed z-[70] w-56 rounded-xl border border-orange-400/60 bg-neutral-900 p-1.5 font-sans text-sm text-neutral-100 shadow-2xl"
-          >
-            <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wider text-orange-400">
-              {playMenuAt.kind === "smart" ? "Smart play" : "Predvajanje"}
-            </p>
-            <button type="button" role="menuitem" onClick={() => choosePlay(false)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-white/[0.08]">
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-amber-400">
-                <path d="M7 4v16l13-8z" />
-              </svg>
-              Predvajaj
-            </button>
-            <button type="button" role="menuitem" onClick={() => choosePlay(true)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-white/[0.08]">
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-amber-400">
-                <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
-              </svg>
-              Celozaslonsko predvajaj
-            </button>
-          </div>,
-          document.body,
-        )}
       {failedAll ? (
         <a
           href={watchUrl}
@@ -807,12 +753,11 @@ export default function YouTubeMiniPlayer({
           {smartAvailable && (
             <button
               type="button"
-              onClick={(e) => {
+              onClick={() => {
                 if (smartOn) return onSmartToggle?.(false);
-                if (playMenu && !playing) return openPlayMenu("smart", e.currentTarget);
                 onSmartToggle?.(true);
-                // Pregledovalnik (playMenu) med predvajanjem: samo vklopi sledenje —
-                // celozaslonsko je posebej (gumb ⛶ ali meni pred predvajanjem).
+                // Pregledovalnik (playMenu): samo vklopi sledenje in predvaja —
+                // celozaslonsko je posebej (gumb ⛶).
                 if (!playMenu) onSmartPlay?.();
                 if (!playing) togglePlay();
               }}

@@ -264,21 +264,10 @@ export default function SongCard({
           : "border-neutral-300 hover:border-neutral-400 dark:border-white/[0.08]! dark:hover:border-white/[0.08]!"
       }`}
     >
-      {/* Odobrena skladba, ročno preverjena: dve kljukici desno spodaj — rumena
-          = akordi v aplikaciji, oranžna = predvajalnik (Smart play, Sam Špili). */}
-      {!hideVerifiedBadges && !song.review_pending && (song.verified_chords_at || song.verified_player_at) && (
+      {/* Odobrena skladba s preverjenim predvajalnikom (Preverjeno špila): ena oranžna
+          kljukica desno spodaj. */}
+      {!hideVerifiedBadges && !song.review_pending && song.verified_player_at && (
         <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1">
-          {song.verified_chords_at && (
-            <span
-              title={`Akordi preverjeni ${new Date(song.verified_chords_at).toLocaleDateString("sl-SI")}`}
-              aria-label="Akordi preverjeni"
-              className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-neutral-900 shadow-sm"
-            >
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round" className="h-2.5 w-2.5">
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
-            </span>
-          )}
           {song.verified_player_at && (
             <span
               title={`Predvajalnik preverjen ${new Date(song.verified_player_at).toLocaleDateString("sl-SI")}`}

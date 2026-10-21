@@ -3,7 +3,7 @@
 // z besedami vrstic taba (Needleman–Wunsch, podobnost besed po Levenshteinu,
 // vedno samo naprej) in iz tega izračuna začetek/konec vsake zapete vrstice.
 //
-//   node --env-file=.env.local scripts/spedenaj/autosync.mjs <songId> --words w.json[,w2.json] [--out lines.json]
+//   node --env-file=.env.local scripts/spedenaj/autosync.mjs <songId> --words w.json[,w2.json] [--out lines.json] [--chords-from backup.json]
 //
 // Več datotek besed: druga (drugi prehod vocals.py --clips) zamenja besede prve znotraj svojih izrezov.
 // Poročilo na koncu predlaga --clips za drugi prehod (deli z neujetimi vrsticami).
@@ -36,6 +36,8 @@ const r3 = (x) => Math.round(x * 1000) / 1000;
 const res = await fetch(`${url}/rest/v1/songs?id=eq.${id}&select=id,title,author,chords_text`, { headers });
 const [song] = await res.json();
 if (!song) throw new Error(`Ni skladbe ${id}`);
+// --chords-from <backup.json>: besedilo iz varnostne kopije (backups/spedenaj) namesto iz baze — za preizkus.
+if (arg("--chords-from")) song.chords_text = JSON.parse(readFileSync(arg("--chords-from"), "utf8")).chords_text;
 const body = splitDescription(parseChords(song.chords_text ?? "")).body;
 // Prvi prehod + drugi prehodi (izrezi): besede drugega znotraj izrezov zamenjajo besede prvega.
 const [rec, ...extra] = arg("--words")
@@ -66,6 +68,13 @@ body.forEach((line, i) => {
   ws.forEach((w, n) => tab.push({ w, line: i, n }));
 });
 const heard = rec.words.map((x) => ({ ...x, n: norm(x.w) })).filter((x) => x.n);
+// Stisnjene besede: Whisper včasih več besed prilepi na skoraj isti čas (Premau: "premau si znal, premau
+// za dve" vse ob 24,3 s). Časi teh besed so napačni, zato v poravnavi štejejo malo — sicer je pri
+// enakih ponovitvah refrena poravnava raje preskočila pravo vrstico (18,4 s) in vse zamaknila za eno.
+const DENSE_SEC = 0.12;
+heard.forEach((h, j) => {
+  h.dense = heard.filter((x, k) => k !== j && Math.abs(x.start - h.start) < DENSE_SEC).length >= 2;
+});
 
 function lev(a, b) {
   const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
@@ -86,7 +95,7 @@ for (let i = 1; i <= A; i++) (S[i][0] = i * GAP), (P[i][0] = 1);
 for (let j = 1; j <= B; j++) (S[0][j] = j * GAP), (P[0][j] = 2);
 for (let i = 1; i <= A; i++)
   for (let j = 1; j <= B; j++) {
-    const m = S[i - 1][j - 1] + 2 * (sim(tab[i - 1].w, heard[j - 1].n) - 0.5);
+    const m = S[i - 1][j - 1] + 2 * (sim(tab[i - 1].w, heard[j - 1].n) - 0.5) * (heard[j - 1].dense ? 0.2 : 1);
     const u = S[i - 1][j] + GAP;
     const l = S[i][j - 1] + GAP;
     if (m >= u && m >= l) (S[i][j] = m), (P[i][j] = 0);
@@ -194,6 +203,47 @@ for (const o of out) {
       `${" ".repeat(36)}slišano: ${o.heard || "—"}`,
   );
 }
+// Opozorila, ki jih "100 %" skrije: enake ponovitve refrena se vedno ujemajo 100 %, tudi ko so zamaknjene
+// za eno vrstico. Sumljivo: prekratka vrstica, prekrivanje/potisk naprej, neporabljene slišane besede
+// (≥ 3 zaporedne), ki so podobne sosednji vrstici — tam je poravnava morda preskočila pravo ponovitev.
+const warn = [];
+const used = new Set(match.filter((j) => j >= 0));
+for (let k = 0; k < out.length; k++) {
+  const o = out[k];
+  if (o.end - o.t < o.words.length * 0.15) warn.push(`vrstica ${o.line} ${fmt(o.t)}: samo ${(o.end - o.t).toFixed(2)} s za ${o.words.length} besed`);
+  if (k > 0 && o.t < out[k - 1].end - 0.05) warn.push(`vrstica ${o.line} ${fmt(o.t)}: začne pred koncem prejšnje`);
+}
+for (let j = 0; j < heard.length; ) {
+  if (used.has(j)) {
+    j++;
+    continue;
+  }
+  let b = j;
+  while (b < heard.length && !used.has(b)) b++;
+  if (b - j >= 3) {
+    const run = heard.slice(j, b).map((h) => h.n).join(" ");
+    const said = `"${heard.slice(j, b).map((h) => h.w).join(" ")}"`;
+    const near = out.filter((o) => Math.abs(o.t - heard[j].start) < 8);
+    const like = near.find((o) => sim(o.text.replace(/ /g, ""), run.replace(/ /g, "")) >= 0.6);
+    // Ponovitev, ki je tab nima (Jaz sem izvisel, 2026-10-21: vsak refren se poje dvakrat, zapisan je
+    // enkrat): neporabljeno petje vsebuje besedilo kakšne vrstice kjerkoli v skladbi.
+    const runJoined = run.replace(/ /g, "");
+    const anywhere = out.find((o) => o.words.length >= 3 && runJoined.includes(o.text.replace(/ /g, "").slice(0, 12)) && sim(o.text.replace(/ /g, ""), runJoined.slice(0, o.text.replace(/ /g, "").length + 2)) >= 0.6);
+    if (like) warn.push(`${fmt(heard[j].start)}: neporabljeno ${said} ≈ vrstica ${like.line} — sosednje vrstice so morda zamaknjene`);
+    else if (anywhere)
+      warn.push(`${fmt(heard[j].start)}: neporabljeno ${said} = besedilo vrstice ${anywhere.line} — tu se poje ponovitev, ki je tab nima? (izpiši jo)`);
+  }
+  j = b;
+}
+// Predolga vrstica: zadnja ujeta beseda je daleč pred naslednjo vrstico — vmes se poje nekaj, česar tab
+// nima (ponovljen refren) ali je tam instrumental. Preveri v w.json.
+for (let k = 0; k < out.length - 1; k++) {
+  const o = out[k];
+  const gap = out[k + 1].t - o.t;
+  if (!o.guess && gap > Math.max(8, o.words.length * 1.2))
+    warn.push(`vrstica ${o.line} ${fmt(o.t)}: do naslednje vrstice ${gap.toFixed(1)} s za ${o.words.length} besed — ponovitev, ki je tab nima, ali instrumental?`);
+}
+if (warn.length) console.log(`\n⚠ preveri (ritem/kromagram):\n  ${warn.join("\n  ")}`);
 const sure = out.filter((o) => !o.guess && o.fromPattern == null).length;
 const pattern = out.filter((o) => o.fromPattern != null).length;
 console.log(`\nzanesljivo: ${sure}/${out.length}, po vzorcu: ${pattern}, ocenjeno: ${out.length - sure - pattern}`);

@@ -92,6 +92,14 @@ body {
   caret-color: transparent;
 }
 
+/* Tudi na vsakem elementu posebej (ne le z dedovanjem od body): Chromov kazalec
+   ob kliku v prazen prostor glave (levo od iskanja) je bil sicer viden. */
+*,
+*::before,
+*::after {
+  caret-color: transparent;
+}
+
 /* Samo polja, v katera se piše — drsnik (range), kljukice ipd. ne: na drsniku
    glasbe v akordih je sicer utripala navpična črtica. */
 input:not([type="range"], [type="checkbox"], [type="radio"], [type="button"], [type="submit"], [type="file"], [type="color"]),

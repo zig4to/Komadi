@@ -94,6 +94,12 @@ ustrezajo končnemu besedilu.
 3. Odstrani "2x", "x2", "Repeat", "Refren" opombe iz telesa (ponovitve morajo biti izpisane).
 4. **Brez LRC** (`dump` to pove): preveri samo očitne bližnjice (2x, "Refren", "(Chorus)") — jih izpiši, če je jasno,
    kaj ponavljajo, sicer javi v poročilu. Čase vrstic teh skladb naredi samodejno iz petja (korak 6b).
+   **Popolnost preveri s petjem** (`w.json`, korak 1b), ker tab tega ne pove (Jaz sem izvisel, 2026-10-21: vsak
+   refren se poje dvakrat, zapisan je bil enkrat — zadnja vrstica refrena je bila označena 13 s). Izpiši besede po
+   frazah (preskok > 1,5 s = nova vrstica) in jih po vrsti primerjaj s tabom: vsak del, ki se poje večkrat, izpiši
+   tolikokrat (v istem `[Chorus N]`, ločeno s prazno vrstico); drugačno besedilo ponovitve (»Sem spet izvisu«) prepiši
+   po petju; vrstica v oklepaju, ki se poje, ostane brez oklepaja (sicer nima časa). `autosync.mjs` take primere
+   javi kot "do naslednje vrstice X s za N besed" — tega opozorila nikoli ne pusti nerazrešenega.
 5. **Akordi nad vsako vrstico z besedilom** (uporabnikova odločitev): vsaka zapeta vrstica v celem telesu mora
    imeti akorde nad besedami, kjer se zamenjajo — tudi ko tab akorde napiše samo enkrat (npr. samo nad prvo
    vrstico kitice in potem "repeat like verse", "Am / C / D", ali kitice brez akordov). **Postopek** (Six Blade
@@ -201,6 +207,13 @@ Za skladbe, ki jih LRCLIB nima s časi (`dump`: "LRCLIB nima…"), namesto ročn
 3. `autosync.mjs <id> --words w.json --out lines.json` → preglej poročilo: vrstice z "?" (pod 70 %) in "?? ocena"
    primerjaj s kromagramom v `a.json` (začetek vrstice ≈ menjava akorda njenega prvega akorda) in jih po potrebi
    popravi v `lines.json`.
+   **"100 %" pri ponovljenih vrsticah ni dokaz** (Premau, 2026-10-21: Chorus 1 in pol Chorusa 2 sta bila
+   zamaknjena za eno vrstico, ~2 s prepozno, vse vrstice pa so kazale 100 %, ker so enake). Vsak opozorilni
+   razdelek "⚠ preveri" na koncu poročila razreši, preden zapišeš — posebej "neporabljeno … ≈ vrstica N" (petje,
+   ki ga poravnava ni dodelila nobeni vrstici → sosednje vrstice so zamaknjene), "samo X s za N besed" in
+   "začne pred koncem prejšnje". V refrenih z enakimi vrsticami preveri še ritem: vrstice si sledijo v enakih
+   razmikih (Premau ~2,05 s); vrstica, ki odstopa, je narobe. Popravi z `lineOverrides` po prepoznanih besedah
+   (`w.json`: `start` prve besede vrstice) in razmiku.
 4. Patch `{ "video": "…", "linesFrom": "lines.json" }` (+ morebitni `lineOverrides`) → `write` brez `--write`, nato
    z `--write`. Zapiše `synced_lines` s ključi, kot "Posnemi čase".
 5. V poročilu navedi delež zanesljivih vrstic in ocenjene/negotove vrstice — te uporabnik preveri ob poslušanju.
@@ -230,7 +243,7 @@ tu ne spreminjaj sam — samo poročaj.
    zelenem okencu "Ali si vedel?" desno od "Nasvet"). Dovoljeno tudi pri preverjenih skladbah (samo prikaz).
    - `about`: 2–3 kratki odstavki (ločeni s prazno vrstico): o čem pesem govori (povzetek besedila s svojimi
      besedami, ne citati), kdo jo je napisal, kdaj in zakaj (povod, ozadje), kakšen je njen namen / sporočilo.
-   - `facts`: natanko 5 kratkih zanimivosti (1–2 stavka): nastanek, snemanje, uspeh na lestvicah, priredbe,
+   - `facts`: do 5 kratkih zanimivosti (1–2 stavka) — če ni toliko preverjenih, manj ali `[]` (takrat je zgodba v `about`; uporabnikova odločitev 2026-10-21, Daleč je za naju pomlad): nastanek, snemanje, uspeh na lestvicah, priredbe,
      filmi, nenavadni podatki. Brez ponavljanja tega, kar je že v `about`.
    - **Samo preverjena dejstva**: vsako dejstvo potrdi s spletnim iskanjem (WebSearch: Wikipedia, Songfacts,
      intervjuji); kar ni potrjeno, izpusti — raje manj znana, a resnična zanimivost kot izmišljena. Pazi na
