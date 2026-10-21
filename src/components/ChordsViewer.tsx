@@ -151,6 +151,27 @@ const SS_WHEEL_GAIN = 1;
 const SMOOTH_SCROLL_TEST_TITLES = ["vojna idej"];
 const SS_SMOOTH_SEC = 8;
 const SS_SMOOTH_STEP = 0.1;
+// "Sam Špili": časovna konstanta glajenja pogleda proti cilju (ms).
+const SS_EASE_MS = 180;
+// Trenutna zapeta vrstica (začetek, konec zadnje njene točke) in naslednja točka
+// z drugo vrstico — za drsenje do naslednje zapete vrstice čez kratke predahe.
+function sungSpanAt(points: SyncPoint[], time: number): { start: number; end: number; next: SyncPoint | null } | null {
+  let idx = -1;
+  for (let lo = 0, hi = points.length - 1; lo <= hi; ) {
+    const mid = (lo + hi) >> 1;
+    if (points[mid].time <= time) {
+      idx = mid;
+      lo = mid + 1;
+    } else hi = mid - 1;
+  }
+  if (idx < 0) return null;
+  const line = points[idx].lineIndex;
+  let first = idx;
+  while (first > 0 && points[first - 1].lineIndex === line) first--;
+  let last = idx;
+  while (last + 1 < points.length && points[last + 1].lineIndex === line) last++;
+  return { start: points[first].time, end: points[last].end, next: points[last + 1] ?? null };
+}
 function fmtClock(s: number) {
   const t = Math.max(0, Math.floor(s));
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
@@ -1875,6 +1896,8 @@ export default function ChordsViewer({
     history: RecAction[];
     future: RedoAction[];
     dirty: boolean;
+    // Deli, kot so bili shranjeni ob odprtju snemalnika (gumb "Ponastavi" pri delu).
+    initial: ChordSection[];
   } | null>(() => {
     if (!autoRecord) return null;
     // Isto kot startRecorder: nadaljuje za zadnjo že posneto vrstico.
@@ -1889,6 +1912,7 @@ export default function ChordsViewer({
       history: [],
       future: [],
       dirty: false,
+      initial: sections,
     };
   });
   const [recorderMsg, setRecorderMsg] = useState<string | null>(
@@ -1910,6 +1934,7 @@ export default function ChordsViewer({
       history: [],
       future: [],
       dirty: false,
+      initial: sections,
     });
     setSmartOn(false);
     setRecorderMsg(
@@ -1959,6 +1984,32 @@ export default function ChordsViewer({
       ...recorder,
       sections,
       activeId: recorder.activeId === id ? (sections[sections.length - 1]?.id ?? null) : recorder.activeId,
+      history: recorder.history.filter((a) => a.kind === "line" || a.sectionId !== id),
+      future: recorder.future.filter((a) => a.kind === "line" || a.sectionId !== id),
+      dirty: true,
+    });
+  };
+  // "Izbriši vse": odstrani vse akorde dela (del, ime in zamik ostanejo).
+  const clearSection = (id: string) => {
+    if (!recorder) return;
+    const section = recorder.sections.find((s) => s.id === id);
+    if (!section?.points.length || !window.confirm(`Izbrišem vse akorde dela "${section.name}" (${section.points.length})?`)) return;
+    setRecorder({
+      ...recorder,
+      sections: recorder.sections.map((s) => (s.id === id ? { ...s, points: [], end: null } : s)),
+      history: recorder.history.filter((a) => a.kind === "line" || a.sectionId !== id),
+      future: recorder.future.filter((a) => a.kind === "line" || a.sectionId !== id),
+      dirty: true,
+    });
+  };
+  // "Ponastavi": del nazaj na stanje ob odprtju snemalnika (akordi, konec, zamik).
+  const resetSection = (id: string) => {
+    if (!recorder) return;
+    const saved = recorder.initial.find((s) => s.id === id);
+    if (!saved) return;
+    setRecorder({
+      ...recorder,
+      sections: recorder.sections.map((s) => (s.id === id ? { ...saved, name: s.name } : s)),
       history: recorder.history.filter((a) => a.kind === "line" || a.sectionId !== id),
       future: recorder.future.filter((a) => a.kind === "line" || a.sectionId !== id),
       dirty: true,
@@ -3030,7 +3081,7 @@ export default function ChordsViewer({
         if (Math.abs(diff) < 1) returning = false;
       } else if (Number.isNaN(pos) || Math.abs(diff) > boxH * 1.5 || Math.abs(diff) < 0.05) pos = target;
       // Kratko glajenje (cilj se premika zvezno, zato majhna zamuda).
-      else pos += diff * (1 - Math.exp(-dt / 110));
+      else pos += diff * (1 - Math.exp(-dt / SS_EASE_MS));
       inner.style.transform = `translate3d(0, ${-pos}px, 0)`;
     };
     const tick = (now: number) => {
@@ -3083,6 +3134,21 @@ export default function ChordsViewer({
       // Solo/vmesni del čez več vrstic akordov: od polovice premora pogled počasi
       // drsi proti vrstici za njim, da je ob koncu sola že vidna (Bad Moon Rising).
       let rate = clock.playing && k >= 0 && span > 0 ? 1 / span : 0;
+      // Brez instrumentalnega premora: pogled drsi enakomerno do mesta naslednje
+      // ZAPETE vrstice in tja pride ob njenem začetku — prej se je ustavil ob koncu
+      // petja (kratek predah) in ob vmesni vrstici brez petja (samo akordi) ob
+      // začetku nove vrstice skočil še za eno vrstico (nova vrstica je trznila gor).
+      const sung = points && k >= 0 ? sungSpanAt(points, lt) : null;
+      if (sung?.next && sung.next.time - sung.end < SS_GAP_MIN) {
+        const to = rowFor(sung.next.lineIndex);
+        const len = sung.next.time - sung.start;
+        if (to > k && len > 0) {
+          const q = Math.min(1, Math.max(0, (lt - sung.start) / len));
+          rowPos = k + (to - k) * q;
+          rate = clock.playing ? (to - k) / len : 0;
+          k = Math.floor(rowPos);
+        }
+      }
       if (gapInfo && gapInfo.nextLine >= 0 && k >= 0) {
         const from = k + 1;
         const to = rowFor(gapInfo.nextLine);
@@ -5062,6 +5128,10 @@ export default function ChordsViewer({
                         ? (section.end != null ? section.end + off : Math.max(...times) + 4)
                         : null;
                       const listOpen = openChordLists.has(section.id);
+                      // Shranjeno stanje dela ob odprtju snemalnika (za "Ponastavi").
+                      const saved = recorder.initial.find((s) => s.id === section.id);
+                      const savedPoints = saved?.points.length ?? 0;
+                      const changed = !saved || JSON.stringify(saved) !== JSON.stringify({ ...section, name: saved.name });
                       // Akordi po času (indeks k = mesto v section.points, ki ga premik spremeni).
                       const ordered = section.points.map((p, k) => ({ p, k })).sort((a, b) => a.p.t - b.p.t);
                       return (
@@ -5107,7 +5177,7 @@ export default function ChordsViewer({
                                   e.stopPropagation();
                                   toggleChordList(section.id);
                                 }}
-                                disabled={!section.points.length}
+                                disabled={!section.points.length && !savedPoints}
                                 aria-expanded={listOpen}
                                 title={listOpen ? "Skrij akorde" : "Pokaži akorde — vsakemu posebej nastaviš čas"}
                                 className={`inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-px font-medium transition-colors disabled:opacity-40 ${
@@ -5171,6 +5241,29 @@ export default function ChordsViewer({
                         </div>
                         {/* Akordi dela po vrsti: čas vsakega posebej (−/+), ▶ predvaja od 1,5 s pred njim.
                             Zamik dela (zgoraj) se prišteje vsem — tu je prikazan končni čas. */}
+                        {listOpen && (
+                          <div className="mx-1.5 mb-1 flex items-center gap-1">
+                            {!section.points.length && <span className="flex-1 text-[10px] text-neutral-500">Ni akordov.</span>}
+                            <button
+                              type="button"
+                              onClick={() => clearSection(section.id)}
+                              disabled={!section.points.length}
+                              title="Odstrani vse akorde tega dela (del ostane)"
+                              className="ml-auto rounded border border-neutral-600 px-1.5 py-0.5 text-neutral-300 hover:border-red-400 hover:text-red-400 disabled:opacity-30"
+                            >
+                              Izbriši vse
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => resetSection(section.id)}
+                              disabled={!saved || !changed}
+                              title={saved ? `Nazaj na shranjeno stanje (${chordCountLabel(savedPoints)})` : "Del še ni bil shranjen"}
+                              className="rounded border border-neutral-600 px-1.5 py-0.5 text-neutral-300 hover:border-orange-400 hover:text-amber-300 disabled:opacity-30"
+                            >
+                              Ponastavi
+                            </button>
+                          </div>
+                        )}
                         {listOpen && section.points.length > 0 && (
                           <ol className="mx-1.5 mb-1.5 divide-y divide-neutral-800 overflow-hidden rounded-md border border-neutral-700 bg-neutral-950">
                             {ordered.map(({ p, k }, n) => (
@@ -5404,9 +5497,9 @@ export default function ChordsViewer({
                 onClick={onClose}
                 aria-label="Zapri"
                 title="Zapri"
-                className="flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)]">
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
               </button>
@@ -5416,9 +5509,9 @@ export default function ChordsViewer({
                 aria-label={ssSidebarOpen ? "Skrij meni" : "Pokaži meni"}
                 title={ssSidebarOpen ? "Skrij meni" : "Pokaži meni"}
                 aria-expanded={ssSidebarOpen}
-                className={`flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${ssSidebarOpen ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
+                className={`flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${ssSidebarOpen ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)]">
                   <path d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
@@ -5456,15 +5549,15 @@ export default function ChordsViewer({
                 disabled={!ssActive && ssRequested}
                 aria-label={ssActive ? "Pavza" : "Predvajaj"}
                 title={ssActive ? "Pavza" : "Predvajaj"}
-                className="flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
                 {ssActive ? (
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)]">
                     <rect x="6" y="5" width="4" height="14" rx="1" />
                     <rect x="14" y="5" width="4" height="14" rx="1" />
                   </svg>
                 ) : (
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="ml-0.5 h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)]">
                     <path d="M7 5v14l12-7z" />
                   </svg>
                 )}
@@ -5476,9 +5569,9 @@ export default function ChordsViewer({
                 }}
                 aria-label="Na začetek"
                 title="Na začetek"
-                className="flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)]">
                   <path d="M6 5v14" />
                   <path d="M18 19 9 12l9-7z" fill="currentColor" />
                 </svg>
@@ -5488,9 +5581,9 @@ export default function ChordsViewer({
                 onClick={() => playerCtlRef.current?.seekBy(5)}
                 aria-label="5 s naprej"
                 title="5 s naprej"
-                className="flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)]">
                   <path d="M13 19l7-7-7-7" /><path d="M5 19l7-7-7-7" />
                 </svg>
               </button>
@@ -5499,20 +5592,20 @@ export default function ChordsViewer({
                 onClick={() => playerCtlRef.current?.seekBy(-5)}
                 aria-label="5 s nazaj"
                 title="5 s nazaj"
-                className="flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
+                className="flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)]">
                   <path d="M11 19l-7-7 7-7" /><path d="M19 19l-7-7 7-7" />
                 </svg>
               </button>
-              <button type="button" onClick={() => ssChangeVolume(5)} aria-label="Glasneje" title="Glasneje (↑)" className="flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
+              <button type="button" onClick={() => ssChangeVolume(5)} aria-label="Glasneje" title="Glasneje (↑)" className="flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)]">
                   <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
                   <path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12" />
                 </svg>
               </button>
-              <button type="button" onClick={() => ssChangeVolume(-5)} aria-label="Tišje" title="Tišje (↓)" className="flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
+              <button type="button" onClick={() => ssChangeVolume(-5)} aria-label="Tišje" title="Tišje (↓)" className="flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)]">
                   <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
                   <path d="M16 12h5" />
                 </svg>
@@ -5523,9 +5616,9 @@ export default function ChordsViewer({
                 aria-label="Prevrtavanje"
                 title="Prevrtavanje"
                 aria-pressed={ssSeekOpen}
-                className={`flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${ssSeekOpen ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
+                className={`flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${ssSeekOpen ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)]">
                   <path d="M3 12h4M13 12h8" /><circle cx="10" cy="12" r="3" />
                 </svg>
               </button>
@@ -5539,9 +5632,9 @@ export default function ChordsViewer({
                 aria-label="Nastavitve"
                 title="Nastavitve"
                 aria-expanded={themeMenuPos !== null}
-                className={`flex h-(--ss-btn) w-(--ss-btn) lg:h-14 lg:w-14 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${themeMenuPos ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
+                className={`flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${themeMenuPos ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)] lg:h-6 lg:w-6">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)]">
                   <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
                   <circle cx="12" cy="12" r="3" />
                 </svg>
