@@ -18,6 +18,8 @@ import type { Song } from "@/types/song";
 const COLUMN_SIZE = 2;
 // Kartic na stran na računalniku (3 vrste × 3), polnijo se po vrstah.
 const DESKTOP_PAGE_SIZE = 9;
+// Največ toliko pik pod swipe vrstico (okno okoli trenutne skupine).
+const MAX_DOTS = 7;
 const COLUMN_GAP_PX = 12; // gap-3
 
 // "2026-09" — ključ meseca v lokalnem času.
@@ -277,18 +279,30 @@ function Swiper({
       {positions > 1 && (
         <div className={`flex items-center justify-center gap-3 ${arrows ? "mt-1.5" : "mt-2.5"}`}>
           {arrows && <ArrowButton direction="left" disabled={active === 0} onClick={() => scrollToGroup(active - 1)} />}
-          <div className="flex justify-center gap-1.5">
-            {Array.from({ length: positions }, (_, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => scrollToGroup(i)}
-                aria-label={`Skupina ${i + 1}`}
-                className={`h-1.5 rounded-full transition-all ${
-                  i === active ? "w-5 bg-amber-500 dark:bg-white/80" : "w-1.5 bg-neutral-300 hover:bg-neutral-400 dark:bg-white/20 dark:hover:bg-white/40"
-                }`}
-              />
-            ))}
+          {/* Največ MAX_DOTS pik okoli trenutne skupine (pri veliko skupinah jih je bila
+              cela vrstica čez zaslon); robni piki sta manjši, če je za njima še kaj. */}
+          <div className="flex items-center justify-center gap-1.5">
+            {(() => {
+              const n = Math.min(positions, MAX_DOTS);
+              const start = Math.max(0, Math.min(active - Math.floor(n / 2), positions - n));
+              return Array.from({ length: n }, (_, k) => {
+                const i = start + k;
+                const edge = (k === 0 && start > 0) || (k === n - 1 && start + n < positions);
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => scrollToGroup(i)}
+                    aria-label={`Skupina ${i + 1}`}
+                    className={`rounded-full transition-all ${
+                      i === active
+                        ? "h-1.5 w-5 bg-amber-500 dark:bg-white/80"
+                        : `${edge ? "h-1 w-1" : "h-1.5 w-1.5"} bg-neutral-300 hover:bg-neutral-400 dark:bg-white/20 dark:hover:bg-white/40`
+                    }`}
+                  />
+                );
+              });
+            })()}
           </div>
           {arrows && (
             <ArrowButton direction="right" disabled={active >= positions - 1} onClick={() => scrollToGroup(active + 1)} />

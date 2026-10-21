@@ -466,16 +466,22 @@ export default function HomeHighlights({
   genres,
   onSelectEra,
   onSelectGenre,
+  only,
 }: {
   eras: HighlightItem[];
   genres: HighlightItem[];
   onSelectEra: (era: string) => void;
   onSelectGenre: (genre: string) => void;
+  // Samo ena vrsta (domača stran: Žanri so pod Avtorji); brez = obe.
+  only?: "eras" | "genres";
 }) {
-  if (eras.length === 0 && genres.length === 0) return null;
+  const showEras = only !== "genres" && eras.length > 0;
+  const showGenres = only !== "eras" && genres.length > 0;
+  if (!showEras && !showGenres) return null;
 
   return (
     <div className="space-y-0">
+      {showEras && (
       <HighlightRow
         title="Obdobja"
         items={eras}
@@ -488,7 +494,9 @@ export default function HomeHighlights({
         images={ERA_IMAGES}
         variant="stat"
       />
-      <div className="mt-3">
+      )}
+      {showGenres && (
+      <div className={showEras ? "mt-3" : ""}>
         <HighlightRow
           title="Žanri"
           items={genres}
@@ -501,6 +509,7 @@ export default function HomeHighlights({
           motifs={GENRE_MOTIFS}
         />
       </div>
+      )}
     </div>
   );
 }

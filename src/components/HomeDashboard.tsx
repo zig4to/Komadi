@@ -76,8 +76,8 @@ function StatCard({
           {decor}
         </span>
       )}
-      <span className="flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
-        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot} ${pulse ? "animate-pulse" : ""}`} />
+      <span className="flex items-center gap-2 text-sm text-neutral-500 lg:text-[15px] dark:text-neutral-400">
+        <span className={`h-1.5 w-1.5 shrink-0 lg:h-2 lg:w-2 rounded-full ${dot} ${pulse ? "animate-pulse" : ""}`} />
         <span className="truncate">{label}</span>
       </span>
       {icon ? (
@@ -154,8 +154,8 @@ function ActionCard({
           {decor}
         </span>
       )}
-      <span className={`flex shrink-0 items-center justify-center rounded-xl bg-neutral-100 dark:bg-white/[0.06] ${small ? "h-8 w-8 lg:h-9 lg:w-9" : "h-9 w-9"} ${tone.text}`}>
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={small ? "h-4 w-4 lg:h-[18px] lg:w-[18px]" : "h-[18px] w-[18px]"}>
+      <span className={`flex shrink-0 items-center justify-center rounded-xl bg-neutral-100 dark:bg-white/[0.06] ${small ? "h-8 w-8 lg:h-11 lg:w-11" : "h-9 w-9 lg:h-11 lg:w-11"} ${tone.text}`}>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={small ? "h-4 w-4 lg:h-6 lg:w-6" : "h-[18px] w-[18px] lg:h-6 lg:w-6"}>
           {icon}
         </svg>
       </span>
@@ -242,8 +242,8 @@ export function HomeBento({
     <div className={`grid grid-cols-6 gap-3 lg:grid-cols-12 ${className}`}>
       {showStats && (
         <>
-          <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} decor={<TopoCorner hover="deco:text-neutral-400/40 dark:deco:text-neutral-400/40" />} />
-          <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={verified <= total ? `/${total}` : undefined} dot="bg-orange-400" onClick={onOpenVerified} decor={<VerifiedCorner hover="deco:text-orange-400/40 dark:deco:text-orange-400/40" />} />
+          <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} decor={<TopoCorner hover="deco:text-neutral-400/22 dark:deco:text-neutral-400/22" />} />
+          <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={verified <= total ? `/${total}` : undefined} dot="bg-orange-400" onClick={onOpenVerified} decor={<VerifiedCorner hover="deco:text-orange-400/22 dark:deco:text-orange-400/22" />} />
           <StatCard className="col-span-3" label="V pregledu" value={review} dot="bg-teal-400" onClick={onOpenReview} decor={<ChecklistCorner />} />
           <StatCard className="col-span-3" label="Playliste" value={playlistCount} dot="bg-yellow-400" onClick={onOpenPlaylists} decor={<PlaylistCorner />} />
         </>
@@ -524,10 +524,10 @@ function VerifiedCorner({ hover }: { hover: string }) {
             cy={cy}
             r={r}
             stroke="currentColor"
-            className={`transition-colors duration-300 ${i === 0 ? "" : i % 2 ? "deco:text-neutral-900/20 dark:deco:text-white/25" : "deco:text-orange-400/40"}`}
+            className={`transition-colors duration-300 ${i === 0 ? "" : i % 2 ? "deco:text-neutral-900/12 dark:deco:text-white/14" : "deco:text-orange-400/22"}`}
           />
         ))}
-        <path d={`M ${cx - 9} ${cy} l 6 6 l 12 -13`} stroke="currentColor" className="transition-colors duration-300 deco:text-orange-400/55" />
+        <path d={`M ${cx - 9} ${cy} l 6 6 l 12 -13`} stroke="currentColor" className="transition-colors duration-300 deco:text-orange-400/30" />
       </g>
     </svg>
   );
@@ -545,11 +545,11 @@ function ChecklistCorner() {
           const x = 66 + i * 6;
           return (
             <g key={i}>
-              <rect x={x} y={y - 7} width={14} height={14} rx={3} stroke="currentColor" className="transition-colors duration-300 deco:text-neutral-900/20 dark:deco:text-white/25" />
+              <rect x={x} y={y - 7} width={14} height={14} rx={3} stroke="currentColor" className="transition-colors duration-300 deco:text-neutral-900/12 dark:deco:text-white/14" />
               {i < 3 && (
-                <path d={`M${x + 3} ${y} l3.5 3.5 l6 -7`} stroke="currentColor" className="transition-colors duration-300 deco:text-teal-400/45" />
+                <path d={`M${x + 3} ${y} l3.5 3.5 l6 -7`} stroke="currentColor" className="transition-colors duration-300 deco:text-teal-400/25" />
               )}
-              <path d={`M${x + 22} ${y} H 172`} stroke="currentColor" className="transition-colors duration-300 deco:text-neutral-900/20 dark:deco:text-white/25" />
+              <path d={`M${x + 22} ${y} H 172`} stroke="currentColor" className="transition-colors duration-300 deco:text-neutral-900/12 dark:deco:text-white/14" />
             </g>
           );
         })}
@@ -564,12 +564,12 @@ function PlaylistCorner() {
   return (
     <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:hidden text-neutral-900/[0.05] dark:text-white/[0.045]">
       <g transform="translate(66 22) scale(4.4)" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
-        <g className="transition-colors duration-300 deco:text-neutral-900/20 dark:deco:text-white/25">
+        <g className="transition-colors duration-300 deco:text-neutral-900/12 dark:deco:text-white/14">
           <path d="M16 6H3" vectorEffect="non-scaling-stroke" />
           <path d="M12 12H3" vectorEffect="non-scaling-stroke" />
           <path d="M12 18H3" vectorEffect="non-scaling-stroke" />
         </g>
-        <g className="transition-colors duration-300 deco:text-yellow-400/50">
+        <g className="transition-colors duration-300 deco:text-yellow-400/28">
           <path d="M21 15V6" vectorEffect="non-scaling-stroke" />
           <circle cx="18.5" cy="15.5" r="2.5" vectorEffect="non-scaling-stroke" />
         </g>
@@ -593,7 +593,7 @@ function DiceCorner() {
             key={i}
             transform={`rotate(${d.rot} ${d.x + d.s / 2} ${d.y + d.s / 2})`}
             stroke="currentColor"
-            className={`transition-colors duration-300 ${i % 2 ? "deco:text-neutral-900/20 dark:deco:text-white/25" : "deco:text-violet-400/45"}`}
+            className={`transition-colors duration-300 ${i % 2 ? "deco:text-neutral-900/12 dark:deco:text-white/14" : "deco:text-violet-400/25"}`}
           >
             <rect x={d.x} y={d.y} width={d.s} height={d.s} rx={d.s * 0.18} stroke="currentColor" />
             {d.pips.map(([px, py], j) => (
@@ -622,7 +622,7 @@ function ShuffleCorner() {
             <g
               key={i}
               stroke="currentColor"
-              className={`transition-colors duration-300 ${i % 2 ? "deco:text-neutral-900/20 dark:deco:text-white/25" : "deco:text-lime-400/45"}`}
+              className={`transition-colors duration-300 ${i % 2 ? "deco:text-neutral-900/12 dark:deco:text-white/14" : "deco:text-lime-400/25"}`}
             >
               <path d={d} stroke="currentColor" />
               <path d={`M 142 ${y - 7} L 150 ${y} L 142 ${y + 7}`} stroke="currentColor" />

@@ -4706,6 +4706,7 @@ export default function Dashboard({ user }: { user: User }) {
                   genres={genreHighlights}
                   onSelectEra={handleHighlightEra}
                   onSelectGenre={handleHighlightGenre}
+                  only="eras"
                 />
                 <div className="mt-3">
                   <FeaturedArtists
@@ -4723,6 +4724,16 @@ export default function Dashboard({ user }: { user: User }) {
                   variant="stat"
                   labelClassName="line-clamp-2! break-words text-base leading-tight! lg:text-lg"
                 />
+                {/* Žanri pod Avtorji (odločitev uporabnika). */}
+                <div className="mt-3">
+                  <HomeHighlights
+                    eras={eraHighlights}
+                    genres={genreHighlights}
+                    onSelectEra={handleHighlightEra}
+                    onSelectGenre={handleHighlightGenre}
+                    only="genres"
+                  />
+                </div>
                 </div>
                 <HomeAside
                   className="hidden lg:block"
