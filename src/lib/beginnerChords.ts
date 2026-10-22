@@ -173,13 +173,13 @@ export function lessonChord(name: string): LessonChord | undefined {
 // Brenkalni vzorci: 8 osmink v taktu 4/4 ("D" = navzdol, "U" = navzgor, null = brez udarca).
 export type Stroke = "D" | "U" | null;
 export const STRUM_PATTERNS: { name: string; hint: string; steps: Stroke[] }[] = [
-  { name: "Samo navzdol", hint: "Štiri udarce navzdol na vsako dobo. Začni tu — roka naj se giblje enakomerno.", steps: ["D", null, "D", null, "D", null, "D", null] },
-  { name: "Navzdol–navzgor", hint: "Osminke: navzdol na dobo, navzgor vmes. Roka niha kot nihalo ves čas.", steps: ["D", "U", "D", "U", "D", "U", "D", "U"] },
   {
-    name: "Osnovni pop",
-    hint: "D · D U · U D U — najpogostejši vzorec. Pri praznem mestu roka še vedno zamahne, le strun ne zadene.",
+    name: "Standard",
+    hint: "Dol, dol-gor, gor-dol-gor (D · D U · U D U) — najpogostejši vzorec. Pri praznem mestu roka še vedno zamahne, le strun ne zadene.",
     steps: ["D", null, "D", "U", null, "U", "D", "U"],
   },
+  { name: "Samo navzdol", hint: "Štiri udarce navzdol na vsako dobo. Začni tu — roka naj se giblje enakomerno.", steps: ["D", null, "D", null, "D", null, "D", null] },
+  { name: "Navzdol–navzgor", hint: "Osminke: navzdol na dobo, navzgor vmes. Roka niha kot nihalo ves čas.", steps: ["D", "U", "D", "U", "D", "U", "D", "U"] },
   { name: "Country / galop", hint: "D · D U D · D U — poskočen ritem za country in folk.", steps: ["D", null, "D", "U", "D", null, "D", "U"] },
   { name: "Off-beat (reggae)", hint: "Samo navzgor med dobami — kratko in odrezano, takoj utišaj z levo roko.", steps: [null, "U", null, "U", null, "U", null, "U"] },
 ];

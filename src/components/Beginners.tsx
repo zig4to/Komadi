@@ -69,7 +69,7 @@ function writeJson(key: string, value: unknown) {
 
 // ---------- Zvok ----------
 
-type AudioApi = { ctx: () => AudioContext | null; strum: (at: number, shape: ChordPosition, up: boolean, vol?: number) => void; click: (at: number, accent: boolean) => void };
+type AudioApi = { ctx: () => AudioContext | null; strum: (at: number, shape: ChordPosition, up: boolean, vol?: number, ringFor?: number) => void; click: (at: number, accent: boolean) => void };
 
 function useAudio(): AudioApi {
   const ctxRef = useRef<AudioContext | null>(null);
@@ -115,7 +115,9 @@ function useAudio(): AudioApi {
     bufs.current.set(midi, b);
     return b;
   };
-  const strum = (at: number, shape: ChordPosition, up: boolean, vol = 0.22) => {
+  // ringFor: koliko sekund akord zveni (do naslednjega udarca) — kot na kitari zveni
+  // tudi čez zgrešen udarec, utihne šele ob naslednjem.
+  const strum = (at: number, shape: ChordPosition, up: boolean, vol = 0.22, ringFor = 0.35) => {
     const c = ctxRef.current;
     if (!c) return;
     const notes = shape.frets
@@ -127,8 +129,8 @@ function useAudio(): AudioApi {
       const g = c.createGain();
       src.buffer = buffer(c, midi);
       g.gain.setValueAtTime(up ? vol * 0.7 : vol, at);
-      // Udarec utihne pred naslednjim, da se brenkanje ne zlije v eno zvonjenje.
-      g.gain.setTargetAtTime(0.0001, at + 0.35, 0.12);
+      // Udarec utihne ob naslednjem, da se brenkanje ne zlije v eno zvonjenje.
+      g.gain.setTargetAtTime(0.0001, at + ringFor, 0.05);
       src.connect(g).connect(c.destination);
       src.start(at + i * 0.011);
       src.stop(at + 1.4);
@@ -314,7 +316,7 @@ export default function Beginners({ onClose, songs }: { onClose: () => void; son
           {tab === "all" && <AllChords known={known} toggleKnown={toggleKnown} />}
           {tab === "changes" && <Changes known={known} audio={audio} />}
           {tab === "strum" && <Strumming known={known} audio={audio} />}
-          {tab === "songs" && <FirstSongs known={known} songs={songs} onGoLessons={() => setTab("lessons")} />}
+          {tab === "songs" && <FirstSongs known={known} toggleKnown={toggleKnown} songs={songs} />}
         </div>
       </div>
     </div>,
@@ -474,22 +476,30 @@ function shapeOf(name: string): ChordPosition {
 
 function Changes({ known, audio }: { known: Set<string>; audio: AudioApi }) {
   const knownLesson = LESSON_CHORD_NAMES.filter((n) => known.has(n));
-  const [a, setA] = useState(knownLesson[0] ?? "Em");
-  const [b, setB] = useState(knownLesson[1] ?? "Am");
+  // 2–4 akordi, menjajo se po vrsti (zadnji → spet prvi).
+  const [picked, setPicked] = useState<string[]>(() => {
+    const pool = [...knownLesson, "Em", "Am", "C", "G"].filter((n, i, arr) => arr.indexOf(n) === i);
+    return pool.slice(0, 4);
+  });
+  const [size, setSize] = useState(2);
+  const list = picked.slice(0, size);
+  const setAt = (i: number, name: string) => setPicked((prev) => prev.map((n, j) => (j === i ? name : n)));
   const [bpm, setBpm] = useState(60);
   const [beats, setBeats] = useState(4);
   const [on, setOn] = useState(false);
   const [sound, setSound] = useState(true);
   const beat = useTicker(audio, on, bpm, 1, (s, at) => {
     audio.click(at, s % beats === 0);
-    if (sound && s % beats === 0) audio.strum(at, shapeOf(Math.floor(s / beats) % 2 === 0 ? a : b), false, 0.16);
+    if (sound && s % beats === 0) audio.strum(at, shapeOf(list[Math.floor(s / beats) % list.length]), false, 0.16);
   });
-  const current = beat < 0 ? a : Math.floor(beat / beats) % 2 === 0 ? a : b;
-  const next = current === a ? b : a;
+  const ci = beat < 0 ? 0 : Math.floor(beat / beats) % list.length;
+  const current = list[ci];
+  const next = list[(ci + 1) % list.length];
 
   // Minutna vaja: čim več čistih menjav v 60 s, štej sam.
   const [records, setRecords] = useState<Record<string, number>>(() => readJson(CHANGES_KEY, {}));
-  const pairKey = [a, b].sort().join(" ↔ ");
+  // Par: vrstni red ni pomemben; 3–4 akordi: zaporedje.
+  const pairKey = size === 2 ? [...list].sort().join(" ↔ ") : list.join(" → ");
   const [left, setLeft] = useState<number | null>(null);
   const [count, setCount] = useState("");
   const endRef = useRef(0);
@@ -527,17 +537,23 @@ function Changes({ known, audio }: { known: Set<string>; audio: AudioApi }) {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-neutral-600 dark:text-neutral-400">
-        Najtežje pri začetku ni prijem, ampak hitra menjava med akordi. Vadi po dva naenkrat — počasi in čisto, nato pospeši.
+        Najtežje pri začetku ni prijem, ampak hitra menjava med akordi. Začni z dvema — počasi in čisto, nato pospeši; ko gre, dodaj tretjega
+        in četrtega (npr. G → Em → C → D).
       </p>
+      <div className="flex gap-1.5">
+        {[2, 3, 4].map((n) => (
+          <button key={n} type="button" onClick={() => setSize(n)} aria-pressed={size === n} className={`${CHIP} ${size === n ? CHIP_ON : CHIP_OFF}`}>
+            {n} akordi
+          </button>
+        ))}
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <div className={LABEL}>Prvi akord</div>
-          <ChordPicker value={a} onChange={setA} known={known} />
-        </div>
-        <div>
-          <div className={LABEL}>Drugi akord</div>
-          <ChordPicker value={b} onChange={setB} known={known} />
-        </div>
+        {list.map((name, i) => (
+          <div key={i}>
+            <div className={LABEL}>{["Prvi", "Drugi", "Tretji", "Četrti"][i]} akord</div>
+            <ChordPicker value={name} onChange={(v) => setAt(i, v)} known={known} />
+          </div>
+        ))}
       </div>
 
       <section className={CARD}>
@@ -552,6 +568,15 @@ function Changes({ known, audio }: { known: Set<string>; audio: AudioApi }) {
             <Diagram name={next} shape={shapeOf(next)} size="w-24" />
           </div>
         </div>
+        {size > 2 && (
+          <div className="mb-2 flex justify-center gap-2 font-mono text-sm">
+            {list.map((n, i) => (
+              <span key={i} className={i === ci && beat >= 0 ? "font-bold text-sky-600 dark:text-sky-300" : "text-neutral-400"}>
+                {n}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="mb-3 flex justify-center gap-1.5">
           {Array.from({ length: beats }, (_, i) => (
             <span key={i} className={`h-2.5 w-2.5 rounded-full ${beat >= 0 && beat % beats === i ? "bg-sky-500" : "bg-neutral-300 dark:bg-white/15"}`} />
@@ -587,7 +612,8 @@ function Changes({ known, audio }: { known: Set<string>; audio: AudioApi }) {
       <section className={CARD}>
         <h3 className="mb-1 font-semibold">Minutna vaja</h3>
         <p className="mb-3 text-sm text-neutral-600 dark:text-neutral-400">
-          60 sekund menjavaj {a} in {b} čim hitreje in štej, kolikokrat ti je uspelo čisto (vsaka zamenjava = 1). Vsak dan poskusi preseči rekord.
+          60 sekund menjavaj {size === 2 ? `${list[0]} in ${list[1]}` : list.join(" → ")} čim hitreje in štej, kolikokrat ti je uspelo čisto (vsaka
+          zamenjava = 1). Vsak dan poskusi preseči rekord.
         </p>
         <div className="flex flex-wrap items-center gap-3">
           {left === null ? (
@@ -665,7 +691,12 @@ function Strumming({ known, audio }: { known: Set<string>; audio: AudioApi }) {
     const i = s % 8;
     if (i % 2 === 0) audio.click(at, i === 0);
     const st = pattern.steps[i];
-    if (st) audio.strum(at, shapeOf(chord), st === "U");
+    if (st) {
+      // Do naslednjega udarca v vzorcu (prazno mesto = roka zgreši strune, akord zveni naprej).
+      let k = 1;
+      while (k < 8 && !pattern.steps[(i + k) % 8]) k++;
+      audio.strum(at, shapeOf(chord), st === "U", undefined, (k * 30) / Math.max(20, bpm));
+    }
   });
   const cur = step < 0 ? -1 : step % 8;
 
@@ -741,7 +772,7 @@ function songChords(text: string): string[] {
   return [...out].filter((n) => /^[A-H]/.test(n));
 }
 
-function FirstSongs({ known, songs, onGoLessons }: { known: Set<string>; songs: Song[]; onGoLessons: () => void }) {
+function FirstSongs({ known, toggleKnown, songs }: { known: Set<string>; toggleKnown: (n: string) => void; songs: Song[] }) {
   const [simplify, setSimplify] = useState(true);
   const parsed = useMemo(
     () => songs.filter((s) => s.chords_text).map((s) => ({ song: s, chords: songChords(s.chords_text as string) })),
@@ -766,17 +797,6 @@ function FirstSongs({ known, songs, onGoLessons }: { known: Set<string>; songs: 
     almost.sort((a, b) => (unlock.get(b.missing) ?? 0) - (unlock.get(a.missing) ?? 0) || a.chords.length - b.chords.length);
     return { ready, almost, unlock: [...unlock.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5) };
   }, [parsed, known, simplify]);
-
-  if (known.size === 0) {
-    return (
-      <div className={`${CARD} text-center text-sm`}>
-        <p className="mb-3">Najprej pri »Začetni akordi« označi akorde, ki jih že znaš (Znam).</p>
-        <button type="button" className={BTN_MAIN} onClick={onGoLessons}>
-          Na začetne akorde
-        </button>
-      </div>
-    );
-  }
 
   const row = (item: { song: Song; chords: string[]; missing?: string }) => (
     <button
@@ -806,10 +826,27 @@ function FirstSongs({ known, songs, onGoLessons }: { known: Set<string>; songs: 
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Znani akordi: tap doda / odstrani (isto kot "Znam" pri lekcijah in Vseh akordih). */}
+      <div>
+        <div className={LABEL}>Akordi, ki jih znaš — tapni za spremembo</div>
+        <div className="flex flex-wrap gap-1.5">
+          {[...LESSON_CHORD_NAMES, ...[...known].filter((n) => !LESSON_CHORD_NAMES.includes(n))].map((n) => {
+            const on = known.has(n);
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => toggleKnown(n)}
+                aria-pressed={on}
+                className={`${CHIP} ${on ? "border-emerald-500/60 bg-emerald-500/10 font-medium text-emerald-700 dark:text-emerald-300" : CHIP_OFF}`}
+              >
+                {n}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <span className="text-neutral-600 dark:text-neutral-400">
-          Znaš: <span className="font-medium text-neutral-900 dark:text-white">{[...known].join(", ")}</span>
-        </span>
         <label className="flex items-center gap-1.5">
           <input type="checkbox" checked={simplify} onChange={(e) => setSimplify(e.target.checked)} />
           Poenostavi akorde (D7 → D, Am7 → Am)
@@ -821,7 +858,10 @@ function FirstSongs({ known, songs, onGoLessons }: { known: Set<string>; songs: 
           {unlock.map(([c, n], i) => (
             <span key={c}>
               {i > 0 && ", "}
-              <span className="font-mono font-semibold text-amber-600 dark:text-amber-400">{c}</span> odklene {n}{" "}
+              <button type="button" onClick={() => toggleKnown(c)} title={`Dodaj ${c} med znane`} className="font-mono font-semibold text-amber-600 underline decoration-dotted underline-offset-2 dark:text-amber-400">
+                {c}
+              </button>{" "}
+              odklene {n}{" "}
               {n === 1 ? "skladbo" : n === 2 ? "skladbi" : n < 5 ? "skladbe" : "skladb"}
             </span>
           ))}
@@ -834,7 +874,9 @@ function FirstSongs({ known, songs, onGoLessons }: { known: Set<string>; songs: 
         {ready.length ? (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{ready.map(row)}</div>
         ) : (
-          <p className="text-sm text-neutral-500">Še nobena skladba — nauči se še kakšen akord.</p>
+          <p className="text-sm text-neutral-500">
+            {known.size ? "Še nobena skladba — nauči se še kakšen akord." : "Zgoraj tapni akorde, ki jih že znaš."}
+          </p>
         )}
       </section>
       {almost.length > 0 && (
