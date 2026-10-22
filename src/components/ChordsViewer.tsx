@@ -1846,6 +1846,18 @@ export default function ChordsViewer({
   // Računalnik (miška, ≥ 1024 px): predvajalnik pripravljen vnaprej — prvi ▶ zaigra in
   // vklopi celozaslonski način v istem kliku. Telefon: ustvari se šele ob prvem ▶.
   const [preloadPlayer] = useState(() => typeof window !== "undefined" && window.matchMedia("(pointer: fine) and (min-width: 1024px)").matches);
+  // Sam Špili na telefonu: predvajalnik pripravljen vnaprej (iPhone: prvi Play je
+  // sicer tiho zavrnjen, ker playVideo ob ustvarjanju ni več v kliku). Do
+  // pripravljenosti Play kaže nalaganje; po 8 s se omogoči vseeno (stara pot).
+  const [playerReady, setPlayerReady] = useState(false);
+  const [ssReadyTimedOut, setSsReadyTimedOut] = useState(false);
+  const ssPreload = samSpili && !follower && !preloadPlayer;
+  useEffect(() => {
+    if (!ssPreload || playerReady) return;
+    const t = setTimeout(() => setSsReadyTimedOut(true), 8000);
+    return () => clearTimeout(t);
+  }, [ssPreload, playerReady]);
+  const ssWaitReady = ssPreload && !playerReady && !ssReadyTimedOut;
   // Glasnost posnetka po 5 % — ista v akordih v aplikaciji in v Sam Špili
   // (komadi:chords:volume; nov predvajalnik jo prevzame ob zagonu). Sam Špili:
   // ↑ / ↓ in gumba v stranski vrstici; navadni pogled: gumba v orodni vrstici.
@@ -4306,7 +4318,8 @@ export default function ChordsViewer({
             onSmartToggle={setSmartOn}
             onUserPlay={() => startPlayView("player")}
             onSmartPlay={() => startPlayView("smart")}
-            preload={preloadPlayer && !follower}
+            preload={(preloadPlayer || samSpili) && !follower}
+            onPlayerReady={() => setPlayerReady(true)}
             playMenu={!samSpili && !follower}
             controllerRef={playerCtlRef}
             playbackRate={playbackRate}
@@ -6067,14 +6080,14 @@ export default function ChordsViewer({
               <button
                 type="button"
                 onClick={ssPlay}
-                disabled={ssRequested}
+                disabled={ssRequested || ssWaitReady}
                 aria-label="Predvajaj"
                 title="Predvajaj"
                 className="group relative flex h-24 w-24 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_15%,transparent)] bg-[color-mix(in_srgb,var(--cv-text)_6%,transparent)] text-(--cv-text) shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-xl transition hover:scale-105 hover:border-[color-mix(in_srgb,var(--cv-text)_25%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)] active:scale-95 disabled:opacity-70 sm:h-28 sm:w-28"
               >
                 {/* Nežen obroč okrog gumba */}
                 <span aria-hidden="true" className="pointer-events-none absolute -inset-3 rounded-full border border-white/[0.06] transition group-hover:-inset-4 group-hover:border-white/10" />
-                {ssRequested ? (
+                {ssRequested || ssWaitReady ? (
                   <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
                 ) : (
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="ml-1.5 h-10 w-10 sm:h-11 sm:w-11">

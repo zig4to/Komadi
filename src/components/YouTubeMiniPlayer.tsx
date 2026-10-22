@@ -129,6 +129,7 @@ export default function YouTubeMiniPlayer({
   videoIds,
   watchUrl,
   onPlaying,
+  onPlayerReady,
   floatingHost,
   sliderHost,
   sliderBelow = false,
@@ -161,6 +162,8 @@ export default function YouTubeMiniPlayer({
   watchUrl: string;
   // Video, ki se je res začel predvajati — ChordsViewer si ga zapomni za naslednjič.
   onPlaying?: (videoId: string) => void;
+  // Predvajalnik je pripravljen (onReady) — Sam Špili na telefonu šele takrat omogoči Play.
+  onPlayerReady?: () => void;
   // "Predvajalnik med pomikanjem": kontrole istega predvajalnika v plavajočem
   // pravokotniku desno (portal v ta element — koren pregledovalnika, da ga
   // pokaže tudi celozaslonski način brskalnika). null = ni prikazan.
@@ -192,6 +195,8 @@ export default function YouTubeMiniPlayer({
   onSmartPlay?: () => void;
   // Računalnik: predvajalnik se ustvari (ustavljen) malo po odprtju, da prvi ▶ v istem
   // kliku zaigra in vklopi celozaslonski način (ob ustvarjanju v kliku bi ga ta porabil).
+  // Tudi Sam Špili na telefonu: iPhone dovoli zvok samo v kliku, playVideo v onReady
+  // novo ustvarjenega predvajalnika pa ni več v kliku — prvi Play je bil tiho zavrnjen.
   preload?: boolean;
   // ▶ in Smart play (ko skladba ne igra) odpreta mali meni: "Predvajaj" / "Celozaslonsko predvajaj".
   playMenu?: boolean;
@@ -207,10 +212,12 @@ export default function YouTubeMiniPlayer({
   const playerRef = useRef<YTPlayer | null>(null);
   const createdRef = useRef<YTPlayer | null>(null);
   const onPlayingRef = useRef(onPlaying);
+  const onPlayerReadyRef = useRef(onPlayerReady);
   const onTimeRef = useRef(onTime);
   const rateRef = useRef(playbackRate);
   useEffect(() => {
     onPlayingRef.current = onPlaying;
+    onPlayerReadyRef.current = onPlayerReady;
     onTimeRef.current = onTime;
     rateRef.current = playbackRate;
   });
@@ -302,6 +309,7 @@ export default function YouTubeMiniPlayer({
               else if (tries > 0) setTimeout(() => readDuration(tries - 1), 500);
             };
             readDuration(10);
+            onPlayerReadyRef.current?.();
             if (!autoplayRef.current) return;
             if (pendingSeekRef.current != null) playerRef.current?.seekTo(pendingSeekRef.current, true);
             playerRef.current?.playVideo();
@@ -416,7 +424,7 @@ export default function YouTubeMiniPlayer({
     };
   });
 
-  // Računalnik: pripravi predvajalnik 1,5 s po odprtju (ustavljen).
+  // Računalnik (in Sam Špili na telefonu): pripravi predvajalnik 1,5 s po odprtju (ustavljen).
   useEffect(() => {
     if (!preload || started) return;
     const t = setTimeout(() => start(false), 1500);
