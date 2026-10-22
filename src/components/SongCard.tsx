@@ -636,7 +636,7 @@ export default function SongCard({
         </div>
       </div>
 
-      <div className="mt-2 hidden min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto text-xs [&>*:nth-child(n+4)]:hidden sm:[&>*:nth-child(n+4)]:inline lg:flex">
+      <div className="mt-2 hidden min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden text-xs [&>*:nth-child(n+4)]:hidden lg:flex">
         <Badge>{song.genre}</Badge>
         <Badge>{song.era}</Badge>
         {song.mood && <Badge>{song.mood}</Badge>}

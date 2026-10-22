@@ -1407,7 +1407,7 @@ export default function ChordsViewer({
       else window.localStorage.setItem(TOOLBAR_SCALE_KEY, String(v));
     } catch {}
   };
-  // Zložena orodna vrstica (puščica pri ⚙); predvajalnik ostane. Na napravo.
+  // Zložena orodna vrstica (puščica desno od ⏮ v predvajalniku); predvajalnik ostane. Na napravo.
   // Telefon: ob vsakem odprtju zložena (uporabnikova odločitev 2026-10-20), odpre
   // jo puščica v vrstici predvajalnika; računalnik si stanje zapomni.
   const [toolbarCollapsed, setToolbarCollapsedState] = useState(() => {
@@ -4279,6 +4279,24 @@ export default function ChordsViewer({
             }
             sliderHost={sliderHostEl}
             sliderBelow={improOpen}
+            // Desno od ⏮: zloži / pokaži orodno vrstico (predvajalnik ostane).
+            afterRestart={
+              <button
+                type="button"
+                onClick={() => {
+                  closeThemeMenu();
+                  setToolbarCollapsed(!toolbarCollapsed);
+                }}
+                aria-pressed={toolbarCollapsed}
+                aria-label={toolbarCollapsed ? "Pokaži orodno vrstico" : "Zloži orodno vrstico"}
+                title={toolbarCollapsed ? "Pokaži orodno vrstico" : "Zloži orodno vrstico"}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-amber-400 transition hover:bg-orange-400/15 active:scale-95"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <path d={toolbarCollapsed ? "m6 9 6 6 6-6" : "m18 15-6-6-6 6"} />
+                </svg>
+              </button>
+            }
             sectionMarkers={sectionMarkers}
             markerLead={markerLead}
             onMarkerClick={(m) => scrollToSection(m.line)}
@@ -4316,19 +4334,6 @@ export default function ChordsViewer({
               } catch {}
             }}
           />
-        {toolbarCollapsed && (
-          <button
-            type="button"
-            onClick={() => setToolbarCollapsed(false)}
-            aria-label="Pokaži orodno vrstico"
-            title="Pokaži orodno vrstico"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-amber-400 transition hover:bg-orange-400/15 active:scale-95"
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </button>
-        )}
         <button
           type="button"
           onClick={onClose}
@@ -4828,21 +4833,6 @@ export default function ChordsViewer({
                 <circle cx="12" cy="12" r="3" />
               </svg>
             </button>
-            {/* Zloži orodno vrstico — predvajalnik zgoraj ostane; nazaj s puščico v njegovi vrstici. */}
-            <button
-              type="button"
-              onClick={() => {
-                closeThemeMenu();
-                setToolbarCollapsed(true);
-              }}
-              aria-label="Zloži orodno vrstico"
-              title="Zloži orodno vrstico"
-              className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-neutral-200 transition hover:text-white active:scale-95 max-lg:order-13"
-            >
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                <path d="m18 15-6-6-6 6" />
-              </svg>
-            </button>
           </div>
         </div>
         <button
@@ -4883,8 +4873,8 @@ export default function ChordsViewer({
             {shapeChords.length > 0 && (
               <div
                 className={`relative z-10 self-start rounded-xl border px-2 py-1.5 lg:px-2.5 ${showShapes ? "border-(--cv-border)" : "border-orange-400/40 bg-orange-400/[0.05]"}`}
-                // Računalnik: bolj desno od naslova in navpično na sredini naslovnega bloka.
-                style={desktopBars ? { marginLeft: "6rem", alignSelf: "center" } : undefined}
+                // Računalnik: bolj desno od naslova, poravnano na vrh kot Nasvet / Ali si vedel? / Kviz.
+                style={desktopBars ? { marginLeft: "6rem" } : undefined}
                 aria-label={showShapes ? "Akordi v skladbi" : "Posebni akordi"}
               >
                 <button
@@ -6093,9 +6083,15 @@ export default function ChordsViewer({
                 )}
               </button>
               )}
+              {/* Capo pred začetkom (nad bližnjicami), da ga ne spregledaš. */}
+              {capo !== null && (
+                <p className="mt-6 text-xl font-semibold text-orange-400 sm:text-2xl">
+                  {capoShift ? `Brez capa (izvirno capo ${capo}, akordi +${capo})` : `Capo: ${capo}. prag`}
+                </p>
+              )}
               {/* Bližnjice na tipkovnici pod Play — samo računalnik (miška, ≥ lg), ne za sledilca. */}
               {!follower && (
-                <div className="mt-10 hidden lg:pointer-fine:block">
+                <div className={`${capo !== null ? "mt-2" : "mt-10"} hidden lg:pointer-fine:block`}>
                   <SamSpiliHotkeys
                     label="Bližnjice na tipkovnici"
                     buttonClassName="flex items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] px-4 py-2 text-sm text-(--cv-muted) backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)] hover:text-(--cv-text)"

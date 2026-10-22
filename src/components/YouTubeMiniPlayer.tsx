@@ -148,8 +148,11 @@ export default function YouTubeMiniPlayer({
   onSelect,
   lockedNote,
   playbackRate = 1,
+  afterRestart,
 }: {
   videoIds: string[];
+  // Dodaten gumb desno od ⏮ (ChordsViewer: zloži / pokaži orodno vrstico); tudi ko noben posnetek ne gre.
+  afterRestart?: React.ReactNode;
   // Hitrost predvajanja ("Hitrost" v ChordsViewer, 0,5–1); velja tudi po zamenjavi posnetka.
   playbackRate?: number;
   // Preverjena skladba: seznam ima samo zaklenjen posnetek, polja za dodajanje
@@ -748,6 +751,9 @@ export default function YouTubeMiniPlayer({
         >
           Odpri na YouTubu{errorCode !== null && ` (napaka ${errorCode})`}
         </a>
+      ) : null}
+      {failedAll ? (
+        afterRestart
       ) : (
         <>
           {smartAvailable && (
@@ -798,6 +804,7 @@ export default function YouTubeMiniPlayer({
               <path d="M6 5h2.5v14H6zM20 5v14L9 12l11-7z" />
             </svg>
           </button>
+          {afterRestart}
 
           {/* Računalnik: drsnik v tej vrstici; telefon: v lastni vrstici (sliderHost). */}
           {sliderHost ? (

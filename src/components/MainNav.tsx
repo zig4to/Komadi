@@ -5,7 +5,7 @@
 // celozaslonskih straneh) kot vrstica pod glavo. Skupno je na telefonu v
 // meniju ⋮ (oddelek "Skupno" pod Uporabnikom), ne v vrstici. Ikone obdržijo barvo
 // funkcije, aktivna tabletka je poudarjena. Telefon: na koncu ikona za iskanje
-// (onSearch), ki odpre iskalno vrstico pod glavo. Playliste nimajo zavihka —
+// (onSearch), ki odpre iskalno vrstico pod glavo, levo od nje "Za začetnike" (onBeginners). Playliste nimajo zavihka —
 // odpre jih kartica na domači strani ("playlists" ostane v tipu za handleMainNav).
 
 export type MainNavTab = "home" | "jam" | "playlists" | "shared";
@@ -41,6 +41,7 @@ export default function MainNav({
   className = "",
   onSearch,
   searchActive,
+  onBeginners,
 }: {
   active: MainNavTab | null;
   onSelect: (tab: MainNavTab) => void;
@@ -48,6 +49,7 @@ export default function MainNav({
   className?: string;
   onSearch?: () => void;
   searchActive?: boolean;
+  onBeginners?: () => void;
 }) {
   return (
     <nav
@@ -88,6 +90,22 @@ export default function MainNav({
           </button>
         );
       })}
+      {onBeginners && (
+        <button
+          type="button"
+          onClick={onBeginners}
+          disabled={disabled}
+          aria-label="Za začetnike"
+          title="Za začetnike"
+          className="inline-flex shrink-0 items-center justify-center rounded-full px-3 py-1.5 text-neutral-600 transition hover:bg-neutral-100 disabled:opacity-40 lg:hidden dark:text-neutral-400 dark:hover:bg-white/[0.05]"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-sky-500 dark:text-sky-400">
+            <path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z" />
+            <path d="M22 10v6" />
+            <path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5" />
+          </svg>
+        </button>
+      )}
       {onSearch && (
         <button
           type="button"

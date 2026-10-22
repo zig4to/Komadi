@@ -35,6 +35,7 @@ import { HomeAside, HomeBento, HomeGreeting } from "@/components/HomeDashboard";
 import MainNav, { type MainNavTab } from "@/components/MainNav";
 import Tuner from "@/components/Tuner";
 import Scales from "@/components/Scales";
+import Beginners from "@/components/Beginners";
 import { authorAccentHex } from "@/lib/authorColor";
 import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES, LIBRARY_OWNER_ID } from "@/lib/constants";
 import { pickDailyFeatured } from "@/lib/dailyRandom";
@@ -419,6 +420,8 @@ export default function Dashboard({ user }: { user: User }) {
   // Uglaševalec (kartica na domači strani; prej v meniju ⋮).
   const [tunerOpen, setTunerOpen] = useState(false);
   const [scalesOpen, setScalesOpen] = useState(false);
+  // "Za začetnike" (gumb levo od iskanja, Beginners.tsx).
+  const [beginnersOpen, setBeginnersOpen] = useState(false);
   const [goalPickerQuery, setGoalPickerQuery] = useState("");
   const [goalExtras, setGoalExtras] = useState<GoalExtra[]>([]);
   const [goalQuickAddOpen, setGoalQuickAddOpen] = useState(false);
@@ -2246,6 +2249,26 @@ export default function Dashboard({ user }: { user: User }) {
       </div>
     );
   }
+  // Gumb "Za začetnike" (računalnik: levo od iskalnega polja; telefon: v MainNav levo od lupe).
+  function renderBeginnersButton() {
+    return (
+      <button
+        type="button"
+        onClick={() => setBeginnersOpen(true)}
+        aria-label="Za začetnike"
+        title="Za začetnike"
+        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-neutral-300 px-3 text-sm text-neutral-700 transition hover:bg-neutral-100 dark:border-white/10 dark:text-neutral-200 dark:bg-white/[0.05] dark:hover:bg-white/[0.1]"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-sky-500 dark:text-sky-400">
+          <path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z" />
+          <path d="M22 10v6" />
+          <path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5" />
+        </svg>
+        <span className="hidden xl:inline">Za začetnike</span>
+      </button>
+    );
+  }
+
   function renderSearchBox(className: string) {
     return (
       <div className={className}>
@@ -3060,6 +3083,7 @@ export default function Dashboard({ user }: { user: User }) {
               </h1>
             </div>
             <div className="flex items-center gap-2">
+              {isDesktop && renderBeginnersButton()}
               {isDesktop && renderSearchBox("relative w-56 xl:w-72")}
               <button
                 onClick={() => {
@@ -3157,6 +3181,7 @@ export default function Dashboard({ user }: { user: User }) {
             onSelect={handleMainNav}
             disabled={!isSupabaseConfigured}
             onSearch={handlePhoneSearch}
+            onBeginners={() => setBeginnersOpen(true)}
             searchActive={phoneSearchShown && (activeNav === "home" || activeNav === "shared")}
             className={`${cls} w-full lg:w-fit ${activeNav === "home" || activeNav === "shared" || activeNav === "jam" ? "lg:hidden" : ""}`}
           />
@@ -4662,6 +4687,7 @@ export default function Dashboard({ user }: { user: User }) {
           </div>
           {tunerOpen && <Tuner onClose={() => setTunerOpen(false)} />}
           {scalesOpen && <Scales onClose={() => setScalesOpen(false)} />}
+          {beginnersOpen && <Beginners songs={songs} onClose={() => setBeginnersOpen(false)} />}
 
           <Filters
             filters={filters}
