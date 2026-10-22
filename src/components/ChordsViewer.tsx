@@ -1858,6 +1858,16 @@ export default function ChordsViewer({
     return () => clearTimeout(t);
   }, [ssPreload, playerReady]);
   const ssWaitReady = ssPreload && !playerReady && !ssReadyTimedOut;
+  // Skupni Jam: ko se vodji skladba izteče, se pregledovalnik po 2 s zapre — s tem
+  // vodja pošlje "close" in sledenje se konča za vse (sledilci in gostje zaprejo akorde).
+  // Ponovni zagon v teh 2 s (onPlaying) zapiranje prekliče.
+  const endCloseRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const onSongEnded = () => {
+    if (shared?.role !== "leader") return;
+    clearTimeout(endCloseRef.current);
+    endCloseRef.current = setTimeout(onClose, 2000);
+  };
+  useEffect(() => () => clearTimeout(endCloseRef.current), []);
   // Glasnost posnetka po 5 % — ista v akordih v aplikaciji in v Sam Špili
   // (komadi:chords:volume; nov predvajalnik jo prevzame ob zagonu). Sam Špili:
   // ↑ / ↓ in gumba v stranski vrstici; navadni pogled: gumba v orodni vrstici.
@@ -4320,6 +4330,7 @@ export default function ChordsViewer({
             onSmartPlay={() => startPlayView("smart")}
             preload={(preloadPlayer || samSpili) && !follower}
             onPlayerReady={() => setPlayerReady(true)}
+            onEnded={onSongEnded}
             playMenu={!samSpili && !follower}
             controllerRef={playerCtlRef}
             playbackRate={playbackRate}
@@ -4341,6 +4352,7 @@ export default function ChordsViewer({
               return error ? error.message : null;
             }}
             onPlaying={(id) => {
+              clearTimeout(endCloseRef.current);
               setPlayingVideo(id);
               try {
                 window.localStorage.setItem(workingVideoKey(song.id), id);

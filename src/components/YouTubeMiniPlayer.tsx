@@ -130,6 +130,7 @@ export default function YouTubeMiniPlayer({
   watchUrl,
   onPlaying,
   onPlayerReady,
+  onEnded,
   floatingHost,
   sliderHost,
   sliderBelow = false,
@@ -164,6 +165,8 @@ export default function YouTubeMiniPlayer({
   onPlaying?: (videoId: string) => void;
   // Predvajalnik je pripravljen (onReady) — Sam Špili na telefonu šele takrat omogoči Play.
   onPlayerReady?: () => void;
+  // Posnetek se je predvajal do konca (stanje 0).
+  onEnded?: () => void;
   // "Predvajalnik med pomikanjem": kontrole istega predvajalnika v plavajočem
   // pravokotniku desno (portal v ta element — koren pregledovalnika, da ga
   // pokaže tudi celozaslonski način brskalnika). null = ni prikazan.
@@ -213,11 +216,13 @@ export default function YouTubeMiniPlayer({
   const createdRef = useRef<YTPlayer | null>(null);
   const onPlayingRef = useRef(onPlaying);
   const onPlayerReadyRef = useRef(onPlayerReady);
+  const onEndedRef = useRef(onEnded);
   const onTimeRef = useRef(onTime);
   const rateRef = useRef(playbackRate);
   useEffect(() => {
     onPlayingRef.current = onPlaying;
     onPlayerReadyRef.current = onPlayerReady;
+    onEndedRef.current = onEnded;
     onTimeRef.current = onTime;
     rateRef.current = playbackRate;
   });
@@ -318,6 +323,7 @@ export default function YouTubeMiniPlayer({
           // 1 = predvaja, 2 = premor, 0 = konec
           onStateChange: (e) => {
             setPlaying(e.data === 1);
+            if (e.data === 0) onEndedRef.current?.();
             // -1 = še ni začel, 3 = nalaga; vse ostalo (tudi 5 = pripravljen, če
             // brskalnik blokira samodejni zagon) pomeni, da gumb spet deluje.
             if (e.data !== -1 && e.data !== 3) {
