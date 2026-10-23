@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import AutoScrollControl from "@/components/AutoScrollControl";
 import ChordDiagram from "@/components/ChordDiagram";
 import YouTubeMiniPlayer, { youTubeVideoId, type PlayerController, VOLUME_KEY, readVolume } from "@/components/YouTubeMiniPlayer";
-import { enterLandscapeFullscreen, canBrowserFullscreen, hasSamSpili, isAppFullscreen, openChordsViewer } from "@/lib/openChords";
+import { enterLandscapeFullscreen, canBrowserFullscreen, hasSamSpili, isAppFullscreen, lockLandscape, openChordsViewer } from "@/lib/openChords";
 import {
   applyEditedText,
   findCapo,
@@ -3466,11 +3466,25 @@ export default function ChordsViewer({
   // špili, gumb na čakalnem zaslonu ali poziv, ko vodja začne igrati.
   const ssFollowerFullscreen = () => {
     setSsFsPromptDismissed(true);
-    if (document.fullscreenElement || !canBrowserFullscreen()) return;
-    if (window.matchMedia("(pointer: coarse)").matches) enterLandscapeFullscreen();
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    if (document.fullscreenElement || !canBrowserFullscreen()) {
+      // Že čez cel zaslon (ali nameščena aplikacija): samo še ležeče.
+      if (coarse) lockLandscape();
+      return;
+    }
+    if (coarse) enterLandscapeFullscreen();
     else document.documentElement.requestFullscreen().catch(() => {});
   };
   const [ssFsPromptDismissed, setSsFsPromptDismissed] = useState(false);
+  // Sledilec na telefonu: ko vodja klikne Play (pridejo vrstice), se zaslon sam
+  // zasuka ležeče (2026-10-23). Brez dotika gre to le, ko je stran že čez cel
+  // zaslon (nameščena aplikacija ali prej tapnjen celozaslonski način) —
+  // sicer ostane poziv "Tapni za celozaslonski način". iPhone zaklepanja nima.
+  useEffect(() => {
+    if (!samSpili || !follower || !ssShowLines) return;
+    if (!window.matchMedia("(pointer: coarse)").matches) return;
+    if (document.fullscreenElement || isAppFullscreen()) lockLandscape();
+  }, [samSpili, follower, ssShowLines]);
   useEffect(() => {
     if (!samSpili) return;
     const onChange = () => setSsIsFullscreen(!!document.fullscreenElement || isAppFullscreen());
@@ -5728,7 +5742,7 @@ export default function ChordsViewer({
                   skrije se skupaj s stransko vrstico. */}
               <div
                 aria-hidden="true"
-                className={`pointer-events-none absolute inset-y-0 z-10 w-px bg-(--cv-text) transition-opacity duration-300 ${ssSidebarOpen ? "opacity-15" : "opacity-0"}`}
+                className={`pointer-events-none absolute inset-y-0 z-10 w-px bg-(--cv-text) transition-opacity duration-300 ${ssSidebarOpen && !(portrait && isPhone) ? "opacity-15" : "opacity-0"}`}
                 style={{ right: "calc(max(0.75rem, env(safe-area-inset-right)) + var(--ss-btn) + 0.625rem)" }}
               />
               {/* Desno zgoraj: ✕ in pod njim gumb Meni (oba vedno vidna, enako kot na
@@ -5991,7 +6005,8 @@ export default function ChordsViewer({
                   paddingTop: "max(1.75rem, env(safe-area-inset-top))",
                   // Zaprta stranska vrstica: besedilo dobi njen prostor (do gumba
                   // Meni, ki plava v kotu); ResizeObserver pisavo prilagodi.
-                  paddingRight: ssSidebarOpen
+                  // Telefon pokončno (2026-10-23): manjši gumbi plavajo čez besedilo, brez rezerviranega stolpca.
+                  paddingRight: ssSidebarOpen && !(portrait && isPhone)
                     ? "calc(max(0.75rem, env(safe-area-inset-right)) + var(--ss-btn) + 0.875rem)"
                     : "calc(max(0.75rem, env(safe-area-inset-right)) + 0.5rem)",
                   paddingBottom: "max(1rem, env(safe-area-inset-bottom))",

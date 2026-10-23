@@ -64,10 +64,15 @@ export function canBrowserFullscreen() {
   return typeof document !== "undefined" && document.fullscreenEnabled && !isAppFullscreen();
 }
 
+// Zaklene ležeče; deluje le, ko je stran čez cel zaslon (ali nameščena aplikacija) — dotik ni potreben.
+export function lockLandscape() {
+  (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape").catch(() => {});
+}
+
 export function enterLandscapeFullscreen() {
   const el = document.documentElement;
   if (isAppFullscreen()) {
-    (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape").catch(() => {});
+    lockLandscape();
     return;
   }
   if (document.fullscreenElement || !el.requestFullscreen) return;

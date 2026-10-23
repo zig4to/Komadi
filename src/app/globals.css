@@ -258,7 +258,7 @@ textarea,
 }
 /* Telefon (2026-10-23): stolpec ima 8 gumbov (✕, zasuk, pavza, na začetek, ±5 s,
    prevrtavanje, ⚙ — brez Meni in glasnosti) in zasede celo višino: 7 razmikov po
-   0,5 rem + 0,75 rem zgoraj in spodaj. Pokončno največ 3,5 rem, da ostane širina za besedilo. */
+   0,5 rem + 0,75 rem zgoraj in spodaj. Pokončno manjši (2 rem) in plavajo čez besedilo. */
 @media (max-width: 1023px) {
   .ss-root {
     --ss-btn: clamp(1.75rem, calc((100dvh - 5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)) / 8), 5rem);
@@ -266,7 +266,7 @@ textarea,
 }
 @media (max-width: 1023px) and (orientation: portrait) {
   .ss-root {
-    --ss-btn: clamp(1.75rem, calc((100dvh - 5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)) / 8), 3.5rem);
+    --ss-btn: 2rem;
   }
 }
 @media (min-width: 1024px) {
