@@ -22,6 +22,9 @@ export interface Song {
   // Kdaj je bila skladba označena kot priljubljena (null, če ni) — določa
   // mesec v "Priljubljeno ta mesec" / "Arhiv priljubljenih".
   favorited_at: string | null;
+  // Kdaj sem skladbo označil kot "Znam" (osebno, tabela song_known, 0044) —
+  // ni stolpec songs, Dashboard.tsx ga prekrije v allSongs.
+  known_at?: string | null;
   youtube_url: string | null;
   // Točna povezava na Spotify skladbo / YouTube Music (albumska različica) —
   // polni ju skill dodaj-iz-cakalne-vrste; brez njiju ListenButton odpre iskanje.

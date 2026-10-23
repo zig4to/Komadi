@@ -1016,7 +1016,8 @@ export default function ChordsViewer({
     </>
   );
   // "Sam Špili": stranska vrstica z gumbi (skrita desno, odpre jo gumb Meni).
-  const [ssSidebarOpen, setSsSidebarOpen] = useState(false);
+  // Na telefonu je vedno odprta in gumba Meni ni (2026-10-23).
+  const [ssSidebarOpen, setSsSidebarOpen] = useState(() => typeof window !== "undefined" && window.innerWidth < 1024);
   // "Sam Špili": ročni popravek velikosti besedila (gumba − / + spodaj desno) —
   // množitelj na samodejno velikost, za vsako skladbo posebej na tej napravi.
   const [ssScale, setSsScale] = useState(() => {
@@ -3445,6 +3446,8 @@ export default function ChordsViewer({
     return () => window.removeEventListener("keydown", onKey);
   }, [follower, samSpili]);
   const ssPlay = () => {
+    // Na telefonu je ob Play stranska vrstica z gumbi vedno odprta (2026-10-23).
+    if (window.innerWidth < 1024) setSsSidebarOpen(true);
     setSmartOn(true);
     setSsActive(true);
     setSsRequested(true);
@@ -5754,14 +5757,13 @@ export default function ChordsViewer({
                 aria-label={ssSidebarOpen ? "Skrij meni" : "Pokaži meni"}
                 title={ssSidebarOpen ? "Skrij meni" : "Pokaži meni"}
                 aria-expanded={ssSidebarOpen}
-                className={`flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${ssSidebarOpen ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
+                className={`max-lg:hidden flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${ssSidebarOpen ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)]">
                   <path d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
-              {/* Telefon: zasuk v pokončni / ležeči način (pod gumbom Meni; skrit, ko je meni odprt). */}
-              {!ssSidebarOpen && (
+              {/* Telefon: zasuk v pokončni / ležeči način — na mestu gumba Meni (tega na telefonu ni). */}
               <button
                 type="button"
                 onClick={ssToggleOrientation}
@@ -5778,7 +5780,6 @@ export default function ChordsViewer({
                   <path d="M12.4 22.4 10 20.8l1.6-2.4" />
                 </svg>
               </button>
-              )}
               <div
                 aria-hidden={!ssSidebarOpen}
                 inert={!ssSidebarOpen}
@@ -5843,13 +5844,13 @@ export default function ChordsViewer({
                   <path d="M11 19l-7-7 7-7" /><path d="M19 19l-7-7 7-7" />
                 </svg>
               </button>
-              <button type="button" onClick={() => ssChangeVolume(5)} aria-label="Glasneje" title="Glasneje (↑)" className="flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
+              <button type="button" onClick={() => ssChangeVolume(5)} aria-label="Glasneje" title="Glasneje (↑)" className="max-lg:hidden flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)]">
                   <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
                   <path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12" />
                 </svg>
               </button>
-              <button type="button" onClick={() => ssChangeVolume(-5)} aria-label="Tišje" title="Tišje (↓)" className="flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
+              <button type="button" onClick={() => ssChangeVolume(-5)} aria-label="Tišje" title="Tišje (↓)" className="max-lg:hidden flex h-(--ss-btn) w-(--ss-btn) items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-[calc(var(--ss-btn)*0.45)] w-[calc(var(--ss-btn)*0.45)]">
                   <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
                   <path d="M16 12h5" />
@@ -5887,10 +5888,11 @@ export default function ChordsViewer({
               </div>
               </div>
               {/* Velikost besedila: + nad − spodaj desno (fino nastavljanje med predvajanjem);
-                  skrita, ko je odprt meni (njegov ⚙ je na istem mestu) ali drsnik. */}
+                  skrita, ko je odprt meni (njegov ⚙ je na istem mestu) ali drsnik.
+                  Na telefonu je ni (2026-10-23) — tam velikost spremeni pinch. */}
               {ssShowLines && !ssSeekOpen && !ssSidebarOpen && (
                 <div
-                  className="absolute z-20 flex flex-col items-center gap-2 font-sans"
+                  className="absolute z-20 flex flex-col items-center gap-2 font-sans max-lg:hidden"
                   style={{
                     bottom: "max(0.75rem, env(safe-area-inset-bottom))",
                     right: "max(0.75rem, env(safe-area-inset-right))",
@@ -6048,7 +6050,8 @@ export default function ChordsViewer({
                   aria-label="Meni"
                   title="Meni (nastavitve in teme)"
                   aria-expanded={themeMenuPos !== null}
-                  className={`flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${themeMenuPos ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
+                  // Na telefonu na začetnem zaslonu ni gumba Meni (2026-10-23) — po Play se odpre stranska vrstica.
+                  className={`max-lg:hidden flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 ${themeMenuPos ? "bg-[color-mix(in_srgb,var(--cv-text)_18%,transparent)]" : "bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]"}`}
                 >
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
                     <path d="M4 6h16M4 12h16M4 18h16" />

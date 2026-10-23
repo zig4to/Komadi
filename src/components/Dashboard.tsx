@@ -140,6 +140,8 @@ export default function Dashboard({ user }: { user: User }) {
   // Moj privat Jam (private_jam, 0039): song_id → { added_at, played }; prekrije
   // songs.jam_added_at / jam_played (stolpca na skupni vrstici se ne uporabljata več).
   const [myJam, setMyJam] = useState<Map<string, { added_at: string; played: boolean }>>(new Map());
+  // "Znam" (song_known, 0044): song_id → known_at, prekrito kot song.known_at.
+  const [myKnown, setMyKnown] = useState<Map<string, string>>(new Map());
   const allSongs = useMemo(
     () =>
       rawSongs.map((s) => {
@@ -147,13 +149,23 @@ export default function Dashboard({ user }: { user: User }) {
         const j = myJam.get(s.id);
         const jamAt = j?.added_at ?? null;
         const jamPlayed = j?.played ?? false;
-        return s.favorite === !!at && s.favorited_at === at && s.jam_added_at === jamAt && s.jam_played === jamPlayed
+        const knownAt = myKnown.get(s.id) ?? null;
+        return s.favorite === !!at &&
+          s.favorited_at === at &&
+          s.jam_added_at === jamAt &&
+          s.jam_played === jamPlayed &&
+          (s.known_at ?? null) === knownAt
           ? s
-          : { ...s, favorite: !!at, favorited_at: at, jam_added_at: jamAt, jam_played: jamPlayed };
+          : { ...s, favorite: !!at, favorited_at: at, jam_added_at: jamAt, jam_played: jamPlayed, known_at: knownAt };
       }),
-    [rawSongs, myFavorites, myJam],
+    [rawSongs, myFavorites, myJam, myKnown],
   );
   const songs = useMemo(() => allSongs.filter((s) => !s.review_pending && s.user_id === LIBRARY_OWNER_ID), [allSongs]);
+  // Stran "Znam": zadnje označene najprej.
+  const knownSongs = useMemo(
+    () => songs.filter((s) => s.known_at).sort((a, b) => (b.known_at ?? "").localeCompare(a.known_at ?? "")),
+    [songs],
+  );
   const reviewSongs = useMemo(
     () =>
       allSongs
@@ -379,6 +391,8 @@ export default function Dashboard({ user }: { user: User }) {
   // "Preverjeno špila": celostranski seznam preverjenih skladb (klik na kartico
   // statistike na domači strani) — enak vzorec kot ostale celostranske strani.
   const [verifiedOpen, setVerifiedOpen] = usePersistentBool("komadi:verified:open", false);
+  // Stran "Znam" (domača stran, kartica pod Tuner): moje skladbe, ki jih znam.
+  const [knownOpen, setKnownOpen] = usePersistentBool("komadi:known:open", false);
   // Iskanje na strani Preverjeno špila (samo po njenih skladbah; tudi listanje ‹ › v akordih gre po zadetkih).
   const [verifiedQuery, setVerifiedQuery] = useState("");
   // Iskanje na strani Vsi komadi (samo po njenih skladbah).
@@ -526,6 +540,41 @@ export default function Dashboard({ user }: { user: User }) {
               const id = (payload.old as { song_id?: string }).song_id;
               if (id) n.delete(id);
             } else n.set(payload.new.song_id, payload.new.favorited_at);
+            return n;
+          });
+        },
+      )
+      .subscribe();
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [user.id]);
+
+  // Moje "Znam" (song_known): ob zagonu in sproti (druge naprave).
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+    supabase
+      .from("song_known")
+      .select("song_id, known_at")
+      .eq("user_id", user.id)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        setMyKnown(new Map((data as { song_id: string; known_at: string }[]).map((r) => [r.song_id, r.known_at])));
+      });
+    const channel = supabase
+      .channel(`known-${user.id}`)
+      .on<{ song_id: string; known_at: string; user_id: string }>(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "song_known", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          setMyKnown((m) => {
+            const n = new Map(m);
+            if (payload.eventType === "DELETE") {
+              const id = (payload.old as { song_id?: string }).song_id;
+              if (id) n.delete(id);
+            } else n.set(payload.new.song_id, payload.new.known_at);
             return n;
           });
         },
@@ -1211,6 +1260,7 @@ export default function Dashboard({ user }: { user: User }) {
     setFixOpen(false);
     setQueueOpen(false);
     setPlaylistsOpen(false);
+    setKnownOpen(false);
     setReviewOpen(false);
     setVerifiedOpen(false);
     setAllSongsOpen(false);
@@ -1227,6 +1277,7 @@ export default function Dashboard({ user }: { user: User }) {
     setVerifiedOpen(false);
     setAllSongsOpen(false);
     setReviewOpen(false);
+    setKnownOpen(false);
     setPlaylistsOpen(true);
     window.scrollTo({ top: 0 });
   }
@@ -1240,6 +1291,7 @@ export default function Dashboard({ user }: { user: User }) {
     setAllSongsOpen(false);
     setReviewOpen(false);
     setPlaylistsOpen(false);
+    setKnownOpen(false);
     setQueueOpen(true);
     refreshImportBatches();
     window.scrollTo({ top: 0 });
@@ -1325,6 +1377,7 @@ export default function Dashboard({ user }: { user: User }) {
     setVerifiedOpen(false);
     setAllSongsOpen(false);
     setPlaylistsOpen(false);
+    setKnownOpen(false);
     setReviewError(null);
     setReviewOpen(true);
     window.scrollTo({ top: 0 });
@@ -1402,6 +1455,7 @@ export default function Dashboard({ user }: { user: User }) {
     setAllSongsOpen(false);
     setReviewOpen(false);
     setPlaylistsOpen(false);
+    setKnownOpen(false);
     setFixOpen(true);
     const song = songId ? songs.find((s) => s.id === songId) : undefined;
     if (song) handleEdit(song);
@@ -1555,6 +1609,31 @@ export default function Dashboard({ user }: { user: User }) {
   }
   async function handleToggleFavorite(song: Song) {
     await setFavorite(song.id, !myFavorites.has(song.id));
+  }
+
+  // "Znam" v meniju kartice: osebni seznam (song_known); optimistično, ob napaki nazaj.
+  async function handleToggleKnown(song: Song) {
+    const prevAt = myKnown.get(song.id);
+    const apply = (value: string | undefined) => {
+      setMyKnown((m) => {
+        const n = new Map(m);
+        if (value) n.set(song.id, value);
+        else n.delete(song.id);
+        return n;
+      });
+      const patch = { known_at: value ?? null };
+      setRandomPick((p) => (p?.id === song.id ? { ...p, ...patch } : p));
+      setRandomFive((list) => list?.map((x) => (x.id === song.id ? { ...x, ...patch } : x)) ?? null);
+    };
+    const on = !prevAt;
+    apply(on ? new Date().toISOString() : undefined);
+    const { error } = on
+      ? await supabase.from("song_known").upsert({ user_id: user.id, song_id: song.id })
+      : await supabase.from("song_known").delete().eq("user_id", user.id).eq("song_id", song.id);
+    if (error) {
+      apply(prevAt);
+      alert("Napaka pri shranjevanju (Znam): " + error.message);
+    }
   }
 
   // Privat Jam je oseben (private_jam); ob napaki se vrne prejšnje stanje.
@@ -2367,7 +2446,7 @@ export default function Dashboard({ user }: { user: User }) {
     ? "jam"
     : playlistsOpen
       ? "playlists"
-      : goalOpen || fixOpen || queueOpen || favArchiveOpen || reviewOpen || verifiedOpen || allSongsOpen
+      : goalOpen || fixOpen || queueOpen || favArchiveOpen || reviewOpen || verifiedOpen || allSongsOpen || knownOpen
         ? null
         : sharedOn
           ? "shared"
@@ -2400,6 +2479,7 @@ export default function Dashboard({ user }: { user: User }) {
     setAllSongsOpen(false);
     setReviewOpen(false);
     setPlaylistsOpen(false);
+    setKnownOpen(false);
   }
   function handleMainNav(tab: MainNavTab) {
     if (tab === "home") {
@@ -2451,6 +2531,14 @@ export default function Dashboard({ user }: { user: User }) {
     window.scrollTo({ top: 0 });
   }
 
+  function openKnown() {
+    closeFullPages();
+    if (sharedOn) closeShared();
+    setActiveView("list");
+    setKnownOpen(true);
+    window.scrollTo({ top: 0 });
+  }
+
   // Domača stran (statistika, desni stolpec): odpre Skupni Jam.
   function openSharedJam() {
     setGoalOpen(false);
@@ -2461,6 +2549,7 @@ export default function Dashboard({ user }: { user: User }) {
     setAllSongsOpen(false);
     setReviewOpen(false);
     setPlaylistsOpen(false);
+    setKnownOpen(false);
     selectJamMode(true);
     setJamOpen(true);
     window.scrollTo({ top: 0 });
@@ -2478,6 +2567,7 @@ export default function Dashboard({ user }: { user: User }) {
   useBackableOpen(verifiedOpen, () => setVerifiedOpen(false));
   useBackableOpen(allSongsOpen, () => setAllSongsOpen(false));
   useBackableOpen(playlistsOpen, () => setPlaylistsOpen(false));
+  useBackableOpen(knownOpen, () => setKnownOpen(false));
   useBackableOpen(goalPickerOpen, () => setGoalPickerOpen(false));
 
   // Obrazec za urejanje se izriše takoj pod kartico skladbe, ki jo urejamo
@@ -2850,6 +2940,46 @@ export default function Dashboard({ user }: { user: User }) {
               Nazaj
             </button>
           </>
+        ) : knownOpen ? (
+          <>
+            <h1 className="flex items-center gap-2">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-6 w-6 shrink-0 text-green-500 dark:text-green-400"
+              >
+                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20" />
+                <path d="m9 9.5 2 2 4-4" />
+              </svg>
+              <span className="text-2xl font-semibold tracking-tight text-neutral-900 drop-shadow-[0_1px_3px_rgba(0,0,0,0.15)] dark:font-light dark:text-white dark:drop-shadow-none">
+                Znam
+              </span>
+            </h1>
+            <button
+              type="button"
+              onClick={() => setKnownOpen(false)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-green-600 dark:text-neutral-300 dark:hover:text-green-400"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4 shrink-0"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              Nazaj
+            </button>
+          </>
         ) : verifiedOpen ? (
           <>
             <h1 className="flex items-center gap-2">
@@ -3134,6 +3264,7 @@ export default function Dashboard({ user }: { user: User }) {
                     setAllSongsOpen(false);
                     setReviewOpen(false);
                     setPlaylistsOpen(false);
+                    setKnownOpen(false);
                     setGoalOpen(true);
                   }}
                   queuedSongs={queuedSongs}
@@ -3159,6 +3290,7 @@ export default function Dashboard({ user }: { user: User }) {
                     setAllSongsOpen(false);
                     setReviewOpen(false);
                     setPlaylistsOpen(false);
+                    setKnownOpen(false);
                     setJamOpen(true);
                     openJamArchive();
                     window.scrollTo({ top: 0 });
@@ -3284,6 +3416,7 @@ export default function Dashboard({ user }: { user: User }) {
                     onReported={handleReported}
                     onSendToReview={handleSendToReview}
                     onToggleFavorite={handleToggleFavorite}
+                    onToggleKnown={handleToggleKnown}
                   />
                   {renderEditForm(song)}
                 </>
@@ -3570,6 +3703,7 @@ export default function Dashboard({ user }: { user: User }) {
                   onEdit={handleEdit}
                   onFilterAuthor={(author) => {
                     setPlaylistsOpen(false);
+                    setKnownOpen(false);
                     handleFilterByAuthor(author);
                   }}
                   onAddToJam={handleAddToJam}
@@ -3578,6 +3712,7 @@ export default function Dashboard({ user }: { user: User }) {
                   onReported={handleReported}
                   onSendToReview={handleSendToReview}
                   onToggleFavorite={handleToggleFavorite}
+                  onToggleKnown={handleToggleKnown}
                 />
                 {renderEditForm(song)}
               </>
@@ -3609,6 +3744,7 @@ export default function Dashboard({ user }: { user: User }) {
                   onReported={handleReported}
                   onSendToReview={handleSendToReview}
                   onToggleFavorite={handleToggleFavorite}
+                  onToggleKnown={handleToggleKnown}
                 />
                 {renderEditForm(song)}
               </div>
@@ -3616,6 +3752,39 @@ export default function Dashboard({ user }: { user: User }) {
           </div>
           {allSongsSorted.length > allSongsVisible && (
             <LoadMoreSentinel key={allSongsVisible} onVisible={() => setAllSongsVisible((n) => n + RESULTS_PAGE)} />
+          )}
+        </div>
+      ) : knownOpen ? (
+        <div className="mt-3! space-y-4">
+          <hr className="border-t border-neutral-200 dark:border-white/[0.08]" />
+          {knownSongs.length === 0 ? (
+            <p className="text-sm text-neutral-500">
+              Seznam je prazen. Skladbo dodaš v meniju kartice (☰) z »Znam«.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {knownSongs.map((song) => (
+                <div key={song.id}>
+                  <SongCard
+                    song={song}
+                    authorImage={authorImages[song.author] ?? null}
+                    onEdit={handleEdit}
+                    onFilterAuthor={(author) => {
+                      setKnownOpen(false);
+                      handleFilterByAuthor(author);
+                    }}
+                    onAddToJam={handleAddToJam}
+                    onAddToSharedJam={handleAddToSharedJam}
+                    onChordsClick={handleChordsClick}
+                    onReported={handleReported}
+                    onSendToReview={handleSendToReview}
+                    onToggleFavorite={handleToggleFavorite}
+                    onToggleKnown={handleToggleKnown}
+                  />
+                  {renderEditForm(song)}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       ) : verifiedOpen ? (
@@ -3664,6 +3833,7 @@ export default function Dashboard({ user }: { user: User }) {
                                 onReported={handleReported}
                                 onSendToReview={handleSendToReview}
                                 onToggleFavorite={handleToggleFavorite}
+                                onToggleKnown={handleToggleKnown}
                               />
                               {renderEditForm(song)}
                             </>
@@ -4109,6 +4279,7 @@ export default function Dashboard({ user }: { user: User }) {
                       onReported={handleReported}
                       onSendToReview={handleSendToReview}
                       onToggleFavorite={handleToggleFavorite}
+                      onToggleKnown={handleToggleKnown}
                     />
                   </div>
                   <div className="relative space-y-2 border-t border-dashed border-yellow-500/50 px-3 pb-3 pt-2.5 text-sm dark:border-white/10">
@@ -4468,6 +4639,7 @@ export default function Dashboard({ user }: { user: User }) {
                 onReported={handleReported}
                 onSendToReview={handleSendToReview}
                 onToggleFavorite={handleToggleFavorite}
+                onToggleKnown={handleToggleKnown}
                 highlighted
                 highlightTone={randomPickFromPartial ? "lime" : "violet"}
               />
@@ -4527,6 +4699,7 @@ export default function Dashboard({ user }: { user: User }) {
                             onReported={handleReported}
                             onSendToReview={handleSendToReview}
                             onToggleFavorite={handleToggleFavorite}
+                            onToggleKnown={handleToggleKnown}
                           />
                           {randomPick?.id !== song.id && renderEditForm(song)}
                         </div>
@@ -4667,9 +4840,13 @@ export default function Dashboard({ user }: { user: User }) {
               verified={verifiedSongs.length}
               review={reviewSongs.length}
               playlistCount={playlistCount}
+              queueCount={queuedSongs.length}
               onOpenVerified={openVerified}
               onOpenAll={openAllSongs}
               onOpenReview={openReview}
+              onOpenQueue={openQueue}
+              knownSongs={knownSongs}
+              onOpenKnown={openKnown}
               onOpenPlaylists={() => handleMainNav("playlists")}
               onRandom={pickRandom}
               onPartial={handlePartialStart}
@@ -5100,6 +5277,7 @@ export default function Dashboard({ user }: { user: User }) {
                             onReported={handleReported}
                             onSendToReview={handleSendToReview}
                             onToggleFavorite={handleToggleFavorite}
+                            onToggleKnown={handleToggleKnown}
                           />
                           {randomPick?.id !== song.id && renderEditForm(song)}
                         </div>

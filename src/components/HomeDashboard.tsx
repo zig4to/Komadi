@@ -1,6 +1,8 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { topoRing } from "@/lib/backgroundPatterns";
+import { openChordsViewer } from "@/lib/openChords";
 import type { SharedJamItem, Song } from "@/types/song";
 
 // Domača stran — pozdrav, statistika in desni stolpec (računalnik) v slogu
@@ -76,7 +78,7 @@ function StatCard({
           {decor}
         </span>
       )}
-      <span className="flex items-center gap-2 text-sm text-neutral-500 lg:text-[15px] dark:text-neutral-400">
+      <span className={`flex items-center gap-2 text-sm text-neutral-500 lg:text-[15px] dark:text-neutral-400 ${onClick ? "pr-5" : ""}`}>
         <span className={`h-1.5 w-1.5 shrink-0 lg:h-2 lg:w-2 rounded-full ${dot} ${pulse ? "animate-pulse" : ""}`} />
         <span className="truncate">{label}</span>
       </span>
@@ -179,7 +181,17 @@ const TONES = {
   blue: { text: "text-blue-600 dark:text-blue-400", ring: "ring-blue-500/50", tint: "bg-blue-500/[0.06]" },
   amber: { text: "text-amber-600 dark:text-amber-400", ring: "ring-amber-500/50", tint: "bg-amber-500/[0.06]" },
   indigo: { text: "text-indigo-600 dark:text-indigo-400", ring: "ring-indigo-500/50", tint: "bg-indigo-500/[0.06]" },
+  green: { text: "text-green-600 dark:text-green-400", ring: "ring-green-500/50", tint: "bg-green-500/[0.06]" },
+  neutral: { text: "text-neutral-400 dark:text-neutral-500", ring: "ring-neutral-500/50", tint: "bg-neutral-500/[0.06]" },
 };
+
+function knownLabel(n: number) {
+  const m100 = n % 100;
+  if (m100 === 1) return `${n} skladba`;
+  if (m100 === 2) return `${n} skladbi`;
+  if (m100 === 3 || m100 === 4) return `${n} skladbe`;
+  return `${n} skladb`;
+}
 
 function filterCountLabel(n: number) {
   if (n === 1) return "1 aktiven";
@@ -188,7 +200,9 @@ function filterCountLabel(n: number) {
   return `${n} aktivnih`;
 }
 
-// Mreža kartic domače strani: zgoraj 4 statistične (enake širine), spodaj
+// Mreža kartic domače strani: zgoraj statistične (Vse / Preverjeno po pol vrstice
+// na telefonu, V pregledu / Čakalna vrsta po pol; na računalniku še Playliste,
+// vse tri po tretjino), spodaj
 // dejanja različnih širin — računalnik 12 stolpcev (3·3·2·2·2), telefon 6
 // (Naključno + Delno po pol, Novo / Popularno / Filtri po tretjino).
 export function HomeBento({
@@ -197,9 +211,13 @@ export function HomeBento({
   verified,
   review,
   playlistCount,
+  queueCount,
+  knownSongs,
+  onOpenKnown,
   onOpenVerified,
   onOpenAll,
   onOpenReview,
+  onOpenQueue,
   onOpenPlaylists,
   onRandom,
   onPartial,
@@ -220,9 +238,13 @@ export function HomeBento({
   verified: number;
   review: number;
   playlistCount: number;
+  queueCount: number;
+  knownSongs: Song[];
+  onOpenKnown: () => void;
   onOpenVerified: () => void;
   onOpenAll: () => void;
   onOpenReview: () => void;
+  onOpenQueue: () => void;
   onOpenPlaylists: () => void;
   onRandom: () => void;
   onPartial: () => void;
@@ -244,8 +266,10 @@ export function HomeBento({
         <>
           <StatCard className="col-span-3" label="Vse skladbe" value={total} dot="bg-neutral-400" onClick={onOpenAll} decor={<TopoCorner hover="deco:text-neutral-400/22 dark:deco:text-neutral-400/22" />} />
           <StatCard className="col-span-3" label="Preverjeno špila" value={verified} suffix={verified <= total ? `/${total}` : undefined} dot="bg-orange-400" onClick={onOpenVerified} decor={<VerifiedCorner hover="deco:text-orange-400/22 dark:deco:text-orange-400/22" />} />
-          <StatCard className="col-span-3" label="V pregledu" value={review} dot="bg-teal-400" onClick={onOpenReview} decor={<ChecklistCorner />} />
-          <StatCard className="col-span-3" label="Playliste" value={playlistCount} dot="bg-yellow-400" onClick={onOpenPlaylists} decor={<PlaylistCorner />} />
+          <StatCard className="col-span-3 lg:col-span-2" label="V pregledu" value={review} dot="bg-teal-400" onClick={onOpenReview} decor={<ChecklistCorner />} />
+          <StatCard className="col-span-3 lg:col-span-2" label="Čakalna vrsta" value={queueCount} dot="bg-fuchsia-400" onClick={onOpenQueue} decor={<QueueCorner />} />
+          {/* Playliste samo na računalniku (uporabnikova odločitev 2026-10-23). */}
+          <StatCard className="col-span-2 max-lg:hidden" label="Playliste" value={playlistCount} dot="bg-yellow-400" onClick={onOpenPlaylists} decor={<PlaylistCorner />} />
         </>
       )}
       <StatCard
@@ -322,7 +346,7 @@ export function HomeBento({
         icon={<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />}
       />
       <ActionCard
-        className="col-span-3 lg:col-span-6"
+        className="col-span-3"
         row
         small
         label="Tuner"
@@ -339,7 +363,7 @@ export function HomeBento({
         }
       />
       <ActionCard
-        className="col-span-3 lg:col-span-6"
+        className="col-span-3"
         row
         small
         label="Lestvice"
@@ -355,6 +379,38 @@ export function HomeBento({
           </>
         }
       />
+      {/* Desno od Tuner / Lestvice: "Znam" in prostor za prihodnjo funkcijo. */}
+      <ActionCard
+        className="col-span-3"
+        row
+        small
+        label="Znam"
+        hint={knownSongs.length ? knownLabel(knownSongs.length) : "skladbe, ki jih znam"}
+        tone={TONES.green}
+        onClick={onOpenKnown}
+        icon={
+          <>
+            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20" />
+            <path d="m9 9.5 2 2 4-4" />
+          </>
+        }
+      />
+      {[0].map((i) => (
+        <ActionCard
+          key={i}
+          className="col-span-3 border-dashed"
+          row
+          small
+          label="Kmalu"
+          hint="nova funkcija"
+          tone={TONES.neutral}
+          onClick={() => {}}
+          disabled
+          icon={<path d="M12 5v14M5 12h14" />}
+        />
+      ))}
+      {/* "Ponovi" pod Tuner (računalnik), na telefonu čez celo širino. */}
+      <RepeatWidget className="col-span-6 lg:col-span-3" songs={knownSongs} onOpenKnown={onOpenKnown} />
     </div>
   );
 }
@@ -416,6 +472,88 @@ function Notice({ tone, title, text, onClick }: { tone: "red" | "teal"; title: s
         <span className="block text-xs text-neutral-500">{text}</span>
       </span>
     </button>
+  );
+}
+
+// Razporeditev skladb po naključnem semenu (stabilna med izrisi, nova ob ↻).
+function seededOrder(id: string, seed: number) {
+  let h = seed | 0;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 2654435761);
+  return (h ^ (h >>> 15)) >>> 0;
+}
+
+// "Ponovi": dve naključni skladbi s seznama "Znam" — da jih ne pozabim.
+// Klik na skladbo odpre Akorde v aplikaciji (brez njih stran Znam), ↻ izbere drugi dve.
+function RepeatWidget({ songs, onOpenKnown, className = "" }: { songs: Song[]; onOpenKnown: () => void; className?: string }) {
+  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 2 ** 31));
+  const picks = useMemo(
+    () => [...songs].sort((a, b) => seededOrder(a.id, seed) - seededOrder(b.id, seed)).slice(0, 2),
+    [songs, seed],
+  );
+  return (
+    <div className={`${CARD} relative isolate overflow-hidden p-4 ${className}`}>
+      <span aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 -z-10 h-36 w-36 rounded-full bg-green-500/[0.10] blur-2xl dark:bg-green-400/[0.08]" />
+      <div className="mb-2 flex items-center justify-between">
+        <button type="button" onClick={onOpenKnown} className="flex items-center gap-2 text-left text-sm text-neutral-700 dark:text-neutral-300">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-green-600 dark:text-green-400">
+            <path d="m17 2 4 4-4 4" />
+            <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+            <path d="m7 22-4-4 4-4" />
+            <path d="M21 13v1a4 4 0 0 1-4 4H3" />
+          </svg>
+          Ponovi
+        </button>
+        <span className="flex items-center gap-1">
+          {songs.length > 2 && (
+            <button
+              type="button"
+              onClick={() => setSeed((s) => (s * 48271 + 1) % 2147483647)}
+              title="Drugi dve"
+              aria-label="Drugi dve"
+              className="rounded-full p-1 text-neutral-400 transition hover:bg-neutral-100 hover:text-green-600 dark:text-neutral-500 dark:hover:bg-white/[0.06] dark:hover:text-green-400"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+            </button>
+          )}
+          <button type="button" onClick={onOpenKnown} aria-label="Odpri Znam" className="p-1">
+            <ArrowUpRight className="h-4 w-4 text-neutral-400 dark:text-neutral-600" />
+          </button>
+        </span>
+      </div>
+      {picks.length === 0 ? (
+        <p className="px-1 py-2 text-xs text-neutral-500">Ko skladbo v meniju kartice označiš z »Znam«, jo bom tu občasno predlagal za ponovitev.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {picks.map((song) => (
+            <li key={song.id}>
+              <button
+                type="button"
+                onClick={() => (song.chords_text ? openChordsViewer(song.id) : onOpenKnown())}
+                className="group flex w-full items-center gap-3 rounded-xl border border-green-500/20 bg-green-500/[0.05] px-2.5 py-2 text-left transition hover:border-green-500/40 hover:bg-green-500/[0.09]"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-500/15 text-green-700 dark:text-green-300">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                  </svg>
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-neutral-800 dark:text-neutral-100">{song.title}</span>
+                  <span className="block truncate text-xs text-neutral-500">{song.author}</span>
+                </span>
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5 shrink-0 text-green-600/0 transition group-hover:text-green-600 dark:group-hover:text-green-400">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -550,6 +688,28 @@ function ChecklistCorner() {
                 <path d={`M${x + 3} ${y} l3.5 3.5 l6 -7`} stroke="currentColor" className="transition-colors duration-300 deco:text-teal-400/25" />
               )}
               <path d={`M${x + 22} ${y} H 172`} stroke="currentColor" className="transition-colors duration-300 deco:text-neutral-900/12 dark:deco:text-white/14" />
+            </g>
+          );
+        })}
+      </g>
+    </svg>
+  );
+}
+
+// Čakalna vrsta: stopnišče vrstic s pikicami (skladbe, ki čakajo) v kotu;
+// ob prehodu vrstice bele, pikice fuksija.
+function QueueCorner() {
+  const rows = [0, 1, 2, 3];
+  return (
+    <svg aria-hidden="true" viewBox="0 0 160 120" preserveAspectRatio="xMaxYMax meet" className="pointer-events-none absolute bottom-0 right-0 -z-10 h-full w-1/2 [@media(hover:none)]:hidden text-neutral-900/[0.05] dark:text-white/[0.045]">
+      <g fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+        {rows.map((i) => {
+          const y = 34 + i * 24;
+          const x = 84 - i * 6;
+          return (
+            <g key={i}>
+              <circle cx={x} cy={y} r={4} stroke="currentColor" className="transition-colors duration-300 deco:text-fuchsia-400/28" />
+              <path d={`M${x + 12} ${y} H 172`} stroke="currentColor" className="transition-colors duration-300 deco:text-neutral-900/12 dark:deco:text-white/14" />
             </g>
           );
         })}

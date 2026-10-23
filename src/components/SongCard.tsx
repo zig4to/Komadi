@@ -31,6 +31,7 @@ export default function SongCard({
   onReported,
   onSendToReview,
   onToggleFavorite,
+  onToggleKnown,
   onImport,
   inLibrary = false,
   highlighted = false,
@@ -51,6 +52,8 @@ export default function SongCard({
   // "Pregled in odobritev" v meniju: pošlje skladbo nazaj v pregled (review_pending).
   onSendToReview?: (song: Song) => void;
   onToggleFavorite?: (song: Song) => void;
+  // "Znam" (osebni seznam naučenih skladb, song_known): doda / odstrani.
+  onToggleKnown?: (song: Song) => void;
   // Način "Skupno" (skladba drugega uporabnika): v meniju je samo "Uvozi v
   // mojo knjižnico" — urejanje, playliste in prijave so za tujo skladbo
   // skrite (RLS jih tako ali tako zavrne).
@@ -525,6 +528,33 @@ export default function SongCard({
                   </svg>
                   Dodaj v playlisto
                 </button>
+                )}
+
+                {onToggleKnown && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActionsOpen(false);
+                      onToggleKnown(song);
+                    }}
+                    aria-pressed={!!song.known_at}
+                    className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-green-600 hover:bg-neutral-100 dark:text-green-400 dark:hover:bg-white/[0.08]"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-[13px] w-[13px] shrink-0"
+                    >
+                      <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20" />
+                      <path d="m9 9.5 2 2 4-4" />
+                    </svg>
+                    {song.known_at ? "Odstrani iz Znam" : "Znam"}
+                  </button>
                 )}
 
                 {onToggleFavorite && (
