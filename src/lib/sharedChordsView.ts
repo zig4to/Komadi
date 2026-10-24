@@ -21,7 +21,10 @@ export type LocalView = {
 // pošiljanju (p, 0–1) in koliko napredka na sekundo (rate = 1/trajanje vrstice,
 // 0 med pavzo) — napredek v vrstici je linearen s časom, zato sledilec med
 // sporočili izračuna natanko isti položaj kot vodja. hl = poudarjena vrstica telesa.
-export type SamSpiliView = { row: number; p: number; rate: number; hl: number; playing: boolean };
+// nhl / nhIn (2026-10-23): naslednja poudarjena vrstica in čez koliko sekund
+// (pravi čas) — sledilec jo prižge sam, za zamik sledilcev prej, namesto da
+// čaka sporočilo vodje (poudarek je sicer zamujal za zamik prenosa).
+export type SamSpiliView = { row: number; p: number; rate: number; hl: number; playing: boolean; nhl?: number; nhIn?: number };
 
 // Zadnji pogled vodje — mimo React stanja: sporočila (~10/s) bi sicer vsakič
 // na novo izrisala Dashboard in pregledovalnik, kar na telefonu zatika drsenje.

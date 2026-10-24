@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import AutoScrollControl from "@/components/AutoScrollControl";
 import ChordDiagram from "@/components/ChordDiagram";
 import YouTubeMiniPlayer, { youTubeVideoId, type PlayerController, VOLUME_KEY, readVolume } from "@/components/YouTubeMiniPlayer";
-import { enterLandscapeFullscreen, canBrowserFullscreen, hasSamSpili, isAppFullscreen, lockLandscape, openChordsViewer } from "@/lib/openChords";
+import { enterLandscapeFullscreen, canBrowserFullscreen, hasSamSpili, isAppFullscreen, openChordsViewer } from "@/lib/openChords";
 import {
   applyEditedText,
   findCapo,
@@ -45,7 +45,7 @@ import { useIsDesktop } from "@/components/Scales";
 import type { ChordSection, Song, SyncedChords, SyncedLines } from "@/types/song";
 import { anchorScrollTop, computeAnchor, getRemoteView, subscribeRemoteView, type LocalView, type RemoteViewEntry, type SamSpiliView } from "@/lib/sharedChordsView";
 import { BACKGROUNDS, BACKGROUND_ORDER } from "@/lib/backgrounds";
-import { readFollowerLead } from "@/lib/followerLead";
+import { FOLLOWER_LEAD_MAX, FOLLOWER_LEAD_STEP, readFollowerLead, useFollowerLead } from "@/lib/followerLead";
 
 // Snemalni stolpec (računalnik): širina po vlečenju, najmanj REC_MIN_WIDTH, besedilu levo vsaj REC_MIN_TEXT.
 const REC_WIDTH_KEY = "komadi:chords:recWidth";
@@ -1049,6 +1049,8 @@ export default function ChordsViewer({
   const [themeMenuPos, setThemeMenuPos] = useState<{ top?: number; bottom?: number; left: number; maxHeight?: number } | null>(null);
   // Razdelek "Napredne nastavitve" na dnu menija ⚙ (razprt/strnjen).
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Sam Špili → Napredne nastavitve: "Zamik sledilcev" (Skupni Jam, na napravo).
+  const [followerLead, setFollowerLead] = useFollowerLead();
   // Podrazdelek "Pametni predvajalnik" v naprednih nastavitvah (razprt/strnjen).
   const [smartInfoOpen, setSmartInfoOpen] = useState(false);
   const themeButtonRef = useRef<HTMLButtonElement>(null);
@@ -1597,6 +1599,21 @@ export default function ChordsViewer({
     });
     return { tabOwner: owner, sectionsWithTabs: sections, firstOrphanTab: firstOrphan };
   }, [body]);
+  // Prazne vrstice med dvema tablaturama istega dela (gap → lastnik): ko sta
+  // tablaturi skriti, se njuni vrstici akordov vrstita ena za drugo brez praznine.
+  const tabGaps = useMemo(() => {
+    const gaps = new Map<number, number>();
+    const isBlank = (l: ChordsLine) => l.kind === "text" && l.segments.every((x) => "text" in x && !x.text.trim());
+    body.forEach((l, i) => {
+      if (!isBlank(l)) return;
+      let p = i - 1;
+      while (p >= 0 && isBlank(body[p])) p--;
+      let n = i + 1;
+      while (n < body.length && isBlank(body[n])) n++;
+      if (body[p]?.kind === "tab" && body[n]?.kind === "tab" && tabOwner.get(p) === tabOwner.get(n)) gaps.set(i, tabOwner.get(p) ?? -1);
+    });
+    return gaps;
+  }, [body, tabOwner]);
   const [openTabs, setOpenTabs] = useState<Set<number>>(() => new Set());
   const toggleTabs = (key: number) =>
     setOpenTabs((prev) => {
@@ -3232,9 +3249,13 @@ export default function ChordsViewer({
         // + zakasnitev sledilcev (Nastavitve Jama), da sledilec ne zaostaja za zamikom sporočil.
         const lead = readFollowerLead();
         const rowPos = v.row < 0 ? -1 : v.row + Math.min(1, v.p + (v.playing ? v.rate * (Math.min(3, (now - rem.at) / 1000) + lead) : 0));
-        if (v.hl !== hl) {
-          hl = v.hl;
-          setSsHlLine(v.hl);
+        // Poudarek: naslednjo vrstico prižge sam, ko (čas od prejema + zamik) doseže nhIn —
+        // ne čaka sporočila vodje, ki pride za zamik prenosa pozneje.
+        const nextDue = v.playing && v.nhl != null && v.nhIn != null && (now - rem.at) / 1000 + lead >= v.nhIn && (now - rem.at) / 1000 < v.nhIn + 3;
+        const wantHl = nextDue ? v.nhl! : v.hl;
+        if (wantHl !== hl) {
+          hl = wantHl;
+          setSsHlLine(wantHl);
         }
         ease(rowTarget(rowPos), dt);
         raf = requestAnimationFrame(tick);
@@ -3295,6 +3316,41 @@ export default function ChordsViewer({
           rate = clock.playing && q > 0 && q < 1 ? (to - from) / (gapInfo.length / 2) : 0;
         }
       }
+      // Outro (po zadnji zapeti vrstici ni več petja): pogled je obstal na vrstici
+      // za njo in zadnje vrstice outra so ostale pod robom (Prostitutka). Zdaj sledi
+      // natapkanim akordom outra — vrstica trenutnega akorda je v 2. vrstici, vmes
+      // enakomerno do naslednje; brez akordov enakomerno do zadnje vrstice ob koncu videa.
+      if (gapInfo && gapInfo.nextLine < 0 && k >= 0 && points?.length) {
+        const from = k + 1;
+        const lastRow = ssLines.length - 1;
+        const anchors: [number, number][] = [];
+        for (const c of timingRef.current.chordPts) {
+          if ("stop" in c || c.line <= gapInfo.lineIndex) continue;
+          const r = rowFor(c.line);
+          if (r >= from && (!anchors.length || r > anchors[anchors.length - 1][1])) anchors.push([c.t, r]);
+        }
+        if (anchors.length) {
+          let a = -1;
+          while (a + 1 < anchors.length && anchors[a + 1][0] <= t) a++;
+          if (a >= 0) {
+            const [t0, r0] = anchors[a];
+            const next = anchors[a + 1];
+            const q = next ? Math.min(1, Math.max(0, (t - t0) / (next[0] - t0))) : 0;
+            rowPos = next ? r0 + (next[1] - r0) * q : r0;
+            rate = clock.playing && next ? (next[1] - r0) / (next[0] - t0) : 0;
+            k = Math.floor(rowPos);
+          }
+        } else if (lastRow > from) {
+          const endSung = points[points.length - 1].end;
+          const len = ssDurationRef.current - offset - endSung;
+          if (len > 0) {
+            const q = Math.min(1, Math.max(0, (lt - endSung) / len));
+            rowPos = from + (lastRow - from) * q;
+            rate = clock.playing && q < 1 ? (lastRow - from) / len : 0;
+            k = Math.floor(rowPos);
+          }
+        }
+      }
       // Intro (pred prvo zapeto vrstico): pogled enakomerno drsi čez vrstice
       // intra in pride na prvo zapeto vrstico ravno, ko se začne petje — prej je
       // stal na vrhu in ob prvi vrstici skočil dol (My Sweet Lord).
@@ -3321,6 +3377,8 @@ export default function ChordsViewer({
       // Vodja v Skupnem Jamu: sporočilo ob novi vrstici, pavzi/predvajanju,
       // preskoku (napredek ni tam, kjer ga sledilec pričakuje) in 1× na sekundo.
       if (leaderReportRef.current) {
+        // Naslednja točka (začetek naslednje vrstice) — sledilec jo prižge sam ob pravem času.
+        const np = clock.playing && points ? points.find((pt) => pt.time > lt) : undefined;
         const view: SamSpiliView = {
           row: k,
           p: Math.round((k >= 0 ? rowPos - k : progress) * 1000) / 1000,
@@ -3328,6 +3386,7 @@ export default function ChordsViewer({
           rate: Math.round(rate * clock.rate * 10000) / 10000,
           hl: want,
           playing: clock.playing,
+          ...(np && np.lineIndex !== want ? { nhl: np.lineIndex, nhIn: Math.round(((np.time - lt) / (clock.rate || 1)) * 1000) / 1000 } : {}),
         };
         const expected = sent ? Math.min(1, sent.p + sent.rate * ((now - sentAt) / 1000)) : 0;
         const changed =
@@ -3516,6 +3575,22 @@ export default function ChordsViewer({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [samSpili, follower, ssShowLines]);
+  // Navaden pogled: preslednica = pavza med predvajanjem, sicer predvajaj (ne med
+  // snemanjem — tam je TAP — in ne pri sledilcu, ki nima lastnega predvajanja).
+  const recorderOn = !!recorder;
+  useEffect(() => {
+    if (samSpili || follower || recorderOn) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      if ((e.target as HTMLElement).closest?.('input:not([type="range"]),textarea,select,[contenteditable="true"]')) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      if (playbackRef.current.playing) playerCtlRef.current?.pause();
+      else playerCtlRef.current?.play();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [samSpili, follower, recorderOn]);
 
   // Snemanje časov: vrstica, ki jo naslednji tap označi, ~ tretjino od vrha.
   const recorderCursor = recorder?.cursor ?? -1;
@@ -3778,19 +3853,31 @@ export default function ChordsViewer({
     if (line.kind === "tab") {
       const owner = tabOwner.get(i) ?? -1;
       const showStaff = !inBody || openTabs.has(owner);
-      const orphanButton = inBody && i === firstOrphanTab && <div className="mt-3">{tabButton(-1)}</div>;
+      const orphanButton = inBody && i === firstOrphanTab && <div className="mb-1.5 mt-3">{tabButton(-1)}</div>;
+      // Prva tablatura pod naslovom dela z gumbom "Tab": malo več prostora pod gumbom.
+      const afterTabHeading = inBody && body[i - 1]?.kind === "section" && sectionsWithTabs.has(i - 1);
       if (!showStaff && !line.header) return <div key={i}>{orphanButton}</div>;
       if (!showStaff && line.header) {
-        // Skrita tablatura: samo zaporedje akordov, za vsakim enak razmik
-        // (3 presledki, tudi za daljšimi imeni), brez vodoravnega pomika.
+        // Skrita tablatura: samo zaporedje akordov, brez vodoravnega pomika. Zaporedne
+        // tablature (tudi s prazno vrstico vmes) imajo skupne stolpce: širina stolpca =
+        // najdaljše ime v njem + 3 presledki, da so akordi poravnani navpično.
+        let a = i;
+        while (a > 0 && (body[a - 1].kind === "tab" || tabGaps.has(a - 1))) a--;
+        let b = i;
+        while (b < body.length - 1 && (body[b + 1].kind === "tab" || tabGaps.has(b + 1))) b++;
+        const colWidths: number[] = [];
+        for (let k = a; k <= b; k++) {
+          const l = body[k];
+          if (l.kind === "tab") l.header?.forEach((c, j) => (colWidths[j] = Math.max(colWidths[j] ?? 0, display(c.name).length)));
+        }
         return (
-          <div key={i}>
+          <div key={i} className={afterTabHeading ? "mt-1.5" : undefined}>
             {orphanButton}
             <div className="flex flex-wrap font-bold text-(--cv-chord)">
               {line.header.map((c, j) => {
                 const name = display(c.name);
                 return (
-                  <span key={j} className="whitespace-pre" style={{ minWidth: `${name.length + 3}ch` }}>
+                  <span key={j} className="whitespace-pre" style={{ minWidth: `${(colWidths[j] ?? name.length) + 3}ch` }}>
                     {chordName(name, inBody ? { line: i, chord: j } : undefined)}
                   </span>
                 );
@@ -3802,7 +3889,7 @@ export default function ChordsViewer({
       // Brez preloma: strune morajo ostati poravnane; široka tablatura se
       // pomika vodoravno (s prstom), velikost pisave ostane ista.
       return (
-        <div key={i} className="overflow-x-auto">
+        <div key={i} className={afterTabHeading ? "mt-1.5 overflow-x-auto" : "overflow-x-auto"}>
           {orphanButton}
           <div className="w-max whitespace-pre">
             {line.header && (
@@ -3843,6 +3930,8 @@ export default function ChordsViewer({
         </div>
       );
     }
+    const gapOwner = tabGaps.get(i);
+    if (inBody && gapOwner !== undefined && !openTabs.has(gapOwner)) return <div key={i} />;
     return (
       <div key={i} className="min-h-[1.375em] whitespace-pre-wrap">
         {line.segments.map((s, j) =>
@@ -4191,6 +4280,36 @@ export default function ChordsViewer({
                     </button>
                   </div>
                 </div>
+                {/* Sam Špili: zakasnitev sledilcev (isto kot zobnik v glavi Jama, followerLead.ts). */}
+                {samSpili && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-neutral-200">
+                    Zamik sledilcev
+                    <span className="block text-[10px] leading-tight text-neutral-500">Ko slediš vodji v Skupnem Jamu: toliko si naprej. Zaostajaš → več, prehitevaš → manj</span>
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setFollowerLead(followerLead - FOLLOWER_LEAD_STEP)}
+                      disabled={followerLead <= 0}
+                      aria-label="Zmanjšaj za 0,25 s"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-orange-400 text-sm text-amber-400 hover:bg-orange-400/15 disabled:opacity-40"
+                    >
+                      −
+                    </button>
+                    <span className="w-10 text-center text-xs tabular-nums text-neutral-200">{followerLead.toFixed(2).replace(".", ",")} s</span>
+                    <button
+                      type="button"
+                      onClick={() => setFollowerLead(followerLead + FOLLOWER_LEAD_STEP)}
+                      disabled={followerLead >= FOLLOWER_LEAD_MAX}
+                      aria-label="Povečaj za 0,25 s"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-orange-400 text-sm text-amber-400 hover:bg-orange-400/15 disabled:opacity-40"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                )}
                 {/* Računalnik, samo ob odprtem Impro: velikost orodne vrstice (null = samodejno). */}
                 {improOpen && (
                 <div className="hidden items-center justify-between gap-2 lg:flex">
@@ -6056,6 +6175,22 @@ export default function ChordsViewer({
                 <button type="button" onClick={onClose} aria-label="Zapri" title="Zapri" className="flex h-9 w-9 lg:h-12 lg:w-12 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)]">
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 lg:h-5 lg:w-5">
                     <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+                {/* Telefon: zasuk zaslona pod ✕ (namesto gumba Meni), kot med predvajanjem. */}
+                <button
+                  type="button"
+                  onClick={ssToggleOrientation}
+                  aria-label={portrait ? "Ležeče" : "Pokončno"}
+                  title={portrait ? "Zasukaj v ležeči način" : "Zasukaj v pokončni način"}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] text-(--cv-text) shadow-[0_8px_24px_-12px_rgba(0,0,0,0.55)] backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)] lg:hidden"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={`h-5 w-5 transition-transform duration-300 ${portrait ? "rotate-90" : ""}`}>
+                    <rect x="8.5" y="6.5" width="7" height="11" rx="1.4" transform="rotate(-45 12 12)" />
+                    <path d="M3.5 9.5A9 9 0 0 1 14 3.2" />
+                    <path d="M11.6 1.6 14 3.2l-1.6 2.4" />
+                    <path d="M20.5 14.5A9 9 0 0 1 10 20.8" />
+                    <path d="M12.4 22.4 10 20.8l1.6-2.4" />
                   </svg>
                 </button>
                 <button

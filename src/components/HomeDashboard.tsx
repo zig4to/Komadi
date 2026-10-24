@@ -193,6 +193,14 @@ function knownLabel(n: number) {
   return `${n} skladb`;
 }
 
+function ownSongLabel(n: number) {
+  const m100 = n % 100;
+  if (m100 === 1) return `${n} lastna skladba`;
+  if (m100 === 2) return `${n} lastni skladbi`;
+  if (m100 === 3 || m100 === 4) return `${n} lastne skladbe`;
+  return `${n} lastnih skladb`;
+}
+
 function filterCountLabel(n: number) {
   if (n === 1) return "1 aktiven";
   if (n === 2) return "2 aktivna";
@@ -214,6 +222,8 @@ export function HomeBento({
   queueCount,
   knownSongs,
   onOpenKnown,
+  ownSongCount,
+  onOpenWriter,
   onOpenVerified,
   onOpenAll,
   onOpenReview,
@@ -241,6 +251,8 @@ export function HomeBento({
   queueCount: number;
   knownSongs: Song[];
   onOpenKnown: () => void;
+  ownSongCount: number;
+  onOpenWriter: () => void;
   onOpenVerified: () => void;
   onOpenAll: () => void;
   onOpenReview: () => void;
@@ -379,7 +391,7 @@ export function HomeBento({
           </>
         }
       />
-      {/* Desno od Tuner / Lestvice: "Znam" in prostor za prihodnjo funkcijo. */}
+      {/* Desno od Tuner / Lestvice: "Znam" in "Pišem" (lastne skladbe, SongWriter.tsx). */}
       <ActionCard
         className="col-span-3"
         row
@@ -395,22 +407,23 @@ export function HomeBento({
           </>
         }
       />
-      {[0].map((i) => (
-        <ActionCard
-          key={i}
-          className="col-span-3 border-dashed"
-          row
-          small
-          label="Kmalu"
-          hint="nova funkcija"
-          tone={TONES.neutral}
-          onClick={() => {}}
-          disabled
-          icon={<path d="M12 5v14M5 12h14" />}
-        />
-      ))}
-      {/* "Ponovi" pod Tuner (računalnik), na telefonu čez celo širino. */}
-      <RepeatWidget className="col-span-6 lg:col-span-3" songs={knownSongs} onOpenKnown={onOpenKnown} />
+      <ActionCard
+        className="col-span-3"
+        row
+        small
+        label="Pišem"
+        hint={ownSongCount ? ownSongLabel(ownSongCount) : "lastne skladbe"}
+        tone={TONES.amber}
+        onClick={onOpenWriter}
+        icon={
+          <>
+            <path d="M12 20h9" />
+            <path d="M16.38 3.62a2.12 2.12 0 0 1 3 3L7.37 18.64a2 2 0 0 1-.86.5l-2.87.84.84-2.87a2 2 0 0 1 .5-.86z" />
+          </>
+        }
+      />
+      {/* "Ponovi": na telefonu čez celo širino pod Tuner; na računalniku v desnem stolpcu (HomeAside). */}
+      <RepeatWidget className="col-span-6 lg:hidden" songs={knownSongs} onOpenKnown={onOpenKnown} />
     </div>
   );
 }
@@ -562,18 +575,22 @@ export function HomeAside({
   reviewCount,
   reportCount,
   songs,
+  knownSongs,
   onOpenJam,
   onOpenReview,
   onOpenFix,
+  onOpenKnown,
   className = "",
 }: {
   jamItems: SharedJamItem[];
   reviewCount: number;
   reportCount: number;
   songs: Song[];
+  knownSongs: Song[];
   onOpenJam: () => void;
   onOpenReview: () => void;
   onOpenFix: () => void;
+  onOpenKnown: () => void;
   className?: string;
 }) {
   const queue = jamItems.filter((x) => !x.played).slice(0, 5);
@@ -608,6 +625,8 @@ export function HomeAside({
           </ol>
         )}
       </div>
+
+      <RepeatWidget songs={knownSongs} onOpenKnown={onOpenKnown} />
 
       {(reportCount > 0 || reviewCount > 0) && (
         <div className={`${CARD} space-y-2 p-4`}>

@@ -9,6 +9,19 @@ import { PORTRAIT_FOCUS_Y } from "@/lib/constants";
 import { supabase } from "@/lib/supabaseClient";
 import type { Playlist, SimilarSong, Song, SongReport } from "@/types/song";
 
+// ZAČASNO: skladbe Adija Smolarja, pripravljene s skillom spedenaj (2026-10-24) — zelena kljukica.
+const SPEDENAJ_TEMP_IDS = new Set([
+  "f400d89c-8bc8-4b0a-9b62-50e91b85e2ab", // To bo hit
+  "e6660cf7-36a5-4db2-bf51-207ee607570a", // Tagada
+  "9aca011c-6077-498e-ba8c-0e8c9e2a85b9", // Gremo na Povšetovo
+  "c5d0f74e-3a31-4906-a847-67858e77ccf6", // Svinja pijana
+  "7979bde0-299a-4a72-bfa8-6d6f3c16715d", // Mene nihče nima rad
+  "932c09da-16c1-4e58-af05-7dcfa64550e4", // Zgubu zgubu
+  "28e0e48d-68e3-45bc-85e2-05f74742cf5a", // Ljubosumnež
+  "cbd032cd-a736-40de-b652-5de25ae76592", // Je treba delat
+  "0ec95f23-6df2-430e-bcee-ebd22899cba9", // Bognedaj, da bi crknu televizor
+]);
+
 // Slika avtorja na desni strani kartice. Svetla tema: zaobljen kvadrat znotraj
 // kartice (10 px od zgornjega, spodnjega in desnega roba). Temna tema: diagonalna "zagozda" (širša
 // zgoraj, ožja spodaj), opacity jo "potopi" v barvo kartice; rob ni ostro
@@ -283,6 +296,19 @@ export default function SongCard({
             </span>
           )}
         </div>
+      )}
+      {/* ZAČASNO (2026-10-24): skladbe, ki jih je pripravil skill spedenaj in čakajo
+          na uporabnikov pregled — zelena kljukica namesto oranžne. Odstrani, ko so pregledane. */}
+      {SPEDENAJ_TEMP_IDS.has(song.id) && !song.verified_player_at && (
+        <span
+          title="Pripravljeno (spedenaj) — čaka na tvoj pregled"
+          aria-label="Pripravljeno za pregled"
+          className="absolute bottom-2 right-2 z-10 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round" className="h-2.5 w-2.5">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </span>
       )}
       {authorImage && (
         <img

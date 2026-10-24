@@ -36,6 +36,7 @@ import MainNav, { type MainNavTab } from "@/components/MainNav";
 import Tuner from "@/components/Tuner";
 import Scales from "@/components/Scales";
 import Beginners from "@/components/Beginners";
+import SongWriter from "@/components/SongWriter";
 import { authorAccentHex } from "@/lib/authorColor";
 import { DEFAULT_MOODS, DEFAULT_ORIGINS, ERAS, GENRES, LIBRARY_OWNER_ID } from "@/lib/constants";
 import { pickDailyFeatured } from "@/lib/dailyRandom";
@@ -436,6 +437,18 @@ export default function Dashboard({ user }: { user: User }) {
   const [scalesOpen, setScalesOpen] = useState(false);
   // "Za začetnike" (gumb levo od iskanja, Beginners.tsx).
   const [beginnersOpen, setBeginnersOpen] = useState(false);
+  // "Pišem" (lastne skladbe benda, SongWriter.tsx): celozaslonska stran, ostane odprta ob osvežitvi.
+  const [writerOpen, setWriterOpen] = usePersistentBool("komadi:writer:open", false);
+  const [ownSongCount, setOwnSongCount] = useState(0);
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    supabase
+      .from("own_songs")
+      .select("id", { count: "exact", head: true })
+      .then(({ count }) => {
+        if (count != null) setOwnSongCount(count);
+      });
+  }, []);
   const [goalPickerQuery, setGoalPickerQuery] = useState("");
   const [goalExtras, setGoalExtras] = useState<GoalExtra[]>([]);
   const [goalQuickAddOpen, setGoalQuickAddOpen] = useState(false);
@@ -1886,7 +1899,7 @@ export default function Dashboard({ user }: { user: User }) {
     let ss = view.ss;
     if (ss?.playing && ss.rate > 0) {
       const late = (Date.now() - lastViewAtRef.current) / 1000;
-      ss = { ...ss, p: Math.min(1, ss.p + ss.rate * late) };
+      ss = { ...ss, p: Math.min(1, ss.p + ss.rate * late), ...(ss.nhIn != null ? { nhIn: Math.max(0, ss.nhIn - late) } : {}) };
     }
     sendView({ type: "view", leaderId: viewerId, leaderName: myDisplayName ?? "", songId: me.songId, since: me.since, mode: openChordsModeRef.current === "samspili" ? "samspili" : null, ...view, ...(ss ? { ss } : {}) });
   };
@@ -4847,6 +4860,8 @@ export default function Dashboard({ user }: { user: User }) {
               onOpenQueue={openQueue}
               knownSongs={knownSongs}
               onOpenKnown={openKnown}
+              ownSongCount={ownSongCount}
+              onOpenWriter={() => setWriterOpen(true)}
               onOpenPlaylists={() => handleMainNav("playlists")}
               onRandom={pickRandom}
               onPartial={handlePartialStart}
@@ -4865,6 +4880,13 @@ export default function Dashboard({ user }: { user: User }) {
           {tunerOpen && <Tuner onClose={() => setTunerOpen(false)} />}
           {scalesOpen && <Scales onClose={() => setScalesOpen(false)} />}
           {beginnersOpen && <Beginners songs={songs} onClose={() => setBeginnersOpen(false)} />}
+          {writerOpen && (
+            <SongWriter
+              userName={myDisplayName ?? ""}
+              onCountChange={setOwnSongCount}
+              onClose={() => setWriterOpen(false)}
+            />
+          )}
 
           <Filters
             filters={filters}
@@ -4944,6 +4966,8 @@ export default function Dashboard({ user }: { user: User }) {
                   reviewCount={reviewSongs.length}
                   reportCount={reportedSongIds.size}
                   songs={verifiedSongs}
+                  knownSongs={knownSongs}
+                  onOpenKnown={openKnown}
                   onOpenJam={openSharedJam}
                   onOpenReview={openReview}
                   onOpenFix={() => openFix()}
