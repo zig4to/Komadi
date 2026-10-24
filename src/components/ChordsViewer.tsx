@@ -1,7 +1,7 @@
 "use client";
 
 import { PATTERN_OPACITY_MAX, PatternSvg, scaledBackgroundColors } from "@/lib/backgroundPatterns";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import AutoScrollControl from "@/components/AutoScrollControl";
 import ChordDiagram from "@/components/ChordDiagram";
@@ -112,6 +112,11 @@ const LRC_OFFSET_STEP = 0.25;
 const SUNG_CHORDS_KEY = "komadi:chords:sungChords";
 // m:ss za časovni razpon instrumentalnega dela.
 const formatSec = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, "0")}`;
+// m:ss.cc (stotinke) za "Popravi čase vrstic".
+const formatCs = (s: number) => {
+  const cs = Math.round(Math.max(0, s) * 100);
+  return `${Math.floor(cs / 6000)}:${String(Math.floor(cs / 100) % 60).padStart(2, "0")}.${String(cs % 100).padStart(2, "0")}`;
+};
 // Navaden durov/molov trozvok (A, Am, Cm, Bbm, F# … tudi kot barre); vse ostalo
 // (/bas, add, sus, 7, maj7, 6, dim …) je "posebni akord", prikazan na vrhu skladbe.
 const isBasicChord = (name: string) => /^[A-H][#b]?m?$/.test(name.replace(/\*+$/, ""));
@@ -1675,8 +1680,16 @@ export default function ChordsViewer({
     () => (syncedLines?.points.length ? remapLines(syncedLines.points, body) : null),
     [syncedLines, body],
   );
+  // "Popravi čase vrstic": osnutek časov (po vrsti), ki med urejanjem takoj
+  // velja za označevanje — premik se vidi ob predvajanju.
+  type FixPoint = { t: number; end: number; line: number };
+  const [lineFix, setLineFix] = useState<{ points: FixPoint[]; history: FixPoint[][]; dirty: boolean } | null>(null);
   const sync = useMemo(() => {
     if (wrongVideo) return null;
+    if (lineFix) {
+      const points = lineFix.points.map((p) => ({ time: p.t, end: p.end, lineIndex: p.line }));
+      return { points, matched: points.length, total: points.length, manual: true };
+    }
     if (syncedRemap?.ok) {
       const points = manualSyncPoints(syncedRemap.points);
       return { points, matched: points.length, total: points.length, manual: true };
@@ -1687,7 +1700,7 @@ export default function ChordsViewer({
       ? [...aligned.points, ...instrumentalPoints(aligned.points, lrc.lines, body)].sort((a, b) => a.time - b.time)
       : aligned.points;
     return { points, matched: aligned.matched, total: lrc.lines.filter((l) => l.text).length, manual: false };
-  }, [wrongVideo, syncedRemap, lrc, body, song.title]);
+  }, [wrongVideo, lineFix, syncedRemap, lrc, body, song.title]);
   // Ročno posneti časi posameznih akordov (songs.synced_chords) — dodatna
   // plast: ob času se obarva prav ta akord (intro, solo …).
   // Razdeljeno na instrumentalne dele (Intro, Instrumental 1 …), vsak s svojim zamikom.
@@ -2004,6 +2017,7 @@ export default function ChordsViewer({
   const [recorderSaving, setRecorderSaving] = useState(false);
   const nextLyricLine = (from: number) => lyricLines.find((i) => i >= from) ?? -1;
   const startRecorder = () => {
+    if (lineFix) return;
     const lines = [...(syncedLines?.points ?? [])].sort((a, b) => a.t - b.t);
     const sections = syncedChords?.sections ?? [];
     const lastLine = lines[lines.length - 1];
@@ -2177,10 +2191,32 @@ export default function ChordsViewer({
       dirty: true,
     });
   };
-  const previewChordAt = (t: number) => {
-    if (!playerCtlRef.current?.seekAndPlay(Math.max(0, t - 1.5))) setRecorderMsg("Najprej enkrat zaženi posnetek z ▶.");
+  // lead: koliko prej začne (▶ = 1,5 s, klik na akord v seznamu = 0).
+  const previewChordAt = (t: number, lead = 1.5) => {
+    if (!playerCtlRef.current?.seekAndPlay(Math.max(0, t - lead))) setRecorderMsg("Najprej enkrat zaženi posnetek z ▶.");
   };
   // Ime akorda na mestu (line, j) — j kot v renderLine (pri "pair" indeks kosa).
+  // Naslov vrstice v seznamu akordov snemalnika: besedilo vrstice, sicer
+  // "<del> · N. vrstica" (vrstice samih akordov: intro, solo …).
+  const recLineLabel = (line: number): string => {
+    const l = body[line];
+    if (l?.kind === "pair") {
+      const text = l.chunks.map((c) => c.lyric).join("").replace(/\s+/g, " ").trim();
+      if (text) return text;
+    }
+    if (l?.kind === "text") {
+      const text = l.segments.map((x) => ("text" in x ? x.text : "")).join("").replace(/\s+/g, " ").trim();
+      if (text) return text;
+    }
+    let k = line;
+    let n = 0;
+    while (k >= 0 && body[k].kind !== "section") {
+      if (body[k].kind !== "text" || k === line) n++;
+      k--;
+    }
+    const sec = k >= 0 ? body[k] : null;
+    return `${sec?.kind === "section" ? sec.label + " · " : ""}${n}. vrstica`;
+  };
   const chordNameAt = (line: number, j: number): string => {
     const l = body[line];
     let name: string | null | undefined = null;
@@ -2408,6 +2444,81 @@ export default function ChordsViewer({
     setSmartOn(true);
   };
 
+  // --- "Popravi čase vrstic": začetek označbe vsake vrstice s −/+ ali "Zdaj" ---
+  const [lineFixSaving, setLineFixSaving] = useState(false);
+  const [lineFixMsg, setLineFixMsg] = useState<string | null>(null);
+  // Vrstica osnutka, ki je trenutno označena (indeks v lineFix.points).
+  const [fixActive, setFixActive] = useState(-1);
+  const fixListRef = useRef<HTMLDivElement>(null);
+  const startLineFix = () => {
+    if (!sync?.points.length || recorder) return;
+    const r2 = (x: number) => Math.round(x * 100) / 100;
+    setLineFix({
+      points: [...sync.points].sort((a, b) => a.time - b.time).map((p) => ({ t: r2(p.time), end: r2(p.end), line: p.lineIndex })),
+      history: [],
+      dirty: false,
+    });
+    setLineFixMsg(null);
+    setSmartOn(true);
+    closeThemeMenu();
+  };
+  const cancelLineFix = () => {
+    if (!lineFix?.dirty || window.confirm("Zavržem spremembe časov?")) {
+      setLineFix(null);
+      setLineFixMsg(null);
+    }
+  };
+  // Nov začetek vrstice k (čas brez zamika). Ostane med sosedama; prejšnja
+  // vrstica, ki se je končala ob starem začetku (ali bi segla čez novega),
+  // se konča ob novem — med vrsticama ni luknje ne prekrivanja.
+  const setFixTime = (k: number, raw: number) => {
+    if (!lineFix) return;
+    const pts = lineFix.points.map((p) => ({ ...p }));
+    const cur = pts[k];
+    const prev = pts[k - 1];
+    const next = pts[k + 1];
+    const lo = prev ? prev.t + 0.1 : 0;
+    const hi = next ? next.t - 0.1 : Infinity;
+    const t = Math.min(hi, Math.max(lo, Math.round(raw * 100) / 100));
+    if (t === cur.t) return;
+    if (prev && (Math.abs(prev.end - cur.t) < 0.05 || prev.end > t)) prev.end = t;
+    cur.end = Math.max(cur.end, t + 0.5);
+    if (next) cur.end = Math.min(cur.end, next.t);
+    cur.t = t;
+    setLineFix({ points: pts, history: [...lineFix.history.slice(-99), lineFix.points], dirty: true });
+  };
+  const undoLineFix = () => {
+    if (!lineFix?.history.length) return;
+    const history = lineFix.history.slice(0, -1);
+    setLineFix({ points: lineFix.history[lineFix.history.length - 1], history, dirty: history.length > 0 });
+  };
+  const saveLineFix = async () => {
+    if (!lineFix?.dirty || !recordVideoId) return;
+    const next: SyncedLines = {
+      videoId: syncedLines?.videoId ?? recordVideoId,
+      ...(syncedLines?.frozen ? { frozen: true } : {}),
+      points: lineFix.points.map(withLineKey),
+    };
+    setLineFixSaving(true);
+    const { error } = await supabase.from("songs").update({ synced_lines: next }).eq("id", song.id);
+    setLineFixSaving(false);
+    if (error) {
+      setLineFixMsg(`Shranjevanje ni uspelo: ${error.message}`);
+      return;
+    }
+    setSyncedLines(next);
+    setLineFix(null);
+    setLineFixMsg(null);
+  };
+  // Označena vrstica ostane vidna v seznamu.
+  useEffect(() => {
+    const list = fixListRef.current;
+    const row = list?.querySelector<HTMLElement>(`[data-fix-row="${fixActive}"]`);
+    if (!list || !row) return;
+    if (row.offsetTop < list.scrollTop || row.offsetTop + row.offsetHeight > list.scrollTop + list.clientHeight)
+      list.scrollTo({ top: row.offsetTop - list.clientHeight / 3, behavior: "smooth" });
+  }, [fixActive]);
+
   // --- Ročno preverjanje (oznaki na kartici, pogoj za "Odobri") ---
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const verifyError = (message: string) =>
@@ -2633,16 +2744,24 @@ export default function ChordsViewer({
     points: null as SyncPoint[] | null,
     offset: 0,
     chordPts: [] as ReturnType<typeof flattenChordSections>,
+    fix: false,
   });
   useEffect(() => {
     timingRef.current = {
+      fix: !!lineFix,
       points: smartActive && sync ? sync.points : null,
       offset: lrcOffset,
       chordPts: recorder ? draftChordPoints : smartActive ? liveChordPoints : [],
     };
   });
   const applyTiming = (t: number) => {
-    const { points, offset, chordPts } = timingRef.current;
+    const { points, offset, chordPts, fix } = timingRef.current;
+    if (fix && points) {
+      // "Popravi čase vrstic": zadnja vrstica osnutka, ki se je že začela.
+      let k = -1;
+      for (let i = 0; i < points.length && points[i].time <= t - offset; i++) k = i;
+      setFixActive((prev) => (prev === k ? prev : k));
+    }
     const gapInfo = points ? instrumentalGapAt(points, t - offset, SS_GAP_MIN) : null;
     const line = points ? (gapInfo ? -1 : lineProgressAt(points, t - offset).lineIndex) : -1;
     setActiveLine((prev) => (prev === line ? prev : line));
@@ -4163,6 +4282,15 @@ export default function ChordsViewer({
                 >
                   {recorder ? "Prekliči snemanje" : syncedLines || syncedChords ? "Nadaljuj snemanje časov" : "Posnemi čase"}
                 </button>
+                {!!sync?.points.length && !recorder && !offsetLocked && (
+                  <button
+                    type="button"
+                    onClick={lineFix ? cancelLineFix : startLineFix}
+                    className="rounded-full border border-orange-400 px-2.5 py-1 text-[11px] font-medium text-amber-400 hover:bg-orange-400/15 lg:hidden"
+                  >
+                    {lineFix ? "Zapri popravljanje časov" : "Popravi čase vrstic"}
+                  </button>
+                )}
                 {(syncedLines || syncedChords) && (
                   <button
                     type="button"
@@ -4681,6 +4809,34 @@ export default function ChordsViewer({
               }`}
             >
               <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-500" />
+            </button>
+            {/* Računalnik: "Popravi čase vrstic" desno od Posnemi čase (na telefonu v ⚙). */}
+            <button
+              type="button"
+              onClick={lineFix ? cancelLineFix : startLineFix}
+              disabled={!lineFix && (!!recorder || !sync?.points.length || offsetLocked)}
+              aria-pressed={!!lineFix}
+              title={
+                lineFix
+                  ? "Zapri popravljanje časov vrstic"
+                  : offsetLocked
+                    ? "Skladba je preverjena — čase spremeniš prek Popravi skladbe"
+                    : sync?.points.length
+                      ? "Popravi čase vrstic — kdaj se začne označba posamezne vrstice"
+                      : "Skladba še nima časov vrstic (Posnemi čase)"
+              }
+              aria-label="Popravi čase vrstic"
+              className={`hidden h-[26px] w-[26px] items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-xs transition active:scale-95 disabled:opacity-40 max-lg:order-10 lg:flex ${
+                lineFix ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
+              }`}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-amber-400">
+                <path d="M3 6h12" />
+                <path d="M3 12h6" />
+                <path d="M3 18h6" />
+                <circle cx="17" cy="16" r="5" />
+                <path d="M17 13.5V16l1.5 1.5" />
+              </svg>
             </button>
             {/* Računalnik: zamik Smart playa v vrstici (na telefonu v ⚙ → Napredne nastavitve). */}
             {smartAvailable && (
@@ -5648,10 +5804,25 @@ export default function ChordsViewer({
                         {listOpen && section.points.length > 0 && (
                           <ol className="mx-1.5 mb-1.5 divide-y divide-neutral-800 overflow-hidden rounded-md border border-neutral-700 bg-neutral-950">
                             {ordered.map(({ p, k }, n) => (
-                              <li key={k} className="flex items-center gap-1 px-1.5 py-1">
-                                <span className="w-4 shrink-0 text-right tabular-nums text-neutral-500">{n + 1}</span>
-                                <span className="min-w-[2.75rem] shrink-0 truncate font-mono font-bold text-amber-400">{chordNameAt(p.line, p.chord)}</span>
-                                <span className="flex-1 tabular-nums text-neutral-200">{formatSecFine(p.t + off)}</span>
+                              <Fragment key={k}>
+                              {/* Nova vrstica pesmi: naslov skupine (akordi so razdeljeni po vrsticah). */}
+                              {(n === 0 || ordered[n - 1].p.line !== p.line) && (
+                                <li className="truncate bg-neutral-900 px-1.5 py-0.5 text-[13px] text-neutral-400" title={recLineLabel(p.line)}>
+                                  {recLineLabel(p.line)}
+                                </li>
+                              )}
+                              <li className="flex items-center gap-1 px-1.5 py-1">
+                                {/* Klik na akord (številka, ime, čas) predvaja od tega akorda naprej. */}
+                                <button
+                                  type="button"
+                                  onClick={() => previewChordAt(p.t + off, 0)}
+                                  title="Predvajaj od tega akorda"
+                                  className="-my-1 -ml-1.5 flex min-w-0 flex-1 items-center gap-1 rounded py-1 pl-1.5 text-left hover:bg-orange-400/10"
+                                >
+                                  <span className="w-4 shrink-0 text-right tabular-nums text-neutral-500">{n + 1}</span>
+                                  <span className="min-w-[2.75rem] shrink-0 truncate font-mono font-bold text-amber-400">{chordNameAt(p.line, p.chord)}</span>
+                                  <span className="flex-1 tabular-nums text-neutral-200">{formatSecFine(p.t + off)}</span>
+                                </button>
                                 <div className="flex shrink-0 items-center gap-0.5">
                                   {[
                                     { d: -0.25, label: "−¼", title: "0,25 s prej" },
@@ -5690,6 +5861,7 @@ export default function ChordsViewer({
                                   </button>
                                 </div>
                               </li>
+                              </Fragment>
                             ))}
                           </ol>
                         )}
@@ -5722,6 +5894,106 @@ export default function ChordsViewer({
                   className="flex-1 rounded-xl border border-orange-400 py-2 font-semibold text-amber-400 active:scale-95 disabled:opacity-40"
                 >
                   {recorderSaving ? "…" : "Shrani"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* "Popravi čase vrstic": seznam vrstic s časom začetka označbe, −/+ in
+            "Zdaj" (trenutni čas posnetka). Isto mesto kot Posnemi čase. */}
+        {lineFix && (
+          <div
+            className="relative z-30 shrink-0 border-t border-orange-400 bg-neutral-950/95 px-3 pt-2 font-sans text-neutral-100 backdrop-blur lg:flex lg:w-[var(--rec-w,30rem)] lg:max-w-[calc(100%-20rem)] lg:flex-col lg:overflow-hidden lg:border-l lg:border-t-0 lg:pt-3"
+            style={{
+              paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+              ...(recWidth ? ({ "--rec-w": `${recWidth}px` } as CSSProperties) : {}),
+            }}
+          >
+            <div className="mx-auto max-w-2xl lg:mx-0 lg:flex lg:min-h-0 lg:max-w-none lg:flex-1 lg:flex-col">
+              <p className="mb-1 text-base text-neutral-300">Popravi čase vrstic</p>
+              <p className="mb-2 text-[13px] leading-snug text-neutral-500 lg:text-[15px]">
+                −/+ premakne začetek označbe vrstice · Zdaj = trenutni čas posnetka · ▶ predvaja od 2 s prej · klik na besedilo vrstice skoči tja
+              </p>
+              {lineFixMsg && <p className="mb-2 text-base text-amber-400">{lineFixMsg}</p>}
+              {!recordVideoId && <p className="mb-2 text-[15px] text-neutral-500">Za shranjevanje enkrat zaženi posnetek z ▶.</p>}
+              <div ref={fixListRef} className="relative max-h-48 space-y-1 overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
+                {lineFix.points.map((p, k) => (
+                  <div
+                    key={k}
+                    data-fix-row={k}
+                    className={`rounded-lg border px-2 py-1.5 ${k === fixActive ? "border-orange-400 bg-orange-400/10" : "border-neutral-800"}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => playerCtlRef.current?.seekAndPlay(Math.max(0, p.t + lrcOffset - 0.3))}
+                      title="Skoči na to vrstico"
+                      className="block w-full truncate text-left text-sm text-neutral-200 hover:text-white lg:text-[15px]"
+                    >
+                      {recLineLabel(p.line)}
+                    </button>
+                    <div className="mt-1 flex flex-wrap items-center gap-1 text-xs lg:text-sm">
+                      <span className="w-[4.5rem] tabular-nums text-amber-400">
+                        {formatCs(p.t + lrcOffset)}
+                      </span>
+                      {[-0.5, -0.25, -0.1, 0.1, 0.25, 0.5].map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setFixTime(k, p.t + d)}
+                          className="rounded-md border border-neutral-600 px-1.5 py-0.5 tabular-nums text-neutral-300 hover:border-orange-400 hover:text-white active:scale-95"
+                        >
+                          {d > 0 ? "+" : "−"}
+                          {String(Math.abs(d)).replace(".", ",")}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const now = playerCtlRef.current?.currentTime();
+                          if (now != null) setFixTime(k, now - lrcOffset);
+                        }}
+                        title="Začetek vrstice = trenutni čas posnetka"
+                        className="rounded-md border border-orange-400 px-1.5 py-0.5 text-amber-400 hover:bg-orange-400/15 active:scale-95"
+                      >
+                        Zdaj
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => playerCtlRef.current?.seekAndPlay(Math.max(0, p.t + lrcOffset - 2))}
+                        aria-label="Predvajaj od 2 s pred vrstico"
+                        title="Predvajaj od 2 s pred vrstico"
+                        className="ml-auto rounded-md border border-neutral-600 px-1.5 py-0.5 text-neutral-300 hover:border-orange-400 hover:text-white active:scale-95"
+                      >
+                        ▶
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-1.5 text-base">
+                <button
+                  type="button"
+                  onClick={undoLineFix}
+                  disabled={!lineFix.history.length}
+                  aria-label="Razveljavi zadnji premik"
+                  className="rounded-xl border border-neutral-600 px-3 py-2 text-neutral-300 active:scale-95 disabled:opacity-40"
+                >
+                  ↶
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelLineFix}
+                  className="flex-1 rounded-xl border border-neutral-600 py-2 text-neutral-300 active:scale-95"
+                >
+                  Prekliči
+                </button>
+                <button
+                  type="button"
+                  onClick={saveLineFix}
+                  disabled={!lineFix.dirty || !recordVideoId || lineFixSaving}
+                  className="flex-1 rounded-xl border border-orange-400 py-2 font-semibold text-amber-400 active:scale-95 disabled:opacity-40"
+                >
+                  {lineFixSaving ? "…" : "Shrani"}
                 </button>
               </div>
             </div>
