@@ -512,9 +512,9 @@ function RepeatWidget({ songs, onOpenKnown, className = "" }: { songs: Song[]; o
     [songs, seed],
   );
   return (
-    <div className={`${CARD} relative isolate overflow-hidden p-4 ${className}`}>
+    <div className={`${CARD} relative isolate overflow-hidden px-4 py-2.5 ${className}`}>
       <span aria-hidden="true" className="pointer-events-none absolute -right-10 -top-12 -z-10 h-36 w-36 rounded-full bg-green-500/[0.10] blur-2xl dark:bg-green-400/[0.08]" />
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between">
         <button type="button" onClick={onOpenKnown} className="flex items-center gap-2 text-left text-sm text-neutral-700 dark:text-neutral-300">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-green-600 dark:text-green-400">
             <path d="m17 2 4 4-4 4" />
@@ -545,17 +545,17 @@ function RepeatWidget({ songs, onOpenKnown, className = "" }: { songs: Song[]; o
         </span>
       </div>
       {picks.length === 0 ? (
-        <p className="px-1 py-2 text-xs text-neutral-500">Ko skladbo v meniju kartice označiš z »Znam«, jo bom tu občasno predlagal za ponovitev.</p>
+        <p className="px-1 pb-0.5 text-xs text-neutral-500">Ko skladbo v meniju kartice označiš z »Znam«, jo bom tu občasno predlagal za ponovitev, da je ne pozabiš.</p>
       ) : (
-        <ul className="space-y-1.5">
+        <ul className="space-y-1">
           {picks.map((song) => (
             <li key={song.id}>
               <button
                 type="button"
                 onClick={() => (song.chords_text ? openChordsViewer(song.id) : onOpenKnown())}
-                className="group flex w-full items-center gap-3 rounded-xl border border-green-500/20 bg-green-500/[0.05] px-2.5 py-2 text-left transition hover:border-green-500/40 hover:bg-green-500/[0.09]"
+                className="group flex w-full items-center gap-2.5 rounded-xl border border-green-500/20 bg-green-500/[0.05] px-2.5 py-1 text-left transition hover:border-green-500/40 hover:bg-green-500/[0.09]"
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-500/15 text-green-700 dark:text-green-300">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-green-500/15 text-green-700 dark:text-green-300">
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                     <path d="M9 18V5l12-2v13" />
                     <circle cx="6" cy="18" r="3" />
