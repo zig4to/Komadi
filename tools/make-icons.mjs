@@ -65,6 +65,9 @@ const GRADIENTS = {
 const COLORS = "t_rdeca";
 // Velikost znaka (trzalica + strela) glede na risbo 0–512; 1.21 = za 21 % večja (2× po 10 %).
 const GLYPH = 1.21;
+// Telefon (maskable + apple-touch): sistem ikono obreže v krog/zaobljen kvadrat in jo prikaže
+// čez cel kvadrat, zato je znak tam manjši (uporabnik 2026-10-25: na telefonu je bila prevelika).
+const GLYPH_PHONE = 0.72; // enako visoka kot znak na nameščeni ikoni TomStudios (~41 %)
 
 // Trzalica s konico spodaj, v koordinatah 0–512, središče ~ (256, 258), višina 292.
 const PICK = "M256 112 C372 112 410 168 388 236 C366 304 306 372 256 404 C206 372 146 304 124 236 C102 168 140 112 256 112 Z";
@@ -472,9 +475,9 @@ if (preview >= 0) {
   const jobs = [
     { file: "icon-192.png", size: 192, rounded: true, glyphScale: GLYPH },
     { file: "icon-512.png", size: 512, rounded: true, glyphScale: GLYPH },
-    { file: "icon-maskable-192.png", size: 192, rounded: false, glyphScale: GLYPH * 0.82 },
-    { file: "icon-maskable-512.png", size: 512, rounded: false, glyphScale: GLYPH * 0.82 },
-    { file: "apple-touch-icon.png", size: 180, rounded: false, glyphScale: GLYPH * 0.9 },
+    { file: "icon-maskable-192.png", size: 192, rounded: false, glyphScale: GLYPH_PHONE },
+    { file: "icon-maskable-512.png", size: 512, rounded: false, glyphScale: GLYPH_PHONE },
+    { file: "apple-touch-icon.png", size: 180, rounded: false, glyphScale: GLYPH_PHONE },
   ];
   writeFileSync(new URL("icon.svg", OUT), svg());
   for (const j of jobs) {
