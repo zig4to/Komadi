@@ -266,7 +266,8 @@ if (cmd === "list") {
   }
 } else if (cmd === "write") {
   const s = await loadSong(id);
-  if (s.verified_player_at) throw new Error(`"${s.title}" je preverjena (verified_player_at) — skill je ne spreminja.`);
+  // --allow-verified samo, ko uporabnik izrecno zahteva popravek preverjene skladbe.
+  if (s.verified_player_at && !process.argv.includes("--allow-verified")) throw new Error(`"${s.title}" je preverjena (verified_player_at) — skill je ne spreminja.`);
   const patchPath = arg("--patch");
   if (!patchPath) throw new Error("--patch patch.json");
   const patch = JSON.parse(readFileSync(patchPath, "utf8"));
