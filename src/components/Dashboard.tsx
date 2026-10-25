@@ -4858,7 +4858,9 @@ export default function Dashboard({ user }: { user: User }) {
           <div
             hidden={!isDesktop && !!authorFilter}
             className={`transition-all duration-300 ease-out ${
-              searchFocused ? "pointer-events-none mb-0! max-h-0 -translate-y-2 overflow-hidden opacity-0 lg:pointer-events-auto lg:max-h-none lg:translate-y-0 lg:overflow-visible lg:opacity-100" : ""
+              // Telefon: skrite tudi po zaprtju tipkovnice, dokler je kaj vpisano — sicer se ob
+              // dotiku zadetka (fokus odide) kartice razprejo nad njim in zadetek odskoči navzdol.
+              searchFocused || (!isDesktop && filters.search !== "") ? "pointer-events-none mb-0! max-h-0 -translate-y-2 overflow-hidden opacity-0 lg:pointer-events-auto lg:max-h-none lg:translate-y-0 lg:overflow-visible lg:opacity-100" : ""
             }`}
           >
             {showHomeStats && <HomeGreeting firstName={fullNameFor(user).split(" ")[0] ?? ""} songCount={songs.length} />}
