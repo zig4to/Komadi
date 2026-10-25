@@ -46,12 +46,13 @@ function isDark(theme: Theme) {
 }
 
 // Privzete vrednosti na telefonu (dokler uporabnik nastavitve ne spremeni):
-// ozadje Dim (v temni temi), svetlost −50 %, vzorec Vrat kitare na 200 %.
+// ozadje Globoka noč vijolična (v temni temi), svetlost −90 %, vzorec Vrat kitare na 270 %
+// (uporabnikova odločitev 2026-10-25; prej Dim, −50 %, 200 %).
 // Računalnik: ozadje teme, 0 %, 100 %.
 function isPhone() {
   return typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
 }
-const PHONE_DEFAULT_BG = BACKGROUNDS.findIndex((b) => b.label === "Dim");
+const PHONE_DEFAULT_BG = BACKGROUNDS.findIndex((b) => b.label === "Globoka noč vijolična");
 export const BRIGHTNESS_MIN = -2;
 export const BRIGHTNESS_MAX = 2;
 // Prosojnost bele tančice za svetlost > 0: postopno (0,2 na 100 %), do 0,4 pri +200 %.
@@ -59,7 +60,7 @@ export function lightVeilAlpha(b: number) {
   return Math.min(0.4, b * 0.2);
 }
 export function defaultBrightness() {
-  return isPhone() ? -0.5 : 0;
+  return isPhone() ? -0.9 : 0;
 }
 // Prosojnost črne tančice za svetlost < 0: do −50 % enako kot prej (−b), naprej
 // postopoma do 0,95 pri −200 % (ozadje skoraj črno, vsebina ostane berljiva).
@@ -68,7 +69,7 @@ export function darkVeilAlpha(b: number) {
   return d <= 0.5 ? d : Math.min(0.95, 0.5 + ((d - 0.5) / 1.5) * 0.45);
 }
 export function defaultPatternOpacity() {
-  return isPhone() ? 2 : 1;
+  return isPhone() ? 2.7 : 1;
 }
 
 function readAppBg(): number | null {
