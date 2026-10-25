@@ -87,12 +87,16 @@ const CENTER_TEXT_KEY = "komadi:chords:centerText";
 const NO_CAPO_KEY = "komadi:chords:noCapo";
 // Okvir s prijemi (Posebni akordi / Akordi v skladbi) razprt (1) ali zložen (0) — globalno.
 const SHAPES_OPEN_KEY = "komadi:chords:shapesOpen";
-const BG_KEY = "komadi:chords:bg";
+// Nov ključ (…2, 2026-10-25): privzeto Akordni diagram tudi v navadnem pogledu, za vse.
+const BG_KEY = "komadi:chords:bg2";
 // "Sam Špili" ima svoje ozadje (privzeto Akordni diagram), ločeno od navadnega pogleda.
 const SS_BG_KEY = "komadi:chords:ssBg";
 // Vidnost vzorca ozadja (Plastnice, Vrat kitare …) v pregledovalniku in Sam Špili.
 // Nov ključ (…2), da privzetih 350 % velja za vse, tudi za že shranjene izbire.
 const PATTERN_OPACITY_KEY = "komadi:chords:patternOpacity2";
+// Navadni pogled (Akordi v aplikaciji) ima od 2026-10-25 svojo vidnost, privzeto 105 %.
+const NORMAL_PATTERN_OPACITY_KEY = "komadi:chords:patternOpacityNormal";
+const DEFAULT_NORMAL_PATTERN_OPACITY = 1.05;
 // Svetlost ozadja (−200 … +200 %): tančica čez ozadje in vzorec, za vse barve in teme.
 const BG_BRIGHTNESS_KEY = "komadi:chords:bgBrightness";
 const DEFAULT_PATTERN_OPACITY = 3.5;
@@ -218,8 +222,8 @@ const BARS_TRANSITION = "550ms cubic-bezier(0.65, 0, 0.35, 1)";
 
 // Ozadja (BACKGROUNDS, BACKGROUND_ORDER) so v src/lib/backgrounds.ts — ista
 // izbira je tudi ozadje aplikacije (⋮ → Nastavitve → Tema).
-const DEFAULT_BG = 3;
-// Indeks "Akordni diagram" v BACKGROUNDS.
+// Indeks "Akordni diagram" v BACKGROUNDS — privzeto v navadnem pogledu in v Sam Špili.
+const DEFAULT_BG = 15;
 const DEFAULT_SS_BG = 15;
 // Barve besedila: "Samodejna" = barva, ki pripada ozadju (BACKGROUNDS.text);
 // ostale imajo svetlo različico za temna ozadja in temno za svetla.
@@ -322,7 +326,7 @@ type ThemePreset = {
 };
 const THEME_PRESETS: ThemePreset[] = [
   // Privzeti videz (kot ob prvem odprtju): navaden pogled Črna, Sam Špili Akordni diagram.
-  { label: "Default", bg: "Črna", ssBg: "Akordni diagram", resetPattern: true, text: "Samodejna", chord: "Rumena", section: "Samodejna", markFill: "Oranžna", markBorder: "Kot ozadje", markShape: 1, markWidth: 1, line: "#fb923c", glow: false },
+  { label: "Default", bg: "Akordni diagram", ssBg: "Akordni diagram", resetPattern: true, text: "Samodejna", chord: "Rumena", section: "Samodejna", markFill: "Oranžna", markBorder: "Kot ozadje", markShape: 1, markWidth: 1, line: "#fb923c", glow: false },
   { label: "Globoka noč", bg: "Globoka noč", text: "Hladna", chord: "Ledeno modra", section: "Vijolična", markFill: "Brez", markBorder: "Modra", markShape: 3, markWidth: 0, line: "#7dd3fc", glow: true },
   { label: "Globoka noč zelena", bg: "Globoka noč zelena", text: "Samodejna", chord: "Smaragdna", section: "Zelena", markFill: "Brez", markBorder: "Zelena", markShape: 3, markWidth: 0, line: "#6ee7b7", glow: true },
   { label: "Globoka noč vijolična", bg: "Globoka noč vijolična", text: "Samodejna", chord: "Vijolična", section: "Vijolična", markFill: "Brez", markBorder: "Vijolična", markShape: 3, markWidth: 0, line: "#c4b5fd", glow: true },
@@ -637,8 +641,16 @@ export default function ChordsViewer({
   // V Sam Špili velja (in se nastavlja) ozadje Sam Špili, sicer navadno.
   const bgIndex = samSpili ? ssBgIndex : normalBgIndex;
   const setBgIndex = samSpili ? setSsBgIndex : setNormalBgIndex;
-  const [patternOpacity, setPatternOpacity] = useState(() => readNumber(PATTERN_OPACITY_KEY, DEFAULT_PATTERN_OPACITY));
-  useEffect(() => writeNumber(PATTERN_OPACITY_KEY, patternOpacity), [patternOpacity]);
+  const [ssPatternOpacity, setSsPatternOpacity] = useState(() => readNumber(PATTERN_OPACITY_KEY, DEFAULT_PATTERN_OPACITY));
+  useEffect(() => writeNumber(PATTERN_OPACITY_KEY, ssPatternOpacity), [ssPatternOpacity]);
+  const [normalPatternOpacity, setNormalPatternOpacity] = useState(() =>
+    readNumber(NORMAL_PATTERN_OPACITY_KEY, DEFAULT_NORMAL_PATTERN_OPACITY),
+  );
+  useEffect(() => writeNumber(NORMAL_PATTERN_OPACITY_KEY, normalPatternOpacity), [normalPatternOpacity]);
+  // Kot ozadje: v Sam Špili velja (in se nastavlja) vidnost Sam Špili, sicer navadna.
+  const patternOpacity = samSpili ? ssPatternOpacity : normalPatternOpacity;
+  const setPatternOpacity = samSpili ? setSsPatternOpacity : setNormalPatternOpacity;
+  const defaultPatternOpacity = samSpili ? DEFAULT_PATTERN_OPACITY : DEFAULT_NORMAL_PATTERN_OPACITY;
   const patternColors = scaledBackgroundColors(patternOpacity);
   const [bgBrightness, setBgBrightness] = useState(() => readNumber(BG_BRIGHTNESS_KEY, 0));
   useEffect(() => writeNumber(BG_BRIGHTNESS_KEY, bgBrightness), [bgBrightness]);
@@ -722,7 +734,7 @@ export default function ChordsViewer({
       return i >= 0 ? i : fallback;
     };
     setBgIndex(idx(BACKGROUNDS, samSpili && p.ssBg ? p.ssBg : p.bg, samSpili ? DEFAULT_SS_BG : DEFAULT_BG));
-    if (p.resetPattern) setPatternOpacity(DEFAULT_PATTERN_OPACITY);
+    if (p.resetPattern) setPatternOpacity(defaultPatternOpacity);
     setTextColorIndex(idx(TEXT_COLORS, p.text, 0));
     setChordColorIndex(idx(CHORD_COLORS, p.chord, 0));
     setSectionColorIndex(idx(SECTION_COLORS, p.section, 0));
@@ -890,7 +902,7 @@ export default function ChordsViewer({
         </div>
         )}
         {bgPickerOpen && (
-          // Vidnost vzorca (samo ozadja z vzorcem): 0 … 600 %, privzeto 350 %.
+          // Vidnost vzorca (samo ozadja z vzorcem): 0 … 600 %, privzeto 105 % (Sam Špili 350 %).
           <div className="mt-3">
             <label htmlFor="cv-pattern-opacity" className="mb-1 flex items-center justify-between text-[11px] text-neutral-400">
               <span>Vidnost vzorca</span>
@@ -908,10 +920,10 @@ export default function ChordsViewer({
                 onChange={(e) => setPatternOpacity(Number(e.target.value))}
                 className="h-1.5 min-w-0 flex-1 cursor-pointer accent-orange-400 disabled:cursor-default disabled:opacity-40"
               />
-              {patternOpacity !== DEFAULT_PATTERN_OPACITY && (
+              {patternOpacity !== defaultPatternOpacity && (
                 <button
                   type="button"
-                  onClick={() => setPatternOpacity(DEFAULT_PATTERN_OPACITY)}
+                  onClick={() => setPatternOpacity(defaultPatternOpacity)}
                   className="shrink-0 rounded-full border border-neutral-600 px-2 py-0.5 text-[10px] text-neutral-300 hover:border-orange-400 hover:text-orange-300"
                 >
                   Privzeto
@@ -1488,7 +1500,8 @@ export default function ChordsViewer({
   // jo puščica v vrstici predvajalnika; računalnik si stanje zapomni.
   const [toolbarCollapsed, setToolbarCollapsedState] = useState(() => {
     try {
-      if (window.matchMedia("(max-width: 1023px)").matches) return true;
+      // Tudi telefon, obrnjen ležeče (širši od 1024 px), in tablica: zaslon na dotik.
+      if (window.matchMedia("(max-width: 1023px), (pointer: coarse) and (hover: none)").matches) return true;
     } catch {}
     return readOptionalNumber(TOOLBAR_COLLAPSED_KEY) === 1;
   });
