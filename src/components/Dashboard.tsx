@@ -4891,6 +4891,7 @@ export default function Dashboard({ user }: { user: User }) {
               onOpenTuner={() => setTunerOpen(true)}
               onOpenScales={() => setScalesOpen(true)}
               disabled={!isSupabaseConfigured}
+              hideBelow={!isDesktop && (activeView !== "list" || filtersOpen)}
             />
           </div>
           {tunerOpen && <Tuner onClose={() => setTunerOpen(false)} />}

@@ -241,6 +241,7 @@ export function HomeBento({
   onOpenTuner,
   onOpenScales,
   disabled,
+  hideBelow = false,
   className = "",
 }: {
   showStats: boolean;
@@ -270,6 +271,7 @@ export function HomeBento({
   onOpenTuner: () => void;
   onOpenScales: () => void;
   disabled?: boolean;
+  hideBelow?: boolean;
   className?: string;
 }) {
   return (
@@ -357,6 +359,10 @@ export function HomeBento({
         onClick={onToggleFilters}
         icon={<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />}
       />
+      {/* Telefon, odprt Novo / Popularno / Filtri: vsebina se odpre takoj pod gumbi,
+          kartice pod njimi (Tuner, Lestvice, Znam, Pišem, Ponovi) so do zaprtja skrite. */}
+      {!hideBelow && (
+      <>
       <ActionCard
         className="col-span-3"
         row
@@ -424,6 +430,8 @@ export function HomeBento({
       />
       {/* "Ponovi": na telefonu čez celo širino pod Tuner; na računalniku v desnem stolpcu (HomeAside). */}
       <RepeatWidget className="col-span-6 lg:hidden" songs={knownSongs} onOpenKnown={onOpenKnown} />
+      </>
+      )}
     </div>
   );
 }
