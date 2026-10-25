@@ -9,8 +9,44 @@ import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const VARIANT = "zap1";
-const A = "#ec4899";
-const B = "#f97316";
+// Barve preliva (zgoraj levo → spodaj desno); COLORS = izbrana.
+const GRADIENTS = {
+  roza: ["#ec4899", "#f97316"],
+  vijolicna: ["#a855f7", "#3b82f6"],
+  smaragd: ["#10b981", "#0ea5e9"],
+  zelena: ["#22c55e", "#0d9488"],
+  modra: ["#3b82f6", "#06b6d4"],
+  indigo: ["#6366f1", "#a855f7"],
+  oranzna: ["#f59e0b", "#ef4444"],
+  rdeca: ["#f43f5e", "#a855f7"],
+  temna: ["#334155", "#0f172a"],
+  // temnejše različice (za odtenek temnejše od zgornjih)
+  t_roza: ["#db2777", "#ea580c"],
+  t_vijolicna: ["#9333ea", "#2563eb"],
+  t_smaragd: ["#059669", "#0284c7"],
+  t_zelena: ["#16a34a", "#0f766e"],
+  t_modra: ["#2563eb", "#0891b2"],
+  t_indigo: ["#4f46e5", "#9333ea"],
+  t_oranzna: ["#d97706", "#dc2626"],
+  t_rdeca: ["#e11d48", "#9333ea"],
+  t_temna: ["#1e293b", "#020617"],
+  // temna z rahlim zelenim (zgoraj levo) in vijoličnim (spodaj desno) pridihom
+  tzv1: ["#1c3a36", "#1e293b", "#2a2347"],
+  tzv2: ["#14463d", "#1e293b", "#33235e"],
+  tzv3: ["#0f5546", "#1b2436", "#3d2272"],
+  tzv4: ["#14463d", "#111827", "#33235e"],
+  // zeleno → vijolične
+  zv1: ["#10b981", "#8b5cf6"],
+  zv2: ["#22c55e", "#a855f7"],
+  zv3: ["#34d399", "#7c3aed"],
+  zv4: ["#059669", "#6d28d9"],
+  zv5: ["#2dd4bf", "#a855f7"],
+  zv6: ["#4ade80", "#c084fc"],
+  zv7: ["#14b8a6", "#6366f1"],
+  zv8: ["#16a34a", "#9333ea"],
+  zv9: ["#6ee7b7", "#8b5cf6"],
+};
+const COLORS = "vijolicna";
 
 // Trzalica s konico spodaj, v koordinatah 0–512, središče ~ (256, 258), višina 292.
 const PICK = "M256 112 C372 112 410 168 388 236 C366 304 306 372 256 404 C206 372 146 304 124 236 C102 168 140 112 256 112 Z";
@@ -52,6 +88,22 @@ const zap = (x, y, s, rot = 0, attrs = "") =>
 // Polna trzalica z izrezom, ki je lahko obris (stroke) — maska z belo ploskvijo in črnim izrezom.
 const maskPick = (id, cut, t = "") => `<mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
     <rect width="512" height="512" fill="#fff"/>${cut}</mask><g mask="url(#${id})">${pick(t, 'fill="#fff"')}</g>`;
+
+// Trzalica z rahlim prelivom (stops, zgoraj → spodaj; diag = diagonalno) in oranžno strelo;
+// shine = mehak odsev zgoraj levo, shadow = mehka senca pod trzalico.
+function orangeZapOn(stops, diag = false, shine = false, shadow = false) {
+  return `<defs>
+      <linearGradient id="pf" x1="0" y1="0" x2="${diag ? 1 : 0.25}" y2="1"><stop offset="0" stop-color="${stops[0]}"/><stop offset="1" stop-color="${stops[1]}"/></linearGradient>
+      <linearGradient id="or" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbbf24"/><stop offset="1" stop-color="#f97316"/></linearGradient>
+      <radialGradient id="sh" cx="0.3" cy="0.22" r="0.5"><stop offset="0" stop-color="#fff" stop-opacity="0.9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+      <filter id="ds" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="12"/></filter>
+      <clipPath id="pc">${pick("")}</clipPath>
+    </defs>` +
+    (shadow ? `<g opacity="0.45" filter="url(#ds)" transform="translate(0 14)">${pick("", 'fill="#000"')}</g>` : "") +
+    pick("", 'fill="url(#pf)"') +
+    (shine ? `<rect x="100" y="100" width="320" height="320" fill="url(#sh)" clip-path="url(#pc)"/>` : "") +
+    zap(256, 244, 6, 0, 'fill="url(#or)" stroke="url(#or)" stroke-width="1.2"');
+}
 
 const VARIANTS = {
   solid: { label: "Polna", glyph: () => pick("", 'fill="#fff"') },
@@ -281,6 +333,53 @@ const VARIANTS = {
     glyph: () => maskPick("z10", zap(244, 246, 6, 0, 'fill="#000" stroke="#000" stroke-width="1.2"') +
       `<path d="M304 206 A52 52 0 0 1 304 282" fill="none" stroke="#000" stroke-width="13" stroke-linecap="round"/>`),
   },
+  // --- trzalica s strelo + oranžni detajli ---
+  // Bela trzalica, strela polna oranžna (preliv jantar → oranžna).
+  zapO1: {
+    label: "Oranžna strela",
+    glyph: () => `<defs><linearGradient id="or" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbbf24"/><stop offset="1" stop-color="#f97316"/></linearGradient></defs>` +
+      pick("", 'fill="#fff"') + zap(256, 244, 6, 0, 'fill="url(#or)" stroke="url(#or)" stroke-width="1.2"'),
+  },
+  // Izrezana strela z oranžnim obrisom.
+  zapO2: {
+    label: "Oranžen obris strele",
+    glyph: () => maskPick("o2", zap(256, 244, 6, 0, 'fill="#000" stroke="#000" stroke-width="1.2"')) +
+      zap(256, 244, 6, 0, 'fill="none" stroke="#f97316" stroke-width="0.9"'),
+  },
+  // Bela trzalica z oranžnim robom, strela izrezana.
+  zapO3: {
+    label: "Oranžen rob trzalice",
+    glyph: () => maskPick("o3", zap(256, 244, 6, 0, 'fill="#000" stroke="#000" stroke-width="1.2"')) +
+      pick(at(256, 258, 0.94, 0), 'fill="none" stroke="#f97316" stroke-width="12" stroke-linejoin="round"'),
+  },
+  // Obris trzalice bel, strela polna oranžna.
+  zapO4: {
+    label: "Obris + oranžna strela",
+    glyph: () => pick(at(256, 258, 0.92, 0), `fill="none" stroke="#fff" stroke-width="${STROKE / 0.92}" stroke-linejoin="round"`) +
+      zap(256, 244, 6.2, 0, 'fill="#f97316" stroke="#f97316" stroke-width="1.2"'),
+  },
+  // Oranžna strela z belim robom (izrez okoli nje).
+  zapO5: {
+    label: "Oranžna strela z vrzeljo",
+    glyph: () => maskPick("o5", zap(256, 244, 6, 0, 'fill="#000" stroke="#000" stroke-width="3.4"')) +
+      zap(256, 244, 6, 0, 'fill="#f97316" stroke="#f97316" stroke-width="1.2"'),
+  },
+  // Bela trzalica, strela samo kot oranžen obris (notranjost bela).
+  zapO6: {
+    label: "Oranžen obris (tanek)",
+    glyph: () => pick("", 'fill="#fff"') + zap(256, 244, 6, 0, 'fill="none" stroke="#f97316" stroke-width="1.4" stroke-linecap="round"'),
+  },
+  zapO7: {
+    label: "Oranžen obris (debel)",
+    glyph: () => pick("", 'fill="#fff"') + zap(256, 244, 6.2, 0, 'fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round"'),
+  },
+  // --- oranžna strela, trzalica z rahlim prelivom / efektom ---
+  zapG1: { label: "Bela → hladno siva", glyph: () => orangeZapOn(["#ffffff", "#dbe3ee"]) },
+  zapG2: { label: "Bela → topla", glyph: () => orangeZapOn(["#ffffff", "#ffe8d6"]) },
+  zapG3: { label: "Bela → lila", glyph: () => orangeZapOn(["#ffffff", "#e4dcf5"]) },
+  zapG4: { label: "Mint → lila", glyph: () => orangeZapOn(["#f0fdf8", "#ebe5fb"], true) },
+  zapG5: { label: "Siva + sijaj", glyph: () => orangeZapOn(["#ffffff", "#dbe3ee"], false, true) },
+  zapG6: { label: "Siva + senca", glyph: () => orangeZapOn(["#ffffff", "#dbe3ee"], false, false, true) },
   // Vzorec: mreža polnih trzalic, izmenično obrnjenih.
   pattern: {
     label: "Vzorec",
@@ -309,14 +408,13 @@ const VARIANTS = {
   },
 };
 
-export function svg({ variant = VARIANT, rounded = true, glyphScale = 1 } = {}) {
+export function svg({ variant = VARIANT, colors = COLORS, rounded = true, glyphScale = 1 } = {}) {
   const r = rounded ? Math.round((512 * 7) / 24) : 0;
   const t = `translate(256 256) scale(${glyphScale}) translate(-256 -258)`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="${A}"/>
-      <stop offset="1" stop-color="${B}"/>
+      ${GRADIENTS[colors].map((c, i, all) => `<stop offset="${i / (all.length - 1)}" stop-color="${c}"/>`).join("")}
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="${r}" fill="url(#bg)"/>
@@ -329,16 +427,24 @@ const png = (s, size) => sharp(Buffer.from(s), { density: 72 * (size / 512) * 4 
 const preview = process.argv.indexOf("--preview");
 if (preview >= 0) {
   const only = process.argv.indexOf("--only");
-  const keys = only >= 0 ? process.argv[only + 1].split(",") : Object.keys(VARIANTS);
-  const S = 220, PAD = 28, LABEL = 34, COLS = 3;
+  const colorsArg = process.argv.indexOf("--colors");
+  // --colors: izbrani znak v vseh barvah preliva; sicer --only / vse različice.
+  const items = colorsArg >= 0
+    ? Object.keys(GRADIENTS).filter((c) => !process.argv[colorsArg + 1]?.startsWith("--") && process.argv[colorsArg + 1] ? c.startsWith(process.argv[colorsArg + 1]) : true).map((c) => ({ variant: VARIANT, colors: c, label: `${c}  ${GRADIENTS[c].join(" → ")}` }))
+    : (only >= 0 ? process.argv[only + 1].split(",") : Object.keys(VARIANTS)).map((v) => ({ variant: v, label: VARIANTS[v].label }));
+  const grid = process.argv.indexOf("--grid");
+  const keys = grid >= 0
+    ? process.argv[grid + 2].split(",").flatMap((c) => process.argv[grid + 1].split(",").map((v) => ({ variant: v, colors: c, label: `${VARIANTS[v].label} · ${c}` })))
+    : items;
+  const S = 200, PAD = 24, LABEL = 30, COLS = grid >= 0 ? process.argv[grid + 1].split(",").length : 3;
   const rows = Math.ceil(keys.length / COLS);
   const W = COLS * (S + PAD) + PAD, H = rows * (S + PAD + LABEL) + PAD;
   const layers = [];
   let labels = "";
   for (const [i, v] of keys.entries()) {
     const x = PAD + (i % COLS) * (S + PAD), y = PAD + Math.floor(i / COLS) * (S + PAD + LABEL);
-    layers.push({ input: await png(svg({ variant: v }), S).toBuffer(), left: x, top: y });
-    labels += `<text x="${x + S / 2}" y="${y + S + 24}" text-anchor="middle" font-family="Arial" font-size="17" fill="#e5e7eb">${i + 1}. ${VARIANTS[v].label}</text>`;
+    layers.push({ input: await png(svg({ variant: v.variant, colors: v.colors }), S).toBuffer(), left: x, top: y });
+    labels += `<text x="${x + S / 2}" y="${y + S + 24}" text-anchor="middle" font-family="Arial" font-size="13" fill="#e5e7eb">${i + 1}. ${v.label}</text>`;
   }
   const bg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="100%" height="100%" fill="#111318"/>${labels}</svg>`;
   await sharp(Buffer.from(bg)).composite(layers).png().toFile(process.argv[preview + 1]);
