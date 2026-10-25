@@ -78,7 +78,7 @@ function StatCard({
           {decor}
         </span>
       )}
-      <span className={`flex items-center gap-2 text-sm text-neutral-500 lg:text-[15px] dark:text-neutral-400 ${onClick ? "pr-5" : ""}`}>
+      <span className={`flex items-center gap-1.5 text-[13px] text-neutral-500 lg:gap-2 lg:text-[15px] dark:text-neutral-400 ${onClick ? "lg:pr-5" : ""}`}>
         <span className={`h-1.5 w-1.5 shrink-0 lg:h-2 lg:w-2 rounded-full ${dot} ${pulse ? "animate-pulse" : ""}`} />
         <span className="truncate">{label}</span>
       </span>
@@ -92,7 +92,8 @@ function StatCard({
           {suffix && <span className="text-2xl text-neutral-400 dark:text-neutral-600">{suffix}</span>}
         </span>
       )}
-      {onClick && <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-neutral-400 dark:text-neutral-600" />}
+      {/* Telefon: puščica spodaj desno, da naslov (npr. "Preverjeno špila") dobi celo širino. */}
+      {onClick && <ArrowUpRight className="absolute right-4 bottom-4 h-4 w-4 text-neutral-400 lg:top-4 lg:bottom-auto dark:text-neutral-600" />}
     </>
   );
   const cls = `${CARD} group relative isolate block overflow-hidden p-4 text-left ${className}`;
