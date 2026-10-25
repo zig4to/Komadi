@@ -1483,6 +1483,12 @@ export default function Dashboard({ user }: { user: User }) {
     setActiveView("list");
     setFilters({ ...emptyFilters, search: author });
     setAuthorFilter(author);
+    // Telefon: "Skladbe izvajalca" takoj pod iskalnim poljem (kartice domače strani so skrite).
+    // Iskanje ostane odprto tudi, ko ime pobrišeš — da vpišeš drugega avtorja.
+    if (!isDesktop) {
+      setSearchOpen(true);
+      window.scrollTo({ top: 0 });
+    }
   }
 
   function handleFiltersChange(f: FilterState) {
@@ -1530,6 +1536,8 @@ export default function Dashboard({ user }: { user: User }) {
   }
 
   function handleBackFromFilter() {
+    // Iskanje, odprto s klikom na avtorja, se z "Nazaj" zapre (kot prej).
+    if (authorFilter) setSearchOpen(false);
     setAuthorFilter(null);
     setFilters(emptyFilters);
     setFiltersOpen(false);
@@ -4844,8 +4852,10 @@ export default function Dashboard({ user }: { user: User }) {
 
           {/* Pozdrav + kartice: statistika (samo na domači strani brez filtrov) in
               dejanja Naključno / Delno / Novo / Popularno / Filtri (vedno). Telefon:
-              med iskanjem se skrijejo, ob zaprtju iskanja se vrnejo. */}
+              med iskanjem se skrijejo, ob zaprtju iskanja se vrnejo; po kliku na avtorja
+              so skrite do "Nazaj" (pod iskanjem takoj "Skladbe izvajalca" in zadetki). */}
           <div
+            hidden={!isDesktop && !!authorFilter}
             className={`transition-all duration-300 ease-out ${
               searchFocused ? "pointer-events-none mb-0! max-h-0 -translate-y-2 overflow-hidden opacity-0 lg:pointer-events-auto lg:max-h-none lg:translate-y-0 lg:overflow-visible lg:opacity-100" : ""
             }`}
