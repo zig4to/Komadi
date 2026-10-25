@@ -474,12 +474,25 @@ export default function ChordsViewer({
   // Zapis akordov; po shranjevanju iz urejevalnika ("Uredi") takoj nova
   // različica (globalni songs v Dashboard.tsx posodobi realtime).
   const [chordsText, setChordsText] = useState(song.chords_text ?? "");
+  // "Verzija": več zapisov akordov iste skladbe (songs.chord_versions, npr.
+  // UG in zabrenkaj.si); main = chords_text. Izbira je na napravi. Besedilo je
+  // v vseh verzijah enako, zato časi vrstic (ključi) veljajo za vse.
+  const versions = song.chord_versions && song.chord_versions.length > 1 ? song.chord_versions : null;
+  const mainVersion = Math.max(0, versions?.findIndex((v) => v.main) ?? 0);
+  const [versionPick, setVersionPick] = useState(() => readNumber(`komadi:chords:version:${song.id}`, -1));
+  const versionIdx = versions && versionPick >= 0 && versionPick < versions.length ? versionPick : mainVersion;
+  const pickVersion = (i: number) => {
+    setVersionPick(i);
+    writeNumber(`komadi:chords:version:${song.id}`, i);
+  };
+  const altText = versions && !versions[versionIdx]?.main ? versions[versionIdx]?.chords_text : undefined;
+  const shownText = altText ?? chordsText;
   // Opis (album, avtor transkripcije, opombe …) je skrit pod "Opis skladbe";
   // na vrhu ostanejo samo naslov, avtor in capo (če ga opis omenja).
   const { description, body, capo } = useMemo(() => {
-    const parts = splitDescription(parseChords(chordsText));
+    const parts = splitDescription(parseChords(shownText));
     return { ...parts, capo: findCapo(parts.description) };
-  }, [chordsText]);
+  }, [shownText]);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   // Celozaslonski način med samodejnim pomikanjem (AutoScrollControl onPlayingChange).
   const [fullscreen, setFullscreen] = useState(false);
@@ -585,7 +598,7 @@ export default function ChordsViewer({
   const [shapesOpen, setShapesOpen] = useState(() => readNumber(SHAPES_OPEN_KEY, 0) === 1);
   useEffect(() => writeNumber(SHAPES_OPEN_KEY, shapesOpen ? 1 : 0), [shapesOpen]);
   // Prijemi iz opisa skladbe ("Cadd4  x 3 3 0 1 0") imajo prednost pred bazo.
-  const descShapes = useMemo(() => parseDescriptionShapes(chordsText), [chordsText]);
+  const descShapes = useMemo(() => parseDescriptionShapes(shownText), [shownText]);
   // Baza prijemov (naloži se ob prvi shemi ali ko je "Pokaži akorde" vklopljen).
   const [chordDb, setChordDb] = useState<Awaited<ReturnType<typeof loadChordDb>> | null>(null);
   // Ali ima pesem kak posebni akord (izračun pred songChords, ki je niže — samo za nalaganje baze).
@@ -5342,6 +5355,28 @@ export default function ChordsViewer({
               </div>
               )}
               </div>
+            )}
+            {/* "Verzija": izbira zapisa akordov (songs.chord_versions), levo od Nasveta. */}
+            {versions && (
+              <label className="z-10 flex items-center gap-1 self-start rounded-lg border border-sky-400/40 bg-sky-400/[0.05] py-0.5 pl-1.5 pr-0.5 text-sky-400" title="Verzija akordov">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0">
+                  <path d="m12 2 9 5-9 5-9-5 9-5z" />
+                  <path d="m3 12 9 5 9-5" />
+                  <path d="m3 17 9 5 9-5" />
+                </svg>
+                <select
+                  value={versionIdx}
+                  onChange={(e) => pickVersion(Number(e.target.value))}
+                  aria-label="Verzija akordov"
+                  className="cursor-pointer rounded border-0 bg-transparent py-0 pl-0 pr-0.5 text-[11px] font-semibold text-(--cv-text) outline-none [&>option]:bg-(--cv-bg)"
+                >
+                  {versions.map((v, i) => (
+                    <option key={i} value={i} title={v.source}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
             {/* "Nasvet": ponavljajoča se zaporedja akordov (shranil skill spedenaj v
                 songs.chord_tips; imena prikazana s transpozicijo / Simpl / No capo). */}
