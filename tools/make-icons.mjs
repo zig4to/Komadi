@@ -30,6 +30,22 @@ const GRADIENTS = {
   t_oranzna: ["#d97706", "#dc2626"],
   t_rdeca: ["#e11d48", "#9333ea"],
   t_temna: ["#1e293b", "#020617"],
+  // več temnejših prelivov (n_ = nove)
+  n_malina: ["#be123c", "#7e22ce"],
+  n_fuksija: ["#c026d3", "#4f46e5"],
+  n_vijolica_roza: ["#7c3aed", "#db2777"],
+  n_polnoc: ["#4338ca", "#0f172a"],
+  n_morje: ["#0e7490", "#4338ca"],
+  n_gozd: ["#047857", "#1e3a8a"],
+  n_smaragd_vijolica: ["#047857", "#7e22ce"],
+  n_zahod: ["#c2410c", "#be185d", "#6d28d9"],
+  n_ogenj: ["#dc2626", "#ea580c"],
+  n_vino: ["#9f1239", "#4c0519"],
+  n_slivovka: ["#6b21a8", "#1e1b4b"],
+  n_aurora: ["#0d9488", "#4f46e5", "#a21caf"],
+  n_breskev: ["#e11d48", "#f59e0b"],
+  n_jeklo: ["#475569", "#1e3a8a"],
+  n_lila_modra: ["#9333ea", "#0ea5e9"],
   // temna z rahlim zelenim (zgoraj levo) in vijoličnim (spodaj desno) pridihom
   tzv1: ["#1c3a36", "#1e293b", "#2a2347"],
   tzv2: ["#14463d", "#1e293b", "#33235e"],
@@ -46,7 +62,9 @@ const GRADIENTS = {
   zv8: ["#16a34a", "#9333ea"],
   zv9: ["#6ee7b7", "#8b5cf6"],
 };
-const COLORS = "vijolicna";
+const COLORS = "t_rdeca";
+// Velikost znaka (trzalica + strela) glede na risbo 0–512; 1.21 = za 21 % večja (2× po 10 %).
+const GLYPH = 1.21;
 
 // Trzalica s konico spodaj, v koordinatah 0–512, središče ~ (256, 258), višina 292.
 const PICK = "M256 112 C372 112 410 168 388 236 C366 304 306 372 256 404 C206 372 146 304 124 236 C102 168 140 112 256 112 Z";
@@ -408,7 +426,7 @@ const VARIANTS = {
   },
 };
 
-export function svg({ variant = VARIANT, colors = COLORS, rounded = true, glyphScale = 1 } = {}) {
+export function svg({ variant = VARIANT, colors = COLORS, rounded = true, glyphScale = GLYPH } = {}) {
   const r = rounded ? Math.round((512 * 7) / 24) : 0;
   const t = `translate(256 256) scale(${glyphScale}) translate(-256 -258)`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
@@ -452,11 +470,11 @@ if (preview >= 0) {
 } else {
   const OUT = new URL("../public/icons/", import.meta.url);
   const jobs = [
-    { file: "icon-192.png", size: 192, rounded: true, glyphScale: 1 },
-    { file: "icon-512.png", size: 512, rounded: true, glyphScale: 1 },
-    { file: "icon-maskable-192.png", size: 192, rounded: false, glyphScale: 0.82 },
-    { file: "icon-maskable-512.png", size: 512, rounded: false, glyphScale: 0.82 },
-    { file: "apple-touch-icon.png", size: 180, rounded: false, glyphScale: 0.9 },
+    { file: "icon-192.png", size: 192, rounded: true, glyphScale: GLYPH },
+    { file: "icon-512.png", size: 512, rounded: true, glyphScale: GLYPH },
+    { file: "icon-maskable-192.png", size: 192, rounded: false, glyphScale: GLYPH * 0.82 },
+    { file: "icon-maskable-512.png", size: 512, rounded: false, glyphScale: GLYPH * 0.82 },
+    { file: "apple-touch-icon.png", size: 180, rounded: false, glyphScale: GLYPH * 0.9 },
   ];
   writeFileSync(new URL("icon.svg", OUT), svg());
   for (const j of jobs) {
