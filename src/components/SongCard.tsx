@@ -27,6 +27,14 @@ const SPEDENAJ_TEMP_IDS = new Set([
   "6d29ba5a-a61e-4f21-9b5a-ee29fcd6982e", // J. C. Van Damme
   "c6f30a48-f556-4b79-aab1-e2a382cebcd5", // Trezinka
   "262a25a0-740a-406e-b5dc-4e4d44fc13c2", // Eks za ex ljubico
+  "9ca5f842-b482-4a8c-9619-b6fe9f7714ac", // Pasji dnevi
+  "76853e34-514b-49da-9ee8-db458f3f7b63", // Punčke mamine
+  "74cb6eea-60e4-45f6-8b31-83531fa7c6ce", // Pesem o rolici papirja
+  "e55807b0-cd4d-470c-98bf-931fe46f155c", // Jaz ne grem v šolo
+  "717aae02-1c0a-43cb-bd15-4758a06c37cf", // Ajajaj, Slovenija
+  "875b028c-7545-4b74-8e42-4dde6cbeaa95", // Na travniku
+  "be3e27a5-bfdc-48f8-a1bf-aa916a4bd0d8", // D...
+  "9a6818b1-d4e8-4986-b1a6-e6196db6a7c5", // Drugače bom živel
 ]);
 
 // Slika avtorja na desni strani kartice. Svetla tema: zaobljen kvadrat znotraj

@@ -21,6 +21,7 @@
 //     "duration": 180.3,                dolžina videa (izbira LRC kandidata)
 //     "lrcOffset": 0.25,                lrc_offsets[video]
 //     "chordSections": [ { "name": "Intro", "end": 19.3, "points": [ { "t": 0.72, "line": 1, "chord": 0 } ] } ],
+//       (del s praznim "points" se izbriše)
 //                                       zamenja dele z istim imenom; line/chord = indeksi iz dump (po novem besedilu)
 //     "lineOverrides": [ { "line": 43, "t": 105.6, "end": 110.02 } ]
 //                                       zapiše synced_lines: LRC poravnava (ali obstoječi ročni časi) + ti popravki
@@ -308,7 +309,7 @@ if (cmd === "list") {
     const names = new Set(patch.chordSections.map((x) => x.name));
     const sections = [
       ...(synced.synced_chords?.videoId === video ? prev.filter((x) => !names.has(x.name)) : []),
-      ...patch.chordSections.map((x, n) => {
+      ...patch.chordSections.filter((x) => x.points.length).map((x, n) => {
         for (const p of x.points) {
           const slot = chordSlots(body[p.line] ?? { kind: "x" }).find((c) => c.j === p.chord);
           if (!slot) throw new Error(`${x.name}: v vrstici ${p.line} ni akorda z indeksom ${p.chord}`);
