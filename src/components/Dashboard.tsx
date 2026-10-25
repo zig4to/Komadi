@@ -2732,9 +2732,10 @@ export default function Dashboard({ user }: { user: User }) {
   }
 
   // Klik kamorkoli izven gumbov Novo/Popularno ali njunega prikaznega
-  // območja zapre pogled nazaj na navaden seznam.
+  // območja zapre pogled nazaj na navaden seznam — samo na računalniku; na
+  // telefonu se zapreta le z gumbom ali Android Back.
   useEffect(() => {
-    if (activeView === "list") return;
+    if (activeView === "list" || !isDesktop) return;
     function onPointerDown(e: PointerEvent) {
       const target = e.target as HTMLElement;
       if (
@@ -2748,7 +2749,7 @@ export default function Dashboard({ user }: { user: User }) {
     }
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [activeView]);
+  }, [activeView, isDesktop]);
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pt-3 pb-8 space-y-6 lg:max-w-4xl lg:pt-5 xl:max-w-6xl">
