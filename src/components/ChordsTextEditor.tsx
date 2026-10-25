@@ -17,8 +17,10 @@ import {
   alignLyrics,
   fetchLrcCandidates,
   lineProgressAt,
+  findLineFocus,
   pickBestCandidate,
   rebaseSyncOnEdit,
+  type LineFocus,
   type LrcCandidate,
 } from "@/lib/syncedLyrics";
 import YouTubeMiniPlayer, { youTubeVideoId, type PlayerController } from "@/components/YouTubeMiniPlayer";
@@ -126,14 +128,20 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 
 export default function ChordsTextEditor({
   song,
+  focus,
   onClose,
   onSaved,
 }: {
   song: Song;
+  // Vrstica, ki jo je Smart play v pregledovalniku označeval: kazalec gre nanjo.
+  focus?: LineFocus | null;
   onClose: () => void;
   onSaved: (chordsText: string) => void;
 }) {
-  const original = song.chords_text ?? "";
+  // Zadnje shranjeno stanje (po "Shrani sproti" se premakne naprej): iz njega se
+  // računata razlika in prestavitev shranjenih časov ob naslednjem shranjevanju.
+  const [base, setBase] = useState<Song>(song);
+  const original = base.chords_text ?? "";
   const initial = toEditableText(original);
   const [text, setText] = useState(initial);
   const [overwrite, setOverwrite] = useState(false);
@@ -252,6 +260,33 @@ export default function ChordsTextEditor({
   const gutterRef = useRef<HTMLDivElement>(null);
   const history = useRef<{ undo: Snapshot[]; redo: Snapshot[]; last: number }>({ undo: [], redo: [], last: 0 });
   const dirty = text !== initial;
+
+  // Odprt iz pregledovalnika med Smart play: kazalec na začetek iste vrstice,
+  // vrstica približno tretjino od vrha.
+  useEffect(() => {
+    if (!focus) return;
+    const src = initial.split("\n");
+    const kinds = src.map(lineKind);
+    const first = kinds.findIndex((k) => k === "section" || k === "chords");
+    const idx = findLineFocus(
+      src.map((l, i): ChordsLine | undefined =>
+        kinds[i] === "text" && l.trim() && i > first ? { kind: "text", segments: [{ text: l }] } : undefined,
+      ),
+      focus,
+    );
+    if (idx < 0) return;
+    const start = src.slice(0, idx).reduce((n, l) => n + l.length + 1, 0);
+    requestAnimationFrame(() => {
+      const ta = taRef.current;
+      if (!ta) return;
+      ta.focus();
+      ta.setSelectionRange(start, start);
+      ta.scrollTop = Math.max(0, 12 + idx * fontSize * LINE_HEIGHT - ta.clientHeight / 3);
+      updateCaret();
+    });
+    // Samo ob odprtju.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Označena vrstica ostane vidna (približno tretjina od vrha), razen tik po
   // tipkanju/kliku v besedilo (3 s) — med urejanjem pogled ne sme uhajati.
@@ -481,11 +516,12 @@ export default function ChordsTextEditor({
     setSaving(true);
     setError(null);
     const next = applyEditedText(original, text);
+    const patch = { chords_text: next, ...rebaseSyncOnEdit(base, next) };
     // Shranjeni časi Smart playa dobijo nove številke vrstic; če katere vrstice
     // ni več, se oznaka "Predvajalnik preverjen" umakne (rebaseSyncOnEdit).
     const { error: dbError } = await supabase
       .from("songs")
-      .update({ chords_text: next, ...rebaseSyncOnEdit(song, next) })
+      .update(patch)
       .eq("id", song.id);
     setSaving(false);
     if (dbError) {
@@ -493,6 +529,7 @@ export default function ChordsTextEditor({
       return false;
     }
     onSaved(next);
+    setBase((b) => ({ ...b, ...patch }));
     return true;
   }
 
@@ -521,6 +558,7 @@ export default function ChordsTextEditor({
     lastInputRef.current = Date.now();
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
+    if (mod && k === "s" && e.shiftKey) return e.preventDefault(), void persist();
     if (mod && k === "s") return e.preventDefault(), void save();
     if (mod && k === "z" && !e.shiftKey) return e.preventDefault(), undo();
     if (mod && (k === "y" || (k === "z" && e.shiftKey))) return e.preventDefault(), redo();
@@ -662,7 +700,21 @@ export default function ChordsTextEditor({
           className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-orange-400 px-3 text-xs font-medium text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-50 active:scale-95"
         >
           <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-500" />
-          {song.synced_lines || song.synced_chords ? "Nadaljuj snemanje časov" : "Posnemi čase"}
+          {base.synced_lines || base.synced_chords ? "Nadaljuj snemanje časov" : "Posnemi čase"}
+        </button>
+        {/* Shrani trenutne spremembe, urejevalnik ostane odprt. */}
+        <button
+          type="button"
+          onClick={() => void persist()}
+          disabled={saving || !dirty}
+          title="Shrani spremembe, urejevalnik ostane odprt (Ctrl+Shift+S)"
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-orange-400 px-3 text-xs font-medium text-amber-400 transition hover:bg-orange-400/15 disabled:opacity-50 active:scale-95"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+            <path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+            <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7M7 3v4a1 1 0 0 0 1 1h7" />
+          </svg>
+          {saving ? "Shranjujem …" : dirty ? "Shrani sproti" : "Shranjeno"}
         </button>
         <span className="text-[11px] leading-tight text-neutral-400">
           {lrcCandidates === null
@@ -670,7 +722,7 @@ export default function ChordsTextEditor({
             : !sync
               ? "Za to skladbo ni besedila s časi — Smart play tu ni na voljo."
               : `Smart play: povezanih ${sync.matched}/${sync.total} zapetih vrstic${sync.uncovered.size ? `, ${sync.uncovered.size} vrstic besedila brez časa (rdeče številke)` : ""}`}
-          {song.synced_lines?.points.length ? " · Skladba ima shranjene čase; ti veljajo v pregledovalniku, tu je predogled po trenutnem besedilu." : ""}
+          {base.synced_lines?.points.length ? " · Skladba ima shranjene čase; ti veljajo v pregledovalniku, tu je predogled po trenutnem besedilu." : ""}
         </span>
       </div>
 

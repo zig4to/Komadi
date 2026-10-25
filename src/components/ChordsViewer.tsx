@@ -28,7 +28,9 @@ import {
   lineProgressAt,
   instrumentalPoints,
   recordableLineIndexes,
+  lineFocusOf,
   lineKey,
+  type LineFocus,
   manualSyncPoints,
   pickBestCandidate,
   rebaseSyncOnEdit,
@@ -78,6 +80,7 @@ const TOOLBAR_COLLAPSED_KEY = "komadi:chords:toolbarCollapsed";
 const SIMPLIFY_KEY = "komadi:chords:simplify";
 // "Pokaži akorde": sheme vseh akordov skladbe desno od naslova (kot na UG).
 const SHOW_SHAPES_KEY = "komadi:chords:showShapes";
+const CENTER_TEXT_KEY = "komadi:chords:centerText";
 // "No capo": skladbe s capom prikaže v akordih brez capa (prijemi + N poltonov). Globalno.
 const NO_CAPO_KEY = "komadi:chords:noCapo";
 // Okvir s prijemi (Posebni akordi / Akordi v skladbi) razprt (1) ali zložen (0) — globalno.
@@ -432,7 +435,7 @@ export default function ChordsViewer({
   // Računalnik: gumb "Napredni urejevalnik" v orodni vrstici (samo za lastne
   // skladbe) — Dashboard zapre pregledovalnik, odpre ChordsTextEditor in ga
   // po zaprtju urejevalnika spet odpre.
-  onOpenEditor?: () => void;
+  onOpenEditor?: (focus: LineFocus | null) => void;
   // Skladba ima odprto prijavo (stran "Popravi skladbe") — takrat se zamik
   // besedila preverjene skladbe spet da nastavljati.
   inFix?: boolean;
@@ -529,6 +532,11 @@ export default function ChordsViewer({
 
   // "Pokaži akorde" — ena nastavitev za vse skladbe.
   const [showShapes, setShowShapes] = useState(() => readNumber(SHOW_SHAPES_KEY, 0) === 1);
+  // "Sredina" — besedilo kot celota na sredini zaslona (vrstice ostanejo poravnane
+  // levo; najbolj levi in najbolj desni del besedila določita njegovo sredino);
+  // ena nastavitev za vse skladbe.
+  const [centerText, setCenterText] = useState(() => readNumber(CENTER_TEXT_KEY, 0) === 1);
+  useEffect(() => writeNumber(CENTER_TEXT_KEY, centerText ? 1 : 0), [centerText]);
   // "Nasvet" (ponavljajoča se zaporedja akordov) — razprt ali strnjen, na tej napravi.
   const [tipsOpen, setTipsOpen] = useState(() => readNumber("komadi:chords:tipsOpen", 0) === 1);
   useEffect(() => writeNumber("komadi:chords:tipsOpen", tipsOpen ? 1 : 0), [tipsOpen]);
@@ -1407,6 +1415,10 @@ export default function ChordsViewer({
   // roba (laptop 1280 px in večji zasloni; največ 135 %). Izmeri se pri 100 % brez
   // prelamljanja ob vsakem izrisu (gumbi se pojavijo/izginejo) in ob spremembi velikosti.
   const toolbarRef = useRef<HTMLDivElement>(null);
+  // Računalnik: levi rob orodne vrstice in naslova pesmi = levi rob prvega gumba
+  // predvajalnika (Smart play ali ▶) — alignLeftEdges.
+  const playerRowRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const [toolbarScale, setToolbarScaleState] = useState<number | null>(() => readOptionalNumber(TOOLBAR_SCALE_KEY));
   const setToolbarScale = (v: number | null) => {
     setToolbarScaleState(v);
@@ -1434,21 +1446,51 @@ export default function ChordsViewer({
     const next = Math.round((from + d * TOOLBAR_SCALE_STEP) * 20) / 20;
     setToolbarScale(Math.max(TOOLBAR_SCALE_MIN, Math.min(TOOLBAR_SCALE_MAX, next)));
   };
+  // Levi rob orodne vrstice (zaradi zoom-a v px / zoom) in vsebine pesmi poravna z
+  // levim robom prvega gumba v vrstici predvajalnika.
+  const alignLeftEdges = useCallback(() => {
+    const desktop = window.matchMedia("(min-width: 1024px)").matches;
+    const bar = toolbarRef.current;
+    const content = scrollRef.current;
+    const ref = playerRowRef.current?.querySelector("button");
+    if (!desktop || !ref) {
+      if (bar) bar.style.paddingLeft = "";
+      if (content) content.style.paddingLeft = "";
+      return;
+    }
+    const target = ref.getBoundingClientRect().left;
+    const first = bar && [...bar.querySelectorAll<HTMLElement>("button, a, span")].find((x) => x.getBoundingClientRect().width > 0);
+    if (bar && first) {
+      const delta = target - first.getBoundingClientRect().left;
+      if (Math.abs(delta) > 0.5) {
+        const zoom = Number(bar.style.zoom) || 1;
+        bar.style.paddingLeft = `${Math.max(0, parseFloat(getComputedStyle(bar).paddingLeft) + delta / zoom)}px`;
+      }
+    }
+    const title = titleRef.current;
+    if (content && title && title.getBoundingClientRect().width > 0) {
+      const delta = target - title.getBoundingClientRect().left;
+      if (Math.abs(delta) > 0.5) content.style.paddingLeft = `${Math.max(0, parseFloat(getComputedStyle(content).paddingLeft) + delta)}px`;
+    }
+  }, []);
   const fitToolbar = useCallback(() => {
     const el = toolbarRef.current;
     if (!el) return;
     if (!window.matchMedia("(min-width: 1024px)").matches) {
       el.style.zoom = "";
+      alignLeftEdges();
       return;
     }
     // Ročna velikost (⚙ → Napredne nastavitve) ali ob odprtem Impro največja samodejna;
     // gumbi se po potrebi prelomijo v drugo vrsto.
     if (el.dataset.scale) {
       el.style.zoom = el.dataset.scale;
+      alignLeftEdges();
       return;
     }
     if (el.dataset.impro !== undefined) {
       el.style.zoom = "1.35";
+      alignLeftEdges();
       return;
     }
     el.style.zoom = "1";
@@ -1459,7 +1501,8 @@ export default function ChordsViewer({
     el.style.width = "";
     el.style.flexWrap = "";
     el.style.zoom = String(Math.max(0.8, Math.min(1.35, (have / Math.max(1, need)) * 0.995)));
-  }, []);
+    alignLeftEdges();
+  }, [alignLeftEdges]);
   useLayoutEffect(() => {
     fitToolbar();
   });
@@ -4563,7 +4606,7 @@ export default function ChordsViewer({
       {/* Telefon: steklena podlaga obeh vrstic — zameglitev je na tem ločenem sloju,
           ne na vrsticah (backdrop-filter bi kot transform ujel fixed sličico videa). */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-neutral-900/55 backdrop-blur-xl backdrop-saturate-150 lg:hidden" />
-      <div className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 max-lg:bg-transparent lg:px-12 lg:[zoom:1.35]">
+      <div ref={playerRowRef} className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 max-lg:bg-transparent lg:px-12 lg:[zoom:1.35]">
         {/* Tudi brez kandidatov: v izbirniku posnetka lahko prilepiš povezavo. */}
         <YouTubeMiniPlayer
             videoIds={offsetLocked && lockedVideo ? [lockedVideo] : videoIds}
@@ -4781,6 +4824,21 @@ export default function ChordsViewer({
             </div>
             <button
               type="button"
+              onClick={() => setCenterText((v) => !v)}
+              aria-pressed={centerText}
+              aria-label="Besedilo na sredino"
+              title={centerText ? "Besedilo nazaj na levo" : "Besedilo na sredino zaslona"}
+              className={`flex h-[26px] w-[26px] items-center justify-center rounded-full border border-orange-400 dark:border-white/15 transition active:scale-95 max-lg:order-6 ${
+                centerText ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
+              }`}
+            >
+              {/* Vrstice, poravnane levo, kot blok na sredini med dvema robovoma. */}
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                <path d="M3 4v16M21 4v16M8 8h8M8 12h5M8 16h7" />
+              </svg>
+            </button>
+            <button
+              type="button"
               onClick={enterFullscreen}
               aria-label="Celozaslonski način"
               title="Celozaslonski način"
@@ -4800,7 +4858,8 @@ export default function ChordsViewer({
             {onOpenEditor && (
               <button
                 type="button"
-                onClick={onOpenEditor}
+                // Urejevalnik se odpre na vrstici, ki jo Smart play zdaj označuje.
+                onClick={() => onOpenEditor(shownLine >= 0 ? lineFocusOf(body, shownLine) : null)}
                 disabled={!!recorder}
                 title="Urejevalnik — napredni urejevalnik besedila z akordi in tablatur"
                 aria-label="Urejevalnik"
@@ -5191,7 +5250,7 @@ export default function ChordsViewer({
             {/* Telefon: naslov čez celo širino — okenca (Posebni akordi, Nasvet, Ali si vedel?,
                 Kviz, Opis) so vedno v svoji vrstici pod avtorjem, samo ikone. */}
             <div className={`shrink-0 max-lg:basis-full ${nav ? "pr-24 lg:pr-0" : ""}`}>
-              <h2 className="text-xl font-semibold text-(--cv-title)">{song.title}</h2>
+              <h2 ref={titleRef} className="text-xl font-semibold text-(--cv-title)">{song.title}</h2>
               <p className="text-sm text-(--cv-muted)">{song.author}</p>
               {capo !== null && (
                 <p className="mt-1 text-sm font-medium text-(--cv-chord)">
@@ -5473,6 +5532,8 @@ export default function ChordsViewer({
                 {description.map((l, i) => renderLine(l, i, false))}
               </div>
             )}
+            {/* "Sredina": blok širok kot najdaljša vrstica, na sredini; vrstice v njem levo. */}
+            <div className={centerText ? "mx-auto w-fit max-w-full" : undefined}>
             {body.map((l, i) => (
               // data-line: cilj "Pametnega predvajalnika"; trenutna vrstica poudarjena.
               <div
@@ -5488,6 +5549,7 @@ export default function ChordsViewer({
                 {renderLine(l, i, true)}
               </div>
             ))}
+            </div>
             </>
             )}
           </div>

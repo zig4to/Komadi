@@ -477,6 +477,58 @@ export function lineKey(line: ChordsLine | undefined): string {
   return "";
 }
 
+// Vrstica z besedilom, prenosljiva med pregledovalnikom in urejevalnikom (ki ima
+// drugačne številke vrstic): ključ + katera ponovitev vrstice s tem ključem je.
+export type LineFocus = { key: string; nth: number };
+
+export function lineFocusOf(body: ChordsLine[], index: number): LineFocus | null {
+  const key = lineKey(body[index]);
+  if (!key || key.startsWith("ch:")) return null;
+  let nth = 0;
+  for (let i = 0; i < index; i++) if (lineKey(body[i]) === key) nth++;
+  return { key, nth };
+}
+
+// Indeks vrstice v `lines` za `focus` (ista ponovitev, sicer zadnja z istim ključem); -1, če je ni.
+export function findLineFocus(lines: (ChordsLine | undefined)[], focus: LineFocus): number {
+  let seen = 0;
+  let last = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lineKey(lines[i]) !== focus.key) continue;
+    if (seen++ === focus.nth) return i;
+    last = i;
+  }
+  return last;
+}
+
+// Ključa se razlikujeta le malo: enako število besed in skupaj največ 2
+// spremenjeni črki, ali vsaj 80 % enakih besed.
+function similarKey(a: string, b: string): boolean {
+  const wa = a.split(" "), wb = b.split(" ");
+  if (wa.length === wb.length) {
+    let diff = 0;
+    for (let i = 0; i < wa.length && diff <= 2; i++) if (wa[i] !== wb[i]) diff += editDistance(wa[i], wb[i]);
+    if (diff <= 2) return true;
+  }
+  const set = new Set(wb);
+  const same = wa.filter((w) => set.has(w)).length;
+  return same / Math.max(wa.length, wb.length) >= 0.8;
+}
+
+function editDistance(a: string, b: string): number {
+  const d = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = d[0];
+    d[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = d[j];
+      d[j] = Math.min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return d[b.length];
+}
+
 // Shranjene točke (vezane na številko vrstice) prestavi na vrstico z istim
 // ključem, če se je številka premaknila — po urejanju besedila ali spremembi
 // razčlenjevanja (chords.ts). Najprej ista smer premika kot pri prejšnji
@@ -503,6 +555,17 @@ export function remapLines<T extends { line: number; key?: string }>(points: T[]
           if (j === p.line) return p;
           changed = true;
           return { ...p, line: j };
+        }
+      }
+    }
+    // Malo spremenjena vrstica (popravljena črka, beseda): ista vrstica ima
+    // podoben ključ → ostane na njej z novim ključem. Prej je ena črka (Jaz bi
+    // te: "lepi" → "lepo") umaknila vse shranjene čase.
+    if (!chordOnly) {
+      for (const j of [guess, guess + 1, guess - 1]) {
+        if (keys[j] && !keys[j].startsWith("ch:") && similarKey(keys[j], p.key)) {
+          changed = true;
+          return { ...p, line: j, key: keys[j] };
         }
       }
     }

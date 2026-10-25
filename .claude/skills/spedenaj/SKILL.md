@@ -141,7 +141,12 @@ ustrezajo končnemu besedilu.
      = (konec − začetek) / bar; preveri, da se izide (Drivin' My Life Away: Solo 1 je bil zapisan s 3 akordi, slišijo
      se 4). Kjer se akord menja sredi takta (ali se ponovi z drugo barvo, npr. E → E7), zapiši tudi to polovico
      (`C#m A E7 E7`); enak akord čez več taktov ponovi za vsak takt. Isto velja za vse instrumentalne dele (solo,
-     interludij, outro);
+     interludij, outro); največ 4 akordi na vrstico;
+   - **past: `bar` iz `audio.py` je pri hitrih skladbah dvojni takt** (Gospa natakarca, J. C. Van Damme,
+     2026-10-25: `bar` ≈ 3,0 s pri ~80 BPM, uporabnik pa sliši takt 1,5 s — vsak zapisan akord je trajal dva
+     takta). Če akord kitice/refrena v `a.json` tipično traja eno polovico takta, ali je skladba hitra (polka,
+     rock'n'roll), vzemi za takt `bar/2`: en akord na vsako polovico, mreža `downbeat + k·bar/2`, in
+     `songs.bpm` popravi na dvojni tempo;
    - vstavi `[Intro]` + vrstico akordov na začetek telesa (pred prvo oznako, za opisom).
 
 ### 4. Oznake delov

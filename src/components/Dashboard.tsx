@@ -49,6 +49,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 import { useBackableOpen } from "@/lib/useBackableOpen";
 import { usePersistentBool } from "@/lib/usePersistentBool";
 import { usePersistentString } from "@/lib/usePersistentString";
+import type { LineFocus } from "@/lib/syncedLyrics";
 import { closeChordsViewer, openChordsViewer, useOpenChordsMode, useOpenChordsNav, useOpenChordsSongId } from "@/lib/openChords";
 import {
   SHARED_VIEW_HEARTBEAT_MS,
@@ -213,6 +214,8 @@ export default function Dashboard({ user }: { user: User }) {
   // Urejevalnik odprt iz pregledovalnika akordov (gumb "Urejevalnik"): ob
   // zaprtju se pregledovalnik spet odpre, z novim besedilom.
   const [editorFromViewer, setEditorFromViewer] = useState(false);
+  // Vrstica, ki jo je Smart play označeval ob odprtju urejevalnika iz pregledovalnika.
+  const [editorFocus, setEditorFocus] = useState<LineFocus | null>(null);
   // "Čakalna vrsta" (tabela queued_songs, gumb "Hitro" ob "Dodaj skladbo"):
   // hiter pregled v SettingsMenu.tsx + celostranski pogled (queueOpen).
   const [queuedSongs, setQueuedSongs] = useState<QueuedSong[]>([]);
@@ -3351,8 +3354,10 @@ export default function Dashboard({ user }: { user: User }) {
       {chordsEditSong && (
         <ChordsTextEditor
           song={chordsEditSong}
+          focus={editorFocus}
           onClose={() => {
             setChordsEditSong(null);
+            setEditorFocus(null);
             if (editorFromViewer) {
               setEditorFromViewer(false);
               openChordsViewer(chordsEditSong.id);
@@ -5407,7 +5412,8 @@ export default function Dashboard({ user }: { user: User }) {
             onOpenEditor={
               // Lastne skladbe in skladbe skupne delavnice (v pregledu ali s prijavo).
               chordsSong.user_id === LIBRARY_OWNER_ID || chordsSong.review_pending || reportedSongIds.has(chordsSong.id)
-                ? () => {
+                ? (focus) => {
+                    setEditorFocus(focus);
                     setEditorFromViewer(true);
                     setChordsEditSong(chordsSong);
                     closeChordsViewer();
