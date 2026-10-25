@@ -20,6 +20,13 @@ const SPEDENAJ_TEMP_IDS = new Set([
   "28e0e48d-68e3-45bc-85e2-05f74742cf5a", // Ljubosumnež
   "cbd032cd-a736-40de-b652-5de25ae76592", // Je treba delat
   "0ec95f23-6df2-430e-bcee-ebd22899cba9", // Bognedaj, da bi crknu televizor
+  "f2a6df97-602d-4b73-a504-a9dc47b6d2e4", // Dvajset ljubic
+  "c6e1deeb-ca7f-4ff8-9090-df107a720722", // Gospa natakarca
+  "22aced85-8a04-4c27-8857-123959287e52", // Jaz bi te
+  "1c1e3ecd-a6ae-4045-bcc3-07564c139d12", // Jaz sem nor
+  "6d29ba5a-a61e-4f21-9b5a-ee29fcd6982e", // J. C. Van Damme
+  "c6f30a48-f556-4b79-aab1-e2a382cebcd5", // Trezinka
+  "262a25a0-740a-406e-b5dc-4e4d44fc13c2", // Eks za ex ljubico
 ]);
 
 // Slika avtorja na desni strani kartice. Svetla tema: zaobljen kvadrat znotraj

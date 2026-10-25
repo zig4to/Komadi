@@ -2217,6 +2217,12 @@ export default function ChordsViewer({
     const sec = k >= 0 ? body[k] : null;
     return `${sec?.kind === "section" ? sec.label + " · " : ""}${n}. vrstica`;
   };
+  // Indeks oznake dela (Verse 1, Chorus 2 …) nad vrstico, -1 pred prvo oznako.
+  const sectionIndexOf = (line: number): number => {
+    let k = Math.min(line, body.length - 1);
+    while (k >= 0 && body[k].kind !== "section") k--;
+    return k;
+  };
   const chordNameAt = (line: number, j: number): string => {
     const l = body[line];
     let name: string | null | undefined = null;
@@ -2450,6 +2456,15 @@ export default function ChordsViewer({
   // Vrstica osnutka, ki je trenutno označena (indeks v lineFix.points).
   const [fixActive, setFixActive] = useState(-1);
   const fixListRef = useRef<HTMLDivElement>(null);
+  // Zloženi deli (indeksi oznak v body) v seznamu Popravi čase vrstic.
+  const [fixCollapsed, setFixCollapsed] = useState<Set<number>>(() => new Set());
+  const toggleFixSection = (sec: number) =>
+    setFixCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(sec)) next.delete(sec);
+      else next.add(sec);
+      return next;
+    });
   const startLineFix = () => {
     if (!sync?.points.length || recorder) return;
     const r2 = (x: number) => Math.round(x * 100) / 100;
@@ -5903,12 +5918,40 @@ export default function ChordsViewer({
             "Zdaj" (trenutni čas posnetka). Isto mesto kot Posnemi čase. */}
         {lineFix && (
           <div
-            className="relative z-30 shrink-0 border-t border-orange-400 bg-neutral-950/95 px-3 pt-2 font-sans text-neutral-100 backdrop-blur lg:flex lg:w-[var(--rec-w,30rem)] lg:max-w-[calc(100%-20rem)] lg:flex-col lg:overflow-hidden lg:border-l lg:border-t-0 lg:pt-3"
+            ref={recPanelRef}
+            className={`relative z-30 shrink-0 border-t border-orange-400 bg-neutral-950/95 px-3 pt-2 font-sans text-neutral-100 backdrop-blur lg:flex lg:w-[var(--rec-w,30rem)] lg:max-w-[calc(100%-20rem)] lg:flex-col lg:overflow-hidden lg:border-l lg:border-t-0 lg:pt-3 ${
+              recDragging ? "select-none" : ""
+            }`}
             style={{
               paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
               ...(recWidth ? ({ "--rec-w": `${recWidth}px` } as CSSProperties) : {}),
             }}
           >
+            {/* Ročaj za širino (računalnik), ista širina kot Posnemi čase. */}
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Širina plošče Popravi čase vrstic"
+              title="Povleci za širino (dvoklik = privzeto)"
+              onPointerDown={(e) => {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                e.currentTarget.setPointerCapture(e.pointerId);
+                setRecDragging(true);
+              }}
+              onPointerMove={onRecResizeMove}
+              onPointerUp={onRecResizeUp}
+              onPointerCancel={onRecResizeUp}
+              onDoubleClick={() => saveRecWidth(null)}
+              className="group absolute inset-y-0 left-0 z-10 hidden w-3 cursor-col-resize touch-none lg:block"
+            >
+              <div
+                className={`absolute inset-y-0 left-0 w-0.5 transition-colors ${
+                  recDragging ? "bg-orange-400" : "bg-transparent group-hover:bg-orange-400/70"
+                }`}
+              />
+              <div className="absolute left-1 top-1/2 h-10 w-1.5 -translate-y-1/2 rounded-full bg-white/20 group-hover:bg-orange-400" />
+            </div>
             <div className="mx-auto max-w-2xl lg:mx-0 lg:flex lg:min-h-0 lg:max-w-none lg:flex-1 lg:flex-col">
               <p className="mb-1 text-base text-neutral-300">Popravi čase vrstic</p>
               <p className="mb-2 text-[13px] leading-snug text-neutral-500 lg:text-[15px]">
@@ -5916,12 +5959,52 @@ export default function ChordsViewer({
               </p>
               {lineFixMsg && <p className="mb-2 text-base text-amber-400">{lineFixMsg}</p>}
               {!recordVideoId && <p className="mb-2 text-[15px] text-neutral-500">Za shranjevanje enkrat zaženi posnetek z ▶.</p>}
-              <div ref={fixListRef} className="relative max-h-48 space-y-1 overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
-                {lineFix.points.map((p, k) => (
+              {(() => {
+                const secs = [...new Set(lineFix.points.map((p) => sectionIndexOf(p.line)).filter((s) => s >= 0))];
+                if (!secs.length) return null;
+                const allCollapsed = secs.every((s) => fixCollapsed.has(s));
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setFixCollapsed(allCollapsed ? new Set() : new Set(secs))}
+                    className="mb-1.5 self-start rounded-md border border-neutral-600 px-2 py-0.5 text-sm text-neutral-300 hover:border-orange-400 hover:text-white active:scale-95"
+                  >
+                    {allCollapsed ? "Razširi vse dele" : "Zloži vse dele skladbe"}
+                  </button>
+                );
+              })()}
+              <div ref={fixListRef} className="relative max-h-48 overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
+                {lineFix.points.map((p, k) => {
+                  const sec = sectionIndexOf(p.line);
+                  const prevSec = k > 0 ? sectionIndexOf(lineFix.points[k - 1].line) : -2;
+                  const secLine = sec >= 0 ? body[sec] : null;
+                  const collapsed = sec >= 0 && fixCollapsed.has(sec);
+                  const secCount = collapsed ? lineFix.points.filter((q) => sectionIndexOf(q.line) === sec).length : 0;
+                  const secActive =
+                    collapsed && fixActive >= 0 && sectionIndexOf(lineFix.points[fixActive]?.line ?? -1) === sec;
+                  return (
+                  <Fragment key={k}>
+                  {sec !== prevSec && secLine?.kind === "section" && (
+                    <button
+                      type="button"
+                      onClick={() => toggleFixSection(sec)}
+                      aria-expanded={!collapsed}
+                      className={`sticky top-0 z-10 flex w-full items-center gap-1.5 rounded-md border bg-neutral-900 px-2 py-0.5 text-left text-sm font-semibold text-amber-300 hover:border-amber-400 lg:text-[15px] ${
+                        secActive ? "border-orange-400" : "border-amber-400/40"
+                      } ${k > 0 ? "mt-3" : ""}`}
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className={`h-3.5 w-3.5 shrink-0 transition-transform ${collapsed ? "-rotate-90" : ""}`}>
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                      <span className="flex-1 truncate">{secLine.label}</span>
+                      {collapsed && <span className="text-xs font-normal text-neutral-400">{secCount} vrst.</span>}
+                    </button>
+                  )}
+                  {!collapsed && (
+                  <div className={sec >= 0 ? "ml-1.5 border-l-2 border-amber-400/40 pl-2 pt-0.5" : "pt-0.5"}>
                   <div
-                    key={k}
                     data-fix-row={k}
-                    className={`rounded-lg border px-2 py-1.5 ${k === fixActive ? "border-orange-400 bg-orange-400/10" : "border-neutral-800"}`}
+                    className={`rounded-lg border px-2 py-0.5 ${k === fixActive ? "border-orange-400 bg-orange-400/10" : "border-neutral-800"}`}
                   >
                     <button
                       type="button"
@@ -5931,7 +6014,7 @@ export default function ChordsViewer({
                     >
                       {recLineLabel(p.line)}
                     </button>
-                    <div className="mt-1 flex flex-wrap items-center gap-1 text-xs lg:text-sm">
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1 text-xs lg:text-sm">
                       <span className="w-[4.5rem] tabular-nums text-amber-400">
                         {formatCs(p.t + lrcOffset)}
                       </span>
@@ -5940,7 +6023,7 @@ export default function ChordsViewer({
                           key={d}
                           type="button"
                           onClick={() => setFixTime(k, p.t + d)}
-                          className="rounded-md border border-neutral-600 px-1.5 py-0.5 tabular-nums text-neutral-300 hover:border-orange-400 hover:text-white active:scale-95"
+                          className="rounded-md border border-neutral-600 px-1.5 py-0 tabular-nums text-neutral-300 hover:border-orange-400 hover:text-white active:scale-95"
                         >
                           {d > 0 ? "+" : "−"}
                           {String(Math.abs(d)).replace(".", ",")}
@@ -5968,7 +6051,11 @@ export default function ChordsViewer({
                       </button>
                     </div>
                   </div>
-                ))}
+                  </div>
+                  )}
+                  </Fragment>
+                  );
+                })}
               </div>
               <div className="mt-2 flex gap-1.5 text-base">
                 <button
