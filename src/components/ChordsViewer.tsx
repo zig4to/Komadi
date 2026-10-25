@@ -47,6 +47,8 @@ import { useIsDesktop } from "@/components/Scales";
 import type { ChordSection, Song, SyncedChords, SyncedLines } from "@/types/song";
 import { anchorScrollTop, computeAnchor, getRemoteView, subscribeRemoteView, type LocalView, type RemoteViewEntry, type SamSpiliView } from "@/lib/sharedChordsView";
 import { BACKGROUNDS, BACKGROUND_ORDER } from "@/lib/backgrounds";
+import { GuitarIcon } from "@/components/ChordsButtons";
+import { BRIGHTNESS_MAX, BRIGHTNESS_MIN, darkVeilAlpha, lightVeilAlpha } from "@/lib/useTheme";
 import { FOLLOWER_LEAD_MAX, FOLLOWER_LEAD_STEP, readFollowerLead, useFollowerLead } from "@/lib/followerLead";
 
 // Snemalni stolpec (računalnik): širina po vlečenju, najmanj REC_MIN_WIDTH, besedilu levo vsaj REC_MIN_TEXT.
@@ -91,6 +93,8 @@ const SS_BG_KEY = "komadi:chords:ssBg";
 // Vidnost vzorca ozadja (Plastnice, Vrat kitare …) v pregledovalniku in Sam Špili.
 // Nov ključ (…2), da privzetih 350 % velja za vse, tudi za že shranjene izbire.
 const PATTERN_OPACITY_KEY = "komadi:chords:patternOpacity2";
+// Svetlost ozadja (−200 … +200 %): tančica čez ozadje in vzorec, za vse barve in teme.
+const BG_BRIGHTNESS_KEY = "komadi:chords:bgBrightness";
 const DEFAULT_PATTERN_OPACITY = 3.5;
 const CHORD_COLOR_KEY = "komadi:chords:chordColor";
 const TEXT_COLOR_KEY = "komadi:chords:textColor";
@@ -478,7 +482,9 @@ export default function ChordsViewer({
   // UG in zabrenkaj.si); main = chords_text. Izbira je na napravi. Besedilo je
   // v vseh verzijah enako, zato časi vrstic (ključi) veljajo za vse.
   const versions = song.chord_versions && song.chord_versions.length > 1 ? song.chord_versions : null;
-  const mainVersion = Math.max(0, versions?.findIndex((v) => v.main) ?? 0);
+  // Privzeto izbrana: "default" (npr. Original), sicer glavna (chords_text).
+  const defaultVersion = versions?.findIndex((v) => v.default) ?? -1;
+  const mainVersion = defaultVersion >= 0 ? defaultVersion : Math.max(0, versions?.findIndex((v) => v.main) ?? 0);
   const [versionPick, setVersionPick] = useState(() => readNumber(`komadi:chords:version:${song.id}`, -1));
   const versionIdx = versions && versionPick >= 0 && versionPick < versions.length ? versionPick : mainVersion;
   const pickVersion = (i: number) => {
@@ -634,6 +640,13 @@ export default function ChordsViewer({
   const [patternOpacity, setPatternOpacity] = useState(() => readNumber(PATTERN_OPACITY_KEY, DEFAULT_PATTERN_OPACITY));
   useEffect(() => writeNumber(PATTERN_OPACITY_KEY, patternOpacity), [patternOpacity]);
   const patternColors = scaledBackgroundColors(patternOpacity);
+  const [bgBrightness, setBgBrightness] = useState(() => readNumber(BG_BRIGHTNESS_KEY, 0));
+  useEffect(() => writeNumber(BG_BRIGHTNESS_KEY, bgBrightness), [bgBrightness]);
+  const bgVeilColor =
+    bgBrightness < 0 ? `rgba(0,0,0,${darkVeilAlpha(bgBrightness)})` : bgBrightness > 0 ? `rgba(255,255,255,${lightVeilAlpha(bgBrightness)})` : null;
+  const bgVeil = bgVeilColor && (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10" style={{ backgroundColor: bgVeilColor }} />
+  );
   // Sam Špili na telefonu: vzorec malo manj viden (manjši zaslon, vzorec bolj moti besedilo).
   const ssPhonePatternColors = scaledBackgroundColors(patternOpacity * 0.75);
   const [chordColorIndex, setChordColorIndex] = useState(() => readNumber(CHORD_COLOR_KEY, 0));
@@ -786,6 +799,36 @@ export default function ChordsViewer({
   );
   const themePickers = (
     <>
+      <div>
+        <label htmlFor="cv-bg-brightness" className="mb-1 flex items-center justify-between text-[13px] font-medium text-neutral-400">
+          <span>Svetlost ozadja</span>
+          <span className="tabular-nums text-neutral-200">
+            {bgBrightness > 0 ? "+" : ""}
+            {Math.round(bgBrightness * 100)} %
+          </span>
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            id="cv-bg-brightness"
+            type="range"
+            min={BRIGHTNESS_MIN}
+            max={BRIGHTNESS_MAX}
+            step={0.05}
+            value={bgBrightness}
+            onChange={(e) => setBgBrightness(Number(e.target.value))}
+            className="h-1.5 min-w-0 flex-1 cursor-pointer accent-orange-400"
+          />
+          {bgBrightness !== 0 && (
+            <button
+              type="button"
+              onClick={() => setBgBrightness(0)}
+              className="shrink-0 rounded-full border border-neutral-600 px-2 py-0.5 text-[10px] text-neutral-300 hover:border-orange-400 hover:text-orange-300"
+            >
+              0
+            </button>
+          )}
+        </div>
+      </div>
       <div>
         {pickerHeader("Predefinirane teme", presetsOpen, () => setPresetsOpen((v) => !v))}
         {presetsOpen && (
@@ -1089,7 +1132,7 @@ export default function ChordsViewer({
     if (themeMenuPos) return closeThemeMenu();
     const r = themeButtonRef.current?.getBoundingClientRect();
     if (!r) return;
-    setThemeMenuPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 296)) });
+    setThemeMenuPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 296)), maxHeight: window.innerHeight - r.bottom - 14 });
   };
   // Ob zaprtju stranske vrstice se zapre tudi njen meni ⚙.
   const toggleSsSidebar = () => {
@@ -1461,29 +1504,58 @@ export default function ChordsViewer({
   };
   // Levi rob orodne vrstice (zaradi zoom-a v px / zoom) in vsebine pesmi poravna z
   // levim robom prvega gumba v vrstici predvajalnika.
+  // Levi rob brez animacije klika (active:scale-95): sredina se ob pomanjšanju ne
+  // premakne, zato rob = sredina − polovica nepomanjšane širine. Brez tega se je
+  // vrstica ob vsakem kliku zamaknila za nekaj px desno (meritev med animacijo).
+  const unscaledLeft = (el: Element) => {
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    let k = cs.scale && cs.scale !== "none" ? parseFloat(cs.scale) || 1 : 1;
+    if (cs.transform && cs.transform !== "none") k *= new DOMMatrix(cs.transform).a || 1;
+    return r.left + r.width / 2 - r.width / k / 2;
+  };
   const alignLeftEdges = useCallback(() => {
     const desktop = window.matchMedia("(min-width: 1024px)").matches;
     const bar = toolbarRef.current;
     const content = scrollRef.current;
     const ref = playerRowRef.current?.querySelector("button");
+    const strip = barsOuterRef.current;
     if (!desktop || !ref) {
       if (bar) bar.style.paddingLeft = "";
       if (content) content.style.paddingLeft = "";
+      if (strip) strip.style.marginLeft = "";
       return;
     }
-    const target = ref.getBoundingClientRect().left;
+    // Lepljivi vrstici (predvajalnik + orodna) sta znotraj content in segata do roba
+    // z negativnim robom = levi padding vsebine. Ko se padding vsebine spremeni, mora
+    // slediti tudi ta rob, sicer se z njo premakne še gumb ▶ (cilj poravnave) in se
+    // padding ob vsakem rendru (kliku) poveča znova — vse je lezlo desno.
+    const syncStrip = () => {
+      if (strip && content) strip.style.marginLeft = `-${getComputedStyle(content).paddingLeft}`;
+    };
+    // Vsakič od osnovnega roba (padding iz razreda), nato do 3 popravki: napaka ene
+    // meritve se ne more seštevati čez rendre (prej se je vrstica ob klikih lezla desno).
+    const target = unscaledLeft(ref);
     const first = bar && [...bar.querySelectorAll<HTMLElement>("button, a, span")].find((x) => x.getBoundingClientRect().width > 0);
     if (bar && first) {
-      const delta = target - first.getBoundingClientRect().left;
-      if (Math.abs(delta) > 0.5) {
-        const zoom = Number(bar.style.zoom) || 1;
+      bar.style.paddingLeft = "";
+      const zoom = Number(bar.style.zoom) || 1;
+      for (let i = 0; i < 3; i++) {
+        const delta = target - unscaledLeft(first);
+        if (Math.abs(delta) <= 0.5) break;
         bar.style.paddingLeft = `${Math.max(0, parseFloat(getComputedStyle(bar).paddingLeft) + delta / zoom)}px`;
       }
     }
     const title = titleRef.current;
     if (content && title && title.getBoundingClientRect().width > 0) {
-      const delta = target - title.getBoundingClientRect().left;
-      if (Math.abs(delta) > 0.5) content.style.paddingLeft = `${Math.max(0, parseFloat(getComputedStyle(content).paddingLeft) + delta)}px`;
+      content.style.paddingLeft = "";
+      syncStrip();
+      for (let i = 0; i < 3; i++) {
+        const delta = unscaledLeft(ref) - title.getBoundingClientRect().left;
+        if (Math.abs(delta) <= 0.5) break;
+        content.style.paddingLeft = `${Math.max(0, parseFloat(getComputedStyle(content).paddingLeft) + delta)}px`;
+        syncStrip();
+      }
     }
   }, []);
   const fitToolbar = useCallback(() => {
@@ -1551,7 +1623,17 @@ export default function ChordsViewer({
   // vedno na vrhu; "Pokaži akorde" prikaže vse.
   const specialChords = songChords.filter((n) => !isBasicChord(n));
   // "Impro": vsi prikazani akordi po vrsti (s ponovitvami) za zaznavo tonalitete.
-  const [improOpen, setImproOpen] = useState(false);
+  const [improOpenState, setImproOpenState] = useState(false);
+  const improOpen = improOpenState;
+  // Računalnik: ob odprtju Impro se orodna vrstica zloži (ne zapomni se — puščica
+  // v vrstici predvajalnika jo pokaže), ob zaprtju se vrne zapomnjeno stanje.
+  const setImproOpen = (v: boolean | ((prev: boolean) => boolean)) => {
+    const next = typeof v === "function" ? v(improOpenState) : v;
+    if (next === improOpenState) return;
+    setImproOpenState(next);
+    if (!window.matchMedia("(min-width: 1024px)").matches) return;
+    setToolbarCollapsedState(next ? true : readOptionalNumber(TOOLBAR_COLLAPSED_KEY) === 1);
+  };
   // "Kviz": ugibanje akordov po delih — nadomesti besedilo (da se odgovorov ne vidi), predvajalnik ostane.
   const [quizOpen, setQuizOpen] = useState(false);
   useBackableOpen(quizOpen, () => setQuizOpen(false));
@@ -1604,10 +1686,18 @@ export default function ChordsViewer({
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
   }, [metroMenuPos]);
+  // Okna Metronom / Hitrost so znotraj orodne vrstice, ki ima na računalniku zoom
+  // (fitToolbar) — brskalnik zato pomnoži tudi njihov fixed top/left; zaslonske
+  // koordinate gumba delimo z zoom-om, da se okno odpre točno pod gumbom, levo poravnano.
+  const popoverPos = (r: DOMRect, width: number) => {
+    const z = Number(toolbarRef.current?.style.zoom) || 1;
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - width * z - 8));
+    return { top: (r.bottom + 6) / z, left: left / z };
+  };
   const toggleMetroMenu = () => {
     const r = metroButtonRef.current?.getBoundingClientRect();
     if (metroMenuPos || !r) return setMetroMenuPos(null);
-    setMetroMenuPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 216)) });
+    setMetroMenuPos(popoverPos(r, 208));
   };
   const rateButtonRef = useRef<HTMLButtonElement>(null);
   const [rateMenuPos, setRateMenuPos] = useState<{ top: number; left: number } | null>(null);
@@ -1624,7 +1714,7 @@ export default function ChordsViewer({
   const toggleRateMenu = () => {
     const r = rateButtonRef.current?.getBoundingClientRect();
     if (rateMenuPos || !r) return setRateMenuPos(null);
-    setRateMenuPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 140)) });
+    setRateMenuPos(popoverPos(r, 128));
   };
   const improChords = (() => {
     const out: string[] = [];
@@ -4169,6 +4259,7 @@ export default function ChordsViewer({
           <PatternSvg id={theme.pattern} colors={patternColors} className="h-full w-full" />
         </div>
       )}
+      {bgVeil}
 
       {closeAsUnfollow && barsHidden && !isFullscreen && (
         <button
@@ -4647,11 +4738,13 @@ export default function ChordsViewer({
                 aria-pressed={toolbarCollapsed}
                 aria-label={toolbarCollapsed ? "Pokaži orodno vrstico" : "Zloži orodno vrstico"}
                 title={toolbarCollapsed ? "Pokaži orodno vrstico" : "Zloži orodno vrstico"}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-orange-400 dark:border-white/15 text-amber-400 transition hover:bg-orange-400/15 active:scale-95"
+                className="flex h-8 shrink-0 items-center gap-1 rounded-full border border-orange-400 pl-2 pr-2.5 text-xs font-medium text-amber-400 transition hover:bg-orange-400/15 active:scale-95 dark:border-white/15"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
                   <path d={toolbarCollapsed ? "m6 9 6 6 6-6" : "m18 15-6-6-6 6"} />
                 </svg>
+                <span className="lg:hidden">Orodja</span>
+                <span className="hidden whitespace-nowrap lg:inline">Orodna vrstica</span>
               </button>
             }
             sectionMarkers={sectionMarkers}
@@ -4729,7 +4822,7 @@ export default function ChordsViewer({
         className={`${toolbarCollapsed ? "hidden" : "flex"} shrink-0 flex-wrap items-center justify-start gap-2 border-b border-neutral-800 bg-neutral-900 px-3 py-1.5 max-lg:border-white/10 max-lg:bg-transparent lg:items-end lg:gap-3 lg:px-12 xl:px-8`}>
         {/* Računalnik: skupine z napisom (Povezave, Prilagajanje, Urejanje, Funkcije,
             Nastavitve); telefon: "contents" + max-lg:order — en tok gumbov kot prej. */}
-        {((hasSamSpili(song) && !recorder && !follower) || (!!song.chords_source_url && /ultimate-guitar.com/.test(song.chords_source_url))) && (
+        {((hasSamSpili(song) && !recorder && !follower) || !!song.zabrenkaj_url || (!!song.chords_source_url && /ultimate-guitar.com/.test(song.chords_source_url))) && (
             <div className="contents lg:flex lg:flex-col lg:gap-1">
               <span className="hidden px-1 text-[9px] font-medium uppercase tracking-[0.08em] text-orange-400 lg:block">Povezave</span>
               <div className="contents lg:flex lg:items-center lg:gap-2">
@@ -4766,6 +4859,19 @@ export default function ChordsViewer({
                     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-orange-500">
                       <path d="M18.1 6.9A8 8 0 1 0 20 12h-7" />
                     </svg>
+                  </a>
+                )}
+                {/* Računalnik: povezava na zabrenkaj.si (zelena kitara kot v meniju Akordi). */}
+                {song.zabrenkaj_url && (
+                  <a
+                    href={song.zabrenkaj_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Odpri na Zabrenkaj.si"
+                    aria-label="Odpri na Zabrenkaj.si"
+                    className="hidden h-[26px] w-[26px] items-center justify-center rounded-full border border-orange-400 text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 lg:flex"
+                  >
+                    <GuitarIcon className="h-4 w-4 shrink-0 text-emerald-400" />
                   </a>
                 )}
               </div>
@@ -5356,19 +5462,30 @@ export default function ChordsViewer({
               )}
               </div>
             )}
-            {/* "Verzija": izbira zapisa akordov (songs.chord_versions), levo od Nasveta. */}
+            {/* "Verzija": izbira zapisa akordov (songs.chord_versions), levo od Nasveta.
+                Okvir kot Nasvet / Ali si vedel? (telefon samo ikona, računalnik ikona +
+                "Verzije"); nevidni select čez ves gumb odpre seznam verzij. */}
             {versions && (
-              <label className="z-10 flex items-center gap-1 self-start rounded-lg border border-sky-400/40 bg-sky-400/[0.05] py-0.5 pl-1.5 pr-0.5 text-sky-400" title="Verzija akordov">
+              <label
+                className="relative z-10 flex items-center gap-1.5 self-start rounded-xl border border-sky-400/40 bg-sky-400/[0.05] px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-sky-400 transition hover:bg-sky-400/10 lg:px-2.5"
+                title={`Verzija akordov: ${versions[versionIdx]?.label ?? ""}`}
+              >
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0">
                   <path d="m12 2 9 5-9 5-9-5 9-5z" />
                   <path d="m3 12 9 5 9-5" />
                   <path d="m3 17 9 5 9-5" />
                 </svg>
+                {/* Telefon: višina vrstice besedila kot pri Nasvet/Kviz (11 px). */}
+                <span aria-hidden="true" className="-ml-1.5 w-0 lg:hidden">&#8203;</span>
+                <span className="hidden lg:inline">Verzije</span>
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="hidden h-3.5 w-3.5 lg:block">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
                 <select
                   value={versionIdx}
                   onChange={(e) => pickVersion(Number(e.target.value))}
                   aria-label="Verzija akordov"
-                  className="cursor-pointer rounded border-0 bg-transparent py-0 pl-0 pr-0.5 text-[11px] font-semibold text-(--cv-text) outline-none [&>option]:bg-(--cv-bg)"
+                  className="absolute inset-0 cursor-pointer opacity-0 [&>option]:bg-(--cv-bg) [&>option]:text-(--cv-text)"
                 >
                   {versions.map((v, i) => (
                     <option key={i} value={i} title={v.source}>
@@ -6311,6 +6428,7 @@ export default function ChordsViewer({
               <PatternSvg id={theme.pattern} colors={isPhone ? ssPhonePatternColors : patternColors} className="h-full w-full" />
             </div>
           )}
+          {bgVeil}
           {ssShowLines ? (
             <>
               {/* Blaga navpična črta levo od stolpca gumbov — besedilo se konča pred njo;

@@ -542,7 +542,7 @@ export default function ChordsButtons({
 }
 
 // Ista ikona kitare kot levo od naslova "Bitne Tabs" v Dashboard.tsx.
-function GuitarIcon({ className }: { className: string }) {
+export function GuitarIcon({ className }: { className: string }) {
   return (
     <svg
       aria-hidden="true"

@@ -297,7 +297,8 @@ export default function SongCard({
     >
       {/* Odobrena skladba s preverjenim predvajalnikom (Preverjeno špila): ena oranžna
           kljukica desno spodaj. */}
-      {!hideVerifiedBadges && !song.review_pending && song.verified_player_at && (
+      {/* Adi Smolar: brez kljukice (uporabnikova odločitev 2026-10-25). */}
+      {!hideVerifiedBadges && !song.review_pending && song.verified_player_at && song.author !== "Adi Smolar" && (
         <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1">
           {song.verified_player_at && (
             <span

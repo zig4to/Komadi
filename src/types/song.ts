@@ -67,7 +67,7 @@ export interface Song {
   chord_tips?: { whole: string[] | null; parts: { label: string; count: number; unit: string[]; which?: number[]; of?: number }[]; sameVerseChorus: boolean } | null;
   // Več verzij akordov (0046_add_chord_versions.sql): main = songs.chords_text,
   // ostale imajo svoj chords_text (npr. zabrenkaj.si). Izbira je na napravi.
-  chord_versions?: { label: string; source?: string; chords_text?: string; main?: boolean }[] | null;
+  chord_versions?: { label: string; source?: string; chords_text?: string; main?: boolean; default?: boolean }[] | null;
   // "Ali si vedel?": o čem govori pesem in 5 zanimivosti (skill spedenaj, 0042_add_song_story.sql).
   song_story?: { about: string; facts: string[]; sources?: string[] } | null;
   // Tempo za metronom (udarcev/min, scripts/fill-bpm.mjs iz zvoka, 0043_add_song_bpm.sql).
