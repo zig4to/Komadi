@@ -495,6 +495,24 @@ export default function ChordsViewer({
     setVersionPick(i);
     writeNumber(`komadi:chords:version:${song.id}`, i);
   };
+  // Seznam verzij (lasten meni namesto sistemskega selecta); klik izven ali Esc ga zapre.
+  const [versionMenuOpen, setVersionMenuOpen] = useState(false);
+  const versionMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!versionMenuOpen) return;
+    const close = (e: PointerEvent) => {
+      if (!versionMenuRef.current?.contains(e.target as Node)) setVersionMenuOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setVersionMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [versionMenuOpen]);
   const altText = versions && !versions[versionIdx]?.main ? versions[versionIdx]?.chords_text : undefined;
   const shownText = altText ?? chordsText;
   // Opis (album, avtor transkripcije, opombe …) je skrit pod "Opis skladbe";
@@ -626,13 +644,13 @@ export default function ChordsViewer({
     [body],
   );
   useEffect(() => {
-    if ((!showShapes && !hasSpecialChords && !tipShapes) || chordDb) return;
+    if ((!showShapes && !shapesOpen && !hasSpecialChords && !tipShapes) || chordDb) return;
     let alive = true;
     loadChordDb().then((db) => alive && setChordDb(db));
     return () => {
       alive = false;
     };
-  }, [showShapes, hasSpecialChords, tipShapes, chordDb]);
+  }, [showShapes, shapesOpen, hasSpecialChords, tipShapes, chordDb]);
 
   // "Tema": ozadje vsebine in barva akordov — ena nastavitev za vse skladbe.
   const [normalBgIndex, setNormalBgIndex] = useState(() => readNumber(BG_KEY, DEFAULT_BG));
@@ -1742,7 +1760,8 @@ export default function ChordsViewer({
     }
     return out;
   })();
-  const shapeChords = showShapes ? songChords : specialChords;
+  // Okence s prijemi vedno pokaže vse akorde skladbe; posebni so obrobljeni.
+  const shapeChords = songChords;
 
   // Tablature v pesmi so privzeto skrite (ostane samo vrstica akordov nad
   // njimi); gumb "Tab" ob naslovu sekcije jih prikaže za to sekcijo. Lastnik
@@ -3755,6 +3774,11 @@ export default function ChordsViewer({
   const autoScrollCtlRef = useRef<{ play: () => void; changeSpeed: (delta: number) => number } | null>(null);
   const startPlayView = (from: "player" | "autoscroll" | "smart") => {
     if (samSpili || recorder || follower) return;
+    // Autoscroll samo zažene skladbo — brez celozaslonskega načina (2026-10-29).
+    if (from === "autoscroll") {
+      playerCtlRef.current?.play();
+      return;
+    }
     const playerExists = playerCtlRef.current?.currentTime() != null;
     closeThemeMenu();
     setIsFullscreen(true);
@@ -3762,8 +3786,27 @@ export default function ChordsViewer({
       document.documentElement.requestFullscreen().catch(() => {});
     }
     if (from === "player" && !smartActive) autoScrollCtlRef.current?.play();
-    if (from === "autoscroll") playerCtlRef.current?.play();
   };
+  // Gumb "Sam Špili" (računalnik: orodna vrstica, Povezave; telefon: zgornja vrstica
+  // levo od Smart playa). Celozaslonsko + ležeče v istem kliku, kot iz menija Akordi.
+  const samSpiliButton = (sizeClass: string) => (
+    <button
+      type="button"
+      onClick={() => {
+        closeThemeMenu();
+        enterLandscapeFullscreen();
+        openChordsViewer(song.id, "samspili");
+      }}
+      title="Sam Špili"
+      aria-label="Sam Špili"
+      className={`${sizeClass} items-center justify-center rounded-full border border-orange-400 text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15`}
+    >
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-orange-400">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M10 8.5v7l5.5-3.5z" />
+      </svg>
+    </button>
+  );
   // Tipkovnica (akordi v aplikaciji in Sam Špili): ↑ / ↓ = glasnost po 5 % (ne za
   // sledilca — ta nima svojega predvajanja; ne v urejevalniku in poljih).
   const ssVolumeKeysRef = useRef(ssChangeVolume);
@@ -4724,6 +4767,8 @@ export default function ChordsViewer({
           ne na vrsticah (backdrop-filter bi kot transform ujel fixed sličico videa). */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-neutral-900/55 backdrop-blur-xl backdrop-saturate-150 lg:hidden" />
       <div ref={playerRowRef} className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 max-lg:bg-transparent lg:px-12 lg:[zoom:1.35]">
+        {/* Telefon: Sam Špili čisto levo zgoraj, pred Smart playem (2026-10-29). */}
+        {hasSamSpili(song) && !recorder && !follower && samSpiliButton("-mr-1 flex h-8 w-8 shrink-0 lg:hidden")}
         {/* Tudi brez kandidatov: v izbirniku posnetka lahko prilepiš povezavo. */}
         <YouTubeMiniPlayer
             videoIds={offsetLocked && lockedVideo ? [lockedVideo] : videoIds}
@@ -4841,24 +4886,8 @@ export default function ChordsViewer({
               <div className="contents lg:flex lg:items-center lg:gap-2">
                 {/* Neposredno v Sam Špili (iste skladbe kot v meniju Akordi, ne med snemanjem
                     in ne za sledilca). Celozaslonsko + ležeče v istem kliku, kot iz menija. */}
-                {hasSamSpili(song) && !recorder && !follower && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      closeThemeMenu();
-                      enterLandscapeFullscreen();
-                      openChordsViewer(song.id, "samspili");
-                    }}
-                    title="Sam Špili"
-                    aria-label="Sam Špili"
-                    className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-orange-400 text-neutral-200 transition hover:text-white active:scale-95 dark:border-white/15 max-lg:order-1"
-                  >
-                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-orange-400">
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="M10 8.5v7l5.5-3.5z" />
-                    </svg>
-                  </button>
-                )}
+                {/* Telefon: gumb je v zgornji vrstici levo od Smart playa (samSpiliButton). */}
+                {hasSamSpili(song) && !recorder && !follower && samSpiliButton("hidden h-[26px] w-[26px] lg:flex")}
                 {/* Računalnik: povezava na Ultimate Guitar (skupina Povezave). */}
                 {song.chords_source_url && /ultimate-guitar.com/.test(song.chords_source_url) && (
                   <a
@@ -5175,7 +5204,8 @@ export default function ChordsViewer({
               onClick={() => setShowShapes((v) => !v)}
               aria-pressed={showShapes}
               title="Pokaži prijeme vseh akordov skladbe"
-              className={`flex h-[26px] items-center gap-1.5 max-lg:order-4 whitespace-nowrap rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
+              // Telefon: skrit — okence "Akordi v skladbi" pod naslovom pokaže vse akorde.
+              className={`hidden h-[26px] items-center gap-1.5 whitespace-nowrap lg:flex rounded-full border border-orange-400 dark:border-white/15 px-2.5 text-xs font-medium transition active:scale-95 ${
                 showShapes ? "bg-orange-400/15 text-amber-400" : "text-neutral-200 hover:text-white"
               }`}
             >
@@ -5391,20 +5421,20 @@ export default function ChordsViewer({
               )}
             </div>
             {/* Prijemi akordov (najprej iz opisa, nato iz baze) — izbrana različica, ‹ › pod
-                akordom zamenja različico (enako kot v oknu ob akordu). Privzeto samo posebni
-                akordi; "Pokaži akorde" prikaže vse (posebni so označeni). */}
+                akordom zamenja različico (enako kot v oknu ob akordu). Vedno vsi akordi
+                skladbe, posebni so obrobljeni. */}
             {shapeChords.length > 0 && (
               <div
-                className={`relative z-10 self-start rounded-xl border px-2 py-1.5 lg:px-2.5 ${showShapes ? "border-(--cv-border)" : "border-orange-400/40 bg-orange-400/[0.05]"}`}
+                className="relative z-10 self-start rounded-xl border border-orange-400/40 bg-orange-400/[0.05] px-2 py-1.5 lg:px-2.5"
                 // Računalnik: bolj desno od naslova, poravnano na vrh kot Nasvet / Ali si vedel? / Kviz.
                 style={desktopBars ? { marginLeft: "6rem" } : undefined}
-                aria-label={showShapes ? "Akordi v skladbi" : "Posebni akordi"}
+                aria-label="Akordi v skladbi"
               >
                 <button
                   type="button"
                   onClick={() => setShapesOpen((v) => !v)}
                   aria-expanded={shapesOpen}
-                  title={showShapes ? "Akordi v skladbi" : "Posebni akordi"}
+                  title="Akordi v skladbi"
                   className="flex w-full items-center gap-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-(--cv-chord)"
                 >
                   {/* Telefon: samo ikona (prijem akorda), kot Nasvet / Ali si vedel? desno od nje. */}
@@ -5414,14 +5444,14 @@ export default function ChordsViewer({
                     <circle cx="10" cy="10.5" r="1.3" fill="currentColor" />
                     <circle cx="14" cy="15.5" r="1.3" fill="currentColor" />
                   </svg>
-                  <span className="hidden lg:inline">{showShapes ? "Akordi v skladbi" : "Posebni akordi"}</span>
+                  <span className="hidden lg:inline">Akordi v skladbi</span>
                   {/* Zaprto okno (samo računalnik): seznam akordov, če jih je največ 5 (sicer le število). */}
                   {!shapesOpen && (
                     <span className="hidden truncate font-normal lg:inline normal-case tracking-normal text-(--cv-muted)">
                       · {shapeChords.length <= 5 ? shapeChords.join(", ") : `${shapeChords.length} akordov`}
                     </span>
                   )}
-                  {shapesOpen && showShapes && specialChords.length > 0 && (
+                  {shapesOpen && specialChords.length > 0 && (
                     <span className="hidden font-normal normal-case tracking-normal text-(--cv-muted) lg:inline">· posebni so obrobljeni</span>
                   )}
                   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`ml-auto hidden h-3.5 w-3.5 shrink-0 transition lg:block ${shapesOpen ? "rotate-180" : ""}`}>
@@ -5431,7 +5461,7 @@ export default function ChordsViewer({
               {shapesOpen && (
               <div className="absolute left-0 top-full mt-1.5 flex w-max max-w-[min(48rem,calc(100vw-2rem))] flex-wrap gap-x-2 gap-y-2 rounded-xl border border-(--cv-border) bg-(--cv-bg) p-2.5 shadow-2xl">
                 {shapeChords.map((name) => {
-                  const special = showShapes && specialChords.includes(name);
+                  const special = specialChords.includes(name);
                   const own = descShapes.get(name);
                   const positions = mergeShapes(own, chordDb ? findChordShapes(chordDb, name) : []);
                   const index = Math.min(shapeChoice[name] ?? 0, Math.max(0, positions.length - 1));
@@ -5476,11 +5506,16 @@ export default function ChordsViewer({
               </div>
             )}
             {/* "Verzija": izbira zapisa akordov (songs.chord_versions), levo od Nasveta.
-                Okvir kot Nasvet / Ali si vedel? (telefon samo ikona, računalnik ikona +
-                "Verzije"); nevidni select čez ves gumb odpre seznam verzij. */}
+                Okvir kot Nasvet / Ali si vedel?, na vseh napravah ikona + "Verzije" +
+                puščica; odpre zaobljen temen meni z verzijami (izbrana s kljukico). */}
             {versions && (
-              <label
-                className="relative z-10 flex items-center gap-1.5 self-start rounded-xl border border-sky-400/40 bg-sky-400/[0.05] px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-sky-400 transition hover:bg-sky-400/10 lg:px-2.5"
+              <div ref={versionMenuRef} className="relative z-20 self-start">
+              <button
+                type="button"
+                onClick={() => setVersionMenuOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={versionMenuOpen}
+                className="flex items-center gap-1.5 rounded-xl border border-sky-400/40 bg-sky-400/[0.05] px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-sky-400 transition hover:bg-sky-400/10 lg:px-2.5"
                 title={`Verzija akordov: ${versions[versionIdx]?.label ?? ""}`}
               >
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0">
@@ -5488,25 +5523,46 @@ export default function ChordsViewer({
                   <path d="m3 12 9 5 9-5" />
                   <path d="m3 17 9 5 9-5" />
                 </svg>
-                {/* Telefon: višina vrstice besedila kot pri Nasvet/Kviz (11 px). */}
-                <span aria-hidden="true" className="-ml-1.5 w-0 lg:hidden">&#8203;</span>
-                <span className="hidden lg:inline">Verzije</span>
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="hidden h-3.5 w-3.5 lg:block">
+                <span>Verzije</span>
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`h-3.5 w-3.5 transition ${versionMenuOpen ? "rotate-180" : ""}`}>
                   <path d="m6 9 6 6 6-6" />
                 </svg>
-                <select
-                  value={versionIdx}
-                  onChange={(e) => pickVersion(Number(e.target.value))}
+              </button>
+              {versionMenuOpen && (
+                <div
+                  role="menu"
                   aria-label="Verzija akordov"
-                  className="absolute inset-0 cursor-pointer opacity-0 [&>option]:bg-(--cv-bg) [&>option]:text-(--cv-text)"
+                  className="animate-chords-drop absolute left-0 top-full mt-2 w-max min-w-56 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 p-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl"
                 >
-                  {versions.map((v, i) => (
-                    <option key={i} value={i} title={v.source}>
-                      {v.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  {versions.map((v, i) => {
+                    const active = i === versionIdx;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={active}
+                        title={v.source}
+                        onClick={() => {
+                          pickVersion(i);
+                          setVersionMenuOpen(false);
+                        }}
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${
+                          active ? "bg-white/[0.07] font-medium text-white" : "text-neutral-300 hover:bg-white/[0.04] hover:text-white"
+                        }`}
+                      >
+                        <span className="flex-1">{v.label}</span>
+                        {active && (
+                          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-sky-400">
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              </div>
             )}
             {/* "Nasvet": ponavljajoča se zaporedja akordov (shranil skill spedenaj v
                 songs.chord_tips; imena prikazana s transpozicijo / Simpl / No capo). */}
