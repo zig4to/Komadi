@@ -2036,6 +2036,9 @@ export default function ChordsViewer({
   const [ssHlLine, setSsHlLine] = useState(-1);
   // "Sam Špili": drsnik čez celo skladbo (spodaj), odpre ga gumb v stolpcu.
   const [ssSeekOpen, setSsSeekOpen] = useState(false);
+  // Začetni zaslon Sam Špili: predogled akordov verzije (indeks; po delih skladbe).
+  const [ssVersionPreview, setSsVersionPreview] = useState<number | null>(null);
+  useBackableOpen(ssVersionPreview !== null, () => setSsVersionPreview(null));
   // Oznake delov na drsniku "Prevrtavanje" (Sam Špili): širina drsnika za
   // razporeditev napisov v dve vrsti (nad / pod drsnikom), kot v YouTubeMiniPlayer.
   const [ssTrackEl, setSsTrackEl] = useState<HTMLDivElement | null>(null);
@@ -3773,7 +3776,7 @@ export default function ChordsViewer({
   const autoScrollCtlRef = useRef<{ play: () => void; changeSpeed: (delta: number) => number } | null>(null);
   const startPlayView = (from: "player" | "autoscroll" | "smart") => {
     if (samSpili || recorder || follower) return;
-    // Autoscroll samo zažene skladbo — brez celozaslonskega načina (2026-10-29).
+    // Autoscroll ▶ / ⏸ zažene / ustavi tudi skladbo — brez celozaslonskega načina (2026-10-29).
     if (from === "autoscroll") {
       playerCtlRef.current?.play();
       return;
@@ -3784,7 +3787,6 @@ export default function ChordsViewer({
     if (playerExists && canBrowserFullscreen() && !document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
     }
-    if (from === "player" && !smartActive) autoScrollCtlRef.current?.play();
   };
   // Gumb "Sam Špili" (računalnik: orodna vrstica, Povezave; telefon: zgornja vrstica
   // levo od Smart playa). Celozaslonsko + ležeče v istem kliku, kot iz menija Akordi.
@@ -6454,8 +6456,9 @@ export default function ChordsViewer({
           speedFactor={2.5}
           above={fontButtons}
           controlRef={autoScrollCtlRef}
-          desktopSpeed={2}
+          desktopSpeed={3}
           onPlayClick={() => startPlayView("autoscroll")}
+          onPauseClick={() => playerCtlRef.current?.pause()}
         />
       ) : (
         !editing &&
@@ -6803,7 +6806,7 @@ export default function ChordsViewer({
               </div>
             </>
           ) : (
-            <div className="relative isolate flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center text-(--cv-text)">
+            <div className="relative isolate flex min-h-0 flex-1 flex-col items-center justify-center gap-6 overflow-hidden px-6 text-center max-lg:landscape:gap-2.5 text-(--cv-text)">
               {/* Začetni zaslon Sam Špili: isto ozadje kot med igranjem (barva, preliv in
                   vzorec izbranega ozadja riše ovoj Sam Špili); tu samo blag sij v sredini. */}
               <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_50%_45%,rgba(255,255,255,0.04),transparent_70%)]" />
@@ -6863,8 +6866,8 @@ export default function ChordsViewer({
                 )}
               </div>
               <div>
-                <p className="text-5xl font-light leading-tight tracking-tight break-words sm:text-7xl lg:text-8xl">{song.title}</p>
-                <p className="mt-3 text-2xl font-light text-(--cv-muted) sm:text-4xl lg:text-5xl">{song.author}</p>
+                <p className="text-5xl font-light leading-tight tracking-tight break-words sm:text-7xl lg:text-8xl max-lg:landscape:text-3xl!">{song.title}</p>
+                <p className="mt-3 text-2xl font-light text-(--cv-muted) sm:text-4xl lg:text-5xl max-lg:landscape:mt-0.5! max-lg:landscape:text-lg!">{song.author}</p>
               </div>
               {follower ? (
                 <div className="flex flex-col items-center gap-4">
@@ -6889,28 +6892,153 @@ export default function ChordsViewer({
                 disabled={ssRequested || ssWaitReady}
                 aria-label="Predvajaj"
                 title="Predvajaj"
-                className="group relative flex h-24 w-24 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_15%,transparent)] bg-[color-mix(in_srgb,var(--cv-text)_6%,transparent)] text-(--cv-text) shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-xl transition hover:scale-105 hover:border-[color-mix(in_srgb,var(--cv-text)_25%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)] active:scale-95 disabled:opacity-70 sm:h-28 sm:w-28"
+                className="group relative flex h-24 w-24 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--cv-text)_15%,transparent)] bg-[color-mix(in_srgb,var(--cv-text)_6%,transparent)] text-(--cv-text) shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-xl transition hover:scale-105 hover:border-[color-mix(in_srgb,var(--cv-text)_25%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)] active:scale-95 disabled:opacity-70 sm:h-28 sm:w-28 max-lg:landscape:h-16! max-lg:landscape:w-16!"
               >
                 {/* Nežen obroč okrog gumba */}
                 <span aria-hidden="true" className="pointer-events-none absolute -inset-3 rounded-full border border-white/[0.06] transition group-hover:-inset-4 group-hover:border-white/10" />
                 {ssRequested || ssWaitReady ? (
                   <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
                 ) : (
-                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="ml-1.5 h-10 w-10 sm:h-11 sm:w-11">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="ml-1.5 h-10 w-10 sm:h-11 sm:w-11 max-lg:landscape:h-7! max-lg:landscape:w-7!">
                     <path d="M7 4.5v15l12.5-7.5L7 4.5z" />
                   </svg>
                 )}
               </button>
               )}
-              {/* Capo pred začetkom (nad bližnjicami), da ga ne spregledaš. */}
-              {capo !== null && (
-                <p className="mt-6 text-xl font-semibold text-orange-400 sm:text-2xl">
-                  {capoShift ? `Brez capa (izvirno capo ${capo}, akordi +${capo})` : `Capo: ${capo}. prag`}
+              {/* Izbira verzije akordov pod Play (songs.chord_versions); oko v vsaki verziji
+                  odpre predogled njenih akordov (brez izbire), gumb spodaj predogled izbrane. */}
+              {versions && !follower && (
+                <div className="mt-8 flex flex-col items-center gap-3 max-lg:landscape:mt-1 max-lg:landscape:gap-2">
+                <div className="flex flex-wrap justify-center gap-2" role="radiogroup" aria-label="Verzija akordov">
+                  {versions.map((v, i) => {
+                    const active = i === versionIdx;
+                    return (
+                      <div
+                        key={i}
+                        className={`flex items-center rounded-full border text-sm backdrop-blur-md transition ${
+                          active
+                            ? "border-sky-400/60 bg-sky-400/15 font-medium text-(--cv-text)"
+                            : "border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] text-(--cv-muted)"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          title={v.source}
+                          onClick={() => pickVersion(i)}
+                          className="rounded-l-full py-2 pl-4 pr-2 transition hover:text-(--cv-text) active:scale-95"
+                        >
+                          {v.label}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSsVersionPreview(i)}
+                          aria-label={`Predogled akordov: ${v.label}`}
+                          title="Predogled akordov"
+                          className="mr-1 flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)] hover:text-(--cv-text) active:scale-95"
+                        >
+                          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSsVersionPreview(versionIdx)}
+                  className="flex items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] px-4 py-2 text-sm text-(--cv-muted) backdrop-blur-md transition hover:text-(--cv-text) active:scale-95"
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  Predogled akordov
+                </button>
+                </div>
+              )}
+              {ssVersionPreview !== null && versions?.[ssVersionPreview] && (() => {
+                const pv = versions[ssVersionPreview];
+                const parsed = splitDescription(parseChords(pv.main || !pv.chords_text ? chordsText : pv.chords_text));
+                const pvCapo = findCapo(parsed.description);
+                const allChords: string[] = [];
+                // Po delih: oznaka + akordi vsake vrstice (brez besedila).
+                const parts: { label: string; rows: string[] }[] = [];
+                for (const line of parsed.body) {
+                  if (line.kind === "section") {
+                    parts.push({ label: line.label, rows: [] });
+                    continue;
+                  }
+                  const names = (
+                    line.kind === "chords" ? line.chords.map((c) => c.name)
+                    : line.kind === "pair" ? line.chunks.map((c) => c.chord)
+                    : line.kind === "text" ? line.segments.map((s) => ("chord" in s ? s.chord : null))
+                    : line.kind === "tab" ? (line.header ?? []).map((c) => c.name)
+                    : []
+                  ).filter((n): n is string => !!n).map(display);
+                  if (!names.length) continue;
+                  names.forEach((n) => {
+                    if (!allChords.includes(n)) allChords.push(n);
+                  });
+                  if (!parts.length) parts.push({ label: "", rows: [] });
+                  parts[parts.length - 1].rows.push(names.join("  "));
+                }
+                return (
+                  <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+                    onClick={(e) => e.target === e.currentTarget && setSsVersionPreview(null)}
+                  >
+                    <div className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-white/10 bg-neutral-900/95 text-left text-neutral-200 shadow-2xl">
+                      <div className="flex items-center gap-3 border-b border-white/10 px-5 py-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-400">Predogled akordov</p>
+                          <p className="truncate text-sm font-medium text-white">{pv.label}</p>
+                        </div>
+                        <button type="button" onClick={() => setSsVersionPreview(null)} aria-label="Zapri" className="p-1 text-neutral-400 hover:text-white">
+                          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                            <path d="M18 6 6 18M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      <div className="overflow-y-auto px-5 py-4">
+                        {pvCapo !== null && <p className="mb-3 text-sm font-semibold text-orange-400">Capo: {pvCapo}. prag</p>}
+                        <div className="mb-4 flex flex-wrap gap-1.5">
+                          {allChords.map((c) => (
+                            <span key={c} className="rounded-lg bg-white/[0.06] px-2 py-0.5 font-mono text-sm text-(--cv-chord)">{c}</span>
+                          ))}
+                        </div>
+                        {parts
+                          .filter((p) => p.rows.length)
+                          .map((p, i) => (
+                            <div key={i} className="mb-3">
+                              {p.label && <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-400">{p.label}</p>}
+                              {p.rows.map((r, j) => (
+                                <p key={j} className="font-mono text-sm leading-relaxed text-(--cv-chord) whitespace-pre-wrap">{r}</p>
+                              ))}
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+              {/* Capo pred začetkom (nad bližnjicami), da ga ne spregledaš. Pri skladbah z
+                  verzijami vrstica vedno zasede prostor (nevidna brez capa), da se ob
+                  menjavi verzije nič ne premakne. */}
+              {(capo !== null || (versions && !follower)) && (
+                <p
+                  aria-hidden={capo === null}
+                  className={`mt-6 text-xl font-semibold text-orange-400 sm:text-2xl max-lg:landscape:mt-0! max-lg:landscape:text-base! ${capo === null ? "invisible" : ""}`}
+                >
+                  {capo === null ? "Capo" : capoShift ? `Brez capa (izvirno capo ${capo}, akordi +${capo})` : `Capo: ${capo}. prag`}
                 </p>
               )}
               {/* Bližnjice na tipkovnici pod Play — samo računalnik (miška, ≥ lg), ne za sledilca. */}
               {!follower && (
-                <div className={`${capo !== null ? "mt-2" : "mt-10"} hidden lg:pointer-fine:block`}>
+                <div className={`${capo !== null || versions ? "mt-2" : "mt-10"} hidden lg:pointer-fine:block`}>
                   <SamSpiliHotkeys
                     label="Bližnjice na tipkovnici"
                     buttonClassName="flex items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--cv-text)_16%,transparent)] px-4 py-2 text-sm text-(--cv-muted) backdrop-blur-md transition active:scale-95 bg-[color-mix(in_srgb,var(--cv-bg)_55%,transparent)] hover:bg-[color-mix(in_srgb,var(--cv-text)_10%,transparent)] hover:text-(--cv-text)"

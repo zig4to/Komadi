@@ -11,6 +11,7 @@ export default function AutoScrollControl({
   onPlayingChange,
   above,
   onPlayClick,
+  onPauseClick,
   controlRef,
   desktopSpeed,
 }: {
@@ -26,9 +27,11 @@ export default function AutoScrollControl({
   // Uporabnik je zagnal/nadaljeval pomikanje s klikom (klicano v istem kliku —
   // ChordsViewer vklopi celozaslonski način, ki ga brskalnik dovoli samo ob kliku).
   onPlayClick?: () => void;
+  // Klik na premor (ne samodejna ustavitev na koncu ali ob dotiku).
+  onPauseClick?: () => void;
   // Zagon od zunaj (ChordsViewer: ▶ v predvajalniku zažene tudi pomikanje).
   controlRef?: React.MutableRefObject<{ play: () => void; changeSpeed: (delta: number) => number } | null>;
-  // Začetna hitrost na računalniku (≥ 1024 px); sicer 5.
+  // Začetna hitrost na računalniku (≥ 1024 px); sicer 3.
   desktopSpeed?: number;
 }) {
   // Samodejno pomikanje: "autoScrollStarted" je enosmerno stikalo (krogec ->
@@ -39,7 +42,7 @@ export default function AutoScrollControl({
   const [autoScrollStarted, setAutoScrollStarted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(() =>
-    desktopSpeed != null && typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches ? desktopSpeed : 5,
+    desktopSpeed != null && typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches ? desktopSpeed : 3,
   );
   const speedRef = useRef(speed);
   const rafIdRef = useRef<number | null>(null);
@@ -321,6 +324,7 @@ export default function AutoScrollControl({
         type="button"
         onClick={() => {
           if (!isPlaying) onPlayClick?.();
+          else onPauseClick?.();
           setIsPlaying((p) => !p);
         }}
         aria-label={isPlaying ? "Premor" : "Nadaljuj"}

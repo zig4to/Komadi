@@ -213,7 +213,8 @@ export default function ImproPanel({
                   {chevron("M9 6l6 6-6 6")}
                 </button>
               </div>
-              <div className="min-w-0 flex-1 text-xs text-neutral-500">
+              {/* Telefon: opis v svoji vrstici pod ‹ seznam lestvic ›. */}
+              <div className="min-w-0 flex-1 text-xs text-neutral-500 max-lg:basis-full">
                 {groups.find((g) => g.options.includes(current))?.label}
                 {current.note ? ` · ${current.note}` : ""} · {Math.round(current.fit * 100)} % tonov akordov skladbe je v lestvici · {index + 1}/{flat.length}
               </div>
