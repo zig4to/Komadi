@@ -522,8 +522,6 @@ export default function ChordsViewer({
     return { ...parts, capo: findCapo(parts.description) };
   }, [shownText]);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
-  // Celozaslonski način med samodejnim pomikanjem (AutoScrollControl onPlayingChange).
-  const [fullscreen, setFullscreen] = useState(false);
   // Mini predvajalnik: youtube_url (za tuje pogosto lyric video), sicer YouTube Music.
   const watchUrl = youTubeVideoId(song.youtube_url) ? song.youtube_url : song.youtube_music_url;
   // Kandidati po vrsti: video, ki je pri tej skladbi že deloval (zapomnjen v
@@ -1425,7 +1423,8 @@ export default function ChordsViewer({
   // Zgornji vrstici skrite: med samodejnim pomikanjem (samo telefon) ali v
   // celozaslonskem načinu. Na računalniku sta sicer vedno vidni (tudi ob drsenju).
   const desktopBars = useIsDesktop();
-  const barsHidden = (fullscreen && !desktopBars) || isFullscreen || !!remote?.fullscreen;
+  // Autoscroll vrstic ne skrije več (tudi na telefonu ne, 2026-10-29).
+  const barsHidden = isFullscreen || !!remote?.fullscreen;
 
   // Drsenje: zgornji vrstici sta lepljivi (sticky) prvi del pomičnega besedila.
   // Navzdol ju besedilo naravno odrine gor (kot filtri v aplikaciji Kam — brez
@@ -6453,7 +6452,6 @@ export default function ChordsViewer({
         <AutoScrollControl
           scrollRef={scrollRef}
           speedFactor={2.5}
-          onPlayingChange={setFullscreen}
           above={fontButtons}
           controlRef={autoScrollCtlRef}
           desktopSpeed={2}
