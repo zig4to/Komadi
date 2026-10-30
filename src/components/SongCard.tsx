@@ -337,10 +337,15 @@ export default function SongCard({
             const img = e.currentTarget;
             if (img.naturalHeight > img.naturalWidth) setPortraitSrc(authorImage);
           }}
-          className={`pointer-events-none absolute object-cover opacity-95 lg:opacity-90 dark:opacity-75 dark:grayscale-[10%] dark:lg:opacity-55 ${IMAGE_CLASS}`}
+          className={`pointer-events-none absolute object-cover opacity-95 lg:opacity-90 dark:opacity-75 dark:grayscale-[10%] dark:lg:opacity-55 ${IMAGE_CLASS} ${
+            // Adi Smolar: na telefonu slika malo nižje, da lasje na vrhu niso odrezani (uporabnik, 2026-10-30).
+            song.author === "Adi Smolar" ? "object-[right_center] max-lg:object-[right_25%]" : ""
+          }`}
           style={{
             zIndex: -1,
-            objectPosition: portraitSrc === authorImage ? `right ${PORTRAIT_FOCUS_Y}` : "right center",
+            ...(song.author === "Adi Smolar"
+              ? {}
+              : { objectPosition: portraitSrc === authorImage ? `right ${PORTRAIT_FOCUS_Y}` : "right center" }),
           }}
         />
       )}
