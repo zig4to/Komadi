@@ -399,6 +399,8 @@ export default function Dashboard({ user }: { user: User }) {
   const [knownOpen, setKnownOpen] = usePersistentBool("komadi:known:open", false);
   // Iskanje na strani Preverjeno špila (samo po njenih skladbah; tudi listanje ‹ › v akordih gre po zadetkih).
   const [verifiedQuery, setVerifiedQuery] = useState("");
+  // Iskanje na strani Pregled in odobritev (samo računalnik; samo po skladbah v pregledu).
+  const [reviewQuery, setReviewQuery] = useState("");
   // Iskanje na strani Vsi komadi (samo po njenih skladbah).
   const [allPageQuery, setAllPageQuery] = useState("");
   // "Vse skladbe": celostranski seznam vse knjižnice (klik na kartico statistike).
@@ -3347,7 +3349,9 @@ export default function Dashboard({ user }: { user: User }) {
           ? renderPageSearch(verifiedQuery, setVerifiedQuery, "Išči po preverjenih skladbah")
           : allSongsOpen
             ? renderPageSearch(allPageQuery, setAllPageQuery, "Išči po vseh skladbah")
-            : null;
+            : reviewOpen
+              ? <div className="hidden lg:block">{renderPageSearch(reviewQuery, setReviewQuery, "Išči po skladbah v pregledu")}</div>
+              : null;
         return pageSearch ? (
           <div className="mt-3! flex flex-col gap-3 lg:flex-row lg:items-center">
             {nav("")}
@@ -4085,7 +4089,7 @@ export default function Dashboard({ user }: { user: User }) {
                 )}
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {reviewSongs.map((song) => (
+                {reviewSongs.filter((s) => matchesSearch(searchWords(reviewQuery), s.title, s.author)).map((song) => (
                   <div
                     key={song.id}
                     className="overflow-hidden rounded-2xl border-2 border-teal-500/60 bg-teal-500/[0.06] shadow-sm dark:border-white/10 dark:bg-white/[0.035]"
@@ -4118,7 +4122,16 @@ export default function Dashboard({ user }: { user: User }) {
                           ? "· pripravljena"
                           : `· ${[song.verified_chords_at ? "✓ akordi" : null, song.verified_player_at ? "✓ predvajalnik" : null].filter(Boolean).join(", ") || "ni preverjena"}`}
                       </span>
-                      <span className="ml-auto font-medium text-teal-700/80 dark:text-teal-300/80">
+                      {/* Značka E: lahka skladba za spedenaj (songs.easy). */}
+                      {song.easy && (
+                        <span
+                          title="Lahka skladba (brez dolgega intra, solov in premorov)"
+                          className="ml-auto flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-teal-600 text-[10px] font-bold leading-none text-white dark:bg-teal-400 dark:text-neutral-900"
+                        >
+                          E
+                        </span>
+                      )}
+                      <span className={`${song.easy ? "" : "ml-auto "}font-medium text-teal-700/80 dark:text-teal-300/80`}>
                         {new Date(song.created_at).toLocaleDateString("sl-SI")}
                       </span>
                       <svg

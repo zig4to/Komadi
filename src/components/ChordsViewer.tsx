@@ -1548,7 +1548,9 @@ export default function ChordsViewer({
     const desktop = window.matchMedia("(min-width: 1024px)").matches;
     const bar = toolbarRef.current;
     const content = scrollRef.current;
-    const ref = playerRowRef.current?.querySelector("button");
+    // Prvi viden gumb (Smart play / ▶) — skriti gumb Sam Špili za telefon (lg:hidden)
+    // ima širino 0 in levi rob 0, zato je besedilo zdrsnilo čisto na levi rob.
+    const ref = [...(playerRowRef.current?.querySelectorAll("button") ?? [])].find((b) => b.getBoundingClientRect().width > 0);
     const strip = barsOuterRef.current;
     if (!desktop || !ref) {
       if (bar) bar.style.paddingLeft = "";
@@ -3790,6 +3792,7 @@ export default function ChordsViewer({
   };
   // Gumb "Sam Špili" (računalnik: orodna vrstica, Povezave; telefon: zgornja vrstica
   // levo od Smart playa). Celozaslonsko + ležeče v istem kliku, kot iz menija Akordi.
+  const ssTopButton = hasSamSpili(song) && !recorder && !follower;
   const samSpiliButton = (sizeClass: string) => (
     <button
       type="button"
@@ -4769,7 +4772,7 @@ export default function ChordsViewer({
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-neutral-900/55 backdrop-blur-xl backdrop-saturate-150 lg:hidden" />
       <div ref={playerRowRef} className="flex shrink-0 items-center justify-between gap-3 bg-neutral-900 px-4 py-2 max-lg:bg-transparent lg:px-12 lg:[zoom:1.35]">
         {/* Telefon: Sam Špili čisto levo zgoraj, pred Smart playem (2026-10-29). */}
-        {hasSamSpili(song) && !recorder && !follower && samSpiliButton("-mr-1 flex h-8 w-8 shrink-0 lg:hidden")}
+        {ssTopButton && samSpiliButton("-mr-1 flex h-8 w-8 shrink-0 lg:hidden")}
         {/* Tudi brez kandidatov: v izbirniku posnetka lahko prilepiš povezavo. */}
         <YouTubeMiniPlayer
             videoIds={offsetLocked && lockedVideo ? [lockedVideo] : videoIds}
