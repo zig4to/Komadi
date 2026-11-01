@@ -1,5 +1,5 @@
 // v4: ob posodobitvi pobriše stare predpomnilnike (stari manifest "standalone").
-const CACHE_NAME = "komadi-cache-v7";
+const CACHE_NAME = "komadi-cache-v8";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
