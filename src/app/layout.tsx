@@ -58,6 +58,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {children}
         <RegisterServiceWorker />
         <Script src="/install-promo.js" strategy="afterInteractive" />
+        {/* gumb nazaj na ploščo Bitneverse (samo v oknu nameščene plošče) */}
+        <Script src="/TomsStudios/hub-back.js" strategy="afterInteractive" />
       </body>
     </html>
   );
