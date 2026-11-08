@@ -1,7 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 
 // Ime uporabnika iz user_metadata v več oblikah: first/last_name (registracija
-// v Komadi ali hubu TomStudios), sicer given/family_name ali enotno
+// v Komadi ali hubu Bitneverse), sicer given/family_name ali enotno
 // full_name/name/display_name. Prazen niz, če imena ni.
 export function fullNameFor(user: User): string {
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>;

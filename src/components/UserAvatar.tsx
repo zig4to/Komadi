@@ -7,7 +7,7 @@ import { fullNameFor, initialsFor } from "@/lib/userName";
 
 // Razdelek "Uporabnik" na vrhu menija ⋮ (SettingsMenu.tsx): krog z
 // začetnicami, ime in e-pošta, obrazec za ime (če ga ni) in odjava — enako
-// kot v hubu TomStudios (auth.js). Ime in začetnice: src/lib/userName.ts.
+// kot v hubu Bitneverse (auth.js). Ime in začetnice: src/lib/userName.ts.
 export default function UserMenuSection({ user: initialUser }: { user: User }) {
   const [user, setUser] = useState(initialUser);
   const [open, setOpen] = useState(false);

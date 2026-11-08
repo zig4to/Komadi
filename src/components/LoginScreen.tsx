@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
-// Prijava / registracija / pozabljeno geslo — enako kot v hubu TomStudios
+// Prijava / registracija / pozabljeno geslo — enako kot v hubu Bitneverse
 // (TomsStudios/auth.js): e-pošta + geslo, registracija samo za povabljene
 // (tabela allowed_emails, sprožilec na auth.users zavrne ostale), ime in
 // priimek v user_metadata (first_name/last_name).
@@ -194,7 +194,7 @@ export default function LoginScreen({
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-semibold tracking-tight">Bitne Tabs</h1>
           <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-            Prijava z računom TomStudios
+            Prijava z računom Bitneverse
           </p>
         </div>
 

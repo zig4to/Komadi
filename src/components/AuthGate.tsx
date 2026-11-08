@@ -8,7 +8,7 @@ import GuestJam from "@/components/GuestJam";
 import { guestTokenFromUrl } from "@/lib/guestLink";
 import { isSupabaseConfigured, supabase } from "@/lib/supabaseClient";
 
-// Obvezna prijava (isti Supabase Auth kot hub TomStudios, glej
+// Obvezna prijava (isti Supabase Auth kot hub Bitneverse, glej
 // TomsStudios/auth.js in docs/sso-integration-recipe.md). Na
 // zig4to.github.io si Komadi s hubom delijo izvor in s tem localStorage, zato
 // getSession() sam najde sejo huba — supabaseClient.ts zato NE sme nastaviti

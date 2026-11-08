@@ -211,7 +211,7 @@ Po izbiri datoteke se prikaže povzetek (koliko skladb, morebitna opozorila) —
 
 ## Prijava uporabnikov
 
-Aplikacija zahteva prijavo z računom **TomStudios** (isti Supabase projekt in Supabase Auth kot hub `TomsStudios`). Registracija je omejena na povabljene: e-pošto je treba prej dodati v tabelo `allowed_emails` (glej `TomsStudios/supabase/001_allowed_emails.sql`). Na `zig4to.github.io` si Komadi s hubom delijo sejo, zato je uporabnik, prijavljen v hubu, prijavljen tudi tu. Povezava iz drugega izvora lahko sejo prinese v hashu (`#sb_at=…&sb_rt=…`).
+Aplikacija zahteva prijavo z računom **Bitneverse** (isti Supabase projekt in Supabase Auth kot hub `TomsStudios`). Registracija je omejena na povabljene: e-pošto je treba prej dodati v tabelo `allowed_emails` (glej `TomsStudios/supabase/001_allowed_emails.sql`). Na `zig4to.github.io` si Komadi s hubom delijo sejo, zato je uporabnik, prijavljen v hubu, prijavljen tudi tu. Povezava iz drugega izvora lahko sejo prinese v hashu (`#sb_at=…&sb_rt=…`).
 
 Vsak uporabnik ima **svojo knjižnico** (skladbe, Jam, Mojih 20, playliste, čakalna vrsta, prijave napak). Nov uporabnik začne prazen. Gumb **"Skupno"** pokaže skladbe vseh drugih uporabnikov: v meniju kartice je "Uvozi v mojo knjižnico", nad seznamom pa "Uvozi vse prikazane". Slike avtorjev (`author_images`) so skupne.
 
