@@ -1,4 +1,4 @@
--- Prijava uporabnikov (skupni Supabase Auth s hubom TomStudios).
+-- Prijava uporabnikov (skupni Supabase Auth s hubom Bitneverse).
 --
 -- Vsak uporabnik ima svojo knjižnico: vse tabele dobijo user_id in RLS
 -- "samo lastne vrstice". Izjema je SELECT na songs, ki je odprt za vse
@@ -7,7 +7,7 @@
 -- .eq("user_id", <moj id>). author_images ostane skupna tabela.
 --
 -- Obstoječe vrstice posvoji račun ziga.skater@gmail.com — ta mora pred
--- zagonom že obstajati (enkrat se prijavi/registriraj v hubu TomStudios),
+-- zagonom že obstajati (enkrat se prijavi/registriraj v hubu Bitneverse),
 -- sicer se migracija prekine in se nič ne spremeni.
 --
 -- Zaženi ob objavi nove verzije aplikacije: stara verzija (brez prijave)

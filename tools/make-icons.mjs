@@ -1,6 +1,6 @@
-// Ikone aplikacije (PWA, favicon, apple-touch) v istem slogu kot TomStudios:
+// Ikone aplikacije (PWA, favicon, apple-touch) v istem slogu kot Bitneverse:
 // navaden diagonalni preliv barv aplikacije (roza #ec4899 → oranžna #f97316, kot
-// kartica Komadi v TomStudios), zaobljen kvadrat (r = 7/24), bel znak — trzalica.
+// kartica Komadi v Bitneverse), zaobljen kvadrat (r = 7/24), bel znak — trzalica.
 // Zagon:  node tools/make-icons.mjs                 → public/icons/ (izbrani VARIANT)
 //         node tools/make-icons.mjs --preview f.png → pregled vseh različic
 // (sharp je že v node_modules prek Next.)
@@ -67,7 +67,7 @@ const COLORS = "t_rdeca";
 const GLYPH = 1.21;
 // Telefon (maskable + apple-touch): sistem ikono obreže v krog/zaobljen kvadrat in jo prikaže
 // čez cel kvadrat, zato je znak tam manjši (uporabnik 2026-10-25: na telefonu je bila prevelika).
-const GLYPH_PHONE = 0.72; // enako visoka kot znak na nameščeni ikoni TomStudios (~41 %)
+const GLYPH_PHONE = 0.72; // enako visoka kot znak na nameščeni ikoni Bitneverse (~41 %)
 
 // Trzalica s konico spodaj, v koordinatah 0–512, središče ~ (256, 258), višina 292.
 const PICK = "M256 112 C372 112 410 168 388 236 C366 304 306 372 256 404 C206 372 146 304 124 236 C102 168 140 112 256 112 Z";
